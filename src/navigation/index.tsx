@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import AuthNavigation from './AuthNavigation';
+import MainNavigation from './MainNavigation';
 // import MainNavigator from './MainNavigator';
 
 const AppNavigator: React.FC = () => {
@@ -8,7 +9,7 @@ const AppNavigator: React.FC = () => {
 
   return (
     <NavigationContainer>
-      <AuthNavigation />
+      {isLoggedIn ? <MainNavigation /> : <AuthNavigation />}
     </NavigationContainer>
   );
 };

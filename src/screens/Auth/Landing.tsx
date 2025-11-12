@@ -7,7 +7,9 @@ import {
 } from 'react-native';
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 const bgImage: any = require('../../assets/images/landing-bg.jpg');
+
 interface Props {
   navigation: {
     navigate: (screen: string) => void;
@@ -16,7 +18,7 @@ interface Props {
 
 const Landing = ({ navigation }: Props) => {
   return (
-    <SafeAreaView>
+    <View>
       <ImageBackground
         source={bgImage}
         resizeMode="cover"
@@ -28,7 +30,7 @@ const Landing = ({ navigation }: Props) => {
       >
         <View className="flex-1 justify-between items-center py-20">
           <View className="justify-center items-center gap-5">
-            <Text className="font-montserrat-bold text-white text-5xl">
+            <Text className="font-montserrat-bold text-white text-5xl leading-tight">
               Epocheye
             </Text>
             <Text className="text-white text-center font-montserrat-bold text-xl">
@@ -57,8 +59,8 @@ const Landing = ({ navigation }: Props) => {
           </View>
         </View>
       </ImageBackground>
-      <StatusBar barStyle="light-content" backgroundColor="black" />
-    </SafeAreaView>
+      <StatusBar hidden />
+    </View>
   );
 };
 
