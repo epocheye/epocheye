@@ -5,7 +5,7 @@ import MainNavigation from './MainNavigation';
 // import MainNavigator from './MainNavigator';
 
 const AppNavigator: React.FC = () => {
-  const isLoggedIn: boolean = false; // Replace with actual authentication logic
+  const isLoggedIn: boolean = true; // Replace with actual authentication logic
 
   return (
     <NavigationContainer>
