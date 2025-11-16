@@ -64,7 +64,7 @@ const Home = () => {
       </View>
 
       {/* Render selected view */}
-      {select === 'Map' ? <Camera /> : <Camera />}
+      {select === 'Map' ? <Map /> : <Camera />}
       <StatusBar hidden />
     </SafeAreaView>
   );
