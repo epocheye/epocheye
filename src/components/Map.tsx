@@ -2,7 +2,7 @@ import { StyleSheet, View, Dimensions } from 'react-native';
 import React, { useMemo, useState } from 'react';
 import MapView, { PROVIDER_GOOGLE, Marker, Region } from 'react-native-maps';
 import { GOOGLE_MAPS_API_KEY } from '@env';
-
+import mapStyle from '../content/mapstyle.json';
 const DEFAULT_REGION: Region = {
   latitude: 28.6139,
   longitude: 77.209,
@@ -24,6 +24,7 @@ const Map = () => {
         provider={PROVIDER_GOOGLE}
         style={styles.map}
         initialRegion={DEFAULT_REGION}
+        customMapStyle={mapStyle}
         showsUserLocation
         showsMyLocationButton
         loadingEnabled
@@ -51,7 +52,7 @@ const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     width: width - 40,
-    height: height * 0.7,
+    height: height * 0.65,
     borderRadius: 20,
     overflow: 'hidden',
     justifyContent: 'center',

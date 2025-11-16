@@ -1,8 +1,15 @@
-import { Image, StatusBar, Text, View, TouchableOpacity } from 'react-native';
+import {
+  Image,
+  StatusBar,
+  Text,
+  View,
+  TouchableOpacity,
+  TextInput,
+} from 'react-native';
 import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePermissionCheck } from '../../utils/usePermissionCheck';
-import { UserCircle } from 'lucide-react-native';
+import { AudioLines, Search, UserCircle } from 'lucide-react-native';
 import Map from '../../components/Map';
 import Camera from '../../components/Camera';
 
@@ -20,10 +27,10 @@ const Home = () => {
         <UserCircle size={28} color="#FFFFFF" />
       </View>
       <View className="justify-center items-center mt-10 mb-5">
-        <Text className="text-white text-3xl leading-tight font-montserrat-medium text-center">
-          Good Morning Sambit
+        <Text className="text-white text-3xl leading-tight font-montserrat-bold text-center">
+          Good Evening, Sambit
         </Text>
-        <Text className="text-white text-base mt-2 font-montserrat-semibold text-center px-4">
+        <Text className="text-white text-base mt-2 font-montserrat-medium text-center px-4">
           Where do you want to visit today?
         </Text>
       </View>
@@ -65,6 +72,15 @@ const Home = () => {
 
       {/* Render selected view */}
       {select === 'Map' ? <Map /> : <Camera />}
+      <View className="justify-between items-center w-full bg-[#222222] border border-[#464646] my-7 rounded-full py-2 px-5 flex-row">
+        <Search size={26} color="white" />
+        <TextInput
+          placeholder="Search any Location"
+          placeholderTextColor="#888888"
+          className=" text-white ml-3 font-montserrat-medium"
+        />
+        <AudioLines size={26} color="white" />
+      </View>
       <StatusBar hidden />
     </SafeAreaView>
   );
