@@ -123,7 +123,7 @@ export default Camera;
 const styles = StyleSheet.create({
   container: {
     width: width - 40,
-    height: height * 0.7,
+    height: height * 0.65,
     borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: '#1a1a1a',

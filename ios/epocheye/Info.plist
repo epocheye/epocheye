@@ -42,6 +42,10 @@
 	<string>EpochEye needs access to your photo library to save and share your AR captures.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>EpochEye needs permission to save AR captures to your photo library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>EpochEye needs microphone access for voice search functionality.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>EpochEye needs speech recognition to enable voice search for locations.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
