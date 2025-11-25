@@ -9,8 +9,8 @@ const Explore = () => {
   const [select, setSelect] = useState('Map');
   return (
     <SafeAreaView className="flex-1 bg-[#111111] px-5 pt-6">
-      <Text className="text-white text-3xl font-montserrat-medium mb-4 text-center">
-        Explore the Map
+      <Text className="text-white text-2xl font-montserrat-medium mb-4 text-center">
+        Discover Places Around You
       </Text>
       <View className="w-full flex-row justify-center mb-6">
         <View className="flex-row items-center bg-black/60 rounded-full p-1">

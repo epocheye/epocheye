@@ -1,10 +1,11 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Home from '../screens/Main/Home';
-import Saved from '../screens/Main/Saved';
 import Explore from '../screens/Main/Explore';
-import Profile from '../screens/Main/Profile';
-import { HomeIcon, Bookmark, Map, UserRound } from 'lucide-react-native';
+import Challenges from '../screens/Main/Challenges.tsx';
+import Saved from '../screens/Main/Saved';
+import SettingsScreen from '../screens/Main/SettingsScreen';
+import { HomeIcon, Bookmark, Map, Trophy, Settings } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
 
@@ -14,14 +15,14 @@ const TabNavigation = () => {
       initialRouteName="Home"
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
         tabBarActiveTintColor: '#FFFFFF',
         tabBarInactiveTintColor: '#777777',
         tabBarStyle: {
-          backgroundColor: '#111111',
-          borderTopColor: '#111111',
-          paddingVertical: 8,
-          height: 65,
+          backgroundColor: '#111',
+          borderTopColor: '#151526',
+          paddingVertical: 6,
+          height: 60,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -34,19 +35,22 @@ const TabNavigation = () => {
               return <HomeIcon color={color} size={iconSize} />;
             case 'Explore':
               return <Map color={color} size={iconSize} />;
+            case 'Challenges':
+              return <Trophy color={color} size={iconSize} />;
             case 'Saved':
               return <Bookmark color={color} size={iconSize} />;
-            case 'Profile':
+            case 'Settings':
             default:
-              return <UserRound color={color} size={iconSize} />;
+              return <Settings color={color} size={iconSize} />;
           }
         },
       })}
     >
       <Tab.Screen name="Home" component={Home} />
       <Tab.Screen name="Explore" component={Explore} />
+      <Tab.Screen name="Challenges" component={Challenges} />
       <Tab.Screen name="Saved" component={Saved} />
-      <Tab.Screen name="Profile" component={Profile} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );
 };
