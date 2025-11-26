@@ -29,7 +29,7 @@ const Email = ({ navigation }: any) => {
       duration: 200,
       useNativeDriver: true,
     }).start(() => {
-      // Change step or navigate to permissions
+      // Change step or navigate to onboarding
       if (step < 4) {
         setStep(step + 1);
         // Fade in animation
@@ -39,8 +39,8 @@ const Email = ({ navigation }: any) => {
           useNativeDriver: true,
         }).start();
       } else {
-        // Navigate to Permissions page when "Create Account" is pressed
-        navigation.navigate('Permissions', { fromAuth: true });
+        // Navigate to Onboarding Flow after account creation
+        navigation.navigate('OnboardingFlow');
       }
     });
   };

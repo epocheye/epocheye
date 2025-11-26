@@ -28,19 +28,133 @@ const profilePlaceholder = require('../../assets/images/logo-white.png');
 const TRENDING_SITES = [
   {
     id: 'site-1',
-    name: 'Humayun’s Tomb',
+    name: "Humayun's Tomb",
     location: 'Delhi, India',
     fact: 'Mughal architecture masterpiece from 1570.',
     image:
       'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80',
+    fullData: {
+      id: 'humayuns-tomb',
+      name: "Humayun's Tomb",
+      location: 'Nizamuddin East, Delhi, India',
+      era: 'Mughal Era',
+      style: 'Persian-Mughal Architecture',
+      yearBuilt: '1570 CE',
+      distance: '2.4 km',
+      estimatedTime: '45 min',
+      heroImages: [
+        'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1585135497273-1a86b09fe70e?auto=format&fit=crop&w=1200&q=80',
+      ],
+      shortDescription:
+        "Humayun's Tomb is a UNESCO World Heritage Site and the tomb of the Mughal Emperor Humayun, commissioned by Empress Bega Begum in 1558.",
+      fullDescription:
+        "Humayun's Tomb is a UNESCO World Heritage Site and the tomb of the Mughal Emperor Humayun. It was commissioned by his first wife, Empress Bega Begum, in 1558, and designed by Persian architects.",
+      funFacts: [
+        {
+          id: 'fact-1',
+          icon: 'star',
+          title: 'Inspiration for Taj Mahal',
+          description:
+            'This tomb inspired the Taj Mahal, built 70 years later.',
+        },
+        {
+          id: 'fact-2',
+          icon: 'compass',
+          title: 'Perfect Symmetry',
+          description: 'The tomb is perfectly symmetrical on all four sides.',
+        },
+        {
+          id: 'fact-3',
+          icon: 'flower',
+          title: 'Char Bagh Garden',
+          description:
+            'The Persian-style garden is divided into 36 square plots.',
+        },
+      ],
+      visitorTips: [
+        'Best visited during early morning.',
+        'Carry water during summer months.',
+        'Hire a local guide for deeper insights.',
+      ],
+      relatedSites: [
+        {
+          id: 'related-1',
+          name: 'Taj Mahal',
+          location: 'Agra, India',
+          image:
+            'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=400&q=80',
+          distance: '210 km',
+        },
+        {
+          id: 'related-2',
+          name: 'Qutub Minar',
+          location: 'Delhi, India',
+          image:
+            'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=400&q=80',
+          distance: '12 km',
+        },
+      ],
+      rating: 4.8,
+      reviews: 2847,
+    },
   },
   {
     id: 'site-2',
     name: 'Qutub Minar',
     location: 'Delhi, India',
-    fact: 'World’s tallest brick minaret at 73 meters.',
+    fact: "World's tallest brick minaret at 73 meters.",
     image:
       'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=800&q=80',
+    fullData: {
+      id: 'qutub-minar',
+      name: 'Qutub Minar',
+      location: 'Mehrauli, Delhi, India',
+      era: 'Delhi Sultanate',
+      style: 'Indo-Islamic Architecture',
+      yearBuilt: '1193 CE',
+      distance: '8.5 km',
+      estimatedTime: '60 min',
+      heroImages: [
+        'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&q=80',
+      ],
+      shortDescription:
+        'The Qutub Minar is a 73-meter tall minaret built in 1193. It is a UNESCO World Heritage Site.',
+      fullDescription:
+        'The Qutub Minar is a 73-meter tall minaret that forms part of the Qutb complex, a UNESCO World Heritage Site in Mehrauli, South Delhi.',
+      funFacts: [
+        {
+          id: 'fact-1',
+          icon: 'star',
+          title: 'Tallest Brick Minaret',
+          description:
+            'At 73 meters, it is the tallest brick minaret in the world.',
+        },
+        {
+          id: 'fact-2',
+          icon: 'compass',
+          title: 'Leaning Tower',
+          description: 'The tower has a slight tilt of about 65 cm.',
+        },
+      ],
+      visitorTips: [
+        'Visit early morning to avoid crowds.',
+        'The Iron Pillar nearby is equally fascinating.',
+      ],
+      relatedSites: [
+        {
+          id: 'related-1',
+          name: "Humayun's Tomb",
+          location: 'Delhi, India',
+          image:
+            'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=400&q=80',
+          distance: '12 km',
+        },
+      ],
+      rating: 4.6,
+      reviews: 3521,
+    },
   },
   {
     id: 'site-3',
@@ -49,6 +163,54 @@ const TRENDING_SITES = [
     fact: 'Mughal palace fort and UNESCO site.',
     image:
       'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80',
+    fullData: {
+      id: 'red-fort',
+      name: 'Red Fort',
+      location: 'Old Delhi, India',
+      era: 'Mughal Era',
+      style: 'Mughal Architecture',
+      yearBuilt: '1648 CE',
+      distance: '5.2 km',
+      estimatedTime: '90 min',
+      heroImages: [
+        'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=1200&q=80',
+      ],
+      shortDescription:
+        'The Red Fort is a historic fort in Old Delhi that served as the main residence of the Mughal Emperors.',
+      fullDescription:
+        'The Red Fort is a historic fort in Old Delhi, India, that served as the main residence of the Mughal Emperors. Emperor Shah Jahan commissioned construction of the Red Fort on 12 May 1638.',
+      funFacts: [
+        {
+          id: 'fact-1',
+          icon: 'star',
+          title: 'Independence Day',
+          description:
+            'The Prime Minister hoists the flag here every Independence Day.',
+        },
+        {
+          id: 'fact-2',
+          icon: 'compass',
+          title: 'Massive Walls',
+          description: 'The walls extend for 2.41 km and are up to 33 m high.',
+        },
+      ],
+      visitorTips: [
+        'Evening sound and light show is a must-see.',
+        'Combine with a walk through Chandni Chowk.',
+      ],
+      relatedSites: [
+        {
+          id: 'related-1',
+          name: 'Jama Masjid',
+          location: 'Delhi, India',
+          image:
+            'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=400&q=80',
+          distance: '0.5 km',
+        },
+      ],
+      rating: 4.5,
+      reviews: 5234,
+    },
   },
 ];
 
@@ -62,7 +224,7 @@ const BADGES = [
 const DAILY_FACTS = [
   'Did you know? The sound of a clap made at the entrance of the Gol Gumbaz can be heard on the other side of the dome due to its whispering gallery.',
   'The Konark Sun Temple was shaped like a colossal chariot with 24 wheels, each 12 feet in diameter, pulled by seven horses.',
-  'The Ajanta Caves hold some of the oldest paintings in India, dating back to the 2nd century BCE, depicting Buddha’s previous lives.',
+  "The Ajanta Caves hold some of the oldest paintings in India, dating back to the 2nd century BCE, depicting Buddha's previous lives.",
 ];
 
 const Home = ({ navigation }: any) => {
@@ -84,6 +246,10 @@ const Home = ({ navigation }: any) => {
   const handleNextFact = () => {
     setFactIndex(prev => (prev + 1) % DAILY_FACTS.length);
     setFactVisible(true);
+  };
+
+  const handleStartTour = (site: any) => {
+    navigation.navigate('SiteDetail', { site: site.fullData });
   };
 
   return (
@@ -112,24 +278,6 @@ const Home = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Scan Monument CTA */}
-        {/* <TouchableOpacity
-          activeOpacity={0.9}
-          className="bg-[#FF7A18] rounded-3xl px-6 py-1 shadow-lg shadow-black/40 mb-8"
-          onPress={() => navigation.navigate('Explore')}
-        >
-          <View className="flex-row items-center justify-between">
-            <View className="flex-1 pr-4">
-              <Text className="text-white text-xl font-montserrat-bold">
-                Scan
-              </Text>
-            </View>
-            <View className="size-12 rounded-full bg-white/20 items-center justify-center">
-              <Camera color="#FFFFFF" size={22} />
-            </View>
-          </View>
-        </TouchableOpacity> */}
 
         {/* Trending Sites */}
         <View className="flex-row items-center justify-between mb-4">
@@ -178,7 +326,10 @@ const Home = ({ navigation }: any) => {
                   <Text className="text-white/85 text-sm font-montserrat-regular mt-3">
                     {site.fact}
                   </Text>
-                  <TouchableOpacity className="mt-4 bg-white/90 rounded-full py-2 px-4 flex-row items-center self-start">
+                  <TouchableOpacity
+                    onPress={() => handleStartTour(site)}
+                    className="mt-4 bg-white/90 rounded-full py-2 px-4 flex-row items-center self-start"
+                  >
                     <Text className="text-black text-sm font-montserrat-semibold">
                       Start Tour
                     </Text>

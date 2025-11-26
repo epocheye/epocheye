@@ -47,7 +47,6 @@ const Permissions = ({ navigation: navProp, route: routeProp }: any) => {
   const isFromAuth = route.params?.fromAuth ?? false;
 
   useEffect(() => {
-    console.log('Permissions screen mounted');
     // Check current permission status on mount
     checkCurrentPermissions();
 
@@ -74,9 +73,8 @@ const Permissions = ({ navigation: navProp, route: routeProp }: any) => {
 
   const checkCurrentPermissions = async () => {
     try {
-      console.log('Checking current permissions...');
       const status = await checkAllPermissions();
-      console.log('Current permission status:', status);
+
       setPermissionStatus(status);
     } catch (error) {
       console.error('Error checking current permissions:', error);
@@ -84,18 +82,15 @@ const Permissions = ({ navigation: navProp, route: routeProp }: any) => {
   };
 
   const handleGrantPermissions = async () => {
-    console.log('Grant permissions button pressed');
     setIsLoading(true);
     setShowWarning(false);
 
     try {
-      console.log('Starting permission request...');
       const result = await requestAllPermissions();
-      console.log('Permission request completed:', result);
+
       setPermissionStatus(result);
 
       if (areAllPermissionsGranted(result)) {
-        console.log('All permissions granted, navigating...');
         // All permissions granted - navigate based on context
         if (isFromAuth) {
           // Coming from signup flow - go to Login
@@ -105,15 +100,12 @@ const Permissions = ({ navigation: navProp, route: routeProp }: any) => {
           navigation.goBack();
         }
       } else {
-        console.log('Some permissions denied');
         // Some permissions denied - show warning
         setShowWarning(true);
       }
     } catch (error) {
-      console.error('Error requesting permissions:', error);
       setShowWarning(true);
     } finally {
-      console.log('Setting loading to false');
       setIsLoading(false);
     }
   };
