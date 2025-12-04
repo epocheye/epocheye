@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import React, { useState, useRef } from 'react';
 
-const Google = require('../assets/images/Google.png');
+const Google = require('../assets/images/Google.webp');
 
 const Email = ({ navigation }: any) => {
   const [step, setStep] = useState(1); // 1: name, 2: email, 3: password, 4: confirm password

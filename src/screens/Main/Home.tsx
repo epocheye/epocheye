@@ -6,6 +6,7 @@ import {
   ScrollView,
   Image,
   ImageBackground,
+  Pressable,
 } from 'react-native';
 import React, { useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -237,7 +238,7 @@ const Home = ({ navigation }: any) => {
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
+    if (hour < 16) return 'Good afternoon';
     return 'Good evening';
   }, []);
 
@@ -266,7 +267,7 @@ const Home = ({ navigation }: any) => {
               {greeting},
             </Text>
             <Text className="text-white text-3xl font-montserrat-bold mt-1">
-              Sambit
+              Sambit Singha
             </Text>
             <Text className="text-[#8D8D92] text-base font-montserrat-medium mt-1">
               Ready to unlock a new monument?
@@ -307,7 +308,11 @@ const Home = ({ navigation }: any) => {
               style={{ width: 220, height: 260, marginRight: 16 }}
               imageStyle={{ borderRadius: 28 }}
             >
-              <View className="flex-1 justify-between rounded-[28px] p-4 bg-black/45">
+              <TouchableOpacity
+                className="flex-1 justify-between rounded-[28px] p-4 bg-black/45"
+                onPress={() => handleStartTour(site)}
+                activeOpacity={0.8}
+              >
                 <View className="bg-white/20 rounded-full px-4 py-1 self-start">
                   <Text className="text-white text-xs font-montserrat-semibold">
                     Trending
@@ -326,17 +331,14 @@ const Home = ({ navigation }: any) => {
                   <Text className="text-white/85 text-sm font-montserrat-regular mt-3">
                     {site.fact}
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => handleStartTour(site)}
-                    className="mt-4 bg-white/90 rounded-full py-2 px-4 flex-row items-center self-start"
-                  >
+                  <View className="mt-4 bg-white/90 rounded-full py-2 px-4 flex-row items-center self-start">
                     <Text className="text-black text-sm font-montserrat-semibold">
                       Start Tour
                     </Text>
                     <ArrowRight color="#000000" size={16} className="ml-2" />
-                  </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             </ImageBackground>
           ))}
         </ScrollView>

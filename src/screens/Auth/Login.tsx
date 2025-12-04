@@ -2,7 +2,7 @@ import { Text, View, TouchableOpacity, Image, TextInput } from 'react-native';
 import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const Google = require('../../assets/images/Google.png');
+const Google = require('../../assets/images/Google.webp');
 import { Eye, EyeOff } from 'lucide-react-native';
 
 const Login = ({ navigation }: any) => {

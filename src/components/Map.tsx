@@ -26,6 +26,9 @@ const Map = () => {
         initialRegion={DEFAULT_REGION}
         customMapStyle={mapStyle}
         showsUserLocation
+        showsBuildings
+        showsTraffic
+        showsPointsOfInterests
         showsMyLocationButton
         loadingEnabled
         // @ts-expect-error Prop exists on native MapView but is missing from type defs

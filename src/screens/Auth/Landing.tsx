@@ -1,4 +1,5 @@
 import {
+  Image,
   ImageBackground,
   StatusBar,
   Text,
@@ -8,7 +9,8 @@ import {
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const bgImage: any = require('../../assets/images/landing-bg.jpg');
+const bgImage: any = require('../../assets/images/bg.webp');
+const underline: any = require('../../assets/images/vector.png');
 
 interface Props {
   navigation: {
@@ -28,12 +30,15 @@ const Landing = ({ navigation }: Props) => {
           height: '100%',
         }}
       >
-        <View className="flex-1 justify-between items-center py-20">
+        <View className="flex-1 justify-center items-center py-20 gap-20">
           <View className="justify-center items-center gap-5">
-            <Text className="font-montserrat-bold text-white text-5xl leading-tight">
-              Epocheye
-            </Text>
-            <Text className="text-white text-center font-montserrat-bold text-xl">
+            <View className="w-full relative">
+              <Text className="font-montserrat-bold text-black text-6xl leading-tight">
+                Epocheye
+              </Text>
+              <Image source={underline} className="absolute top-16" />
+            </View>
+            <Text className="text-black text-center font-montserrat-bold text-xl">
               Turn Your Phone into Time Machine
             </Text>
           </View>
