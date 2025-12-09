@@ -86,15 +86,14 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ navigation }) => {
   );
 
   /**
-   * Called when user taps "Go to Home" on completion screen.
-   * Navigates to the main app.
+   * Called when user taps "Go to Login" on completion screen.
+   * Navigates to the login screen after signup.
    */
   const handleGoHome = useCallback(() => {
-    // Navigate to main app
-    // In a real app, this would set auth state and navigate to MainNavigation
+    // Navigate to login screen after signup completion
     navigation.reset({
       index: 0,
-      routes: [{ name: 'Permissions' }], // Go to permissions first, then home
+      routes: [{ name: 'Login' }],
     });
   }, [navigation]);
 

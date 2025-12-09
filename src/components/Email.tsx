@@ -8,8 +8,11 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import React, { useState, useRef } from 'react';
+import { signup } from '../utils/api/auth';
 
 const Google = require('../assets/images/Google.webp');
 
@@ -19,8 +22,32 @@ const Email = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  const handleSignup = async () => {
+    setIsLoading(true);
+
+    try {
+      const result = await signup({
+        email: email.trim(),
+        name: name.trim(),
+        password,
+      });
+
+      if (result.success) {
+        // Navigate to Onboarding Flow after successful signup
+        navigation.navigate('OnboardingFlow');
+      } else {
+        Alert.alert('Signup Failed', result.error.message);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleNext = () => {
     // Fade out animation
@@ -29,7 +56,7 @@ const Email = ({ navigation }: any) => {
       duration: 200,
       useNativeDriver: true,
     }).start(() => {
-      // Change step or navigate to onboarding
+      // Change step or call signup API
       if (step < 4) {
         setStep(step + 1);
         // Fade in animation
@@ -39,8 +66,13 @@ const Email = ({ navigation }: any) => {
           useNativeDriver: true,
         }).start();
       } else {
-        // Navigate to Onboarding Flow after account creation
-        navigation.navigate('OnboardingFlow');
+        // Call signup API
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+        handleSignup();
       }
     });
   };
@@ -234,18 +266,22 @@ const Email = ({ navigation }: any) => {
           {/* Continue/Register Button */}
           <TouchableOpacity
             className={`py-4 rounded-2xl flex-row justify-center items-center gap-2 ${
-              isStepValid() ? 'bg-white' : 'bg-gray-700'
+              isStepValid() && !isLoading ? 'bg-white' : 'bg-gray-700'
             }`}
-            onPress={isStepValid() ? handleNext : undefined}
-            disabled={!isStepValid()}
+            onPress={isStepValid() && !isLoading ? handleNext : undefined}
+            disabled={!isStepValid() || isLoading}
           >
-            <Text
-              className={`font-montserrat-semibold text-center text-lg ${
-                isStepValid() ? 'text-black' : 'text-gray-500'
-              }`}
-            >
-              {getButtonText()}
-            </Text>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#000000" />
+            ) : (
+              <Text
+                className={`font-montserrat-semibold text-center text-lg ${
+                  isStepValid() ? 'text-black' : 'text-gray-500'
+                }`}
+              >
+                {getButtonText()}
+              </Text>
+            )}
           </TouchableOpacity>
 
           {/* Divider */}

@@ -8,14 +8,20 @@ import { OnboardingFlow } from '../screens/Onboarding';
 
 const Stack = createNativeStackNavigator();
 
-const AuthNavigation: React.FC = () => {
+interface AuthNavigationProps {
+  onLoginSuccess: () => void;
+}
+
+const AuthNavigation: React.FC<AuthNavigationProps> = ({ onLoginSuccess }) => {
   return (
     <Stack.Navigator
       initialRouteName="Landing"
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="Landing" component={Landing} />
-      <Stack.Screen name="Login" component={Login} />
+      <Stack.Screen name="Login">
+        {props => <Login {...props} onLoginSuccess={onLoginSuccess} />}
+      </Stack.Screen>
       <Stack.Screen name="Register" component={Signup} />
       <Stack.Screen
         name="OnboardingFlow"

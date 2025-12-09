@@ -9,7 +9,11 @@ import { HomeIcon, Bookmark, Map, Trophy, Settings } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
 
-const TabNavigation = () => {
+interface TabNavigationProps {
+  onLogout: () => void;
+}
+
+const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
   return (
     <Tab.Navigator
       initialRouteName="Home"
@@ -50,7 +54,9 @@ const TabNavigation = () => {
       <Tab.Screen name="Explore" component={Explore} />
       <Tab.Screen name="Challenges" component={Challenges} />
       <Tab.Screen name="Saved" component={Saved} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="Settings">
+        {props => <SettingsScreen {...props} onLogout={onLogout} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 };

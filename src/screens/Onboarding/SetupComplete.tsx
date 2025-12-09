@@ -306,7 +306,7 @@ const SetupComplete: React.FC<SetupCompleteProps> = ({
           className="bg-[#FF7A18] rounded-2xl py-4 flex-row items-center justify-center"
         >
           <Text className="text-white text-lg font-montserrat-semibold mr-2">
-            Go to Home
+            Go to Login
           </Text>
           <ChevronRight color="#FFFFFF" size={22} />
         </TouchableOpacity>

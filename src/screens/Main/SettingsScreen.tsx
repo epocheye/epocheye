@@ -12,6 +12,7 @@ import React, { useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationProp } from '@react-navigation/native';
 import { usePermissionCheck } from '../../utils/usePermissionCheck';
+import { logout } from '../../utils/api/auth';
 import {
   Mail,
   Phone,
@@ -31,6 +32,7 @@ import {
 
 interface Props {
   navigation: NavigationProp<any>;
+  onLogout?: () => void;
 }
 
 interface SettingItemProps {
@@ -113,7 +115,7 @@ const ToggleSetting: React.FC<ToggleSettingProps> = ({
   </View>
 );
 
-const SettingsScreen: React.FC<Props> = ({ navigation }) => {
+const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   // Check permissions on this screen
   usePermissionCheck();
 
@@ -141,9 +143,16 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       {
         text: 'Logout',
         style: 'destructive',
-        onPress: () => {
-          // Handle logout logic
-          console.log('Logout');
+        onPress: async () => {
+          try {
+            await logout();
+            if (onLogout) {
+              onLogout();
+            }
+          } catch (error) {
+            console.error('Logout failed:', error);
+            Alert.alert('Error', 'Failed to logout. Please try again.');
+          }
         },
       },
     ]);

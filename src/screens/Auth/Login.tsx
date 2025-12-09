@@ -1,17 +1,54 @@
-import { Text, View, TouchableOpacity, Image, TextInput } from 'react-native';
+import {
+  Text,
+  View,
+  TouchableOpacity,
+  Image,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const Google = require('../../assets/images/Google.webp');
 import { Eye, EyeOff } from 'lucide-react-native';
+import { login } from '../../utils/api/auth';
 
-const Login = ({ navigation }: any) => {
+const Login = ({ navigation, onLoginSuccess }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    navigation.navigate('Permissions');
+  const handleLogin = async () => {
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address');
+      return;
+    }
+
+    if (!password) {
+      Alert.alert('Error', 'Please enter your password');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const result = await login({ email: email.trim(), password });
+
+      if (result.success) {
+        // Trigger navigation update by calling the callback
+        if (onLoginSuccess) {
+          onLoginSuccess();
+        }
+      } else {
+        Alert.alert('Login Failed', result.error.message);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -41,6 +78,7 @@ const Login = ({ navigation }: any) => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!isLoading}
             />
           </View>
 
@@ -57,8 +95,12 @@ const Login = ({ navigation }: any) => {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
+                editable={!isLoading}
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
+              >
                 {showPassword ? (
                   <EyeOff size={20} color="#888888" />
                 ) : (
@@ -72,6 +114,7 @@ const Login = ({ navigation }: any) => {
           <TouchableOpacity
             onPress={() => navigation.navigate('ForgotPassword')}
             className="self-end mb-6"
+            disabled={isLoading}
           >
             <Text className="text-blue-500 font-montserrat-medium text-base">
               Forgot Password?
@@ -81,11 +124,17 @@ const Login = ({ navigation }: any) => {
           {/* Login Button */}
           <TouchableOpacity
             onPress={handleLogin}
-            className="bg-white py-4 rounded-xl mb-6"
+            className="bg-white py-4 rounded-xl mb-6 flex-row justify-center items-center"
+            disabled={isLoading}
+            style={{ opacity: isLoading ? 0.7 : 1 }}
           >
-            <Text className="text-black font-montserrat-semibold text-center text-lg">
-              Log In
-            </Text>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#000000" />
+            ) : (
+              <Text className="text-black font-montserrat-semibold text-center text-lg">
+                Log In
+              </Text>
+            )}
           </TouchableOpacity>
 
           {/* Divider */}

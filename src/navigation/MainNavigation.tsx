@@ -7,16 +7,21 @@ import ARExperienceScreen from '../screens/Main/ARExperienceScreen';
 
 const Stack = createNativeStackNavigator();
 
-const MainNavigation: React.FC = () => {
+interface MainNavigationProps {
+  onLogout: () => void;
+}
+
+const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
   return (
     <Stack.Navigator initialRouteName="MainTabs">
       <Stack.Screen
         name="MainTabs"
-        component={TabNavigation}
         options={{
           headerShown: false,
         }}
-      />
+      >
+        {props => <TabNavigation {...props} onLogout={onLogout} />}
+      </Stack.Screen>
       <Stack.Screen
         name="Permissions"
         component={Permissions}
