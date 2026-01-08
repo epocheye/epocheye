@@ -122,11 +122,6 @@ const SiteDetailScreen: React.FC<SiteDetailScreenProps> = ({
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
-  const handleNavigateToSite = useCallback(() => {
-    // In production, this would open maps
-    console.log('Navigate to site');
-  }, []);
-
   const handleStartARExperience = useCallback(() => {
     navigation.navigate('ARExperience', { site });
   }, [navigation, site]);
@@ -297,23 +292,14 @@ const SiteDetailScreen: React.FC<SiteDetailScreenProps> = ({
           </View>
 
           {/* Action Buttons */}
-          <View className="flex-row gap-4 mt-5">
-            <TouchableOpacity
-              onPress={handleNavigateToSite}
-              className="flex-1 bg-[#1F1F2A] rounded-2xl py-4 flex-row items-center justify-center border border-[#272730]"
-            >
-              <Navigation color="#FFFFFF" size={20} />
-              <Text className="text-white text-base font-montserrat-semibold ml-2">
-                Navigate
-              </Text>
-            </TouchableOpacity>
+          <View className="mt-5">
             <TouchableOpacity
               onPress={handleStartARExperience}
-              className="flex-1 bg-[#FF7A18] rounded-2xl py-4 flex-row items-center justify-center"
+              className="bg-[#FF7A18] rounded-2xl py-4 flex-row items-center justify-center"
             >
               <Camera color="#FFFFFF" size={20} />
               <Text className="text-white text-base font-montserrat-semibold ml-2">
-                Start AR
+                Start AR Experience
               </Text>
             </TouchableOpacity>
           </View>

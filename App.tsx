@@ -3,7 +3,7 @@ import './global.css';
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation';
-import { NetworkProvider, useNetwork } from './src/context/NetworkContext';
+import { NetworkProvider, useNetwork, UserProvider } from './src/context';
 import NoInternetScreen from './src/screens/NoInternetScreen';
 
 /**
@@ -27,7 +27,9 @@ export default function App() {
   return (
     <SafeAreaProvider style={{ backgroundColor: '#111111' }}>
       <NetworkProvider>
-        <AppContent />
+        <UserProvider>
+          <AppContent />
+        </UserProvider>
       </NetworkProvider>
     </SafeAreaProvider>
   );

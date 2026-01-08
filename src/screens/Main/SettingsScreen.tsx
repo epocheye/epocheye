@@ -7,12 +7,15 @@ import {
   Alert,
   TextInput,
   Image,
+  ActivityIndicator,
 } from 'react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NavigationProp } from '@react-navigation/native';
+import { NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { usePermissionCheck } from '../../utils/usePermissionCheck';
 import { logout } from '../../utils/api/auth';
+import { useUser } from '../../context';
+import { launchImageLibrary } from 'react-native-image-picker';
 import {
   Mail,
   Phone,
@@ -28,6 +31,7 @@ import {
   Trash2,
   ShieldCheck,
   Download,
+  Save,
 } from 'lucide-react-native';
 
 interface Props {
@@ -119,14 +123,61 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   // Check permissions on this screen
   usePermissionCheck();
 
+  // User context
+  const {
+    profile,
+    isLoading,
+    updateProfile,
+    uploadUserAvatar,
+    clearUserData,
+    refreshUserData,
+  } = useUser();
+
   // Settings state
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
   const [locationServices, setLocationServices] = useState(true);
   const [twoFactorAuth, setTwoFactorAuth] = useState(false);
-  const [fullName, setFullName] = useState('John Doe');
-  const [email, setEmail] = useState('john.doe@example.com');
-  const [phone, setPhone] = useState('+1 (555) 123-4567');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Load profile data when available
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.name || '');
+      setEmail(profile.email || '');
+      setPhone(profile.phone || '');
+
+      // Load notification preferences from profile.preferences if available
+      if (profile.preferences) {
+        setPushNotifications(profile.preferences.pushNotifications ?? true);
+        setEmailNotifications(profile.preferences.emailNotifications ?? false);
+        setLocationServices(profile.preferences.locationServices ?? true);
+        setTwoFactorAuth(profile.preferences.twoFactorAuth ?? false);
+      }
+    }
+  }, [profile]);
+
+  // Track changes
+  useEffect(() => {
+    if (profile) {
+      const changed =
+        fullName !== profile.name ||
+        email !== profile.email ||
+        phone !== profile.phone;
+      setHasChanges(changed);
+    }
+  }, [fullName, email, phone, profile]);
+
+  // Refresh user data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshUserData();
+    }, [refreshUserData]),
+  );
 
   const permissionOverview = useMemo(
     () => [
@@ -137,6 +188,83 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
     [locationServices],
   );
 
+  const handleSaveChanges = async () => {
+    if (!hasChanges) return;
+
+    setIsSaving(true);
+    try {
+      // Prepare preferences object with notification settings
+      const preferences = {
+        pushNotifications,
+        emailNotifications,
+        locationServices,
+        twoFactorAuth,
+        ...(profile?.preferences || {}),
+      };
+
+      const success = await updateProfile({
+        name: fullName,
+        phone: phone,
+        preferences: preferences,
+      });
+
+      if (success) {
+        Alert.alert('Success', 'Profile updated successfully');
+        setHasChanges(false);
+      } else {
+        Alert.alert('Error', 'Failed to update profile. Please try again.');
+      }
+    } catch (error) {
+      console.error('Update profile error:', error);
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAvatarUpload = () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 512,
+        maxHeight: 512,
+      },
+      async response => {
+        if (response.didCancel) {
+          return;
+        }
+
+        if (response.errorCode) {
+          Alert.alert('Error', 'Failed to select image');
+          return;
+        }
+
+        if (response.assets && response.assets[0]) {
+          const asset = response.assets[0];
+          const formData = new FormData();
+          formData.append('avatar', {
+            uri: asset.uri,
+            type: asset.type || 'image/jpeg',
+            name: asset.fileName || 'avatar.jpg',
+          } as any);
+
+          try {
+            const success = await uploadUserAvatar(formData);
+            if (success) {
+              Alert.alert('Success', 'Avatar updated successfully');
+            } else {
+              Alert.alert('Error', 'Failed to upload avatar');
+            }
+          } catch (error) {
+            console.error('Avatar upload error:', error);
+            Alert.alert('Error', 'Failed to upload avatar');
+          }
+        }
+      },
+    );
+  };
+
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
@@ -146,6 +274,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
         onPress: async () => {
           try {
             await logout();
+            clearUserData();
             if (onLogout) {
               onLogout();
             }
@@ -210,70 +339,111 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
         </View>
 
         {/* Profile */}
-        <View className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5">
-          <View className="flex-row items-center">
-            <View className="w-16 h-16 rounded-full bg-white/5 items-center justify-center mr-4 relative">
-              <Image
-                source={require('../../assets/images/logo-white.png')}
-                className="w-10 h-10"
-                resizeMode="contain"
-              />
-              <TouchableOpacity className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#FF7A18] items-center justify-center">
-                <Camera size={16} color="white" />
-              </TouchableOpacity>
-            </View>
-            <View className="flex-1">
-              <Text className="text-white text-xl font-montserrat-bold">
-                {fullName}
-              </Text>
-              <Text className="text-[#9A9AAF] text-sm font-montserrat-regular mt-1">
-                {email}
-              </Text>
-            </View>
+        {isLoading ? (
+          <View
+            className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5 items-center justify-center"
+            style={{ height: 280 }}
+          >
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text className="text-[#9A9AAF] text-sm font-montserrat-regular mt-3">
+              Loading profile...
+            </Text>
           </View>
-          <View className="mt-5">
-            <View className="mb-3">
-              <Text className="text-xs uppercase tracking-[2px] text-[#8B8B9E] font-montserrat-semibold mb-2">
-                Full name
-              </Text>
-              <TextInput
-                value={fullName}
-                onChangeText={setFullName}
-                placeholder="Full name"
-                placeholderTextColor="#8B8B9E"
-                className="bg-[#090912] border border-white/10 rounded-2xl text-white font-montserrat-medium px-4 py-3"
-              />
-            </View>
-            <View className="flex-row">
-              <View className="flex-1 mr-3">
-                <Text className="text-xs uppercase tracking-[2px] text-[#8B8B9E] font-montserrat-semibold mb-2">
-                  Email
-                </Text>
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  placeholder="Email"
-                  placeholderTextColor="#8B8B9E"
-                  className="bg-[#090912] border border-white/10 rounded-2xl text-white font-montserrat-medium px-4 py-3"
-                />
+        ) : (
+          <View className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5">
+            <View className="flex-row items-center">
+              <View className="w-16 h-16 rounded-full bg-white/5 items-center justify-center mr-4 relative">
+                {profile?.avatar_url ? (
+                  <Image
+                    source={{ uri: profile.avatar_url }}
+                    className="w-16 h-16 rounded-full"
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Image
+                    source={require('../../assets/images/logo-white.png')}
+                    className="w-10 h-10"
+                    resizeMode="contain"
+                  />
+                )}
+                <TouchableOpacity
+                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#FF7A18] items-center justify-center"
+                  onPress={handleAvatarUpload}
+                >
+                  <Camera size={16} color="white" />
+                </TouchableOpacity>
               </View>
               <View className="flex-1">
+                <Text className="text-white text-xl font-montserrat-bold">
+                  {fullName || 'User'}
+                </Text>
+                <Text className="text-[#9A9AAF] text-sm font-montserrat-regular mt-1">
+                  {email || 'No email'}
+                </Text>
+              </View>
+            </View>
+            <View className="mt-5">
+              <View className="mb-3">
                 <Text className="text-xs uppercase tracking-[2px] text-[#8B8B9E] font-montserrat-semibold mb-2">
-                  Phone
+                  Full name
                 </Text>
                 <TextInput
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  placeholder="Phone"
+                  value={fullName}
+                  onChangeText={setFullName}
+                  placeholder="Full name"
                   placeholderTextColor="#8B8B9E"
                   className="bg-[#090912] border border-white/10 rounded-2xl text-white font-montserrat-medium px-4 py-3"
                 />
               </View>
+              <View className="flex-row">
+                <View className="flex-1 mr-3">
+                  <Text className="text-xs uppercase tracking-[2px] text-[#8B8B9E] font-montserrat-semibold mb-2">
+                    Email
+                  </Text>
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    placeholder="Email"
+                    placeholderTextColor="#8B8B9E"
+                    className="bg-[#090912] border border-white/10 rounded-2xl text-white font-montserrat-medium px-4 py-3"
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-xs uppercase tracking-[2px] text-[#8B8B9E] font-montserrat-semibold mb-2">
+                    Phone
+                  </Text>
+                  <TextInput
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                    placeholder="Phone"
+                    placeholderTextColor="#8B8B9E"
+                    className="bg-[#090912] border border-white/10 rounded-2xl text-white font-montserrat-medium px-4 py-3"
+                  />
+                </View>
+              </View>
             </View>
+            {hasChanges && (
+              <TouchableOpacity
+                className="mt-4 flex-row items-center justify-center rounded-2xl bg-[#3B82F6] py-3"
+                onPress={handleSaveChanges}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Save size={18} color="white" />
+                    <Text className="text-white text-base font-montserrat-semibold ml-2">
+                      Save Changes
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
-        </View>
+        )}
 
         {/* Security */}
         <View className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5">
