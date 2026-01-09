@@ -10,19 +10,9 @@ import {
 } from 'react-native';
 import React, { useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  Bell,
-  Camera,
-  MapPin,
-  ArrowRight,
-  ChevronRight,
-  Star,
-  Crown,
-  Compass,
-  Medal,
-  X,
-} from 'lucide-react-native';
+import { Bell, MapPin, ArrowRight, X, Loader } from 'lucide-react-native';
 import { usePermissionCheck } from '../../utils/usePermissionCheck';
+import { usePlaces } from '../../context';
 
 const profilePlaceholder = require('../../assets/images/logo-white.png');
 
@@ -215,13 +205,6 @@ const TRENDING_SITES = [
   },
 ];
 
-const BADGES = [
-  { id: 'badge-1', label: 'Time Traveler', icon: Star },
-  { id: 'badge-2', label: 'Heritage Hero', icon: Crown },
-  { id: 'badge-3', label: 'Trailblazer', icon: Compass },
-  { id: 'badge-4', label: 'Archivist', icon: Medal },
-];
-
 const DAILY_FACTS = [
   'Did you know? The sound of a clap made at the entrance of the Gol Gumbaz can be heard on the other side of the dome due to its whispering gallery.',
   'The Konark Sun Temple was shaped like a colossal chariot with 24 wheels, each 12 feet in diameter, pulled by seven horses.',
@@ -231,6 +214,8 @@ const DAILY_FACTS = [
 const Home = ({ navigation }: any) => {
   // Check permissions on this screen
   usePermissionCheck();
+
+  const { nearbyPlaces, isLoadingNearby, nearbyError } = usePlaces();
 
   const [factIndex, setFactIndex] = useState(0);
   const [factVisible, setFactVisible] = useState(true);
@@ -249,8 +234,49 @@ const Home = ({ navigation }: any) => {
     setFactVisible(true);
   };
 
-  const handleStartTour = (site: any) => {
-    navigation.navigate('SiteDetail', { site: site.fullData });
+  const handleVisitPlace = (place: any) => {
+    // Convert Place to site format for SiteDetail screen
+    const siteData = {
+      id: place.id,
+      name: place.name,
+      location: place.formatted || `${place.city}, ${place.country}`,
+      era: place.categories[0] || 'Historic',
+      style: place.categories.join(', ') || 'Architecture',
+      yearBuilt: 'Unknown',
+      distance: `${(place.distance_meters / 1000).toFixed(1)} km`,
+      estimatedTime: '45 min',
+      heroImages: [
+        'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
+      ],
+      shortDescription: `Explore ${place.name} located at ${place.formatted}.`,
+      fullDescription: `${place.name} is a historic site located at ${place.formatted}. Discover its rich history and cultural significance.`,
+      funFacts: [],
+      visitorTips: [
+        'Best visited during early morning or late afternoon.',
+        'Carry water and wear comfortable shoes.',
+      ],
+      relatedSites: [],
+      rating: 4.5,
+      reviews: 0,
+      lat: place.lat,
+      lon: place.lon,
+      address_line1: place.address_line1,
+      city: place.city,
+      country: place.country,
+    };
+    navigation.navigate('SiteDetail', { site: siteData });
+  };
+
+  // Get a default image based on categories
+  const getPlaceImage = (categories: string[]) => {
+    const category = categories[0]?.toLowerCase() || '';
+    if (category.includes('temple') || category.includes('religious')) {
+      return 'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80';
+    }
+    if (category.includes('fort') || category.includes('castle')) {
+      return 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80';
+    }
+    return 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80';
   };
 
   return (
@@ -280,104 +306,103 @@ const Home = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* Trending Sites */}
-        <View className="flex-row items-center justify-between mb-4">
+        {/* Nearby Places */}
+        <View className="mb-4">
           <Text className="text-white text-xl font-montserrat-semibold">
             Nearby Highlights
           </Text>
-          <TouchableOpacity
-            className="flex-row items-center"
-            onPress={() => navigation.navigate('Explore')}
-          >
-            <Text className="text-[#B4B4BA] text-sm font-montserrat-medium mr-1">
-              View Map
+          {nearbyError && (
+            <Text className="text-red-400 text-sm font-montserrat-medium mt-2">
+              {nearbyError}
             </Text>
-            <ChevronRight color="#B4B4BA" size={18} />
-          </TouchableOpacity>
+          )}
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingRight: 12 }}
-          style={{ marginHorizontal: -20, paddingLeft: 20 }}
-        >
-          {TRENDING_SITES.map(site => (
-            <ImageBackground
-              key={site.id}
-              source={{ uri: site.image }}
-              style={{ width: 220, height: 260, marginRight: 16 }}
-              imageStyle={{ borderRadius: 28 }}
-            >
-              <TouchableOpacity
-                className="flex-1 justify-between rounded-[28px] p-4 bg-black/45"
-                onPress={() => handleStartTour(site)}
-                activeOpacity={0.8}
-              >
-                <View className="bg-white/20 rounded-full px-4 py-1 self-start">
-                  <Text className="text-white text-xs font-montserrat-semibold">
-                    Trending
-                  </Text>
-                </View>
-                <View>
-                  <Text className="text-white text-2xl font-montserrat-bold">
-                    {site.name}
-                  </Text>
-                  <View className="flex-row items-center mt-2">
-                    <MapPin color="#FFFFFF" size={16} />
-                    <Text className="text-white text-sm font-montserrat-medium ml-1">
-                      {site.location}
-                    </Text>
-                  </View>
-                  <Text className="text-white/85 text-sm font-montserrat-regular mt-3">
-                    {site.fact}
-                  </Text>
-                  <View className="mt-4 bg-white/90 rounded-full py-2 px-4 flex-row items-center self-start">
-                    <Text className="text-black text-sm font-montserrat-semibold">
-                      Start Tour
-                    </Text>
-                    <ArrowRight color="#000000" size={16} className="ml-2" />
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </ImageBackground>
-          ))}
-        </ScrollView>
 
-        {/* Badges */}
-        <View className="mt-8">
-          <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-white text-xl font-montserrat-semibold">
-              Earned Badges
+        {isLoadingNearby ? (
+          <View className="h-64 items-center justify-center">
+            <Loader color="#FF7A18" size={32} />
+            <Text className="text-[#9A9AAF] text-sm font-montserrat-medium mt-4">
+              Finding nearby places...
             </Text>
-            <TouchableOpacity>
-              <Text className="text-[#FF7A18] text-sm font-montserrat-semibold">
-                View All
-              </Text>
-            </TouchableOpacity>
           </View>
+        ) : nearbyPlaces.length === 0 ? (
+          <View className="h-64 items-center justify-center">
+            <MapPin color="#FF7A18" size={48} />
+            <Text className="text-white text-lg font-montserrat-semibold mt-4">
+              No nearby places found
+            </Text>
+            <Text className="text-[#9A9AAF] text-sm font-montserrat-medium mt-2 text-center px-8">
+              Try moving to a different location or check your permissions
+            </Text>
+          </View>
+        ) : (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingRight: 10 }}
+            contentContainerStyle={{ paddingRight: 12 }}
+            style={{ marginHorizontal: -20, paddingLeft: 20 }}
           >
-            {BADGES.map(badge => {
-              const Icon = badge.icon;
+            {nearbyPlaces.slice(0, 10).map((place, index) => {
+              const imageUri = getPlaceImage(place.categories);
+              const distanceKm = (place.distance_meters / 1000).toFixed(1);
+              const shortDescription = place.categories[0] || 'Historic site';
+
               return (
-                <View
-                  key={badge.id}
-                  className="w-28 h-32 bg-[#13131B] rounded-3xl mr-4 border border-[#232330] items-center justify-center"
+                <ImageBackground
+                  key={place.id}
+                  source={{ uri: imageUri }}
+                  style={{ width: 220, height: 260, marginRight: 16 }}
+                  imageStyle={{ borderRadius: 28 }}
                 >
-                  <View className="w-12 h-12 rounded-full bg-[#1F1F2A] items-center justify-center mb-3">
-                    <Icon color="#FFB347" size={26} />
-                  </View>
-                  <Text className="text-white text-sm font-montserrat-medium text-center px-2">
-                    {badge.label}
-                  </Text>
-                </View>
+                  <TouchableOpacity
+                    className="flex-1 justify-between rounded-[28px] p-4 bg-black/45"
+                    onPress={() => handleVisitPlace(place)}
+                    activeOpacity={0.8}
+                  >
+                    <View className="bg-white/20 rounded-full px-4 py-1 self-start">
+                      <Text className="text-white text-xs font-montserrat-semibold">
+                        {distanceKm} km away
+                      </Text>
+                    </View>
+                    <View>
+                      <Text
+                        className="text-white text-2xl font-montserrat-bold"
+                        numberOfLines={2}
+                      >
+                        {place.name}
+                      </Text>
+                      <View className="flex-row items-center mt-2">
+                        <MapPin color="#FFFFFF" size={16} />
+                        <Text
+                          className="text-white text-sm font-montserrat-medium ml-1"
+                          numberOfLines={1}
+                        >
+                          {place.city}, {place.country}
+                        </Text>
+                      </View>
+                      <Text
+                        className="text-white/85 text-sm font-montserrat-regular mt-3"
+                        numberOfLines={2}
+                      >
+                        {shortDescription}
+                      </Text>
+                      <View className="mt-4 bg-white/90 rounded-full py-2 px-4 flex-row items-center self-start">
+                        <Text className="text-black text-sm font-montserrat-semibold">
+                          Explore
+                        </Text>
+                        <ArrowRight
+                          color="#000000"
+                          size={16}
+                          className="ml-2"
+                        />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </ImageBackground>
               );
             })}
           </ScrollView>
-        </View>
+        )}
 
         {/* Daily Fact */}
         {factVisible && (

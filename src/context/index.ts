@@ -17,3 +17,8 @@ export {
   useUser,
   default as UserContext,
 } from './UserContext';
+
+export {
+  PlacesProvider,
+  usePlaces,
+} from './PlacesContext';

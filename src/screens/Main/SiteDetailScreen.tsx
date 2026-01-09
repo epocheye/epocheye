@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   StatusBar,
   Dimensions,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -25,6 +26,7 @@ import {
   Star,
   Bookmark,
 } from 'lucide-react-native';
+import { usePlaces } from '../../context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -117,10 +119,32 @@ const SiteDetailScreen: React.FC<SiteDetailScreenProps> = ({
   route,
 }) => {
   const site = route.params?.site || DEMO_SITE;
+  const { toggleSavePlace, isPlaceSaved } = usePlaces();
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Check if this place is saved
+  const isSaved = isPlaceSaved(site.id);
+
+  const handleToggleSave = async () => {
+    if (isSaving) return;
+
+    setIsSaving(true);
+    try {
+      const success = await toggleSavePlace(site.id);
+      if (!success) {
+        // Show error feedback if needed
+        console.error('Failed to toggle save state');
+      }
+    } catch (error) {
+      console.error('Error toggling save:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleStartARExperience = useCallback(() => {
     navigation.navigate('ARExperience', { site });
@@ -183,14 +207,19 @@ const SiteDetailScreen: React.FC<SiteDetailScreenProps> = ({
                 />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => setIsSaved(!isSaved)}
+                onPress={handleToggleSave}
+                disabled={isSaving}
                 className="w-11 h-11 rounded-full bg-black/40 items-center justify-center"
               >
-                <Bookmark
-                  color={isSaved ? '#FFB347' : '#FFFFFF'}
-                  size={22}
-                  fill={isSaved ? '#FFB347' : 'transparent'}
-                />
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#FFB347" />
+                ) : (
+                  <Bookmark
+                    color={isSaved ? '#FFB347' : '#FFFFFF'}
+                    size={22}
+                    fill={isSaved ? '#FFB347' : 'transparent'}
+                  />
+                )}
               </TouchableOpacity>
               <TouchableOpacity className="w-11 h-11 rounded-full bg-black/40 items-center justify-center">
                 <Share2 color="#FFFFFF" size={22} />
