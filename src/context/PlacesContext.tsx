@@ -74,6 +74,7 @@ interface PlacesProviderProps {
 }
 
 const SEARCH_RADIUS_METERS = 1000;
+const SEARCH_RADIUS_FALLBACKS = [1000, 5000, 10000, 20000]; // 1km, 5km, 10km, 20km
 const SEARCH_LIMIT = 50;
 const API_CALL_COOLDOWN_MS = 60000; // 1 minute
 const LOCATION_CHECK_INTERVAL_MS = 5000; // 5 seconds
@@ -156,52 +157,153 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
   }, []);
 
   /**
-   * Fetch nearby places from API
+   * Fetch nearby places from API with cascading radius fallback
+   * Tries 1km -> 5km -> 10km -> 20km in sequence
+   * Only retries after cooldown period (1 minute)
    */
   const fetchNearbyPlaces = useCallback(
     async (location: LocationData, force: boolean = false) => {
+      console.log('========== FINDPLACES DEBUG START ==========');
+      console.log('Location:', {
+        lat: location.latitude,
+        lon: location.longitude,
+        timestamp: new Date(location.timestamp).toISOString(),
+      });
+      console.log('Force fetch:', force);
+
       // Check if we should make the API call
       if (!force && !canMakeApiCall()) {
-        console.log('API call cooldown active, skipping...');
+        const timeSinceLastCall = Date.now() - lastApiCallTime.current;
+        const remainingTime = Math.ceil(
+          (API_CALL_COOLDOWN_MS - timeSinceLastCall) / 1000,
+        );
+        console.log(
+          `⏳ API call cooldown active. Wait ${remainingTime}s more.`,
+        );
+        console.log('========== FINDPLACES DEBUG END ==========');
         return;
       }
 
       if (!force && !hasMovedOutsideRadius(location)) {
-        console.log('User still within radius, skipping API call...');
+        console.log('📍 User still within 1km radius, skipping API call');
+        if (lastApiCallLocation.current) {
+          const distance = calculateDistance(
+            lastApiCallLocation.current.latitude,
+            lastApiCallLocation.current.longitude,
+            location.latitude,
+            location.longitude,
+          );
+          console.log(
+            `Current distance from last check: ${distance.toFixed(0)}m`,
+          );
+        }
+        console.log('========== FINDPLACES DEBUG END ==========');
         return;
       }
 
       try {
         setIsLoadingNearby(true);
         setNearbyError(null);
+        console.log('🔍 Starting cascading radius search...');
 
         const authenticated = await isAuthenticated();
         if (!authenticated) {
+          console.log('❌ User not authenticated');
           setNearbyPlaces([]);
+          console.log('========== FINDPLACES DEBUG END ==========');
           return;
         }
+        console.log('✅ User authenticated');
 
-        const result = await findPlaces({
-          latitude: location.latitude,
-          longitude: location.longitude,
-          radius_meters: SEARCH_RADIUS_METERS,
-          limit: SEARCH_LIMIT,
-        });
+        // Try each radius in sequence until we find places
+        let foundPlaces: Place[] = [];
+        let usedRadius = SEARCH_RADIUS_FALLBACKS[0];
 
-        if (result.success) {
-          setNearbyPlaces(result.data.places);
+        for (let i = 0; i < SEARCH_RADIUS_FALLBACKS.length; i++) {
+          const radius = SEARCH_RADIUS_FALLBACKS[i];
+          console.log(
+            `\n🔎 Attempt ${i + 1}/${
+              SEARCH_RADIUS_FALLBACKS.length
+            }: Searching within ${radius}m (${radius / 1000}km)...`,
+          );
+
+          const requestPayload = {
+            latitude: location.latitude,
+            longitude: location.longitude,
+            radius_meters: radius,
+            limit: SEARCH_LIMIT,
+          };
+          console.log('📤 API Request:', JSON.stringify(requestPayload));
+
+          const startTime = Date.now();
+          const result = await findPlaces(requestPayload);
+          const duration = Date.now() - startTime;
+
+          console.log(`⏱️  API Response time: ${duration}ms`);
+
+          if (result.success) {
+            console.log(
+              `✅ API Success: ${result.data.places.length} places found`,
+            );
+            if (result.data.places.length > 0) {
+              foundPlaces = result.data.places;
+              usedRadius = radius;
+              console.log(
+                `🎯 Success at ${radius}m! Found ${foundPlaces.length} places`,
+              );
+              console.log(
+                'Sample places:',
+                foundPlaces.slice(0, 3).map(p => ({
+                  id: p.id,
+                  name: p.name,
+                  distance: `${p.distance_meters}m`,
+                })),
+              );
+              break;
+            } else {
+              console.log(
+                `⚠️  No places at ${radius}m, trying larger radius...`,
+              );
+            }
+          } else {
+            console.error(`❌ API Error at ${radius}m:`, {
+              message: result.error.message,
+              statusCode: result.error.statusCode,
+            });
+          }
+        }
+
+        // Update state and tracking after all attempts
+        if (foundPlaces.length > 0) {
+          setNearbyPlaces(foundPlaces);
           lastApiCallLocation.current = location;
           lastApiCallTime.current = Date.now();
-          console.log(`Fetched ${result.data.places.length} nearby places`);
+          console.log(
+            `\n✅ FINAL RESULT: ${
+              foundPlaces.length
+            } places (radius: ${usedRadius}m / ${usedRadius / 1000}km)`,
+          );
+          console.log(
+            `Next API call allowed at: ${new Date(
+              Date.now() + API_CALL_COOLDOWN_MS,
+            ).toLocaleTimeString()}`,
+          );
         } else {
-          setNearbyError(result.error.message);
-          console.error('Failed to fetch nearby places:', result.error.message);
+          setNearbyPlaces([]);
+          lastApiCallLocation.current = location;
+          lastApiCallTime.current = Date.now();
+          setNearbyError('No places found within 20km radius');
+          console.log(
+            '\n❌ FINAL RESULT: No places found at any radius (1km -> 5km -> 10km -> 20km)',
+          );
+          console.log('Will retry after cooldown period (1 minute)');
         }
       } catch (error) {
         setNearbyError('Failed to fetch nearby places');
-        console.error('Error fetching nearby places:', error);
+        console.error('💥 CRITICAL ERROR:', error);
       } finally {
         setIsLoadingNearby(false);
+        console.log('========== FINDPLACES DEBUG END ==========\n');
       }
     },
     [canMakeApiCall, hasMovedOutsideRadius],
