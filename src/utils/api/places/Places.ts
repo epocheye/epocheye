@@ -49,14 +49,31 @@ export async function findPlaces(
   request: FindPlacesRequest
 ): Promise<PlacesResult<FindPlacesResponse>> {
   try {
-    const client = await createAuthenticatedClient();
+    console.log('🔐 [findPlaces] Creating authenticated client...');
+    const client = createAuthenticatedClient();
+    
+    console.log('📤 [findPlaces] Making request to /api/findplaces');
+    console.log('📤 [findPlaces] Request payload:', JSON.stringify(request));
+    
     const response = await client.post<FindPlacesResponse>(
-      '/api/findplaces',
+      '/findplaces',
       request
     );
+    
+    console.log('✅ [findPlaces] Response received:', {
+      status: response.status,
+      hasPlaces: !!response.data?.places,
+      placesCount: response.data?.places?.length || 0
+    });
+    
     return { success: true, data: response.data };
   } catch (error) {
     const axiosError = error as AxiosError<{ message?: string }>;
+    console.error('❌ [findPlaces] Error occurred:', {
+      message: getErrorMessage(axiosError),
+      statusCode: getStatusCode(axiosError),
+      responseData: axiosError.response?.data
+    });
     return {
       success: false,
       error: {

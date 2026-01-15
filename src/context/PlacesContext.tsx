@@ -103,6 +103,10 @@ function calculateDistance(
   return R * c;
 }
 
+function isValidCoordinate(value: number): boolean {
+  return Number.isFinite(value) && Math.abs(value) <= 180;
+}
+
 /**
  * Places Provider Component
  * Manages nearby and saved places with intelligent geo-tracking
@@ -120,6 +124,10 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(
     null,
   );
+
+  // Track authentication state to trigger re-initialization
+  const [isUserAuthenticated, setIsUserAuthenticated] =
+    useState<boolean>(false);
 
   // Refs for tracking
   const lastApiCallLocation = useRef<LocationData | null>(null);
@@ -242,11 +250,10 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
           console.log(`⏱️  API Response time: ${duration}ms`);
 
           if (result.success) {
-            console.log(
-              `✅ API Success: ${result.data.places.length} places found`,
-            );
-            if (result.data.places.length > 0) {
-              foundPlaces = result.data.places;
+            const placesArray = result.data?.places || [];
+            console.log(`✅ API Success: ${placesArray.length} places found`);
+            if (placesArray.length > 0) {
+              foundPlaces = placesArray;
               usedRadius = radius;
               console.log(
                 `🎯 Success at ${radius}m! Found ${foundPlaces.length} places`,
@@ -275,7 +282,36 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
 
         // Update state and tracking after all attempts
         if (foundPlaces.length > 0) {
-          setNearbyPlaces(foundPlaces);
+          const placesWithDistance = foundPlaces.map(place => {
+            if (place.distance_meters > 0) {
+              return place;
+            }
+
+            if (
+              !isValidCoordinate(place.lat) ||
+              !isValidCoordinate(place.lon) ||
+              !isValidCoordinate(location.latitude) ||
+              !isValidCoordinate(location.longitude)
+            ) {
+              return place;
+            }
+
+            const distanceMeters = Math.round(
+              calculateDistance(
+                location.latitude,
+                location.longitude,
+                place.lat,
+                place.lon,
+              ),
+            );
+
+            return {
+              ...place,
+              distance_meters: distanceMeters,
+            };
+          });
+
+          setNearbyPlaces(placesWithDistance);
           lastApiCallLocation.current = location;
           lastApiCallTime.current = Date.now();
           console.log(
@@ -480,23 +516,51 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
   }, []);
 
   /**
-   * Initialize on mount
+   * Check authentication status periodically
+   * This ensures we start tracking when user logs in
    */
   useEffect(() => {
-    const initialize = async () => {
+    const checkAuth = async () => {
       const authenticated = await isAuthenticated();
-      if (authenticated) {
-        startLocationTracking();
-        fetchSavedPlaces();
-      }
+      setIsUserAuthenticated(authenticated);
     };
 
-    initialize();
+    // Check immediately
+    checkAuth();
+
+    // Check periodically (every 2 seconds) to detect login/logout
+    const authCheckInterval = setInterval(checkAuth, 2000);
+
+    return () => {
+      clearInterval(authCheckInterval);
+    };
+  }, []);
+
+  /**
+   * Initialize location tracking when authentication state changes
+   */
+  useEffect(() => {
+    if (isUserAuthenticated) {
+      console.log('🔐 User authenticated, starting location tracking...');
+      startLocationTracking();
+      fetchSavedPlaces();
+    } else {
+      console.log('🔓 User not authenticated, stopping location tracking...');
+      stopLocationTracking();
+      // Clear places data when logged out
+      setNearbyPlaces([]);
+      setSavedPlaces([]);
+    }
 
     return () => {
       stopLocationTracking();
     };
-  }, [startLocationTracking, stopLocationTracking, fetchSavedPlaces]);
+  }, [
+    isUserAuthenticated,
+    startLocationTracking,
+    stopLocationTracking,
+    fetchSavedPlaces,
+  ]);
 
   const value: PlacesContextType = {
     nearbyPlaces,

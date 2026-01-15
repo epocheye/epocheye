@@ -226,12 +226,18 @@ export function createAuthenticatedClient(): AxiosInstance {
   // Request interceptor to add auth token
   authClient.interceptors.request.use(
     async config => {
+      console.log('🔐 [Auth Interceptor] Getting valid access token...');
       const accessToken = await getValidAccessToken();
 
       if (!accessToken) {
+        console.error('❌ [Auth Interceptor] No access token available!');
         throw new Error('Not authenticated. Please login again.');
       }
 
+      console.log('✅ [Auth Interceptor] Access token found, adding to request');
+      console.log('📍 [Auth Interceptor] Token preview:', accessToken.substring(0, 20) + '...');
+      console.log('🎯 [Auth Interceptor] Request URL:', config.url);
+      
       config.headers.Authorization = `Bearer ${accessToken}`;
       return config;
     },
