@@ -85,15 +85,15 @@ const Saved = ({ navigation }: any) => {
   // Extract unique categories from saved places
   const categories = useMemo(() => {
     const cats = new Set<string>();
-    savedPlaces.forEach(saved => {
+    (savedPlaces || []).forEach(saved => {
       saved.place_data.categories.forEach(cat => cats.add(cat));
     });
     return ['All', ...Array.from(cats)];
   }, [savedPlaces]);
 
   const filteredPlaces = useMemo(() => {
-    if (activeFilter === 'All') return savedPlaces;
-    return savedPlaces.filter(saved =>
+    if (activeFilter === 'All') return savedPlaces || [];
+    return (savedPlaces || []).filter(saved =>
       saved.place_data.categories.includes(activeFilter),
     );
   }, [activeFilter, savedPlaces]);

@@ -235,6 +235,13 @@ const Home = ({ navigation }: any) => {
   };
 
   const handleVisitPlace = (place: any) => {
+    console.log('🏛️ [Home] handleVisitPlace called with place:', {
+      id: place.id,
+      name: place.name,
+      lat: place.lat,
+      lon: place.lon,
+    });
+
     // Convert Place to site format for SiteDetail screen
     const siteData = {
       id: place.id,
@@ -264,6 +271,8 @@ const Home = ({ navigation }: any) => {
       city: place.city,
       country: place.country,
     };
+
+    console.log('🏛️ [Home] Navigating to SiteDetail with siteData:', siteData);
     navigation.navigate('SiteDetail', { site: siteData });
   };
 
@@ -325,7 +334,7 @@ const Home = ({ navigation }: any) => {
               Finding nearby places...
             </Text>
           </View>
-        ) : nearbyPlaces.length === 0 ? (
+        ) : !nearbyPlaces || nearbyPlaces.length === 0 ? (
           <View className="h-64 items-center justify-center">
             <MapPin color="#FF7A18" size={48} />
             <Text className="text-white text-lg font-montserrat-semibold mt-4">

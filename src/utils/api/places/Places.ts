@@ -93,15 +93,31 @@ export async function savePlace(
   placeId: string
 ): Promise<PlacesResult<{ message: string }>> {
   try {
-    const client = await createAuthenticatedClient();
+    console.log('💾 [savePlace] Starting save place request...');
+    console.log('💾 [savePlace] Place ID:', placeId);
+    
+    const client = createAuthenticatedClient();
+    console.log('💾 [savePlace] Authenticated client created');
+    
     const request: SavePlaceRequest = { place_id: placeId };
+    console.log('💾 [savePlace] Request payload:', JSON.stringify(request));
+    console.log('💾 [savePlace] Endpoint: /user/save-place');
+    
     const response = await client.post<{ message: string }>(
-      '/api/user/save-place',
+      '/user/save-place',
       request
     );
+    
+    console.log('✅ [savePlace] Success:', response.data);
     return { success: true, data: response.data };
   } catch (error) {
     const axiosError = error as AxiosError<{ message?: string }>;
+    console.error('❌ [savePlace] Error occurred:', {
+      message: getErrorMessage(axiosError),
+      statusCode: getStatusCode(axiosError),
+      responseData: axiosError.response?.data,
+      placeId
+    });
     return {
       success: false,
       error: {
@@ -121,13 +137,27 @@ export async function unsavePlace(
   placeId: string
 ): Promise<PlacesResult<{ message: string }>> {
   try {
-    const client = await createAuthenticatedClient();
+    console.log('🗑️  [unsavePlace] Starting unsave place request...');
+    console.log('🗑️  [unsavePlace] Place ID:', placeId);
+    
+    const client = createAuthenticatedClient();
+    console.log('🗑️  [unsavePlace] Authenticated client created');
+    console.log('🗑️  [unsavePlace] Endpoint: /user/save-place/' + placeId);
+    
     const response = await client.delete<{ message: string }>(
-      `/api/user/save-place/${placeId}`
+      `/user/save-place/${placeId}`
     );
+    
+    console.log('✅ [unsavePlace] Success:', response.data);
     return { success: true, data: response.data };
   } catch (error) {
     const axiosError = error as AxiosError<{ message?: string }>;
+    console.error('❌ [unsavePlace] Error occurred:', {
+      message: getErrorMessage(axiosError),
+      statusCode: getStatusCode(axiosError),
+      responseData: axiosError.response?.data,
+      placeId
+    });
     return {
       success: false,
       error: {
@@ -146,13 +176,28 @@ export async function getSavedPlaces(): Promise<
   PlacesResult<SavedPlace[]>
 > {
   try {
-    const client = await createAuthenticatedClient();
+    console.log('📋 [getSavedPlaces] Starting get saved places request...');
+    
+    const client = createAuthenticatedClient();
+    console.log('📋 [getSavedPlaces] Authenticated client created');
+    console.log('📋 [getSavedPlaces] Endpoint: /user/saved-places');
+    
     const response = await client.get<SavedPlace[]>(
-      '/api/user/save-places'
+      '/user/saved-places'
     );
+    
+    console.log('✅ [getSavedPlaces] Success:', {
+      count: response.data?.length || 0,
+      status: response.status
+    });
     return { success: true, data: response.data };
   } catch (error) {
     const axiosError = error as AxiosError<{ message?: string }>;
+    console.error('❌ [getSavedPlaces] Error occurred:', {
+      message: getErrorMessage(axiosError),
+      statusCode: getStatusCode(axiosError),
+      responseData: axiosError.response?.data
+    });
     return {
       success: false,
       error: {

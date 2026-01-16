@@ -130,19 +130,34 @@ const SiteDetailScreen: React.FC<SiteDetailScreenProps> = ({
   const isSaved = isPlaceSaved(site.id);
 
   const handleToggleSave = async () => {
-    if (isSaving) return;
+    console.log('🎯 [SiteDetailScreen] handleToggleSave called');
+    console.log('🎯 [SiteDetailScreen] Site ID:', site.id);
+    console.log('🎯 [SiteDetailScreen] Site object:', site);
+    console.log('🎯 [SiteDetailScreen] isSaving:', isSaving);
+    console.log('🎯 [SiteDetailScreen] isSaved:', isSaved);
+
+    if (isSaving) {
+      console.log('⚠️  [SiteDetailScreen] Already saving, skipping...');
+      return;
+    }
 
     setIsSaving(true);
     try {
+      console.log('🎯 [SiteDetailScreen] Calling toggleSavePlace...');
       const success = await toggleSavePlace(site.id);
+      console.log('🎯 [SiteDetailScreen] toggleSavePlace result:', success);
+
       if (!success) {
         // Show error feedback if needed
-        console.error('Failed to toggle save state');
+        console.error('❌ [SiteDetailScreen] Failed to toggle save state');
+      } else {
+        console.log('✅ [SiteDetailScreen] Save toggled successfully!');
       }
     } catch (error) {
-      console.error('Error toggling save:', error);
+      console.error('❌ [SiteDetailScreen] Exception:', error);
     } finally {
       setIsSaving(false);
+      console.log('🎯 [SiteDetailScreen] Save operation completed');
     }
   };
 

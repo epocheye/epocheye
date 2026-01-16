@@ -362,13 +362,16 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
       const result = await getSavedPlaces();
 
       if (result.success) {
-        setSavedPlaces(result.data);
-        console.log(`Fetched ${result.data.length} saved places`);
+        // Ensure we always set an array, even if data is undefined/null
+        setSavedPlaces(Array.isArray(result.data) ? result.data : []);
+        console.log(`Fetched ${result.data?.length || 0} saved places`);
       } else {
+        setSavedPlaces([]);
         setSavedError(result.error.message);
         console.error('Failed to fetch saved places:', result.error.message);
       }
     } catch (error) {
+      setSavedPlaces([]);
       setSavedError('Failed to fetch saved places');
       console.error('Error fetching saved places:', error);
     } finally {
@@ -452,29 +455,51 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
    */
   const toggleSavePlace = useCallback(
     async (placeId: string): Promise<boolean> => {
+      console.log('🔄 [toggleSavePlace] Called with placeId:', placeId);
+      console.log('🔄 [toggleSavePlace] savedPlaces:', savedPlaces);
+
+      if (!Array.isArray(savedPlaces)) {
+        console.error(
+          '❌ [toggleSavePlace] savedPlaces is not an array:',
+          savedPlaces,
+        );
+        return false;
+      }
+
       const isSaved = savedPlaces.some(saved => saved.place_id === placeId);
+      console.log('🔄 [toggleSavePlace] isSaved:', isSaved);
+      console.log('🔄 [toggleSavePlace] Action:', isSaved ? 'UNSAVE' : 'SAVE');
 
       try {
         let result;
         if (isSaved) {
+          console.log('🔄 [toggleSavePlace] Calling unsavePlace...');
           result = await unsavePlace(placeId);
         } else {
+          console.log('🔄 [toggleSavePlace] Calling savePlace...');
           result = await savePlace(placeId);
         }
 
+        console.log('🔄 [toggleSavePlace] Result:', result);
+
         if (result.success) {
+          console.log(
+            '✅ [toggleSavePlace] Success! Refreshing saved places...',
+          );
           // Refresh saved places
           await fetchSavedPlaces();
           return true;
         } else {
           console.error(
-            `Failed to ${isSaved ? 'unsave' : 'save'} place:`,
+            `❌ [toggleSavePlace] Failed to ${
+              isSaved ? 'unsave' : 'save'
+            } place:`,
             result.error.message,
           );
           return false;
         }
       } catch (error) {
-        console.error('Error toggling save place:', error);
+        console.error('❌ [toggleSavePlace] Exception:', error);
         return false;
       }
     },
@@ -486,6 +511,10 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
    */
   const isPlaceSaved = useCallback(
     (placeId: string): boolean => {
+      if (!Array.isArray(savedPlaces)) {
+        console.warn('savedPlaces is not an array:', savedPlaces);
+        return false;
+      }
       return savedPlaces.some(saved => saved.place_id === placeId);
     },
     [savedPlaces],
