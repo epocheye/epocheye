@@ -29,11 +29,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ navigation }) => {
   const savePreferencesToAPI = async (
     preferences: UserPreferences,
   ): Promise<boolean> => {
-    // Simulating API call delay
     return new Promise(resolve => {
-      console.log('Saving preferences to API:', preferences);
       setTimeout(() => {
-        // Mock successful save
         resolve(true);
       }, 500);
     });
@@ -75,8 +72,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ navigation }) => {
             [{ text: 'OK' }],
           );
         }
-      } catch (error) {
-        console.error('Error saving preferences:', error);
+      } catch {
         Alert.alert('Error', 'Something went wrong. Please try again.', [
           { text: 'OK' },
         ]);

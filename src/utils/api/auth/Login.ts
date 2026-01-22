@@ -3,7 +3,7 @@
  * Handles login, token refresh, and logout operations
  */
 
-import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { baseUrl } from '@env';
 import {
   LoginRequest,
@@ -20,54 +20,14 @@ import {
   getAccessToken,
   clearTokens,
 } from './tokenStorage';
+import {
+  createBaseClient,
+  getErrorMessage,
+  getStatusCode,
+  isApiError,
+} from '../helpers';
 
-const API_TIMEOUT_MS = 30000;
-
-/**
- * Create axios instance with default configuration
- */
-const apiClient: AxiosInstance = axios.create({
-  baseURL: baseUrl,
-  timeout: API_TIMEOUT_MS,
-  headers: {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  },
-});
-
-/**
- * Extracts error message from axios error
- */
-function getErrorMessage(error: AxiosError<{ message?: string }>): string {
-  if (error.response?.data?.message) {
-    return error.response.data.message;
-  }
-
-  if (error.code === 'ECONNABORTED') {
-    return 'Request timed out. Please try again.';
-  }
-
-  if (error.code === 'ERR_NETWORK') {
-    return 'Network error. Please check your connection.';
-  }
-
-  return error.message || 'An unexpected error occurred';
-}
-
-/**
- * Gets status code from axios error
- */
-function getStatusCode(error: AxiosError): number {
-  if (error.response?.status) {
-    return error.response.status;
-  }
-
-  if (error.code === 'ECONNABORTED') {
-    return 408;
-  }
-
-  return 0;
-}
+const apiClient: AxiosInstance = createBaseClient();
 
 /**
  * Authenticates user with email and password
@@ -97,7 +57,7 @@ export async function login(
       data: loginResponse,
     };
   } catch (error) {
-    if (axios.isAxiosError(error)) {
+    if (isApiError(error)) {
       return {
         success: false,
         error: {
@@ -106,7 +66,6 @@ export async function login(
         },
       };
     }
-
     return {
       success: false,
       error: {
@@ -154,13 +113,11 @@ export async function refreshAccessToken(): Promise<
       data: refreshResponse,
     };
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      // If refresh token is invalid, clear all tokens
+    if (isApiError(error)) {
       const statusCode = getStatusCode(error);
       if (statusCode === 401 || statusCode === 403) {
         await clearTokens();
       }
-
       return {
         success: false,
         error: {
@@ -169,7 +126,6 @@ export async function refreshAccessToken(): Promise<
         },
       };
     }
-
     return {
       success: false,
       error: {
@@ -190,12 +146,9 @@ export async function getValidAccessToken(): Promise<string | null> {
 
   if (isExpired) {
     const refreshResult = await refreshAccessToken();
-
     if (!refreshResult.success) {
-      console.error('Failed to refresh token:', refreshResult.error.message);
       return null;
     }
-
     return refreshResult.data.access_token;
   }
 
@@ -214,30 +167,15 @@ export async function logout(): Promise<void> {
  * @returns Configured axios instance with auth interceptors
  */
 export function createAuthenticatedClient(): AxiosInstance {
-  const authClient = axios.create({
-    baseURL: baseUrl,
-    timeout: API_TIMEOUT_MS,
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-  });
+  const authClient = createBaseClient();
 
   // Request interceptor to add auth token
   authClient.interceptors.request.use(
     async config => {
-      console.log('🔐 [Auth Interceptor] Getting valid access token...');
       const accessToken = await getValidAccessToken();
-
       if (!accessToken) {
-        console.error('❌ [Auth Interceptor] No access token available!');
         throw new Error('Not authenticated. Please login again.');
       }
-
-      console.log('✅ [Auth Interceptor] Access token found, adding to request');
-      console.log('📍 [Auth Interceptor] Token preview:', accessToken.substring(0, 20) + '...');
-      console.log('🎯 [Auth Interceptor] Request URL:', config.url);
-      
       config.headers.Authorization = `Bearer ${accessToken}`;
       return config;
     },

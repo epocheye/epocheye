@@ -74,10 +74,9 @@ const Permissions = ({ navigation: navProp, route: routeProp }: any) => {
   const checkCurrentPermissions = async () => {
     try {
       const status = await checkAllPermissions();
-
       setPermissionStatus(status);
-    } catch (error) {
-      console.error('Error checking current permissions:', error);
+    } catch {
+      // Permission check failed silently
     }
   };
 

@@ -56,7 +56,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
               return <Settings color={color} size={iconSize} />;
           }
         },
-        tabBarButton: props => {
+        tabBarButton: (props: any) => {
           // Show "New Features" overlay for Explore and Challenges tabs
           if (route.name === 'Explore' || route.name === 'Challenges') {
             return (

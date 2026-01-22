@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationProp } from '@react-navigation/native';
@@ -22,5 +22,3 @@ const Signup: React.FC<Props> = ({ navigation }) => {
 };
 
 export default Signup;
-
-const styles = StyleSheet.create({});

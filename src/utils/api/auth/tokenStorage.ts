@@ -27,8 +27,7 @@ export async function storeTokens(tokens: AuthTokens): Promise<void> {
     ];
 
     await AsyncStorage.multiSet(entries);
-  } catch (error) {
-    console.error('Failed to store authentication tokens:', error);
+  } catch {
     throw new Error('Failed to store authentication tokens');
   }
 }
@@ -49,8 +48,7 @@ export async function updateAccessToken(
     ];
 
     await AsyncStorage.multiSet(entries);
-  } catch (error) {
-    console.error('Failed to update access token:', error);
+  } catch {
     throw new Error('Failed to update access token');
   }
 }
@@ -84,8 +82,7 @@ export async function getTokens(): Promise<AuthTokens | null> {
       accessExpires,
       uid,
     };
-  } catch (error) {
-    console.error('Failed to retrieve authentication tokens:', error);
+  } catch {
     return null;
   }
 }
@@ -97,8 +94,7 @@ export async function getTokens(): Promise<AuthTokens | null> {
 export async function getAccessToken(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-  } catch (error) {
-    console.error('Failed to retrieve access token:', error);
+  } catch {
     return null;
   }
 }
@@ -110,8 +106,7 @@ export async function getAccessToken(): Promise<string | null> {
 export async function getRefreshToken(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-  } catch (error) {
-    console.error('Failed to retrieve refresh token:', error);
+  } catch {
     return null;
   }
 }
@@ -123,8 +118,7 @@ export async function getRefreshToken(): Promise<string | null> {
 export async function getUserId(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
-  } catch (error) {
-    console.error('Failed to retrieve user ID:', error);
+  } catch {
     return null;
   }
 }
@@ -147,8 +141,7 @@ export async function isAccessTokenExpired(): Promise<boolean> {
     // Add a 60-second buffer to account for network latency
     const bufferMs = 60 * 1000;
     return now.getTime() >= expiryDate.getTime() - bufferMs;
-  } catch (error) {
-    console.error('Failed to check token expiry:', error);
+  } catch {
     return true;
   }
 }
@@ -160,8 +153,7 @@ export async function clearTokens(): Promise<void> {
   try {
     const keys = Object.values(STORAGE_KEYS);
     await AsyncStorage.multiRemove(keys);
-  } catch (error) {
-    console.error('Failed to clear authentication tokens:', error);
+  } catch {
     throw new Error('Failed to clear authentication tokens');
   }
 }

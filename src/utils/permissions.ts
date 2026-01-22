@@ -48,8 +48,7 @@ export const checkAllPermissions = async (): Promise<PermissionResult> => {
       camera: handlePermissionStatus(cameraStatus),
       storage: handlePermissionStatus(storageStatus),
     };
-  } catch (error) {
-    console.error('Error checking permissions:', error);
+  } catch {
     return {
       location: false,
       camera: false,
@@ -64,7 +63,6 @@ const requestWithTimeout = async (
 ): Promise<PermissionStatus> => {
   return new Promise(async (resolve, reject) => {
     const timeout = setTimeout(() => {
-      console.warn(`Permission request timed out after ${timeoutMs}ms`);
       reject(new Error('Permission request timeout'));
     }, timeoutMs);
 
@@ -83,32 +81,26 @@ export const requestAllPermissions = async (): Promise<PermissionResult> => {
   const permissions = getPermissions();
 
   try {
-    console.log('Requesting permissions...');
-    
-    // Request permissions one by one with timeout to avoid hanging
     let locationStatus: PermissionStatus = RESULTS.DENIED;
     let cameraStatus: PermissionStatus = RESULTS.DENIED;
     let storageStatus: PermissionStatus = RESULTS.DENIED;
 
     try {
       locationStatus = await requestWithTimeout(permissions.location, 15000);
-      console.log('Location status:', locationStatus);
-    } catch (error) {
-      console.error('Location permission error:', error);
+    } catch {
+      // Permission denied or timed out
     }
     
     try {
       cameraStatus = await requestWithTimeout(permissions.camera, 15000);
-      console.log('Camera status:', cameraStatus);
-    } catch (error) {
-      console.error('Camera permission error:', error);
+    } catch {
+      // Permission denied or timed out
     }
     
     try {
       storageStatus = await requestWithTimeout(permissions.storage, 15000);
-      console.log('Storage status:', storageStatus);
-    } catch (error) {
-      console.error('Storage permission error:', error);
+    } catch {
+      // Permission denied or timed out
     }
 
     const result = {
@@ -116,8 +108,6 @@ export const requestAllPermissions = async (): Promise<PermissionResult> => {
       camera: handlePermissionStatus(cameraStatus),
       storage: handlePermissionStatus(storageStatus),
     };
-
-    console.log('Permission result:', result);
 
     // Handle blocked/denied permanently
     const isAnyBlocked =
@@ -137,8 +127,7 @@ export const requestAllPermissions = async (): Promise<PermissionResult> => {
     }
 
     return result;
-  } catch (error) {
-    console.error('Error requesting permissions:', error);
+  } catch {
     return {
       location: false,
       camera: false,

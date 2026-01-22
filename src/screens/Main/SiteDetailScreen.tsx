@@ -130,34 +130,29 @@ const SiteDetailScreen: React.FC<SiteDetailScreenProps> = ({
   const isSaved = isPlaceSaved(site.id);
 
   const handleToggleSave = async () => {
-    console.log('🎯 [SiteDetailScreen] handleToggleSave called');
-    console.log('🎯 [SiteDetailScreen] Site ID:', site.id);
-    console.log('🎯 [SiteDetailScreen] Site object:', site);
-    console.log('🎯 [SiteDetailScreen] isSaving:', isSaving);
-    console.log('🎯 [SiteDetailScreen] isSaved:', isSaved);
-
-    if (isSaving) {
-      console.log('⚠️  [SiteDetailScreen] Already saving, skipping...');
-      return;
-    }
+    if (isSaving) return;
 
     setIsSaving(true);
     try {
-      console.log('🎯 [SiteDetailScreen] Calling toggleSavePlace...');
-      const success = await toggleSavePlace(site.id);
-      console.log('🎯 [SiteDetailScreen] toggleSavePlace result:', success);
-
-      if (!success) {
-        // Show error feedback if needed
-        console.error('❌ [SiteDetailScreen] Failed to toggle save state');
-      } else {
-        console.log('✅ [SiteDetailScreen] Save toggled successfully!');
-      }
-    } catch (error) {
-      console.error('❌ [SiteDetailScreen] Exception:', error);
+      // Pass the full site data when saving
+      await toggleSavePlace(site.id, {
+        id: site.id,
+        name: site.name,
+        lat: site.lat,
+        lon: site.lon,
+        city: site.city,
+        country: site.country,
+        formatted: site.location,
+        address_line1: site.address_line1 || site.location,
+        address_line2: '',
+        state: '',
+        postcode: '',
+        street: '',
+        distance_meters: 0,
+        categories: [site.era, site.style].filter(Boolean),
+      });
     } finally {
       setIsSaving(false);
-      console.log('🎯 [SiteDetailScreen] Save operation completed');
     }
   };
 

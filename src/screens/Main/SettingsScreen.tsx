@@ -214,8 +214,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
       } else {
         Alert.alert('Error', 'Failed to update profile. Please try again.');
       }
-    } catch (error) {
-      console.error('Update profile error:', error);
+    } catch {
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setIsSaving(false);
@@ -256,8 +255,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             } else {
               Alert.alert('Error', 'Failed to upload avatar');
             }
-          } catch (error) {
-            console.error('Avatar upload error:', error);
+          } catch {
             Alert.alert('Error', 'Failed to upload avatar');
           }
         }
@@ -278,8 +276,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             if (onLogout) {
               onLogout();
             }
-          } catch (error) {
-            console.error('Logout failed:', error);
+          } catch {
             Alert.alert('Error', 'Failed to logout. Please try again.');
           }
         },
@@ -607,7 +604,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: () => console.log('Delete account'),
+                    onPress: () => {},
                   },
                 ],
               )

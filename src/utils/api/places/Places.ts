@@ -3,7 +3,6 @@
  * Handles finding nearby places, saving/unsaving places
  */
 
-import { AxiosError } from 'axios';
 import { createAuthenticatedClient } from '../auth';
 import {
   FindPlacesRequest,
@@ -11,199 +10,112 @@ import {
   SavePlaceRequest,
   SavedPlace,
   PlacesResult,
-  PlacesError,
 } from './types';
-
-/**
- * Extracts error message from axios error
- */
-function getErrorMessage(error: AxiosError<{ message?: string }>): string {
-  if (error.response?.data?.message) {
-    return error.response.data.message;
-  }
-
-  if (error.code === 'ECONNABORTED') {
-    return 'Request timed out. Please try again.';
-  }
-
-  if (error.code === 'ERR_NETWORK') {
-    return 'Network error. Please check your connection.';
-  }
-
-  return error.message || 'An unexpected error occurred';
-}
-
-/**
- * Gets status code from axios error
- */
-function getStatusCode(error: AxiosError): number {
-  return error.response?.status || (error.code === 'ECONNABORTED' ? 408 : 0);
-}
+import { createErrorResult } from '../helpers';
 
 /**
  * Find nearby places based on location and radius
- * @param request - Location and search parameters
- * @returns PlacesResult with found places or error
  */
 export async function findPlaces(
   request: FindPlacesRequest
 ): Promise<PlacesResult<FindPlacesResponse>> {
   try {
-    console.log('🔐 [findPlaces] Creating authenticated client...');
     const client = createAuthenticatedClient();
-    
-    console.log('📤 [findPlaces] Making request to /api/findplaces');
-    console.log('📤 [findPlaces] Request payload:', JSON.stringify(request));
-    
-    const response = await client.post<FindPlacesResponse>(
-      '/findplaces',
-      request
-    );
-    
-    console.log('✅ [findPlaces] Response received:', {
-      status: response.status,
-      hasPlaces: !!response.data?.places,
-      placesCount: response.data?.places?.length || 0
-    });
-    
+    const response = await client.post<FindPlacesResponse>('/findplaces', request);
     return { success: true, data: response.data };
   } catch (error) {
-    const axiosError = error as AxiosError<{ message?: string }>;
-    console.error('❌ [findPlaces] Error occurred:', {
-      message: getErrorMessage(axiosError),
-      statusCode: getStatusCode(axiosError),
-      responseData: axiosError.response?.data
-    });
-    return {
-      success: false,
-      error: {
-        message: getErrorMessage(axiosError),
-        statusCode: getStatusCode(axiosError),
-      },
-    };
+    return createErrorResult(error);
   }
 }
 
 /**
  * Save a place to user's saved places
- * @param placeId - The ID of the place to save
- * @returns PlacesResult with success status or error
  */
 export async function savePlace(
-  placeId: string
+  placeId: string,
+  placeData?: any
 ): Promise<PlacesResult<{ message: string }>> {
   try {
-    console.log('💾 [savePlace] Starting save place request...');
-    console.log('💾 [savePlace] Place ID:', placeId);
-    
     const client = createAuthenticatedClient();
-    console.log('💾 [savePlace] Authenticated client created');
-    
-    const request: SavePlaceRequest = { place_id: placeId };
-    console.log('💾 [savePlace] Request payload:', JSON.stringify(request));
-    console.log('💾 [savePlace] Endpoint: /user/save-place');
-    
+    const request: SavePlaceRequest = { 
+      place_id: placeId,
+      place_data: placeData 
+    };
+    console.log('[Places API] savePlace -> POST /api/user/save-place', request);
     const response = await client.post<{ message: string }>(
-      '/user/save-place',
+      '/api/user/save-place',
       request
     );
-    
-    console.log('✅ [savePlace] Success:', response.data);
+    console.log('[Places API] savePlace <-', response.status, response.data);
     return { success: true, data: response.data };
   } catch (error) {
-    const axiosError = error as AxiosError<{ message?: string }>;
-    console.error('❌ [savePlace] Error occurred:', {
-      message: getErrorMessage(axiosError),
-      statusCode: getStatusCode(axiosError),
-      responseData: axiosError.response?.data,
-      placeId
-    });
-    return {
-      success: false,
-      error: {
-        message: getErrorMessage(axiosError),
-        statusCode: getStatusCode(axiosError),
-      },
-    };
+    console.error('[Places API] savePlace error', error);
+    return createErrorResult(error);
   }
 }
 
 /**
  * Remove a place from user's saved places
- * @param placeId - The ID of the place to unsave
- * @returns PlacesResult with success status or error
  */
 export async function unsavePlace(
   placeId: string
 ): Promise<PlacesResult<{ message: string }>> {
   try {
-    console.log('🗑️  [unsavePlace] Starting unsave place request...');
-    console.log('🗑️  [unsavePlace] Place ID:', placeId);
-    
     const client = createAuthenticatedClient();
-    console.log('🗑️  [unsavePlace] Authenticated client created');
-    console.log('🗑️  [unsavePlace] Endpoint: /user/save-place/' + placeId);
-    
-    const response = await client.delete<{ message: string }>(
-      `/user/save-place/${placeId}`
+    console.log(
+      '[Places API] unsavePlace -> DELETE /api/user/save-place/{placeId}',
+      placeId
     );
-    
-    console.log('✅ [unsavePlace] Success:', response.data);
+    const response = await client.delete<{ message: string }>(
+      `/api/user/save-place/${placeId}`
+    );
+    console.log('[Places API] unsavePlace <-', response.status, response.data);
     return { success: true, data: response.data };
   } catch (error) {
-    const axiosError = error as AxiosError<{ message?: string }>;
-    console.error('❌ [unsavePlace] Error occurred:', {
-      message: getErrorMessage(axiosError),
-      statusCode: getStatusCode(axiosError),
-      responseData: axiosError.response?.data,
-      placeId
-    });
-    return {
-      success: false,
-      error: {
-        message: getErrorMessage(axiosError),
-        statusCode: getStatusCode(axiosError),
-      },
-    };
+    console.error('[Places API] unsavePlace error', error);
+    return createErrorResult(error);
   }
 }
 
 /**
  * Get all saved places for the user
- * @returns PlacesResult with saved places array or error
  */
-export async function getSavedPlaces(): Promise<
-  PlacesResult<SavedPlace[]>
-> {
+export async function getSavedPlaces(): Promise<PlacesResult<SavedPlace[]>> {
   try {
-    console.log('📋 [getSavedPlaces] Starting get saved places request...');
-    
     const client = createAuthenticatedClient();
-    console.log('📋 [getSavedPlaces] Authenticated client created');
-    console.log('📋 [getSavedPlaces] Endpoint: /user/saved-places');
+    console.log('[Places API] getSavedPlaces -> GET /api/user/saved-places');
+    const response = await client.get<
+      | SavedPlace[]
+      | { saved_places?: SavedPlace[]; savedPlaces?: SavedPlace[]; data?: SavedPlace[] }
+    >('/api/user/saved-places');
     
-    const response = await client.get<SavedPlace[]>(
-      '/user/saved-places'
-    );
+    console.log('[Places API] getSavedPlaces RAW RESPONSE:', JSON.stringify(response.data, null, 2));
     
-    console.log('✅ [getSavedPlaces] Success:', {
-      count: response.data?.length || 0,
-      status: response.status
+    const raw = Array.isArray(response.data)
+      ? response.data
+      : response.data.saved_places || response.data.savedPlaces || response.data.data || [];
+    
+    console.log('[Places API] getSavedPlaces RAW ARRAY:', raw.length, 'items');
+    
+    const normalized = raw.map((saved, index) => {
+      const placeData =
+        (saved as SavedPlace).place_data ||
+        (saved as { place?: SavedPlace['place_data'] }).place ||
+        (saved as { placeData?: SavedPlace['place_data'] }).placeData;
+      
+      console.log(`[Places API] Item ${index}:`, {
+        hasPlaceData: !!placeData,
+        keys: Object.keys(saved),
+        placeDataKeys: placeData ? Object.keys(placeData) : 'none',
+      });
+      
+      return placeData ? { ...saved, place_data: placeData } : saved;
     });
-    return { success: true, data: response.data };
+    
+    console.log('[Places API] getSavedPlaces NORMALIZED:', normalized.length, 'items');
+    return { success: true, data: normalized };
   } catch (error) {
-    const axiosError = error as AxiosError<{ message?: string }>;
-    console.error('❌ [getSavedPlaces] Error occurred:', {
-      message: getErrorMessage(axiosError),
-      statusCode: getStatusCode(axiosError),
-      responseData: axiosError.response?.data
-    });
-    return {
-      success: false,
-      error: {
-        message: getErrorMessage(axiosError),
-        statusCode: getStatusCode(axiosError),
-      },
-    };
+    console.error('[Places API] getSavedPlaces error', error);
+    return createErrorResult(error);
   }
 }

@@ -47,7 +47,7 @@ interface PlacesContextType {
   // Actions
   refreshNearbyPlaces: () => Promise<void>;
   refreshSavedPlaces: () => Promise<void>;
-  toggleSavePlace: (placeId: string) => Promise<boolean>;
+  toggleSavePlace: (placeId: string, placeData?: any) => Promise<boolean>;
   isPlaceSaved: (placeId: string) => boolean;
 
   // Utilities
@@ -171,57 +171,24 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
    */
   const fetchNearbyPlaces = useCallback(
     async (location: LocationData, force: boolean = false) => {
-      console.log('========== FINDPLACES DEBUG START ==========');
-      console.log('Location:', {
-        lat: location.latitude,
-        lon: location.longitude,
-        timestamp: new Date(location.timestamp).toISOString(),
-      });
-      console.log('Force fetch:', force);
-
       // Check if we should make the API call
       if (!force && !canMakeApiCall()) {
-        const timeSinceLastCall = Date.now() - lastApiCallTime.current;
-        const remainingTime = Math.ceil(
-          (API_CALL_COOLDOWN_MS - timeSinceLastCall) / 1000,
-        );
-        console.log(
-          `⏳ API call cooldown active. Wait ${remainingTime}s more.`,
-        );
-        console.log('========== FINDPLACES DEBUG END ==========');
         return;
       }
 
       if (!force && !hasMovedOutsideRadius(location)) {
-        console.log('📍 User still within 1km radius, skipping API call');
-        if (lastApiCallLocation.current) {
-          const distance = calculateDistance(
-            lastApiCallLocation.current.latitude,
-            lastApiCallLocation.current.longitude,
-            location.latitude,
-            location.longitude,
-          );
-          console.log(
-            `Current distance from last check: ${distance.toFixed(0)}m`,
-          );
-        }
-        console.log('========== FINDPLACES DEBUG END ==========');
         return;
       }
 
       try {
         setIsLoadingNearby(true);
         setNearbyError(null);
-        console.log('🔍 Starting cascading radius search...');
 
         const authenticated = await isAuthenticated();
         if (!authenticated) {
-          console.log('❌ User not authenticated');
           setNearbyPlaces([]);
-          console.log('========== FINDPLACES DEBUG END ==========');
           return;
         }
-        console.log('✅ User authenticated');
 
         // Try each radius in sequence until we find places
         let foundPlaces: Place[] = [];
@@ -229,11 +196,6 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
 
         for (let i = 0; i < SEARCH_RADIUS_FALLBACKS.length; i++) {
           const radius = SEARCH_RADIUS_FALLBACKS[i];
-          console.log(
-            `\n🔎 Attempt ${i + 1}/${
-              SEARCH_RADIUS_FALLBACKS.length
-            }: Searching within ${radius}m (${radius / 1000}km)...`,
-          );
 
           const requestPayload = {
             latitude: location.latitude,
@@ -241,42 +203,16 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
             radius_meters: radius,
             limit: SEARCH_LIMIT,
           };
-          console.log('📤 API Request:', JSON.stringify(requestPayload));
 
-          const startTime = Date.now();
           const result = await findPlaces(requestPayload);
-          const duration = Date.now() - startTime;
-
-          console.log(`⏱️  API Response time: ${duration}ms`);
 
           if (result.success) {
             const placesArray = result.data?.places || [];
-            console.log(`✅ API Success: ${placesArray.length} places found`);
             if (placesArray.length > 0) {
               foundPlaces = placesArray;
               usedRadius = radius;
-              console.log(
-                `🎯 Success at ${radius}m! Found ${foundPlaces.length} places`,
-              );
-              console.log(
-                'Sample places:',
-                foundPlaces.slice(0, 3).map(p => ({
-                  id: p.id,
-                  name: p.name,
-                  distance: `${p.distance_meters}m`,
-                })),
-              );
               break;
-            } else {
-              console.log(
-                `⚠️  No places at ${radius}m, trying larger radius...`,
-              );
             }
-          } else {
-            console.error(`❌ API Error at ${radius}m:`, {
-              message: result.error.message,
-              statusCode: result.error.statusCode,
-            });
           }
         }
 
@@ -314,32 +250,16 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
           setNearbyPlaces(placesWithDistance);
           lastApiCallLocation.current = location;
           lastApiCallTime.current = Date.now();
-          console.log(
-            `\n✅ FINAL RESULT: ${
-              foundPlaces.length
-            } places (radius: ${usedRadius}m / ${usedRadius / 1000}km)`,
-          );
-          console.log(
-            `Next API call allowed at: ${new Date(
-              Date.now() + API_CALL_COOLDOWN_MS,
-            ).toLocaleTimeString()}`,
-          );
         } else {
           setNearbyPlaces([]);
           lastApiCallLocation.current = location;
           lastApiCallTime.current = Date.now();
           setNearbyError('No places found within 20km radius');
-          console.log(
-            '\n❌ FINAL RESULT: No places found at any radius (1km -> 5km -> 10km -> 20km)',
-          );
-          console.log('Will retry after cooldown period (1 minute)');
         }
-      } catch (error) {
+      } catch {
         setNearbyError('Failed to fetch nearby places');
-        console.error('💥 CRITICAL ERROR:', error);
       } finally {
         setIsLoadingNearby(false);
-        console.log('========== FINDPLACES DEBUG END ==========\n');
       }
     },
     [canMakeApiCall, hasMovedOutsideRadius],
@@ -362,18 +282,14 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
       const result = await getSavedPlaces();
 
       if (result.success) {
-        // Ensure we always set an array, even if data is undefined/null
         setSavedPlaces(Array.isArray(result.data) ? result.data : []);
-        console.log(`Fetched ${result.data?.length || 0} saved places`);
       } else {
         setSavedPlaces([]);
         setSavedError(result.error.message);
-        console.error('Failed to fetch saved places:', result.error.message);
       }
-    } catch (error) {
+    } catch {
       setSavedPlaces([]);
       setSavedError('Failed to fetch saved places');
-      console.error('Error fetching saved places:', error);
     } finally {
       setIsLoadingSaved(false);
     }
@@ -408,7 +324,6 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
     Geolocation.getCurrentPosition(
       position => {
         handleLocationUpdate(position);
-        // Fetch places immediately on first load
         const location: LocationData = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -416,22 +331,19 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
         };
         fetchNearbyPlaces(location, true);
       },
-      error => {
-        console.error('Error getting initial location:', error);
+      () => {
         setNearbyError('Unable to get your location');
       },
       { enableHighAccuracy: false, timeout: 15000, maximumAge: 10000 },
     );
 
-    // Set up periodic location checks every 5 seconds
+    // Set up periodic location checks
     locationCheckInterval.current = setInterval(() => {
-      Geolocation.getCurrentPosition(
-        handleLocationUpdate,
-        error => {
-          console.warn('Error updating location:', error);
-        },
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 5000 },
-      );
+      Geolocation.getCurrentPosition(handleLocationUpdate, () => {}, {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 5000,
+      });
     }, LOCATION_CHECK_INTERVAL_MS);
   }, [handleLocationUpdate, fetchNearbyPlaces]);
 
@@ -454,56 +366,31 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
    * Toggle save/unsave a place
    */
   const toggleSavePlace = useCallback(
-    async (placeId: string): Promise<boolean> => {
-      console.log('🔄 [toggleSavePlace] Called with placeId:', placeId);
-      console.log('🔄 [toggleSavePlace] savedPlaces:', savedPlaces);
-
+    async (placeId: string, placeData?: any): Promise<boolean> => {
       if (!Array.isArray(savedPlaces)) {
-        console.error(
-          '❌ [toggleSavePlace] savedPlaces is not an array:',
-          savedPlaces,
-        );
         return false;
       }
 
       const isSaved = savedPlaces.some(saved => saved.place_id === placeId);
-      console.log('🔄 [toggleSavePlace] isSaved:', isSaved);
-      console.log('🔄 [toggleSavePlace] Action:', isSaved ? 'UNSAVE' : 'SAVE');
 
       try {
-        let result;
-        if (isSaved) {
-          console.log('🔄 [toggleSavePlace] Calling unsavePlace...');
-          result = await unsavePlace(placeId);
-        } else {
-          console.log('🔄 [toggleSavePlace] Calling savePlace...');
-          result = await savePlace(placeId);
-        }
-
-        console.log('🔄 [toggleSavePlace] Result:', result);
+        const result = isSaved
+          ? await unsavePlace(placeId)
+          : await savePlace(
+              placeId,
+              placeData || nearbyPlaces.find(p => p.id === placeId),
+            );
 
         if (result.success) {
-          console.log(
-            '✅ [toggleSavePlace] Success! Refreshing saved places...',
-          );
-          // Refresh saved places
           await fetchSavedPlaces();
           return true;
-        } else {
-          console.error(
-            `❌ [toggleSavePlace] Failed to ${
-              isSaved ? 'unsave' : 'save'
-            } place:`,
-            result.error.message,
-          );
-          return false;
         }
-      } catch (error) {
-        console.error('❌ [toggleSavePlace] Exception:', error);
+        return false;
+      } catch {
         return false;
       }
     },
-    [savedPlaces, fetchSavedPlaces],
+    [savedPlaces, nearbyPlaces, fetchSavedPlaces],
   );
 
   /**
@@ -512,7 +399,6 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
   const isPlaceSaved = useCallback(
     (placeId: string): boolean => {
       if (!Array.isArray(savedPlaces)) {
-        console.warn('savedPlaces is not an array:', savedPlaces);
         return false;
       }
       return savedPlaces.some(saved => saved.place_id === placeId);
@@ -570,13 +456,10 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
    */
   useEffect(() => {
     if (isUserAuthenticated) {
-      console.log('🔐 User authenticated, starting location tracking...');
       startLocationTracking();
       fetchSavedPlaces();
     } else {
-      console.log('🔓 User not authenticated, stopping location tracking...');
       stopLocationTracking();
-      // Clear places data when logged out
       setNearbyPlaces([]);
       setSavedPlaces([]);
     }

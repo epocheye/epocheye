@@ -82,21 +82,46 @@ const Saved = ({ navigation }: any) => {
   const [refreshing, setRefreshing] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
+  const safeSavedPlaces = useMemo(() => {
+    console.log('[Saved Screen] Total savedPlaces:', savedPlaces?.length || 0);
+
+    const filtered = (savedPlaces || []).filter((saved, index) => {
+      const hasPlaceData = !!saved?.place_data;
+      const hasCategories =
+        hasPlaceData && Array.isArray(saved.place_data.categories);
+
+      console.log(`[Saved Screen] Item ${index}:`, {
+        id: saved?.id,
+        hasPlaceData,
+        hasCategories,
+        keys: saved ? Object.keys(saved) : 'null',
+        placeDataKeys: saved?.place_data
+          ? Object.keys(saved.place_data)
+          : 'none',
+      });
+
+      return hasPlaceData && hasCategories;
+    });
+
+    console.log('[Saved Screen] Filtered safeSavedPlaces:', filtered.length);
+    return filtered;
+  }, [savedPlaces]);
+
   // Extract unique categories from saved places
   const categories = useMemo(() => {
     const cats = new Set<string>();
-    (savedPlaces || []).forEach(saved => {
+    safeSavedPlaces.forEach(saved => {
       saved.place_data.categories.forEach(cat => cats.add(cat));
     });
     return ['All', ...Array.from(cats)];
-  }, [savedPlaces]);
+  }, [safeSavedPlaces]);
 
   const filteredPlaces = useMemo(() => {
-    if (activeFilter === 'All') return savedPlaces || [];
-    return (savedPlaces || []).filter(saved =>
+    if (activeFilter === 'All') return safeSavedPlaces;
+    return safeSavedPlaces.filter(saved =>
       saved.place_data.categories.includes(activeFilter),
     );
-  }, [activeFilter, savedPlaces]);
+  }, [activeFilter, safeSavedPlaces]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -207,8 +232,8 @@ const Saved = ({ navigation }: any) => {
               Saved Places
             </Text>
             <Text className="text-[#9A9AAF] text-sm font-montserrat-medium mt-1">
-              {savedPlaces.length}{' '}
-              {savedPlaces.length === 1 ? 'place' : 'places'} saved
+              {safeSavedPlaces.length}{' '}
+              {safeSavedPlaces.length === 1 ? 'place' : 'places'} saved
             </Text>
           </View>
         </View>

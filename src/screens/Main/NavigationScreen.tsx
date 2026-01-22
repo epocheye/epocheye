@@ -73,8 +73,7 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
 
       const requestResult = await request(permission);
       return requestResult === RESULTS.GRANTED;
-    } catch (error) {
-      console.error('Permission error:', error);
+    } catch {
       return false;
     }
   };
@@ -101,15 +100,13 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
           setDestination(destCoords);
           fetchRoute({ latitude, longitude }, destCoords);
         },
-        error => {
-          console.error('Location error:', error);
+        () => {
           Alert.alert('Error', 'Unable to get your location');
           setIsLoading(false);
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
       );
-    } catch (error) {
-      console.error('Error getting location:', error);
+    } catch {
       setIsLoading(false);
     }
   };
@@ -149,8 +146,7 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
           animated: true,
         });
       }
-    } catch (error) {
-      console.error('Route fetch error:', error);
+    } catch {
       setIsLoading(false);
     }
   };
@@ -191,7 +187,7 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
             Linking.openURL(webUrl);
           }
         })
-        .catch(err => console.error('Error opening maps:', err));
+        .catch(() => {});
     }
   };
 

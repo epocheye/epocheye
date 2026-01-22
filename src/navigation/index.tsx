@@ -24,8 +24,8 @@ const AppNavigator: React.FC = () => {
         if (savedState) {
           setInitialState(JSON.parse(savedState));
         }
-      } catch (error) {
-        console.error('Failed to load navigation state:', error);
+      } catch {
+        // Navigation state loading failed silently
       }
     };
 
@@ -36,8 +36,7 @@ const AppNavigator: React.FC = () => {
     try {
       const authenticated = await isAuthenticated();
       setIsLoggedIn(authenticated);
-    } catch (error) {
-      console.error('Error checking auth status:', error);
+    } catch {
       setIsLoggedIn(false);
     } finally {
       setIsLoading(false);
@@ -65,8 +64,8 @@ const AppNavigator: React.FC = () => {
             NAVIGATION_STATE_KEY,
             JSON.stringify(state),
           );
-        } catch (error) {
-          console.error('Failed to save navigation state:', error);
+        } catch {
+          // Navigation state saving failed silently
         }
       }
     },

@@ -34,6 +34,7 @@ export interface FindPlacesResponse {
 
 export interface SavePlaceRequest {
   place_id: string;
+  place_data?: Place;
 }
 
 export interface SavedPlace {

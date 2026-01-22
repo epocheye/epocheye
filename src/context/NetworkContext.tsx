@@ -37,8 +37,8 @@ const LAST_STATE_KEY = '@epocheye/last_navigation_state';
 export async function saveNavigationState(state: any): Promise<void> {
   try {
     await AsyncStorage.setItem(LAST_STATE_KEY, JSON.stringify(state));
-  } catch (error) {
-    console.error('Failed to save navigation state:', error);
+  } catch {
+    // Silent fail - navigation state is non-critical
   }
 }
 
@@ -49,8 +49,7 @@ export async function getNavigationState(): Promise<any | null> {
   try {
     const state = await AsyncStorage.getItem(LAST_STATE_KEY);
     return state ? JSON.parse(state) : null;
-  } catch (error) {
-    console.error('Failed to get navigation state:', error);
+  } catch {
     return null;
   }
 }
@@ -61,8 +60,8 @@ export async function getNavigationState(): Promise<any | null> {
 export async function clearNavigationState(): Promise<void> {
   try {
     await AsyncStorage.removeItem(LAST_STATE_KEY);
-  } catch (error) {
-    console.error('Failed to clear navigation state:', error);
+  } catch {
+    // Silent fail - navigation state is non-critical
   }
 }
 

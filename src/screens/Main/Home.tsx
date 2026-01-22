@@ -235,14 +235,6 @@ const Home = ({ navigation }: any) => {
   };
 
   const handleVisitPlace = (place: any) => {
-    console.log('🏛️ [Home] handleVisitPlace called with place:', {
-      id: place.id,
-      name: place.name,
-      lat: place.lat,
-      lon: place.lon,
-    });
-
-    // Convert Place to site format for SiteDetail screen
     const siteData = {
       id: place.id,
       name: place.name,
@@ -272,7 +264,6 @@ const Home = ({ navigation }: any) => {
       country: place.country,
     };
 
-    console.log('🏛️ [Home] Navigating to SiteDetail with siteData:', siteData);
     navigation.navigate('SiteDetail', { site: siteData });
   };
 

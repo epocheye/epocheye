@@ -94,15 +94,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
       if (statsResult.success) {
         setStats(statsResult.data);
-      } else {
-        // Stats error is non-critical, just log it
-        console.warn('Failed to fetch user stats:', statsResult.error.message);
       }
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to fetch user data';
       setError(errorMessage);
-      console.error('Error fetching user data:', err);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);

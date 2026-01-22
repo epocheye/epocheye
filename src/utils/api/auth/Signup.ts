@@ -3,11 +3,8 @@
  * Handles user registration operations
  */
 
-import axios, { AxiosError, AxiosInstance } from 'axios';
-import { baseUrl } from '@env';
 import { AuthResult } from './types';
-
-const API_TIMEOUT_MS = 30000;
+import { createBaseClient, createErrorResult, isApiError } from '../helpers';
 
 /**
  * Signup request interface
@@ -26,51 +23,7 @@ export interface SignupResponse {
   uid: string;
 }
 
-/**
- * Create axios instance with default configuration
- */
-const apiClient: AxiosInstance = axios.create({
-  baseURL: baseUrl,
-  timeout: API_TIMEOUT_MS,
-  headers: {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  },
-});
-
-/**
- * Extracts error message from axios error
- */
-function getErrorMessage(error: AxiosError<{ message?: string }>): string {
-  if (error.response?.data?.message) {
-    return error.response.data.message;
-  }
-
-  if (error.code === 'ECONNABORTED') {
-    return 'Request timed out. Please try again.';
-  }
-
-  if (error.code === 'ERR_NETWORK') {
-    return 'Network error. Please check your connection.';
-  }
-
-  return error.message || 'An unexpected error occurred';
-}
-
-/**
- * Gets status code from axios error
- */
-function getStatusCode(error: AxiosError): number {
-  if (error.response?.status) {
-    return error.response.status;
-  }
-
-  if (error.code === 'ECONNABORTED') {
-    return 408;
-  }
-
-  return 0;
-}
+const apiClient = createBaseClient();
 
 /**
  * Registers a new user
@@ -82,28 +35,8 @@ export async function signup(
 ): Promise<AuthResult<SignupResponse>> {
   try {
     const response = await apiClient.post<SignupResponse>('/signup', data);
-
-    return {
-      success: true,
-      data: response.data,
-    };
+    return { success: true, data: response.data };
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      return {
-        success: false,
-        error: {
-          message: getErrorMessage(error),
-          statusCode: getStatusCode(error),
-        },
-      };
-    }
-
-    return {
-      success: false,
-      error: {
-        message: 'An unexpected error occurred',
-        statusCode: 0,
-      },
-    };
+    return createErrorResult(error);
   }
 }

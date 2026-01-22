@@ -239,9 +239,7 @@ const Email = ({ navigation }: any) => {
                 secureTextEntry
                 autoFocus
                 returnKeyType="done"
-                onSubmitEditing={
-                  isStepValid() ? () => console.log('Register') : undefined
-                }
+                onSubmitEditing={isStepValid() ? handleNext : undefined}
               />
               {confirmPassword.length > 0 && confirmPassword !== password && (
                 <Text className="text-red-400 font-montserrat-regular text-sm mt-2 ml-2">

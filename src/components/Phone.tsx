@@ -1,7 +1,7 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native';
 import React from 'react';
+import { Text, TextInput, View } from 'react-native';
 
-const Phone = () => {
+const Phone: React.FC = () => {
   return (
     <View className="my-10">
       <Text className="text-gray-300 font-montserrat-semibold text-lg">
@@ -17,5 +17,3 @@ const Phone = () => {
 };
 
 export default Phone;
-
-const styles = StyleSheet.create({});
