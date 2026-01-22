@@ -8,6 +8,7 @@ import {
   TextInput,
   Image,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import React, { useMemo, useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -214,7 +215,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
       } else {
         Alert.alert('Error', 'Failed to update profile. Please try again.');
       }
-    } catch {
+    } catch (error) {
+      console.error('Update profile error:', error);
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setIsSaving(false);
@@ -255,7 +257,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             } else {
               Alert.alert('Error', 'Failed to upload avatar');
             }
-          } catch {
+          } catch (error) {
+            console.error('Avatar upload error:', error);
             Alert.alert('Error', 'Failed to upload avatar');
           }
         }
@@ -276,7 +279,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             if (onLogout) {
               onLogout();
             }
-          } catch {
+          } catch (error) {
+            console.error('Logout failed:', error);
             Alert.alert('Error', 'Failed to logout. Please try again.');
           }
         },
@@ -326,7 +330,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           </View>
           <TouchableOpacity
             className="flex-row items-center rounded-full border border-white/10 bg-[#13131F] px-4 py-2"
-            onPress={() => navigation.navigate('ContactSupport')}
+            onPress={() => Linking.openURL('mailto:support@epocheye.app')}
           >
             <MessageCircle size={16} color="white" />
             <Text className="text-white text-sm font-montserrat-medium ml-2">
@@ -443,7 +447,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
         )}
 
         {/* Security */}
-        <View className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5">
+        {/* <View className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5">
           <View className="flex-row items-center mb-5">
             <View className="w-10 h-10 rounded-full bg-white/5 items-center justify-center mr-3">
               <Shield size={20} color="#3B82F6" />
@@ -465,10 +469,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             value={twoFactorAuth}
             onValueChange={handle2FAToggle}
           />
-        </View>
+        </View> */}
 
         {/* Notifications */}
-        <View className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5">
+        {/* <View className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5">
           <View className="flex-row items-center mb-5">
             <View className="w-10 h-10 rounded-full bg-white/5 items-center justify-center mr-3">
               <Bell size={20} color="#3B82F6" />
@@ -491,7 +495,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             value={emailNotifications}
             onValueChange={setEmailNotifications}
           />
-        </View>
+        </View> */}
 
         {/* Privacy */}
         <View className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5">
@@ -539,7 +543,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
         </View>
 
         {/* Legal & Support */}
-        <View className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5">
+        {/* <View className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5">
           <View className="flex-row items-center mb-5">
             <View className="w-10 h-10 rounded-full bg-white/5 items-center justify-center mr-3">
               <Info size={20} color="#3B82F6" />
@@ -572,7 +576,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             subtitle="Chat with our team"
             onPress={() => navigation.navigate('ContactSupport')}
           />
-        </View>
+        </View> */}
 
         <View className="items-center py-8">
           <Text className="text-[#8B8B9E] text-sm font-montserrat-medium">
@@ -604,7 +608,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: () => {},
+                    onPress: () => console.log('Delete account'),
                   },
                 ],
               )
