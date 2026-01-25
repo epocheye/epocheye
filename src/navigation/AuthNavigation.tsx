@@ -5,33 +5,39 @@ import Login from '../screens/Auth/Login';
 import Signup from '../screens/Auth/Signup';
 import Permissions from '../screens/Auth/Permissions';
 import { OnboardingFlow } from '../screens/Onboarding';
+import { ROUTES } from '../core/constants';
+import type { AuthStackParamList } from '../core/types';
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 interface AuthNavigationProps {
   onLoginSuccess: () => void;
 }
 
+/**
+ * Authentication navigation stack
+ * Handles unauthenticated user flows: landing, login, signup, onboarding
+ */
 const AuthNavigation: React.FC<AuthNavigationProps> = ({ onLoginSuccess }) => {
   return (
     <Stack.Navigator
-      initialRouteName="Landing"
+      initialRouteName={ROUTES.AUTH.LANDING}
       screenOptions={{ headerShown: false }}
     >
-      <Stack.Screen name="Landing" component={Landing} />
-      <Stack.Screen name="Login">
+      <Stack.Screen name={ROUTES.AUTH.LANDING} component={Landing} />
+      <Stack.Screen name={ROUTES.AUTH.LOGIN}>
         {props => <Login {...props} onLoginSuccess={onLoginSuccess} />}
       </Stack.Screen>
-      <Stack.Screen name="Register" component={Signup} />
+      <Stack.Screen name={ROUTES.AUTH.REGISTER} component={Signup} />
       <Stack.Screen
-        name="OnboardingFlow"
+        name={ROUTES.AUTH.ONBOARDING}
         component={OnboardingFlow}
         options={{
           gestureEnabled: false,
           animation: 'fade',
         }}
       />
-      <Stack.Screen name="Permissions" component={Permissions} />
+      <Stack.Screen name={ROUTES.AUTH.PERMISSIONS} component={Permissions} />
     </Stack.Navigator>
   );
 };

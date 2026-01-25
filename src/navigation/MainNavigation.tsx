@@ -4,18 +4,24 @@ import TabNavigation from './TabNavigation';
 import Permissions from '../screens/Auth/Permissions';
 import SiteDetailScreen from '../screens/Main/SiteDetailScreen';
 import ARExperienceScreen from '../screens/Main/ARExperienceScreen';
+import { ROUTES } from '../core/constants';
+import type { MainStackParamList } from '../core/types';
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<MainStackParamList>();
 
 interface MainNavigationProps {
   onLogout: () => void;
 }
 
+/**
+ * Main navigation stack for authenticated users
+ * Contains the tab navigator and modal screens
+ */
 const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
   return (
-    <Stack.Navigator initialRouteName="MainTabs">
+    <Stack.Navigator initialRouteName={ROUTES.MAIN.TABS}>
       <Stack.Screen
-        name="MainTabs"
+        name={ROUTES.MAIN.TABS}
         options={{
           headerShown: false,
         }}
@@ -23,7 +29,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         {props => <TabNavigation {...props} onLogout={onLogout} />}
       </Stack.Screen>
       <Stack.Screen
-        name="Permissions"
+        name={ROUTES.MAIN.PERMISSIONS}
         component={Permissions}
         options={{
           headerShown: false,
@@ -31,7 +37,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         }}
       />
       <Stack.Screen
-        name="SiteDetail"
+        name={ROUTES.MAIN.SITE_DETAIL}
         component={SiteDetailScreen}
         options={{
           headerShown: false,
@@ -39,7 +45,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         }}
       />
       <Stack.Screen
-        name="ARExperience"
+        name={ROUTES.MAIN.AR_EXPERIENCE}
         component={ARExperienceScreen}
         options={{
           headerShown: false,

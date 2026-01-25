@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavigationContainer, NavigationState } from '@react-navigation/native';
 import { View, ActivityIndicator } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthNavigation from './AuthNavigation';
 import MainNavigation from './MainNavigation';
 import { isAuthenticated } from '../utils/api/auth';
+import { StorageService } from '../shared/services';
+import { STORAGE_KEYS } from '../core/constants';
 
-const NAVIGATION_STATE_KEY = '@epocheye/navigation_state';
-
+/**
+ * Root navigator component that handles authentication state
+ * and persists navigation state across sessions
+ */
 const AppNavigator: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -20,9 +23,11 @@ const AppNavigator: React.FC = () => {
   useEffect(() => {
     const loadNavigationState = async () => {
       try {
-        const savedState = await AsyncStorage.getItem(NAVIGATION_STATE_KEY);
+        const savedState = await StorageService.get<NavigationState>(
+          STORAGE_KEYS.NAVIGATION.STATE,
+        );
         if (savedState) {
-          setInitialState(JSON.parse(savedState));
+          setInitialState(savedState);
         }
       } catch {
         // Navigation state loading failed silently
@@ -60,10 +65,7 @@ const AppNavigator: React.FC = () => {
     async (state: NavigationState | undefined) => {
       if (state) {
         try {
-          await AsyncStorage.setItem(
-            NAVIGATION_STATE_KEY,
-            JSON.stringify(state),
-          );
+          await StorageService.set(STORAGE_KEYS.NAVIGATION.STATE, state);
         } catch {
           // Navigation state saving failed silently
         }
