@@ -4,7 +4,7 @@
  */
 
 export { ROUTES } from './routes';
-export type { AuthRoutes, MainRoutes, TabRoutes, OnboardingRoutes } from './routes';
+export type { OnboardingRoutes, MainRoutes, TabRoutes } from './routes';
 
 export { STORAGE_KEYS } from './storage-keys';
 export type { StorageKey } from './storage-keys';

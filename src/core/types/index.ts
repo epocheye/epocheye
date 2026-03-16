@@ -22,15 +22,15 @@ export type {
 // Navigation types
 export type {
   PlaceNavParam,
-  AuthStackParamList,
+  OnboardingStackParamList,
   MainStackParamList,
   TabParamList,
   RootStackParamList,
-  AuthNavigationProp,
+  OnboardingNavigationProp,
   MainNavigationProp,
   TabNavigationProp,
   TabMainNavigationProp,
-  AuthScreenProps,
+  OnboardingScreenProps,
   MainScreenProps,
   TabScreenProps,
   RouteParams,

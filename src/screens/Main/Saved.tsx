@@ -1,9 +1,9 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Text,
   View,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   ImageBackground,
   Modal,
@@ -13,54 +13,13 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import {
-  MapPin,
-  Share2,
-  Trash2,
-  Play,
-  Filter,
-  X,
-  Camera,
-  Bookmark,
-} from 'lucide-react-native';
+import { MapPin, Trash2, Play, X, Camera, Bookmark } from 'lucide-react-native';
 import { usePlaces } from '../../context';
+import type { TabScreenProps } from '../../core/types/navigation.types';
+import type { SavedPlace, Place } from '../../utils/api/places/types';
 
-const SAVED_PLACES = [
-  {
-    id: 'saved-1',
-    name: 'Humayun’s Tomb',
-    location: 'Delhi, India',
-    era: 'Mughal',
-    type: 'Architecture',
-    image:
-      'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80',
-    description:
-      'A UNESCO heritage site built in 1570. Considered the earliest example of Mughal garden-tomb style.',
-  },
-  {
-    id: 'saved-2',
-    name: 'Charminar',
-    location: 'Hyderabad, India',
-    era: 'Deccan Sultanate',
-    type: 'Monument',
-    image:
-      'https://images.unsplash.com/photo-1489493585363-d69421e0edd3?auto=format&fit=crop&w=900&q=80',
-    description:
-      'Iconic mosque and monument built in 1591 with four grand minarets framing the skyline.',
-  },
-  {
-    id: 'saved-3',
-    name: 'Gateway of India',
-    location: 'Mumbai, India',
-    era: 'Colonial',
-    type: 'Harbor Landmark',
-    image:
-      'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=900&q=80',
-    description:
-      'Commemorative arch built in 1924 overlooking the Arabian Sea, symbolizing Mumbai’s maritime legacy.',
-  },
-];
-
+// Enable LayoutAnimation on Android so card removal is animated.
+// Must be called at module level before the component is rendered.
 if (
   Platform.OS === 'android' &&
   UIManager.setLayoutAnimationEnabledExperimental
@@ -68,7 +27,65 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const Saved = ({ navigation }: any) => {
+// Map a place's first category to a relevant stock image.
+// This is a temporary measure until the backend supplies its own CDN images.
+const CATEGORY_IMAGE_MAP: Record<string, string> = {
+  temple:
+    'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80',
+  religious:
+    'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80',
+  fort: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80',
+  castle:
+    'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80',
+};
+const FALLBACK_PLACE_IMAGE =
+  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80';
+
+/** Returns a representative image URI for a place based on its categories. */
+function getPlaceImage(categories: string[]): string {
+  const first = categories[0]?.toLowerCase() ?? '';
+  for (const [keyword, uri] of Object.entries(CATEGORY_IMAGE_MAP)) {
+    if (first.includes(keyword)) {
+      return uri;
+    }
+  }
+  return FALLBACK_PLACE_IMAGE;
+}
+
+/** Converts a raw Place API object into the shape expected by SiteDetail. */
+function buildSiteData(place: Place) {
+  return {
+    id: place.id,
+    name: place.name,
+    location: place.formatted || `${place.city}, ${place.country}`,
+    era: place.categories[0] || 'Historic',
+    style: place.categories.join(', ') || 'Architecture',
+    yearBuilt: 'Unknown',
+    distance: `${(place.distance_meters / 1000).toFixed(1)} km`,
+    estimatedTime: '45 min',
+    // Placeholder hero image until the backend provides CDN URLs
+    heroImages: [getPlaceImage(place.categories)],
+    shortDescription: `Explore ${place.name} located at ${place.formatted}.`,
+    fullDescription: `${place.name} is a historic site located at ${place.formatted}. Discover its rich history and cultural significance.`,
+    funFacts: [],
+    visitorTips: [
+      'Best visited during early morning or late afternoon.',
+      'Carry water and wear comfortable shoes.',
+    ],
+    relatedSites: [],
+    rating: 4.5,
+    reviews: 0,
+    lat: place.lat,
+    lon: place.lon,
+    address_line1: place.address_line1,
+    city: place.city,
+    country: place.country,
+  };
+}
+
+type Props = TabScreenProps<'Saved'>;
+
+const Saved = ({ navigation }: Props) => {
   const {
     savedPlaces,
     isLoadingSaved,
@@ -78,36 +95,22 @@ const Saved = ({ navigation }: any) => {
   } = usePlaces();
 
   const [activeFilter, setActiveFilter] = useState('All');
-  const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<SavedPlace | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
-  const safeSavedPlaces = useMemo(() => {
-    console.log('[Saved Screen] Total savedPlaces:', savedPlaces?.length || 0);
+  // Filter out entries that lack a valid place_data shape. The API normalises
+  // this in getSavedPlaces(), but we defend here as an extra guard.
+  const safeSavedPlaces = useMemo(
+    () =>
+      (savedPlaces || []).filter(
+        saved =>
+          !!saved?.place_data && Array.isArray(saved.place_data.categories),
+      ),
+    [savedPlaces],
+  );
 
-    const filtered = (savedPlaces || []).filter((saved, index) => {
-      const hasPlaceData = !!saved?.place_data;
-      const hasCategories =
-        hasPlaceData && Array.isArray(saved.place_data.categories);
-
-      console.log(`[Saved Screen] Item ${index}:`, {
-        id: saved?.id,
-        hasPlaceData,
-        hasCategories,
-        keys: saved ? Object.keys(saved) : 'null',
-        placeDataKeys: saved?.place_data
-          ? Object.keys(saved.place_data)
-          : 'none',
-      });
-
-      return hasPlaceData && hasCategories;
-    });
-
-    console.log('[Saved Screen] Filtered safeSavedPlaces:', filtered.length);
-    return filtered;
-  }, [savedPlaces]);
-
-  // Extract unique categories from saved places
+  // Build the list of category filter chips from the actual saved places data
   const categories = useMemo(() => {
     const cats = new Set<string>();
     safeSavedPlaces.forEach(saved => {
@@ -131,62 +134,171 @@ const Saved = ({ navigation }: any) => {
 
   const handleRemove = async (placeId: string) => {
     setRemovingId(placeId);
+    // Animate the card disappearing so the UI feels responsive
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
-    const success = await toggleSavePlace(placeId);
+    await toggleSavePlace(placeId);
 
     if (selectedPlace?.place_id === placeId) {
       setSelectedPlace(null);
     }
-
     setRemovingId(null);
   };
 
-  const handleLaunchPlace = (saved: any) => {
+  const handleLaunchPlace = (saved: SavedPlace) => {
+    navigation.navigate('SiteDetail', {
+      site: buildSiteData(saved.place_data),
+    });
+  };
+
+  const renderPlaceCard = ({ item: saved }: { item: SavedPlace }) => {
     const place = saved.place_data;
-    const siteData = {
-      id: place.id,
-      name: place.name,
-      location: place.formatted || `${place.city}, ${place.country}`,
-      era: place.categories[0] || 'Historic',
-      style: place.categories.join(', ') || 'Architecture',
-      yearBuilt: 'Unknown',
-      distance: `${(place.distance_meters / 1000).toFixed(1)} km`,
-      estimatedTime: '45 min',
-      heroImages: [
-        'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
-      ],
-      shortDescription: `Explore ${place.name} located at ${place.formatted}.`,
-      fullDescription: `${place.name} is a historic site located at ${place.formatted}. Discover its rich history and cultural significance.`,
-      funFacts: [],
-      visitorTips: [
-        'Best visited during early morning or late afternoon.',
-        'Carry water and wear comfortable shoes.',
-      ],
-      relatedSites: [],
-      rating: 4.5,
-      reviews: 0,
-      lat: place.lat,
-      lon: place.lon,
-      address_line1: place.address_line1,
-      city: place.city,
-      country: place.country,
-    };
-    navigation.navigate('SiteDetail', { site: siteData });
+    const imageUri = getPlaceImage(place.categories);
+    const isRemoving = removingId === place.id;
+
+    return (
+      <TouchableOpacity
+        onPress={() => setSelectedPlace(saved)}
+        className="w-[48%] mb-5"
+        activeOpacity={0.9}
+        disabled={isRemoving}
+        accessibilityRole="button"
+        accessibilityLabel={`Saved place: ${place.name}`}
+        accessibilityHint="Opens place details"
+      >
+        <ImageBackground
+          source={{ uri: imageUri }}
+          style={{ height: 190 }}
+          imageStyle={{ borderRadius: 26 }}
+        >
+          <View className="flex-1 justify-between bg-black/35 rounded-[26px] p-4">
+            <View className="bg-white/20 rounded-full px-3 py-1 self-start">
+              <Text
+                className="text-white text-xs font-montserrat-semibold"
+                numberOfLines={1}
+              >
+                {place.categories[0] || 'Historic'}
+              </Text>
+            </View>
+            <View>
+              <Text
+                className="text-white text-[18px] font-montserrat-bold"
+                numberOfLines={2}
+              >
+                {place.name}
+              </Text>
+              <View className="flex-row items-center mt-1">
+                <MapPin color="#FFFFFF" size={16} />
+                <Text
+                  className="text-white text-xs font-montserrat-medium ml-1"
+                  numberOfLines={1}
+                >
+                  {place.city}, {place.country}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </ImageBackground>
+        <View className="flex-row items-center justify-between mt-3">
+          <TouchableOpacity
+            className="flex-row items-center bg-[#171722] rounded-full px-3 py-2"
+            onPress={() => handleLaunchPlace(saved)}
+            accessibilityRole="button"
+            accessibilityLabel={`View details for ${place.name}`}
+          >
+            <Play color="#FF7A18" size={16} />
+            <Text className="text-white text-xs font-montserrat-semibold ml-1">
+              View
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            className="w-9 h-9 rounded-full bg-[#2A1111] items-center justify-center"
+            onPress={() => handleRemove(place.id)}
+            disabled={isRemoving}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${place.name} from saved places`}
+          >
+            {isRemoving ? (
+              <ActivityIndicator size="small" color="#FF6262" />
+            ) : (
+              <Trash2 color="#FF6262" size={18} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
-  const getPlaceImage = (categories: string[]) => {
-    const category = categories[0]?.toLowerCase() || '';
-    if (category.includes('temple') || category.includes('religious')) {
-      return 'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80';
-    }
-    if (category.includes('fort') || category.includes('castle')) {
-      return 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80';
-    }
-    return 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80';
-  };
+  // Rendered above the grid in the FlatList, keeping the
+  // header, error banner, and filter chips scroll-linked to the list.
+  const ListHeader = () => (
+    <>
+      <View className="flex-row items-center justify-between mt-6 mb-4">
+        <View>
+          <Text className="text-[#7E7E8F] text-sm font-montserrat-bold uppercase tracking-[4px]">
+            Library
+          </Text>
+          <Text className="text-white text-3xl font-montserrat-bold mt-2">
+            Saved Places
+          </Text>
+          <Text className="text-[#9A9AAF] text-sm font-montserrat-medium mt-1">
+            {safeSavedPlaces.length}{' '}
+            {safeSavedPlaces.length === 1 ? 'place' : 'places'} saved
+          </Text>
+        </View>
+      </View>
 
-  const renderEmptyState = () => (
+      {savedError && (
+        <View className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 mb-4">
+          <Text className="text-red-400 text-sm font-montserrat-medium">
+            {savedError}
+          </Text>
+        </View>
+      )}
+
+      {categories.length > 1 && (
+        <FlatList
+          horizontal
+          data={categories}
+          keyExtractor={item => item}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingVertical: 10 }}
+          renderItem={({ item: filter }) => (
+            <TouchableOpacity
+              onPress={() => setActiveFilter(filter)}
+              className={`mr-3 px-4 py-2 rounded-full border ${
+                activeFilter === filter
+                  ? 'bg-[#FF7A18] border-[#FF7A18]'
+                  : 'border-[#2A2A36]'
+              }`}
+              accessibilityRole="button"
+              accessibilityLabel={`Filter by ${filter}`}
+              accessibilityState={{ selected: activeFilter === filter }}
+            >
+              <Text
+                className={`text-sm font-montserrat-semibold ${
+                  activeFilter === filter ? 'text-white' : 'text-[#B7B7C7]'
+                }`}
+              >
+                {filter}
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+
+      {isLoadingSaved && (
+        <View className="h-64 items-center justify-center">
+          <ActivityIndicator size="large" color="#FF7A18" />
+          <Text className="text-[#9A9AAF] text-sm font-montserrat-medium mt-4">
+            Loading saved places...
+          </Text>
+        </View>
+      )}
+    </>
+  );
+
+  const EmptyState = () => (
     <View className="flex-1 items-center justify-center mt-12">
       <View className="w-44 h-44 rounded-full bg-[#171726] items-center justify-center mb-6">
         <Bookmark color="#FF7A18" size={48} />
@@ -201,6 +313,8 @@ const Saved = ({ navigation }: any) => {
       <TouchableOpacity
         className="bg-[#FF7A18] rounded-full px-8 py-3"
         onPress={() => navigation.navigate('Home')}
+        accessibilityRole="button"
+        accessibilityLabel="Explore nearby sites"
       >
         <Text className="text-white text-base font-montserrat-semibold">
           Explore Nearby Sites
@@ -211,9 +325,21 @@ const Saved = ({ navigation }: any) => {
 
   return (
     <SafeAreaView className="flex-1 bg-[#070709]">
-      <ScrollView
+      {/* FlatList with numColumns provides a virtualised 2-column grid,
+          keeping memory usage constant regardless of how many places are saved. */}
+      <FlatList
+        data={isLoadingSaved ? [] : filteredPlaces}
+        renderItem={renderPlaceCard}
+        keyExtractor={item => item.id}
+        numColumns={2}
+        columnWrapperStyle={{ justifyContent: 'space-between' }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: 32,
+        }}
+        ListHeaderComponent={<ListHeader />}
+        ListEmptyComponent={!isLoadingSaved ? <EmptyState /> : null}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -222,147 +348,15 @@ const Saved = ({ navigation }: any) => {
             colors={['#FF7A18']}
           />
         }
+      />
+
+      {/* Bottom sheet modal for place detail preview */}
+      <Modal
+        visible={!!selectedPlace}
+        transparent
+        animationType="slide"
+        accessibilityViewIsModal={true}
       >
-        <View className="flex-row items-center justify-between mt-6 mb-4">
-          <View>
-            <Text className="text-[#7E7E8F] text-sm font-montserrat-bold uppercase tracking-[4px]">
-              Library
-            </Text>
-            <Text className="text-white text-3xl font-montserrat-bold mt-2">
-              Saved Places
-            </Text>
-            <Text className="text-[#9A9AAF] text-sm font-montserrat-medium mt-1">
-              {safeSavedPlaces.length}{' '}
-              {safeSavedPlaces.length === 1 ? 'place' : 'places'} saved
-            </Text>
-          </View>
-        </View>
-
-        {savedError && (
-          <View className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 mb-4">
-            <Text className="text-red-400 text-sm font-montserrat-medium">
-              {savedError}
-            </Text>
-          </View>
-        )}
-
-        {categories.length > 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingVertical: 10 }}
-          >
-            {categories.map(filter => (
-              <TouchableOpacity
-                key={filter}
-                onPress={() => setActiveFilter(filter)}
-                className={`mr-3 px-4 py-2 rounded-full border ${
-                  activeFilter === filter
-                    ? 'bg-[#FF7A18] border-[#FF7A18]'
-                    : 'border-[#2A2A36]'
-                }`}
-              >
-                <Text
-                  className={`text-sm font-montserrat-semibold ${
-                    activeFilter === filter ? 'text-white' : 'text-[#B7B7C7]'
-                  }`}
-                >
-                  {filter}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-
-        {isLoadingSaved ? (
-          <View className="h-64 items-center justify-center">
-            <ActivityIndicator size="large" color="#FF7A18" />
-            <Text className="text-[#9A9AAF] text-sm font-montserrat-medium mt-4">
-              Loading saved places...
-            </Text>
-          </View>
-        ) : filteredPlaces.length === 0 ? (
-          renderEmptyState()
-        ) : (
-          <View className="flex-wrap flex-row justify-between">
-            {filteredPlaces.map(saved => {
-              const place = saved.place_data;
-              const imageUri = getPlaceImage(place.categories);
-              const isRemoving = removingId === place.id;
-
-              return (
-                <TouchableOpacity
-                  key={saved.id}
-                  onPress={() => setSelectedPlace(saved)}
-                  className="w-[48%] mb-5"
-                  activeOpacity={0.9}
-                  disabled={isRemoving}
-                >
-                  <ImageBackground
-                    source={{ uri: imageUri }}
-                    style={{ height: 190 }}
-                    imageStyle={{ borderRadius: 26 }}
-                  >
-                    <View className="flex-1 justify-between bg-black/35 rounded-[26px] p-4">
-                      <View className="bg-white/20 rounded-full px-3 py-1 self-start">
-                        <Text
-                          className="text-white text-xs font-montserrat-semibold"
-                          numberOfLines={1}
-                        >
-                          {place.categories[0] || 'Historic'}
-                        </Text>
-                      </View>
-                      <View>
-                        <Text
-                          className="text-white text-[18px] font-montserrat-bold"
-                          numberOfLines={2}
-                        >
-                          {place.name}
-                        </Text>
-                        <View className="flex-row items-center mt-1">
-                          <MapPin color="#FFFFFF" size={16} />
-                          <Text
-                            className="text-white text-xs font-montserrat-medium ml-1"
-                            numberOfLines={1}
-                          >
-                            {place.city}, {place.country}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  </ImageBackground>
-                  <View className="flex-row items-center justify-between mt-3">
-                    <TouchableOpacity
-                      className="flex-row items-center bg-[#171722] rounded-full px-3 py-2"
-                      onPress={() => handleLaunchPlace(saved)}
-                    >
-                      <Play color="#FF7A18" size={16} />
-                      <Text className="text-white text-xs font-montserrat-semibold ml-1">
-                        View
-                      </Text>
-                    </TouchableOpacity>
-                    <View className="flex-row items-center">
-                      <TouchableOpacity
-                        className="w-9 h-9 rounded-full bg-[#2A1111] items-center justify-center"
-                        onPress={() => handleRemove(place.id)}
-                        disabled={isRemoving}
-                      >
-                        {isRemoving ? (
-                          <ActivityIndicator size="small" color="#FF6262" />
-                        ) : (
-                          <Trash2 color="#FF6262" size={18} />
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
-
-      <Modal visible={!!selectedPlace} transparent animationType="slide">
         <View className="flex-1 bg-black/60 justify-end">
           <View className="bg-[#0F0F17] rounded-t-[32px] p-6 border-t border-[#1F1F2B]">
             {selectedPlace && (
@@ -375,7 +369,11 @@ const Saved = ({ navigation }: any) => {
                   >
                     {selectedPlace.place_data.name}
                   </Text>
-                  <TouchableOpacity onPress={() => setSelectedPlace(null)}>
+                  <TouchableOpacity
+                    onPress={() => setSelectedPlace(null)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close preview"
+                  >
                     <X color="#7D7D8F" size={26} />
                   </TouchableOpacity>
                 </View>
@@ -423,6 +421,8 @@ const Saved = ({ navigation }: any) => {
                       setSelectedPlace(null);
                       handleLaunchPlace(selectedPlace);
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open full details for ${selectedPlace.place_data.name}`}
                   >
                     <Camera color="#FFFFFF" size={18} />
                     <Text className="text-white text-base font-montserrat-semibold ml-2">

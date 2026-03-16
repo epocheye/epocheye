@@ -1,7 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import TabNavigation from './TabNavigation';
-import Permissions from '../screens/Auth/Permissions';
+import Permissions from '../screens/Main/PermissionsScreen';
 import SiteDetailScreen from '../screens/Main/SiteDetailScreen';
 import ARExperienceScreen from '../screens/Main/ARExperienceScreen';
 import { ROUTES } from '../core/constants';

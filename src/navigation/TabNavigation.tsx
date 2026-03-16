@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import Home from '../screens/Main/Home';
 import Explore from '../screens/Main/Explore';
 import Challenges from '../screens/Main/Challenges.tsx';
@@ -22,10 +23,25 @@ const Tab = createBottomTabNavigator<TabParamList>();
 /** Tab icon size */
 const TAB_ICON_SIZE = 22;
 
+/**
+ * Tab bar color tokens.
+ * Named constants here so changes to branding only need one touchpoint.
+ */
+const TAB_COLORS = {
+  /** Dark background for the tab bar strip */
+  barBackground: '#111111',
+  /** Subtle navy separator above the tab bar */
+  barBorder: '#151526',
+  /** Icon/label color for the active (selected) tab */
+  activeTint: '#FFFFFF',
+  /** Icon/label color for inactive tabs */
+  inactiveTint: '#777777',
+} as const;
+
 /** Tab bar style constants */
 const TAB_BAR_STYLE = {
-  backgroundColor: '#111',
-  borderTopColor: '#151526',
+  backgroundColor: TAB_COLORS.barBackground,
+  borderTopColor: TAB_COLORS.barBorder,
   paddingVertical: 6,
   height: 60,
 } as const;
@@ -65,43 +81,51 @@ const getTabIcon = (
 };
 
 /**
- * Renders a "Coming Soon" overlay for disabled tabs
+ * Renders a "Coming Soon" overlay for disabled tabs.
+ * Explicitly discards the original onPress so tapping the overlay area
+ * cannot navigate to the screen, even through child press propagation.
  */
-const ComingSoonTabButton: React.FC<{ props: any }> = ({ props }) => (
-  <TouchableOpacity
-    {...props}
-    style={[props.style, { position: 'relative' }]}
-    onPress={() => {}}
-  >
-    {props.children}
-    <View
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 8,
-      }}
+const ComingSoonTabButton: React.FC<BottomTabBarButtonProps> = props => {
+  // Pull onPress out so it is not forwarded to the TouchableOpacity
+  const { onPress: _ignored, children, style, ...rest } = props;
+  return (
+    <TouchableOpacity
+      {...rest}
+      style={[style, { position: 'relative' }]}
+      onPress={() => {}}
+      accessibilityLabel="Coming soon"
+      accessibilityHint="This feature is not yet available"
     >
-      <Sparkles size={16} color="#FFD700" />
-      <Text
+      {children}
+      <View
         style={{
-          color: '#FFD700',
-          fontSize: 8,
-          fontWeight: '600',
-          marginTop: 2,
-          textAlign: 'center',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          borderRadius: 8,
         }}
       >
-        New{'\n'}Features
-      </Text>
-    </View>
-  </TouchableOpacity>
-);
+        <Sparkles size={16} color="#FFD700" />
+        <Text
+          style={{
+            color: '#FFD700',
+            fontSize: 8,
+            fontWeight: '600',
+            marginTop: 2,
+            textAlign: 'center',
+          }}
+        >
+          New{'\n'}Features
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 /**
  * Bottom tab navigation for authenticated users
@@ -114,21 +138,21 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarActiveTintColor: '#FFFFFF',
-        tabBarInactiveTintColor: '#777777',
+        tabBarActiveTintColor: TAB_COLORS.activeTint,
+        tabBarInactiveTintColor: TAB_COLORS.inactiveTint,
         tabBarStyle: TAB_BAR_STYLE,
         tabBarLabelStyle: TAB_BAR_LABEL_STYLE,
         tabBarIcon: ({ color, size }) =>
           getTabIcon(route.name as keyof TabParamList, color, size),
-        tabBarButton: (props: any) => {
+        tabBarButton: (btnProps: BottomTabBarButtonProps) => {
           // Show "New Features" overlay for Explore and Challenges tabs
           if (
             route.name === ROUTES.TABS.EXPLORE ||
             route.name === ROUTES.TABS.CHALLENGES
           ) {
-            return <ComingSoonTabButton props={props} />;
+            return <ComingSoonTabButton {...btnProps} />;
           }
-          return <TouchableOpacity {...props} />;
+          return <TouchableOpacity {...btnProps} />;
         },
       })}
     >

@@ -13,7 +13,7 @@ import React, {
   useRef,
   ReactNode,
 } from 'react';
-import Geolocation from '@react-native-community/geolocation';
+import Geolocation, { GeoPosition } from '@react-native-community/geolocation';
 import {
   findPlaces,
   savePlace,
@@ -47,11 +47,14 @@ interface PlacesContextType {
   // Actions
   refreshNearbyPlaces: () => Promise<void>;
   refreshSavedPlaces: () => Promise<void>;
-  toggleSavePlace: (placeId: string, placeData?: any) => Promise<boolean>;
+  toggleSavePlace: (placeId: string, placeData?: Place) => Promise<boolean>;
   isPlaceSaved: (placeId: string) => boolean;
 
   // Utilities
   clearPlacesData: () => void;
+  // Notify the context when auth state changes so it can start/stop tracking
+  // without polling AsyncStorage on a 2-second interval.
+  setAuthenticated: (authenticated: boolean) => void;
 }
 
 const PlacesContext = createContext<PlacesContextType>({
@@ -67,6 +70,7 @@ const PlacesContext = createContext<PlacesContextType>({
   toggleSavePlace: async () => false,
   isPlaceSaved: () => false,
   clearPlacesData: () => {},
+  setAuthenticated: () => {},
 });
 
 interface PlacesProviderProps {
@@ -299,7 +303,7 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
    * Handle location updates
    */
   const handleLocationUpdate = useCallback(
-    (position: any) => {
+    (position: GeoPosition) => {
       const newLocation: LocationData = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
@@ -366,7 +370,7 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
    * Toggle save/unsave a place
    */
   const toggleSavePlace = useCallback(
-    async (placeId: string, placeData?: any): Promise<boolean> => {
+    async (placeId: string, placeData?: Place): Promise<boolean> => {
       if (!Array.isArray(savedPlaces)) {
         return false;
       }
@@ -431,8 +435,9 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
   }, []);
 
   /**
-   * Check authentication status periodically
-   * This ensures we start tracking when user logs in
+   * Check authentication status once on mount.
+   * Ongoing auth changes are signalled externally via setAuthenticated(),
+   * which the navigation root calls after login/logout — no polling needed.
    */
   useEffect(() => {
     const checkAuth = async () => {
@@ -440,15 +445,7 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
       setIsUserAuthenticated(authenticated);
     };
 
-    // Check immediately
     checkAuth();
-
-    // Check periodically (every 2 seconds) to detect login/logout
-    const authCheckInterval = setInterval(checkAuth, 2000);
-
-    return () => {
-      clearInterval(authCheckInterval);
-    };
   }, []);
 
   /**
@@ -487,6 +484,8 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
     toggleSavePlace,
     isPlaceSaved,
     clearPlacesData,
+    // Called by the navigation root after login/logout to avoid polling
+    setAuthenticated: setIsUserAuthenticated,
   };
 
   return (

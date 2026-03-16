@@ -1,8 +1,12 @@
-import { StyleSheet, View, Dimensions } from 'react-native';
-import React, { useMemo, useState } from 'react';
-import MapView, { PROVIDER_GOOGLE, Marker, Region } from 'react-native-maps';
+import { StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { useWindowDimensions } from 'react-native';
+import MapView, { PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { GOOGLE_MAPS_API_KEY } from '@env';
 import mapStyle from '../content/mapstyle.json';
+
+// Default to a neutral location; the map will show the user's real position
+// via showsUserLocation once the key is valid.
 const DEFAULT_REGION: Region = {
   latitude: 28.6139,
   longitude: 77.209,
@@ -11,15 +15,22 @@ const DEFAULT_REGION: Region = {
 };
 
 const Map = () => {
-  const [region, setRegion] = useState<Region>(DEFAULT_REGION);
-  const googleMapsApiKey = useMemo(
-    () =>
-      GOOGLE_MAPS_API_KEY?.trim() || 'AIzaSyDQCW5NWi1ipV1GkVNwPht67pvvYTtED7U',
-    [],
-  );
+  const { width, height } = useWindowDimensions();
+  const [_region, setRegion] = useState<Region>(DEFAULT_REGION);
+
+  // Fail loudly in development if the key is missing rather than using a
+  // hardcoded fallback. The key must live exclusively in .env and never in
+  // source control.
+  if (__DEV__ && !GOOGLE_MAPS_API_KEY?.trim()) {
+    console.error(
+      '[Map] GOOGLE_MAPS_API_KEY is missing. Add it to your .env file.',
+    );
+  }
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, { width: width - 40, height: height * 0.65 }]}
+    >
       <MapView
         provider={PROVIDER_GOOGLE}
         style={styles.map}
@@ -32,30 +43,17 @@ const Map = () => {
         showsMyLocationButton
         loadingEnabled
         // @ts-expect-error Prop exists on native MapView but is missing from type defs
-        googleMapsApiKey={googleMapsApiKey}
+        googleMapsApiKey={GOOGLE_MAPS_API_KEY?.trim()}
         onRegionChangeComplete={setRegion}
-      >
-        <Marker
-          coordinate={{
-            latitude: region.latitude,
-            longitude: region.longitude,
-          }}
-          title="New Delhi"
-          description="Welcome to India's capital!"
-        />
-      </MapView>
+      />
     </View>
   );
 };
 
 export default Map;
 
-const { width, height } = Dimensions.get('window');
-
 const styles = StyleSheet.create({
   container: {
-    width: width - 40,
-    height: height * 0.65,
     borderRadius: 20,
     overflow: 'hidden',
     justifyContent: 'center',

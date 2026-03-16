@@ -23,15 +23,17 @@ export interface PlaceNavParam {
 }
 
 /**
- * Auth Stack Parameter List
+ * Onboarding Stack Parameter List
  */
-export type AuthStackParamList = {
-  Landing: undefined;
-  Login: undefined;
-  Register: undefined;
-  OnboardingFlow: undefined;
-  Permissions: undefined;
-  ForgotPassword: undefined;
+export type OnboardingStackParamList = {
+  SplashVideo: undefined;
+  EmotionalQuestion: undefined;
+  MirrorMoment: { answer: 'yes' | 'no' };
+  AncestryInput: undefined;
+  FirstTaste: { region: string | null };
+  Signup: undefined;
+  OnboardingPermissions: undefined;
+  WorldOpens: undefined;
 };
 
 /**
@@ -60,7 +62,7 @@ export type TabParamList = {
  * Root Stack Parameter List
  */
 export type RootStackParamList = {
-  Auth: AuthStackParamList;
+  Onboarding: OnboardingStackParamList;
   Main: MainStackParamList;
 };
 
@@ -69,9 +71,9 @@ export type RootStackParamList = {
 // ============================================
 
 /**
- * Auth Stack Navigation Prop
+ * Onboarding Stack Navigation Prop
  */
-export type AuthNavigationProp = NativeStackNavigationProp<AuthStackParamList>;
+export type OnboardingNavigationProp = NativeStackNavigationProp<OnboardingStackParamList>;
 
 /**
  * Main Stack Navigation Prop
@@ -96,11 +98,11 @@ export type TabMainNavigationProp = CompositeNavigationProp<
 // ============================================
 
 /**
- * Auth Screen Props
+ * Onboarding Screen Props
  */
-export type AuthScreenProps<T extends keyof AuthStackParamList> = {
-  navigation: NativeStackNavigationProp<AuthStackParamList, T>;
-  route: RouteProp<AuthStackParamList, T>;
+export type OnboardingScreenProps<T extends keyof OnboardingStackParamList> = {
+  navigation: NativeStackNavigationProp<OnboardingStackParamList, T>;
+  route: RouteProp<OnboardingStackParamList, T>;
 };
 
 /**

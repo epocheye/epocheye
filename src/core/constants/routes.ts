@@ -8,15 +8,17 @@
  */
 export const ROUTES = {
   /**
-   * Auth Stack Routes (unauthenticated users)
+   * Onboarding Stack Routes (first-launch flow)
    */
-  AUTH: {
-    LANDING: 'Landing',
-    LOGIN: 'Login',
-    REGISTER: 'Register',
-    ONBOARDING: 'OnboardingFlow',
-    PERMISSIONS: 'Permissions',
-    FORGOT_PASSWORD: 'ForgotPassword',
+  ONBOARDING: {
+    SPLASH_VIDEO: 'SplashVideo',
+    EMOTIONAL_QUESTION: 'EmotionalQuestion',
+    MIRROR_MOMENT: 'MirrorMoment',
+    ANCESTRY_INPUT: 'AncestryInput',
+    FIRST_TASTE: 'FirstTaste',
+    SIGNUP: 'Signup',
+    PERMISSIONS: 'OnboardingPermissions',
+    WORLD_OPENS: 'WorldOpens',
   },
 
   /**
@@ -40,21 +42,11 @@ export const ROUTES = {
     SAVED: 'Saved',
     SETTINGS: 'Settings',
   },
-
-  /**
-   * Onboarding Flow Sub-routes
-   */
-  ONBOARDING: {
-    INTRO: 'OnboardingIntro',
-    QUESTIONNAIRE: 'Questionnaire',
-    SETUP_COMPLETE: 'SetupComplete',
-  },
 } as const;
 
 /**
  * Type helper for route names
  */
-export type AuthRoutes = (typeof ROUTES.AUTH)[keyof typeof ROUTES.AUTH];
+export type OnboardingRoutes = (typeof ROUTES.ONBOARDING)[keyof typeof ROUTES.ONBOARDING];
 export type MainRoutes = (typeof ROUTES.MAIN)[keyof typeof ROUTES.MAIN];
 export type TabRoutes = (typeof ROUTES.TABS)[keyof typeof ROUTES.TABS];
-export type OnboardingRoutes = (typeof ROUTES.ONBOARDING)[keyof typeof ROUTES.ONBOARDING];

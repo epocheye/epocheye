@@ -1,25 +1,33 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavigationContainer, NavigationState } from '@react-navigation/native';
 import { View, ActivityIndicator } from 'react-native';
-import AuthNavigation from './AuthNavigation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigation from './MainNavigation';
 import { isAuthenticated } from '../utils/api/auth';
 import { StorageService } from '../shared/services';
 import { STORAGE_KEYS } from '../core/constants';
+import { usePlaces } from '../context';
+import { OnboardingCallbackProvider } from '../context/OnboardingCallbackContext';
 
 /**
- * Root navigator component that handles authentication state
- * and persists navigation state across sessions
+ * Root navigator component.
+ * Gates on two conditions:
+ * 1. Has the user completed onboarding? (STORAGE_KEYS.ONBOARDING.COMPLETED)
+ * 2. Is the user authenticated? (token check)
+ *
+ * If onboarding incomplete OR not authenticated → OnboardingNavigator
+ * If onboarding complete AND authenticated → MainNavigation
  */
 const AppNavigator: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [initialState, setInitialState] = useState<NavigationState | undefined>(
     undefined,
   );
   const navigationRef = useRef<any>(null);
+  const { setAuthenticated } = usePlaces();
 
-  // Load saved navigation state on mount
   useEffect(() => {
     const loadNavigationState = async () => {
       try {
@@ -37,30 +45,45 @@ const AppNavigator: React.FC = () => {
     loadNavigationState();
   }, []);
 
-  const checkAuthStatus = useCallback(async () => {
+  const checkAppState = useCallback(async () => {
     try {
-      const authenticated = await isAuthenticated();
-      setIsLoggedIn(authenticated);
+      const [onboardingComplete, authenticated] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING.COMPLETED),
+        isAuthenticated(),
+      ]);
+
+      const hasCompletedOnboarding = onboardingComplete === 'true';
+      const isLoggedIn = authenticated;
+
+      if (hasCompletedOnboarding && isLoggedIn) {
+        setShowOnboarding(false);
+        setAuthenticated(true);
+      } else {
+        setShowOnboarding(true);
+        setAuthenticated(false);
+      }
     } catch {
-      setIsLoggedIn(false);
+      setShowOnboarding(true);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setAuthenticated]);
 
   useEffect(() => {
-    checkAuthStatus();
-  }, [checkAuthStatus]);
-
-  const handleLoginSuccess = useCallback(() => {
-    setIsLoggedIn(true);
-  }, []);
+    checkAppState();
+  }, [checkAppState]);
 
   const handleLogout = useCallback(() => {
-    setIsLoggedIn(false);
-  }, []);
+    setShowOnboarding(true);
+    setAuthenticated(false);
+  }, [setAuthenticated]);
 
-  // Save navigation state on change
+  // Called by WorldOpensScreen after the banner animation completes
+  const handleOnboardingComplete = useCallback(() => {
+    setShowOnboarding(false);
+    setAuthenticated(true);
+  }, [setAuthenticated]);
+
   const handleStateChange = useCallback(
     async (state: NavigationState | undefined) => {
       if (state) {
@@ -88,10 +111,14 @@ const AppNavigator: React.FC = () => {
       initialState={initialState}
       onStateChange={handleStateChange}
     >
-      {isLoggedIn ? (
-        <MainNavigation onLogout={handleLogout} />
+      {showOnboarding ? (
+        <OnboardingCallbackProvider
+          value={{ onOnboardingComplete: handleOnboardingComplete }}
+        >
+          <OnboardingNavigator />
+        </OnboardingCallbackProvider>
       ) : (
-        <AuthNavigation onLoginSuccess={handleLoginSuccess} />
+        <MainNavigation onLogout={handleLogout} />
       )}
     </NavigationContainer>
   );

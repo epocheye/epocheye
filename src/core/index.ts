@@ -10,10 +10,9 @@ export type { ApiEndpoints, AppConfig } from './config';
 // Constants
 export { ROUTES, STORAGE_KEYS, ERROR_MESSAGES } from './constants';
 export type {
-  AuthRoutes,
+  OnboardingRoutes,
   MainRoutes,
   TabRoutes,
-  OnboardingRoutes,
   StorageKey,
   ErrorMessageKey,
 } from './constants';
@@ -33,15 +32,15 @@ export type {
   AsyncFunction,
   Callback,
   PlaceNavParam,
-  AuthStackParamList,
+  OnboardingStackParamList,
   MainStackParamList,
   TabParamList,
   RootStackParamList,
-  AuthNavigationProp,
+  OnboardingNavigationProp,
   MainNavigationProp,
   TabNavigationProp,
   TabMainNavigationProp,
-  AuthScreenProps,
+  OnboardingScreenProps,
   MainScreenProps,
   TabScreenProps,
 } from './types';
