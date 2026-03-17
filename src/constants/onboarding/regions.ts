@@ -22,7 +22,6 @@ export const REGIONS: Region[] = [
   { id: 'maharashtra', name: 'Maharashtra', abbreviation: 'MH', color: '#A0522D' },
   { id: 'persia', name: 'Persia', abbreviation: 'PR', color: '#6B4C8A' },
   { id: 'china', name: 'China', abbreviation: 'CN', color: '#B22234' },
-  { id: 'west_africa', name: 'West Africa', abbreviation: 'WA', color: '#C68B00' },
   { id: 'the_ottomans', name: 'The Ottomans', abbreviation: 'OT', color: '#1E6F8A' },
   { id: 'mesopotamia', name: 'Mesopotamia', abbreviation: 'MS', color: '#5C7A3D' },
 ];
