@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Modal,
   StatusBar,
-  Dimensions,
   Animated,
   Image,
 } from 'react-native';
@@ -27,8 +26,6 @@ import {
   ChevronRight,
   Shield,
 } from 'lucide-react-native';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Demo monument placeholder
 const CAMERA_PLACEHOLDER =

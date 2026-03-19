@@ -13,7 +13,9 @@ import React, {
   useRef,
   ReactNode,
 } from 'react';
-import Geolocation, { GeoPosition } from '@react-native-community/geolocation';
+import Geolocation, {
+  type GeolocationResponse,
+} from '@react-native-community/geolocation';
 import {
   findPlaces,
   savePlace,
@@ -196,8 +198,6 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
 
         // Try each radius in sequence until we find places
         let foundPlaces: Place[] = [];
-        let usedRadius = SEARCH_RADIUS_FALLBACKS[0];
-
         for (let i = 0; i < SEARCH_RADIUS_FALLBACKS.length; i++) {
           const radius = SEARCH_RADIUS_FALLBACKS[i];
 
@@ -214,7 +214,6 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
             const placesArray = result.data?.places || [];
             if (placesArray.length > 0) {
               foundPlaces = placesArray;
-              usedRadius = radius;
               break;
             }
           }
@@ -303,7 +302,7 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
    * Handle location updates
    */
   const handleLocationUpdate = useCallback(
-    (position: GeoPosition) => {
+    (position: GeolocationResponse) => {
       const newLocation: LocationData = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,

@@ -4,7 +4,6 @@
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
-import { baseUrl } from '@env';
 import {
   LoginRequest,
   LoginResponse,

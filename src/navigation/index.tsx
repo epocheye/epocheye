@@ -1,30 +1,30 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavigationContainer, NavigationState } from '@react-navigation/native';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigation from './MainNavigation';
+import LoginScreen from '../screens/Auth/LoginScreen';
 import { isAuthenticated } from '../utils/api/auth';
 import { StorageService } from '../shared/services';
 import { STORAGE_KEYS } from '../core/constants';
+import { COLORS } from '../core/constants/theme';
 import { usePlaces } from '../context';
 import { OnboardingCallbackProvider } from '../context/OnboardingCallbackContext';
 
 /**
- * Root navigator component.
- * Gates on two conditions:
- * 1. Has the user completed onboarding? (STORAGE_KEYS.ONBOARDING.COMPLETED)
- * 2. Is the user authenticated? (token check)
- *
- * If onboarding incomplete OR not authenticated → OnboardingNavigator
- * If onboarding complete AND authenticated → MainNavigation
+ * Three-state root navigator:
+ * - 'onboarding': First-time user. Shows OnboardingNavigator.
+ * - 'login': Returning user whose tokens expired. Shows LoginScreen.
+ * - 'main': Authenticated user. Shows MainNavigation.
  */
+type AppState = 'loading' | 'onboarding' | 'login' | 'main';
+
 const AppNavigator: React.FC = () => {
-  const [showOnboarding, setShowOnboarding] = useState<boolean>(true);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [initialState, setInitialState] = useState<NavigationState | undefined>(
-    undefined,
-  );
+  const [appState, setAppState] = useState<AppState>('loading');
+  const [initialNavState, setInitialNavState] = useState<
+    NavigationState | undefined
+  >(undefined);
   const navigationRef = useRef<any>(null);
   const { setAuthenticated } = usePlaces();
 
@@ -35,7 +35,7 @@ const AppNavigator: React.FC = () => {
           STORAGE_KEYS.NAVIGATION.STATE,
         );
         if (savedState) {
-          setInitialState(savedState);
+          setInitialNavState(savedState);
         }
       } catch {
         // Navigation state loading failed silently
@@ -53,19 +53,23 @@ const AppNavigator: React.FC = () => {
       ]);
 
       const hasCompletedOnboarding = onboardingComplete === 'true';
-      const isLoggedIn = authenticated;
 
-      if (hasCompletedOnboarding && isLoggedIn) {
-        setShowOnboarding(false);
+      if (hasCompletedOnboarding && authenticated) {
+        // Fully authenticated returning user → skip straight to main app
         setAuthenticated(true);
-      } else {
-        setShowOnboarding(true);
+        setAppState('main');
+      } else if (hasCompletedOnboarding && !authenticated) {
+        // Returning user whose tokens expired → show login screen only
         setAuthenticated(false);
+        setAppState('login');
+      } else {
+        // First-time user → show full onboarding
+        setAuthenticated(false);
+        setAppState('onboarding');
       }
     } catch {
-      setShowOnboarding(true);
-    } finally {
-      setIsLoading(false);
+      setAuthenticated(false);
+      setAppState('onboarding');
     }
   }, [setAuthenticated]);
 
@@ -74,14 +78,21 @@ const AppNavigator: React.FC = () => {
   }, [checkAppState]);
 
   const handleLogout = useCallback(() => {
-    setShowOnboarding(true);
+    // After logout, returning users see the login screen (not re-onboarding)
     setAuthenticated(false);
+    setAppState('login');
   }, [setAuthenticated]);
 
-  // Called by WorldOpensScreen after the banner animation completes
+  // Called by WelcomeScreen after the banner animation completes
   const handleOnboardingComplete = useCallback(() => {
-    setShowOnboarding(false);
     setAuthenticated(true);
+    setAppState('main');
+  }, [setAuthenticated]);
+
+  // Called by LoginScreen on successful sign-in
+  const handleLoginSuccess = useCallback(() => {
+    setAuthenticated(true);
+    setAppState('main');
   }, [setAuthenticated]);
 
   const handleStateChange = useCallback(
@@ -97,21 +108,26 @@ const AppNavigator: React.FC = () => {
     [],
   );
 
-  if (isLoading) {
+  if (appState === 'loading') {
     return (
-      <View className="flex-1 bg-[#111111] justify-center items-center">
-        <ActivityIndicator size="large" color="#ffffff" />
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={COLORS.textPrimary} />
       </View>
     );
+  }
+
+  // Returning user login — rendered outside NavigationContainer (no navigation needed)
+  if (appState === 'login') {
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
     <NavigationContainer
       ref={navigationRef}
-      initialState={initialState}
+      initialState={initialNavState}
       onStateChange={handleStateChange}
     >
-      {showOnboarding ? (
+      {appState === 'onboarding' ? (
         <OnboardingCallbackProvider
           value={{ onOnboardingComplete: handleOnboardingComplete }}
         >
@@ -123,5 +139,14 @@ const AppNavigator: React.FC = () => {
     </NavigationContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
 
 export default AppNavigator;

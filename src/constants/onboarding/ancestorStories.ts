@@ -2,8 +2,16 @@
  * Ancestor Stories
  * Region-specific stories for the FirstTaste onboarding screen.
  * Each story follows the same emotional structure:
- * name → year → action → legacy connection to the present.
+ * name -> year -> action -> legacy connection to the present.
  */
+
+import { CDN_BASE } from '../../core/constants/theme';
+
+export interface MonumentInfo {
+  name: string;
+  year: string;
+  imageUrl: string;
+}
 
 export const ANCESTOR_STORIES: Record<string, string> = {
   Odisha:
@@ -49,7 +57,68 @@ export const ANCESTOR_STORIES: Record<string, string> = {
 export const DEFAULT_STORY_REGION = 'Odisha';
 
 /**
- * Monument data associated with the default story
+ * Monument data per region — maps region name to monument info with CDN image
+ */
+export const MONUMENT_DATA_MAP: Record<string, MonumentInfo> = {
+  Odisha: {
+    name: 'Konark Sun Temple',
+    year: '1250 AD',
+    imageUrl: `${CDN_BASE}/Konarka_Temple-2.jpg`,
+  },
+  Rajasthan: {
+    name: 'Chittorgarh Fort',
+    year: '1459 AD',
+    imageUrl: `${CDN_BASE}/chittorgarh-fort.jpg`,
+  },
+  Bengal: {
+    name: 'Victoria Memorial',
+    year: '1605 AD',
+    imageUrl: `${CDN_BASE}/victoria.jpg`,
+  },
+  Punjab: {
+    name: 'Golden Temple',
+    year: '1604 AD',
+    imageUrl: `${CDN_BASE}/amritsar.jpg`,
+  },
+  'Tamil Nadu': {
+    name: 'Brihadisvara Temple',
+    year: '1010 AD',
+    imageUrl: `${CDN_BASE}/tamil.jpg`,
+  },
+  Kerala: {
+    name: 'Padmanabhapuram Palace',
+    year: '1568 AD',
+    imageUrl: `${CDN_BASE}/kerala.jpg`,
+  },
+  Maharashtra: {
+    name: 'Ajanta Caves',
+    year: '2nd Century BC',
+    imageUrl: `${CDN_BASE}/maharashtra.jpg`,
+  },
+  Persia: {
+    name: 'Persepolis',
+    year: '515 BC',
+    imageUrl: `${CDN_BASE}/persia.jpg`,
+  },
+  China: {
+    name: 'Longmen Grottoes',
+    year: '676 AD',
+    imageUrl: `${CDN_BASE}/china.jpg`,
+  },
+  'The Ottomans': {
+    name: 'Süleymaniye Mosque',
+    year: '1557 AD',
+    imageUrl: `${CDN_BASE}/ottoman.jpg`,
+  },
+  Mesopotamia: {
+    name: 'Ishtar Gate',
+    year: '575 BC',
+    imageUrl: `${CDN_BASE}/mesopotamia.jpg`,
+  },
+};
+
+/**
+ * Legacy export for backward compatibility
  */
 export const MONUMENT_DATA = {
   name: 'Konark Sun Temple',

@@ -7,22 +7,25 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import { FONTS, COLORS, RADIUS, FONT_SIZES } from '../../core/constants/theme';
 
 interface AmberButtonProps {
   title: string;
   onPress: () => void;
   style?: ViewStyle;
   textStyle?: TextStyle;
+  disabled?: boolean;
 }
 
 /**
- * Primary filled amber CTA button with warm ripple animation on tap.
+ * Primary filled amber CTA button with press animation.
  */
 const AmberButton: React.FC<AmberButtonProps> = ({
   title,
   onPress,
   style,
   textStyle,
+  disabled = false,
 }) => {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const opacityAnim = React.useRef(new Animated.Value(1)).current;
@@ -63,11 +66,13 @@ const AmberButton: React.FC<AmberButtonProps> = ({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={onPress}
+      disabled={disabled}
     >
       <Animated.View
         style={[
           styles.button,
           style,
+          disabled && styles.disabled,
           { transform: [{ scale: scaleAnim }], opacity: opacityAnim },
         ]}
       >
@@ -79,16 +84,20 @@ const AmberButton: React.FC<AmberButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#D4860A',
-    borderRadius: 40,
-    paddingVertical: 16,
+    backgroundColor: COLORS.amber,
+    borderRadius: RADIUS.pill,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  disabled: {
+    opacity: 0.5,
+  },
   text: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 16,
-    color: '#FFFFFF',
+    fontFamily: FONTS.semiBold,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.textPrimary,
+    letterSpacing: 0.3,
   },
 });
 

@@ -7,6 +7,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import { FONTS, COLORS, RADIUS, FONT_SIZES } from '../../core/constants/theme';
 
 interface GhostButtonProps {
   title: string;
@@ -16,7 +17,7 @@ interface GhostButtonProps {
 }
 
 /**
- * Ghost button — white border, transparent fill, rounded 40px.
+ * Ghost button — white border, transparent fill, rounded pill.
  * Warm amber ripple animation on tap.
  */
 const GhostButton: React.FC<GhostButtonProps> = ({
@@ -60,7 +61,7 @@ const GhostButton: React.FC<GhostButtonProps> = ({
 
   const backgroundColor = bgAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(212,134,10,0)', 'rgba(212,134,10,0.25)'],
+    outputRange: ['rgba(212,134,10,0)', 'rgba(212,134,10,0.2)'],
   });
 
   return (
@@ -85,19 +86,20 @@ const GhostButton: React.FC<GhostButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 40,
-    paddingVertical: 14,
-    width: 180,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderFocus,
+    borderRadius: RADIUS.pill,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
+    paddingHorizontal: 40,
   },
   text: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 16,
-    color: '#FFFFFF',
+    fontFamily: FONTS.medium,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.textPrimary,
+    letterSpacing: 0.3,
   },
 });
 

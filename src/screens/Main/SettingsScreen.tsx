@@ -105,7 +105,7 @@ const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
         name: fullName,
         phone: phone,
         // Preserve any existing preferences; only profile fields are edited here
-        preferences: profile?.preferences,
+        preferences: profile?.preferences ?? {},
       });
 
       if (success) {

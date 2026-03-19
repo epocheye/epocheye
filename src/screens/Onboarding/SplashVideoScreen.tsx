@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, StatusBar, Animated } from 'react-native';
 import Video, { OnProgressData } from 'react-native-video';
 import GhostButton from '../../components/onboarding/GhostButton';
+import { FONTS, COLORS, FONT_SIZES } from '../../core/constants/theme';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants/routes';
 
@@ -20,7 +21,7 @@ const SplashVideoScreen: React.FC<Props> = ({ navigation }) => {
   const navigateNext = useCallback(() => {
     if (hasNavigated.current) return;
     hasNavigated.current = true;
-    navigation.navigate(ROUTES.ONBOARDING.EMOTIONAL_QUESTION);
+    navigation.navigate(ROUTES.ONBOARDING.HOOK);
   }, [navigation]);
 
   const handleProgress = useCallback(
@@ -75,24 +76,27 @@ const SplashVideoScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1A1612',
+    backgroundColor: COLORS.bgWarm,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingBottom: 100,
+    paddingBottom: 96,
+    paddingHorizontal: 24,
   },
   heroText: {
-    fontFamily: 'CormorantGaramond-SemiBold',
-    fontSize: 44,
-    color: '#FFFFFF',
+    fontFamily: FONTS.semiBold,
+    fontSize: FONT_SIZES.hero,
+    color: COLORS.textPrimary,
     textAlign: 'center',
+    lineHeight: 44,
     marginBottom: 32,
-    paddingHorizontal: 32,
+    letterSpacing: 0.3,
   },
   buttonContainer: {
-    width: 180,
+    width: '100%',
+    paddingHorizontal: 40,
   },
 });
 

@@ -9,16 +9,19 @@
 export const ROUTES = {
   /**
    * Onboarding Stack Routes (first-launch flow)
+   * SplashVideo → Hook → AncestryInput → FirstTaste → Signup → Welcome
    */
   ONBOARDING: {
     SPLASH_VIDEO: 'SplashVideo',
+    HOOK: 'Hook',
     EMOTIONAL_QUESTION: 'EmotionalQuestion',
     MIRROR_MOMENT: 'MirrorMoment',
     ANCESTRY_INPUT: 'AncestryInput',
     FIRST_TASTE: 'FirstTaste',
     SIGNUP: 'Signup',
-    PERMISSIONS: 'OnboardingPermissions',
+    ONBOARDING_PERMISSIONS: 'OnboardingPermissions',
     WORLD_OPENS: 'WorldOpens',
+    WELCOME: 'Welcome',
   },
 
   /**

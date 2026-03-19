@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+import { PlatformPressable } from '@react-navigation/elements';
 import Home from '../screens/Main/Home';
 import Explore from '../screens/Main/Explore';
 import Challenges from '../screens/Main/Challenges.tsx';
@@ -86,13 +87,12 @@ const getTabIcon = (
  * cannot navigate to the screen, even through child press propagation.
  */
 const ComingSoonTabButton: React.FC<BottomTabBarButtonProps> = props => {
-  // Pull onPress out so it is not forwarded to the TouchableOpacity
-  const { onPress: _ignored, children, style, ...rest } = props;
+  const { children, style, ...rest } = props;
   return (
-    <TouchableOpacity
+    <PlatformPressable
       {...rest}
       style={[style, { position: 'relative' }]}
-      onPress={() => {}}
+      onPress={() => undefined}
       accessibilityLabel="Coming soon"
       accessibilityHint="This feature is not yet available"
     >
@@ -123,9 +123,13 @@ const ComingSoonTabButton: React.FC<BottomTabBarButtonProps> = props => {
           New{'\n'}Features
         </Text>
       </View>
-    </TouchableOpacity>
+    </PlatformPressable>
   );
 };
+
+const DefaultTabButton: React.FC<BottomTabBarButtonProps> = props => (
+  <PlatformPressable {...props} />
+);
 
 /**
  * Bottom tab navigation for authenticated users
@@ -152,7 +156,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
           ) {
             return <ComingSoonTabButton {...btnProps} />;
           }
-          return <TouchableOpacity {...btnProps} />;
+          return <DefaultTabButton {...btnProps} />;
         },
       })}
     >

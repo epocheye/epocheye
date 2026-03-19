@@ -3,8 +3,11 @@
  * Manage geolocation state and updates
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import Geolocation from '@react-native-community/geolocation';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import Geolocation, {
+  type GeolocationError,
+  type GeolocationResponse,
+} from '@react-native-community/geolocation';
 import { LocationData } from '../../core/types';
 import { APP_CONFIG } from '../../core/config';
 import { ERROR_MESSAGES } from '../../core/constants';
@@ -62,7 +65,16 @@ const DEFAULT_OPTIONS: GeolocationOptions = {
 export function useGeolocation(
   options: GeolocationOptions = {}
 ): UseGeolocationReturn {
-  const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
+  const { enableHighAccuracy, maximumAge, timeout } = options;
+  const mergedOptions = useMemo(
+    () => ({
+      ...DEFAULT_OPTIONS,
+      enableHighAccuracy,
+      maximumAge,
+      timeout,
+    }),
+    [enableHighAccuracy, maximumAge, timeout]
+  );
 
   const [state, setState] = useState<GeolocationState>({
     location: null,
@@ -77,7 +89,7 @@ export function useGeolocation(
    * Handle successful location update
    */
   const handleSuccess = useCallback(
-    (position: { coords: { latitude: number; longitude: number }; timestamp: number }) => {
+    (position: GeolocationResponse) => {
       const locationData: LocationData = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
@@ -97,7 +109,7 @@ export function useGeolocation(
    * Handle location error
    */
   const handleError = useCallback(
-    (error: { code: number; message: string; PERMISSION_DENIED: number; POSITION_UNAVAILABLE: number; TIMEOUT: number }) => {
+    (error: GeolocationError) => {
       let errorMessage: string;
 
       switch (error.code) {

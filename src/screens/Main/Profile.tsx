@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, View, Image, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useUser } from '../../context';
-import { Award, Target, MapPin, TrendingUp } from 'lucide-react-native';
+import { Award, Target, TrendingUp } from 'lucide-react-native';
 
 const Profile = () => {
   const { profile, stats, isLoading, refreshUserData } = useUser();

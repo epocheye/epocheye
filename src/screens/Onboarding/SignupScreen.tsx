@@ -10,24 +10,31 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TouchableOpacity,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthButton from '../../components/onboarding/AuthButton';
 import AmberButton from '../../components/onboarding/AmberButton';
 import { login, signup } from '../../utils/api/auth';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
+import {
+  FONTS,
+  COLORS,
+  FONT_SIZES,
+  SPACING,
+  RADIUS,
+} from '../../core/constants/theme';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants/routes';
 
 type Props = OnboardingScreenProps<'Signup'>;
-
 type AuthMode = 'initial' | 'login' | 'register';
 
 /**
- * Screen 6 — Signup/Login screen.
- * Cleanest screen in the flow. No textures, no animations.
- * Three auth options: Google, Apple, Email. Google/Apple coming soon.
- * Email opens inline form with login/register toggle.
+ * Screen 5 — Signup/Login screen.
+ * Three auth options: Google, Apple, Email. Google/Apple alerts "Coming Soon".
+ * Email opens an inline form with a login/register toggle.
+ * On success, stores onboarding complete flag and navigates to Welcome.
  */
 const SignupScreen: React.FC<Props> = ({ navigation }) => {
   const [mode, setMode] = useState<AuthMode>('initial');
@@ -42,10 +49,6 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleAppleAuth = () => {
     Alert.alert('Coming Soon', 'Apple sign-in will be available soon.');
-  };
-
-  const handleEmailAuth = () => {
-    setMode('login');
   };
 
   const handleSubmit = async () => {
@@ -67,7 +70,7 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
 
       if (result.success) {
         await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.COMPLETED, 'true');
-        navigation.navigate(ROUTES.ONBOARDING.PERMISSIONS);
+        navigation.navigate(ROUTES.ONBOARDING.WELCOME);
       } else {
         Alert.alert('Login failed', result.error.message);
       }
@@ -80,11 +83,10 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
       setLoading(false);
 
       if (result.success) {
-        // After signup, log them in automatically
         const loginResult = await login({ email: email.trim(), password });
         if (loginResult.success) {
           await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.COMPLETED, 'true');
-          navigation.navigate(ROUTES.ONBOARDING.PERMISSIONS);
+          navigation.navigate(ROUTES.ONBOARDING.WELCOME);
         } else {
           Alert.alert(
             'Account created',
@@ -113,7 +115,7 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
       <AuthButton
         title="Continue with Email"
         variant="email"
-        onPress={handleEmailAuth}
+        onPress={() => setMode('login')}
       />
     </View>
   );
@@ -124,7 +126,7 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
         <TextInput
           style={styles.input}
           placeholder="Your name"
-          placeholderTextColor="rgba(255,255,255,0.4)"
+          placeholderTextColor={COLORS.textTertiary}
           value={name}
           onChangeText={setName}
           autoCapitalize="words"
@@ -134,7 +136,7 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
       <TextInput
         style={styles.input}
         placeholder="Email"
-        placeholderTextColor="rgba(255,255,255,0.4)"
+        placeholderTextColor={COLORS.textTertiary}
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -144,7 +146,7 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
       <TextInput
         style={styles.input}
         placeholder="Password"
-        placeholderTextColor="rgba(255,255,255,0.4)"
+        placeholderTextColor={COLORS.textTertiary}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -152,7 +154,7 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color="#D4860A" size="small" />
+          <ActivityIndicator color={COLORS.amber} size="small" />
           <Text style={styles.loadingText}>
             {mode === 'login' ? 'Signing in...' : 'Creating account...'}
           </Text>
@@ -164,14 +166,16 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
         />
       )}
 
-      <Text
-        style={styles.switchText}
+      <TouchableOpacity
         onPress={() => setMode(mode === 'login' ? 'register' : 'login')}
+        style={styles.switchButton}
       >
-        {mode === 'login'
-          ? "Don't have an account? Sign up"
-          : 'Already have an account? Sign in'}
-      </Text>
+        <Text style={styles.switchText}>
+          {mode === 'login'
+            ? "Don't have an account? Sign up"
+            : 'Already have an account? Sign in'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -190,9 +194,16 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.header}>Save your story.{'\n'}Keep exploring.</Text>
-
-        <View style={styles.spacer} />
+        <View style={styles.headerSection}>
+          <Text style={styles.headline}>
+            {mode === 'register' ? 'Create your account.' : 'Welcome back.'}
+          </Text>
+          {mode === 'initial' && (
+            <Text style={styles.subheader}>
+              Save your story. Keep exploring.
+            </Text>
+          )}
+        </View>
 
         {mode === 'initial' ? renderInitial() : renderForm()}
 
@@ -207,66 +218,73 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1A1612',
+    backgroundColor: COLORS.bgWarm,
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: SPACING.xxl,
   },
-  header: {
-    fontFamily: 'CormorantGaramond-SemiBold',
-    fontSize: 36,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    lineHeight: 48,
+  headerSection: {
+    marginBottom: SPACING.section,
   },
-  spacer: {
-    height: 40,
+  headline: {
+    fontFamily: FONTS.bold,
+    fontSize: FONT_SIZES.hero,
+    color: COLORS.textPrimary,
+    lineHeight: 44,
+    marginBottom: SPACING.sm,
+  },
+  subheader: {
+    fontFamily: FONTS.regular,
+    fontSize: FONT_SIZES.subtitle,
+    color: COLORS.textSecondary,
   },
   authButtons: {
-    gap: 16,
+    gap: SPACING.lg,
   },
   form: {
-    gap: 16,
+    gap: SPACING.lg,
   },
   input: {
     height: 56,
-    borderRadius: 16,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 20,
-    fontFamily: 'DMSans-Regular',
-    fontSize: 16,
-    color: '#FFFFFF',
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.bgCard,
+    paddingHorizontal: SPACING.xl,
+    fontFamily: FONTS.regular,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.textPrimary,
   },
   loadingContainer: {
     height: 56,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 12,
+    gap: SPACING.md,
   },
   loadingText: {
-    fontFamily: 'DMSans-Regular',
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
+    fontFamily: FONTS.regular,
+    fontSize: FONT_SIZES.small,
+    color: COLORS.textSecondary,
+  },
+  switchButton: {
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
   },
   switchText: {
-    fontFamily: 'DMSans-Regular',
-    fontSize: 14,
-    color: '#D4860A',
-    textAlign: 'center',
-    marginTop: 8,
+    fontFamily: FONTS.medium,
+    fontSize: FONT_SIZES.small,
+    color: COLORS.amber,
   },
   footnote: {
-    fontFamily: 'DMSans-Regular',
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.3)',
+    fontFamily: FONTS.regular,
+    fontSize: FONT_SIZES.caption,
+    color: COLORS.textMuted,
     textAlign: 'center',
-    marginTop: 40,
-    marginBottom: 24,
+    marginTop: SPACING.section,
+    marginBottom: SPACING.xxl,
   },
 });
 

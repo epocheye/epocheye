@@ -24,9 +24,12 @@ export interface PlaceNavParam {
 
 /**
  * Onboarding Stack Parameter List
+ * 6-screen first-launch flow:
+ * SplashVideo → Hook → AncestryInput → FirstTaste → Signup → Welcome
  */
 export type OnboardingStackParamList = {
   SplashVideo: undefined;
+  Hook: undefined;
   EmotionalQuestion: undefined;
   MirrorMoment: { answer: 'yes' | 'no' };
   AncestryInput: undefined;
@@ -34,6 +37,7 @@ export type OnboardingStackParamList = {
   Signup: undefined;
   OnboardingPermissions: undefined;
   WorldOpens: undefined;
+  Welcome: undefined;
 };
 
 /**
@@ -70,24 +74,14 @@ export type RootStackParamList = {
 // Navigation Props
 // ============================================
 
-/**
- * Onboarding Stack Navigation Prop
- */
-export type OnboardingNavigationProp = NativeStackNavigationProp<OnboardingStackParamList>;
+export type OnboardingNavigationProp =
+  NativeStackNavigationProp<OnboardingStackParamList>;
 
-/**
- * Main Stack Navigation Prop
- */
-export type MainNavigationProp = NativeStackNavigationProp<MainStackParamList>;
+export type MainNavigationProp =
+  NativeStackNavigationProp<MainStackParamList>;
 
-/**
- * Tab Navigator Navigation Prop
- */
 export type TabNavigationProp = BottomTabNavigationProp<TabParamList>;
 
-/**
- * Combined Tab + Main Stack Navigation Prop
- */
 export type TabMainNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<TabParamList>,
   NativeStackNavigationProp<MainStackParamList>
@@ -97,25 +91,16 @@ export type TabMainNavigationProp = CompositeNavigationProp<
 // Screen Props
 // ============================================
 
-/**
- * Onboarding Screen Props
- */
 export type OnboardingScreenProps<T extends keyof OnboardingStackParamList> = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, T>;
   route: RouteProp<OnboardingStackParamList, T>;
 };
 
-/**
- * Main Screen Props
- */
 export type MainScreenProps<T extends keyof MainStackParamList> = {
   navigation: NativeStackNavigationProp<MainStackParamList, T>;
   route: RouteProp<MainStackParamList, T>;
 };
 
-/**
- * Tab Screen Props
- */
 export type TabScreenProps<T extends keyof TabParamList> = {
   navigation: TabMainNavigationProp;
   route: RouteProp<TabParamList, T>;
@@ -125,10 +110,7 @@ export type TabScreenProps<T extends keyof TabParamList> = {
 // Utility Types
 // ============================================
 
-/**
- * Extract route params type from a param list
- */
 export type RouteParams<
   ParamList extends Record<string, object | undefined>,
-  RouteName extends keyof ParamList
+  RouteName extends keyof ParamList,
 > = ParamList[RouteName];

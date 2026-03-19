@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react';
+import { createContext, useContext } from 'react';
 
 interface OnboardingCallbackContextValue {
   /** Call this when the onboarding flow has fully completed to switch to the main app */

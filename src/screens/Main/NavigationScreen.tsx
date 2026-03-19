@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,18 @@ import {
   ActivityIndicator,
   Platform,
   Linking,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
-import Geolocation from 'react-native-geolocation-service';
+import MapView, {
+  Marker,
+  Polyline,
+  PROVIDER_GOOGLE,
+  type LatLng,
+} from 'react-native-maps';
+import Geolocation, {
+  type GeolocationResponse,
+} from '@react-native-community/geolocation';
 import {
   ArrowLeft,
   Navigation as NavigationIcon,
@@ -19,46 +27,56 @@ import {
   Car,
 } from 'lucide-react-native';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import type {
+  MainScreenProps,
+  PlaceNavParam,
+} from '../../core/types/navigation.types';
 
-interface NavigationScreenProps {
-  navigation: any;
-  route: any;
-}
+type Props = MainScreenProps<'NavigationScreen'>;
+type NavigationSite = PlaceNavParam & {
+  coordinates?: LatLng;
+  location?: string;
+};
 
 interface RouteInfo {
   distance: string;
   duration: string;
-  steps: any[];
+  steps: string[];
 }
 
-const NavigationScreen: React.FC<NavigationScreenProps> = ({
-  navigation,
-  route,
-}) => {
-  const { site } = route.params || {};
+const NavigationScreen: React.FC<Props> = ({ navigation, route }) => {
+  const site = route.params.site as NavigationSite;
   const mapRef = useRef<MapView>(null);
 
-  // State
-  const [currentLocation, setCurrentLocation] = useState<any>(null);
-  const [destination, setDestination] = useState<any>(null);
-  const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<LatLng | null>(null);
+  const [destination, setDestination] = useState<LatLng | null>(null);
+  const [routeCoordinates, setRouteCoordinates] = useState<LatLng[]>([]);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Default coordinates for Humayun's Tomb (if not provided in site data)
-  const getDestinationCoords = () => {
+  const destinationName = site?.name || 'Destination';
+  const destinationDescription =
+    site?.formatted || site?.location || 'Navigate to site';
+
+  const getDestinationCoords = useCallback((): LatLng => {
     if (site?.coordinates) {
       return site.coordinates;
     }
-    // Default to Humayun's Tomb coordinates
+
+    if (typeof site?.lat === 'number' && typeof site?.lon === 'number') {
+      return {
+        latitude: site.lat,
+        longitude: site.lon,
+      };
+    }
+
     return {
       latitude: 28.5933,
       longitude: 77.2507,
     };
-  };
+  }, [site]);
 
-  // Request location permission
-  const requestLocationPermission = async () => {
+  const requestLocationPermission = useCallback(async () => {
     try {
       const permission =
         Platform.OS === 'ios'
@@ -76,10 +94,62 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
     } catch {
       return false;
     }
-  };
+  }, []);
 
-  // Get current location
-  const getCurrentLocation = async () => {
+  const calculateDistance = useCallback((coord1: LatLng, coord2: LatLng) => {
+    const earthRadiusKm = 6371;
+    const dLat = ((coord2.latitude - coord1.latitude) * Math.PI) / 180;
+    const dLon = ((coord2.longitude - coord1.longitude) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((coord1.latitude * Math.PI) / 180) *
+        Math.cos((coord2.latitude * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return earthRadiusKm * c;
+  }, []);
+
+  const fetchRoute = useCallback(
+    async (origin: LatLng, targetDestination: LatLng) => {
+      try {
+        const simulatedRoute: LatLng[] = [
+          origin,
+          {
+            latitude: (origin.latitude + targetDestination.latitude) / 2,
+            longitude: (origin.longitude + targetDestination.longitude) / 2,
+          },
+          targetDestination,
+        ];
+
+        setRouteCoordinates(simulatedRoute);
+
+        const distance = calculateDistance(origin, targetDestination);
+        const duration = Math.round((distance / 40) * 60);
+
+        setRouteInfo({
+          distance: `${distance.toFixed(1)} km`,
+          duration: `${duration} min`,
+          steps: [],
+        });
+
+        setIsLoading(false);
+
+        if (mapRef.current) {
+          mapRef.current.fitToCoordinates([origin, targetDestination], {
+            edgePadding: { top: 100, right: 50, bottom: 100, left: 50 },
+            animated: true,
+          });
+        }
+      } catch {
+        setIsLoading(false);
+      }
+    },
+    [calculateDistance],
+  );
+
+  const getCurrentLocation = useCallback(async () => {
     try {
       const hasPermission = await requestLocationPermission();
 
@@ -93,12 +163,17 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
       }
 
       Geolocation.getCurrentPosition(
-        position => {
-          const { latitude, longitude } = position.coords;
-          setCurrentLocation({ latitude, longitude });
-          const destCoords = getDestinationCoords();
-          setDestination(destCoords);
-          fetchRoute({ latitude, longitude }, destCoords);
+        (position: GeolocationResponse) => {
+          const userLocation = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+
+          setCurrentLocation(userLocation);
+
+          const destinationCoords = getDestinationCoords();
+          setDestination(destinationCoords);
+          fetchRoute(userLocation, destinationCoords);
         },
         () => {
           Alert.alert('Error', 'Unable to get your location');
@@ -109,68 +184,13 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
     } catch {
       setIsLoading(false);
     }
-  };
+  }, [fetchRoute, getDestinationCoords, requestLocationPermission]);
 
-  // Fetch route from Google Directions API
-  const fetchRoute = async (origin: any, destination: any) => {
-    try {
-      // Note: In production, you should use your own Google Maps API key
-      // For now, we'll create a simple straight line route
-      const route = [
-        origin,
-        {
-          latitude: (origin.latitude + destination.latitude) / 2,
-          longitude: (origin.longitude + destination.longitude) / 2,
-        },
-        destination,
-      ];
-
-      setRouteCoordinates(route);
-
-      // Calculate approximate distance and duration
-      const distance = calculateDistance(origin, destination);
-      const duration = Math.round((distance / 40) * 60); // Assuming 40 km/h average speed
-
-      setRouteInfo({
-        distance: `${distance.toFixed(1)} km`,
-        duration: `${duration} min`,
-        steps: [],
-      });
-
-      setIsLoading(false);
-
-      // Fit map to show route
-      if (mapRef.current) {
-        mapRef.current.fitToCoordinates([origin, destination], {
-          edgePadding: { top: 100, right: 50, bottom: 100, left: 50 },
-          animated: true,
-        });
-      }
-    } catch {
-      setIsLoading(false);
+  const openExternalNavigation = useCallback(() => {
+    if (!destination) {
+      return;
     }
-  };
 
-  // Calculate distance between two coordinates (Haversine formula)
-  const calculateDistance = (coord1: any, coord2: any) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = ((coord2.latitude - coord1.latitude) * Math.PI) / 180;
-    const dLon = ((coord2.longitude - coord1.longitude) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((coord1.latitude * Math.PI) / 180) *
-        Math.cos((coord2.latitude * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  // Open in external navigation app
-  const openExternalNavigation = () => {
-    if (!destination) return;
-
-    const label = site?.name || 'Destination';
     const url = Platform.select({
       ios: `maps://app?daddr=${destination.latitude},${destination.longitude}&dirflg=d`,
       android: `google.navigation:q=${destination.latitude},${destination.longitude}`,
@@ -181,23 +201,22 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
         .then(supported => {
           if (supported) {
             Linking.openURL(url);
-          } else {
-            // Fallback to Google Maps web
-            const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}`;
-            Linking.openURL(webUrl);
+            return;
           }
+
+          const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}`;
+          Linking.openURL(webUrl);
         })
         .catch(() => {});
     }
-  };
+  }, [destination]);
 
   useEffect(() => {
     getCurrentLocation();
-  }, []);
+  }, [getCurrentLocation]);
 
   return (
     <SafeAreaView className="flex-1 bg-[#05050A]" edges={['top']}>
-      {/* Header */}
       <View className="absolute top-0 left-0 right-0 z-10 px-5 pt-4 pb-4 bg-[#05050A]/95">
         <View className="flex-row items-center justify-between">
           <TouchableOpacity
@@ -212,7 +231,7 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
               Navigation
             </Text>
             <Text className="text-[#8D8D92] text-sm font-montserrat-medium">
-              {site?.name || 'Destination'}
+              {destinationName}
             </Text>
           </View>
 
@@ -226,7 +245,6 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
         </View>
       </View>
 
-      {/* Map */}
       <View className="flex-1">
         {isLoading ? (
           <View className="flex-1 items-center justify-center bg-[#05050A]">
@@ -239,7 +257,7 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
           <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
-            style={{ flex: 1 }}
+            style={styles.map}
             initialRegion={{
               latitude: currentLocation?.latitude || 28.6139,
               longitude: currentLocation?.longitude || 77.209,
@@ -251,7 +269,6 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
             showsCompass
             showsTraffic
           >
-            {/* Current Location Marker */}
             {currentLocation && (
               <Marker
                 coordinate={currentLocation}
@@ -260,17 +277,15 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
               />
             )}
 
-            {/* Destination Marker */}
             {destination && (
               <Marker
                 coordinate={destination}
-                title={site?.name || 'Destination'}
-                description={site?.location}
+                title={destinationName}
+                description={destinationDescription}
                 pinColor="#FF7A18"
               />
             )}
 
-            {/* Route Line */}
             {routeCoordinates.length > 0 && (
               <Polyline
                 coordinates={routeCoordinates}
@@ -282,7 +297,6 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
         )}
       </View>
 
-      {/* Route Info Card */}
       {!isLoading && routeInfo && (
         <View className="absolute bottom-0 left-0 right-0 px-5 pb-6">
           <View className="bg-[#12121A] rounded-3xl p-5 border border-[#272730]">
@@ -293,10 +307,10 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
                 </View>
                 <View className="ml-3 flex-1">
                   <Text className="text-white text-base font-montserrat-bold">
-                    {site?.name || 'Destination'}
+                    {destinationName}
                   </Text>
                   <Text className="text-[#8D8D92] text-sm font-montserrat-medium">
-                    {site?.location || 'Navigate to site'}
+                    {destinationDescription}
                   </Text>
                 </View>
               </View>
@@ -342,5 +356,11 @@ const NavigationScreen: React.FC<NavigationScreenProps> = ({
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  map: {
+    flex: 1,
+  },
+});
 
 export default NavigationScreen;

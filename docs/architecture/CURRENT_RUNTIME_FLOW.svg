@@ -1,0 +1,284 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 1420" role="img" aria-labelledby="title desc">
+  <title id="title">EpochEye current runtime flow</title>
+  <desc id="desc">Visual map of the current EpochEye app runtime, including entry point, provider stack, onboarding flow, main navigation, and key service relationships.</desc>
+  <defs>
+    <style>
+      .bg { fill: #05070c; }
+      .section { fill: #0b1220; stroke: #1f2a44; stroke-width: 2; rx: 24; }
+      .section-title { fill: #f8fafc; font: 700 28px Arial, sans-serif; }
+      .section-sub { fill: #94a3b8; font: 400 15px Arial, sans-serif; }
+      .node { fill: #111827; stroke: #60a5fa; stroke-width: 2.5; rx: 18; }
+      .node-amber { fill: #1d1408; stroke: #f59e0b; stroke-width: 2.5; rx: 18; }
+      .node-green { fill: #071a15; stroke: #10b981; stroke-width: 2.5; rx: 18; }
+      .node-dormant { fill: #151821; stroke: #64748b; stroke-width: 2; stroke-dasharray: 10 8; rx: 18; }
+      .gate { fill: #14111f; stroke: #c084fc; stroke-width: 2.5; rx: 18; }
+      .note { fill: #0f172a; stroke: #334155; stroke-width: 2; rx: 20; }
+      .mini { fill: #0f172a; stroke: #334155; stroke-width: 1.5; rx: 14; }
+      .title { fill: #ffffff; font: 700 38px Arial, sans-serif; }
+      .subtitle { fill: #a5b4c7; font: 400 18px Arial, sans-serif; }
+      .label { fill: #e5eefc; font: 700 18px Arial, sans-serif; }
+      .sub { fill: #9fb0c8; font: 400 13px Arial, sans-serif; }
+      .small { fill: #a8b4c7; font: 400 12px Arial, sans-serif; }
+      .muted { fill: #7f8ea6; font: 400 12px Arial, sans-serif; }
+      .legend { fill: #dbe7f5; font: 600 14px Arial, sans-serif; }
+      .line { stroke: #6ea8ff; stroke-width: 3; fill: none; marker-end: url(#arrowBlue); }
+      .line-amber { stroke: #f59e0b; stroke-width: 3; fill: none; marker-end: url(#arrowAmber); }
+      .line-green { stroke: #10b981; stroke-width: 3; fill: none; marker-end: url(#arrowGreen); }
+      .line-dormant { stroke: #64748b; stroke-width: 2.5; fill: none; stroke-dasharray: 10 8; marker-end: url(#arrowMuted); }
+      .line-muted { stroke: #94a3b8; stroke-width: 2.5; fill: none; marker-end: url(#arrowMuted); }
+      .chip { fill: #182235; stroke: #2d4265; stroke-width: 1; rx: 999; }
+      .chip-text { fill: #cfe1ff; font: 600 12px Arial, sans-serif; }
+    </style>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6ea8ff" />
+    </marker>
+    <marker id="arrowAmber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" />
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#10b981" />
+    </marker>
+    <marker id="arrowMuted" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="2000" height="1420" />
+
+  <text x="60" y="58" class="title">EpochEye Current Runtime Flow</text>
+  <text x="60" y="90" class="subtitle">Actual visual map derived from the live repo on March 17, 2026.</text>
+
+  <rect class="chip" x="1460" y="38" width="120" height="28" />
+  <text x="1520" y="57" text-anchor="middle" class="chip-text">active path</text>
+  <rect class="chip" x="1600" y="38" width="120" height="28" style="fill:#1f1408;stroke:#7c5b1a;" />
+  <text x="1660" y="57" text-anchor="middle" class="chip-text">onboarding</text>
+  <rect class="chip" x="1740" y="38" width="170" height="28" style="fill:#151821;stroke:#64748b;stroke-dasharray:10 8;" />
+  <text x="1825" y="57" text-anchor="middle" class="chip-text">present but dormant</text>
+
+  <rect class="section" x="40" y="120" width="1920" height="250" />
+  <text x="70" y="160" class="section-title">1. Boot And Gating</text>
+  <text x="70" y="184" class="section-sub">Entry point, provider stack, offline branch, and onboarding/auth decision.</text>
+
+  <rect class="node" x="80" y="220" width="150" height="76" />
+  <text x="155" y="252" text-anchor="middle" class="label">index.js</text>
+  <text x="155" y="273" text-anchor="middle" class="sub">AppRegistry</text>
+
+  <rect class="node" x="270" y="220" width="150" height="76" />
+  <text x="345" y="252" text-anchor="middle" class="label">App.tsx</text>
+  <text x="345" y="273" text-anchor="middle" class="sub">root component</text>
+
+  <rect class="node" x="460" y="220" width="170" height="76" />
+  <text x="545" y="252" text-anchor="middle" class="label">SafeAreaProvider</text>
+  <text x="545" y="273" text-anchor="middle" class="sub">react-native-safe-area-context</text>
+
+  <rect class="node" x="670" y="205" width="230" height="106" />
+  <text x="785" y="236" text-anchor="middle" class="label">Provider Stack</text>
+  <text x="785" y="258" text-anchor="middle" class="sub">NetworkProvider</text>
+  <text x="785" y="278" text-anchor="middle" class="sub">UserProvider</text>
+  <text x="785" y="298" text-anchor="middle" class="sub">PlacesProvider</text>
+
+  <rect class="node" x="940" y="220" width="170" height="76" />
+  <text x="1025" y="252" text-anchor="middle" class="label">AppContent</text>
+  <text x="1025" y="273" text-anchor="middle" class="sub">network-aware shell</text>
+
+  <rect class="node" x="1150" y="220" width="180" height="76" />
+  <text x="1240" y="252" text-anchor="middle" class="label">AppNavigator</text>
+  <text x="1240" y="273" text-anchor="middle" class="sub">src/navigation/index.tsx</text>
+
+  <rect class="gate" x="1370" y="205" width="250" height="106" />
+  <text x="1495" y="236" text-anchor="middle" class="label">Gate</text>
+  <text x="1495" y="258" text-anchor="middle" class="sub">onboarding_complete?</text>
+  <text x="1495" y="278" text-anchor="middle" class="sub">isAuthenticated()?</text>
+  <text x="1495" y="298" text-anchor="middle" class="small">also restores saved nav state</text>
+
+  <rect class="node" x="940" y="320" width="180" height="76" style="stroke:#ef4444;" />
+  <text x="1030" y="352" text-anchor="middle" class="label">NoInternetScreen</text>
+  <text x="1030" y="373" text-anchor="middle" class="sub">offline fallback</text>
+
+  <rect class="node-amber" x="1370" y="320" width="250" height="76" />
+  <text x="1495" y="352" text-anchor="middle" class="label">OnboardingNavigator</text>
+  <text x="1495" y="373" text-anchor="middle" class="sub">8-screen first-run flow</text>
+
+  <rect class="node" x="1660" y="320" width="250" height="76" />
+  <text x="1785" y="352" text-anchor="middle" class="label">MainNavigation</text>
+  <text x="1785" y="373" text-anchor="middle" class="sub">authenticated app shell</text>
+
+  <path class="line" d="M230 258 L270 258" />
+  <path class="line" d="M420 258 L460 258" />
+  <path class="line" d="M630 258 L670 258" />
+  <path class="line" d="M900 258 L940 258" />
+  <path class="line" d="M1110 258 L1150 258" />
+  <path class="line" d="M1330 258 L1370 258" />
+  <path class="line-muted" d="M1025 296 L1025 320" />
+  <text x="1045" y="314" class="small">offline</text>
+  <path class="line-amber" d="M1495 311 L1495 320" />
+  <text x="1455" y="333" class="small">false</text>
+  <path class="line" d="M1620 258 L1730 258 L1730 320" />
+  <text x="1665" y="280" class="small">true</text>
+
+  <rect class="section" x="40" y="430" width="1920" height="230" />
+  <text x="70" y="470" class="section-title">2. Onboarding Flow</text>
+  <text x="70" y="494" class="section-sub">This path is active whenever onboarding is incomplete or tokens are absent.</text>
+
+  <rect class="node-amber" x="70" y="540" width="180" height="72" />
+  <text x="160" y="570" text-anchor="middle" class="label">SplashVideoScreen</text>
+  <text x="160" y="592" text-anchor="middle" class="sub">intro video</text>
+
+  <rect class="node-amber" x="290" y="540" width="180" height="72" />
+  <text x="380" y="570" text-anchor="middle" class="label">EmotionalQuestion</text>
+  <text x="380" y="592" text-anchor="middle" class="sub">answer: yes / no</text>
+
+  <rect class="node-amber" x="510" y="540" width="180" height="72" />
+  <text x="600" y="570" text-anchor="middle" class="label">MirrorMoment</text>
+  <text x="600" y="592" text-anchor="middle" class="sub">conditional copy</text>
+
+  <rect class="node-amber" x="730" y="540" width="180" height="72" />
+  <text x="820" y="570" text-anchor="middle" class="label">AncestryInput</text>
+  <text x="820" y="592" text-anchor="middle" class="sub">region selector</text>
+
+  <rect class="node-amber" x="950" y="540" width="180" height="72" />
+  <text x="1040" y="570" text-anchor="middle" class="label">FirstTaste</text>
+  <text x="1040" y="592" text-anchor="middle" class="sub">ancestor story</text>
+
+  <rect class="node-amber" x="1170" y="540" width="180" height="72" />
+  <text x="1260" y="570" text-anchor="middle" class="label">SignupScreen</text>
+  <text x="1260" y="592" text-anchor="middle" class="sub">login or register</text>
+
+  <rect class="node-amber" x="1390" y="540" width="220" height="72" />
+  <text x="1500" y="570" text-anchor="middle" class="label">Onboarding Permissions</text>
+  <text x="1500" y="592" text-anchor="middle" class="sub">location + notifications</text>
+
+  <rect class="node-amber" x="1650" y="540" width="220" height="72" />
+  <text x="1760" y="570" text-anchor="middle" class="label">WorldOpensScreen</text>
+  <text x="1760" y="592" text-anchor="middle" class="sub">calls useOnboardingComplete()</text>
+
+  <path class="line-amber" d="M1495 396 L1495 520 L160 520 L160 540" />
+  <path class="line-amber" d="M250 576 L290 576" />
+  <path class="line-amber" d="M470 576 L510 576" />
+  <path class="line-amber" d="M690 576 L730 576" />
+  <path class="line-amber" d="M910 576 L950 576" />
+  <path class="line-amber" d="M1130 576 L1170 576" />
+  <path class="line-amber" d="M1350 576 L1390 576" />
+  <path class="line-amber" d="M1610 576 L1650 576" />
+  <text x="1385" y="530" class="small">stores tokens + sets onboarding flag</text>
+  <path class="line-amber" d="M1760 612 L1760 640 L1785 640 L1785 396" />
+
+  <rect class="section" x="40" y="700" width="1920" height="380" />
+  <text x="70" y="740" class="section-title">3. Main App</text>
+  <text x="70" y="764" class="section-sub">MainNavigation contains the tab shell plus modal/detail routes.</text>
+
+  <rect class="node" x="1440" y="790" width="250" height="76" />
+  <text x="1565" y="822" text-anchor="middle" class="label">TabNavigation</text>
+  <text x="1565" y="843" text-anchor="middle" class="sub">Home / Explore / Challenges / Saved / Settings</text>
+
+  <rect class="node" x="1730" y="760" width="180" height="68" />
+  <text x="1820" y="790" text-anchor="middle" class="label">Main Permissions</text>
+  <text x="1820" y="811" text-anchor="middle" class="sub">modal</text>
+
+  <rect class="node" x="1730" y="860" width="180" height="68" />
+  <text x="1820" y="890" text-anchor="middle" class="label">SiteDetailScreen</text>
+  <text x="1820" y="911" text-anchor="middle" class="sub">detail route</text>
+
+  <rect class="node" x="1730" y="960" width="180" height="68" />
+  <text x="1820" y="990" text-anchor="middle" class="label">ARExperience</text>
+  <text x="1820" y="1011" text-anchor="middle" class="sub">simulated AR flow</text>
+
+  <rect class="node-green" x="1110" y="910" width="150" height="72" />
+  <text x="1185" y="940" text-anchor="middle" class="label">Home.tsx</text>
+  <text x="1185" y="962" text-anchor="middle" class="sub">nearby highlights</text>
+
+  <rect class="node-green" x="1290" y="910" width="150" height="72" />
+  <text x="1365" y="940" text-anchor="middle" class="label">Saved.tsx</text>
+  <text x="1365" y="962" text-anchor="middle" class="sub">saved places</text>
+
+  <rect class="node-green" x="1470" y="910" width="150" height="72" />
+  <text x="1545" y="940" text-anchor="middle" class="label">Settings.tsx</text>
+  <text x="1545" y="962" text-anchor="middle" class="sub">profile + logout</text>
+
+  <rect class="node-dormant" x="1110" y="1000" width="150" height="72" />
+  <text x="1185" y="1030" text-anchor="middle" class="label">Explore.tsx</text>
+  <text x="1185" y="1052" text-anchor="middle" class="sub">tab blocked</text>
+
+  <rect class="node-dormant" x="1290" y="1000" width="150" height="72" />
+  <text x="1365" y="1030" text-anchor="middle" class="label">Challenges.tsx</text>
+  <text x="1365" y="1052" text-anchor="middle" class="sub">tab blocked</text>
+
+  <path class="line" d="M1785 396 L1785 730 L1565 730 L1565 790" />
+  <path class="line" d="M1785 396 L1785 760" />
+  <path class="line" d="M1785 396 L1820 396 L1820 860" />
+  <path class="line" d="M1785 396 L1900 396 L1900 960 L1910 960" />
+
+  <path class="line-green" d="M1565 866 L1185 866 L1185 910" />
+  <path class="line-green" d="M1565 866 L1365 866 L1365 910" />
+  <path class="line-green" d="M1565 866 L1545 866 L1545 910" />
+  <path class="line-dormant" d="M1565 866 L1185 866 L1185 1000" />
+  <path class="line-dormant" d="M1565 866 L1365 866 L1365 1000" />
+
+  <path class="line-green" d="M1260 946 L1730 894" />
+  <path class="line-green" d="M1440 946 L1730 894" />
+  <path class="line-green" d="M1910 994 L1910 994" />
+  <path class="line" d="M1820 928 L1820 960" />
+
+  <text x="1110" y="1088" class="small">Explore owns</text>
+  <text x="1110" y="1104" class="small">Map.tsx + Camera.tsx</text>
+  <text x="1375" y="1088" class="small">present in repo, not usable</text>
+  <text x="1375" y="1104" class="small">through current tabs</text>
+
+  <rect class="section" x="40" y="1120" width="1920" height="260" />
+  <text x="70" y="1160" class="section-title">4. Key Service Relationships</text>
+  <text x="70" y="1184" class="section-sub">These file groups power the screens above.</text>
+
+  <rect class="note" x="60" y="1210" width="580" height="140" />
+  <text x="85" y="1240" class="label">Auth And Onboarding State</text>
+  <rect class="mini" x="82" y="1265" width="120" height="54" />
+  <text x="142" y="1296" text-anchor="middle" class="sub">SignupScreen</text>
+  <rect class="mini" x="228" y="1265" width="120" height="54" />
+  <text x="288" y="1288" text-anchor="middle" class="sub">Login.ts</text>
+  <text x="288" y="1305" text-anchor="middle" class="small">Signup.ts</text>
+  <rect class="mini" x="374" y="1265" width="120" height="54" />
+  <text x="434" y="1296" text-anchor="middle" class="sub">tokenStorage.ts</text>
+  <rect class="mini" x="520" y="1265" width="100" height="54" />
+  <text x="570" y="1288" text-anchor="middle" class="sub">AsyncStorage</text>
+  <text x="570" y="1305" text-anchor="middle" class="small">tokens + onboarding</text>
+  <path class="line-muted" d="M202 1292 L228 1292" />
+  <path class="line-muted" d="M348 1292 L374 1292" />
+  <path class="line-muted" d="M494 1292 L520 1292" />
+
+  <rect class="note" x="700" y="1210" width="580" height="140" />
+  <text x="725" y="1240" class="label">Places Discovery And Saved Places</text>
+  <rect class="mini" x="722" y="1265" width="120" height="54" />
+  <text x="782" y="1288" text-anchor="middle" class="sub">Home / Saved /</text>
+  <text x="782" y="1305" text-anchor="middle" class="small">SiteDetail</text>
+  <rect class="mini" x="868" y="1265" width="120" height="54" />
+  <text x="928" y="1296" text-anchor="middle" class="sub">PlacesContext</text>
+  <rect class="mini" x="1014" y="1228" width="120" height="54" />
+  <text x="1074" y="1259" text-anchor="middle" class="sub">Geolocation</text>
+  <rect class="mini" x="1014" y="1302" width="120" height="54" />
+  <text x="1074" y="1333" text-anchor="middle" class="sub">Places.ts API</text>
+  <rect class="mini" x="1160" y="1265" width="100" height="54" />
+  <text x="1210" y="1288" text-anchor="middle" class="sub">Backend</text>
+  <text x="1210" y="1305" text-anchor="middle" class="small">find/save/unsave</text>
+  <path class="line-green" d="M842 1292 L868 1292" />
+  <path class="line-green" d="M988 1292 L1014 1255" />
+  <path class="line-green" d="M988 1292 L1014 1329" />
+  <path class="line-green" d="M1134 1329 L1160 1292" />
+
+  <rect class="note" x="1340" y="1210" width="580" height="140" />
+  <text x="1365" y="1240" class="label">User Data And Permissions</text>
+  <rect class="mini" x="1362" y="1265" width="120" height="54" />
+  <text x="1422" y="1296" text-anchor="middle" class="sub">SettingsScreen</text>
+  <rect class="mini" x="1508" y="1265" width="120" height="54" />
+  <text x="1568" y="1296" text-anchor="middle" class="sub">UserContext</text>
+  <rect class="mini" x="1654" y="1230" width="120" height="54" />
+  <text x="1714" y="1261" text-anchor="middle" class="sub">Profile.ts</text>
+  <rect class="mini" x="1654" y="1300" width="120" height="54" />
+  <text x="1714" y="1331" text-anchor="middle" class="sub">Stats.ts</text>
+  <rect class="mini" x="1800" y="1265" width="100" height="54" />
+  <text x="1850" y="1296" text-anchor="middle" class="sub">Backend</text>
+  <path class="line-muted" d="M1482 1292 L1508 1292" />
+  <path class="line-muted" d="M1628 1292 L1654 1257" />
+  <path class="line-muted" d="M1628 1292 L1654 1327" />
+  <path class="line-muted" d="M1774 1257 L1800 1292" />
+  <text x="1365" y="1370" class="small">Permission paths currently split between src/utils/permissions.ts</text>
+  <text x="1365" y="1386" class="small">and src/shared/services/permission.service.ts</text>
+</svg>

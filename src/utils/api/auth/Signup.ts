@@ -4,7 +4,7 @@
  */
 
 import { AuthResult } from './types';
-import { createBaseClient, createErrorResult, isApiError } from '../helpers';
+import { createBaseClient, createErrorResult } from '../helpers';
 
 /**
  * Signup request interface

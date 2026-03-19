@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 1360" role="img" aria-labelledby="title desc">
+  <title id="title">EpochEye current file and module map</title>
+  <desc id="desc">Visual map of the current EpochEye codebase grouped by major folders and key files, including active and dormant areas.</desc>
+  <defs>
+    <style>
+      .bg { fill: #05070c; }
+      .panel { fill: #0b1220; stroke: #1f2a44; stroke-width: 2; rx: 24; }
+      .box { fill: #111827; stroke: #60a5fa; stroke-width: 2.5; rx: 20; }
+      .box-amber { fill: #1d1408; stroke: #f59e0b; stroke-width: 2.5; rx: 20; }
+      .box-green { fill: #071a15; stroke: #10b981; stroke-width: 2.5; rx: 20; }
+      .box-muted { fill: #151821; stroke: #64748b; stroke-width: 2; stroke-dasharray: 10 8; rx: 20; }
+      .title { fill: #ffffff; font: 700 38px Arial, sans-serif; }
+      .subtitle { fill: #a5b4c7; font: 400 18px Arial, sans-serif; }
+      .section-title { fill: #f8fafc; font: 700 26px Arial, sans-serif; }
+      .heading { fill: #eaf2ff; font: 700 20px Arial, sans-serif; }
+      .body { fill: #c1d0e6; font: 400 15px Arial, sans-serif; }
+      .small { fill: #8fa3bf; font: 400 13px Arial, sans-serif; }
+      .legend { fill: #dbe7f5; font: 600 14px Arial, sans-serif; }
+      .line { stroke: #6ea8ff; stroke-width: 3; fill: none; marker-end: url(#arrowBlue); }
+      .line-amber { stroke: #f59e0b; stroke-width: 3; fill: none; marker-end: url(#arrowAmber); }
+      .line-green { stroke: #10b981; stroke-width: 3; fill: none; marker-end: url(#arrowGreen); }
+      .line-muted { stroke: #94a3b8; stroke-width: 2.5; fill: none; stroke-dasharray: 10 8; marker-end: url(#arrowMuted); }
+      .chip { fill: #182235; stroke: #2d4265; stroke-width: 1; rx: 999; }
+      .chip-text { fill: #cfe1ff; font: 600 12px Arial, sans-serif; }
+    </style>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6ea8ff" />
+    </marker>
+    <marker id="arrowAmber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" />
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#10b981" />
+    </marker>
+    <marker id="arrowMuted" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="2000" height="1360" />
+
+  <text x="60" y="58" class="title">EpochEye Current File And Module Map</text>
+  <text x="60" y="90" class="subtitle">Grouped view of the repo so you can see where the current flow lives and what is waiting off-path.</text>
+
+  <rect class="chip" x="1520" y="38" width="120" height="28" />
+  <text x="1580" y="57" text-anchor="middle" class="chip-text">root / active</text>
+  <rect class="chip" x="1660" y="38" width="120" height="28" style="fill:#1f1408;stroke:#7c5b1a;" />
+  <text x="1720" y="57" text-anchor="middle" class="chip-text">onboarding</text>
+  <rect class="chip" x="1800" y="38" width="150" height="28" style="fill:#151821;stroke:#64748b;stroke-dasharray:10 8;" />
+  <text x="1875" y="57" text-anchor="middle" class="chip-text">dormant / unused</text>
+
+  <rect class="panel" x="40" y="120" width="1920" height="1180" />
+  <text x="70" y="160" class="section-title">Project Overview</text>
+  <text x="70" y="184" class="small">The arrows show the dominant code-reading path and dependency direction, not every single import.</text>
+
+  <rect class="box" x="80" y="240" width="360" height="180" />
+  <text x="110" y="278" class="heading">Root Boot Files</text>
+  <text x="110" y="308" class="body">index.js</text>
+  <text x="110" y="332" class="body">App.tsx</text>
+  <text x="110" y="356" class="body">app.json</text>
+  <text x="110" y="380" class="body">package.json</text>
+  <text x="110" y="404" class="body">global.css, babel.config.js, metro.config.js</text>
+
+  <rect class="box" x="520" y="240" width="360" height="200" />
+  <text x="550" y="278" class="heading">Navigation</text>
+  <text x="550" y="308" class="body">src/navigation/index.tsx</text>
+  <text x="550" y="332" class="body">src/navigation/MainNavigation.tsx</text>
+  <text x="550" y="356" class="body">src/navigation/OnboardingNavigator.tsx</text>
+  <text x="550" y="380" class="body">src/navigation/TabNavigation.tsx</text>
+  <text x="550" y="408" class="small">Owns the onboarding/main split and tab registration.</text>
+
+  <rect class="box" x="960" y="240" width="360" height="220" />
+  <text x="990" y="278" class="heading">Context Providers</text>
+  <text x="990" y="308" class="body">src/context/NetworkContext.tsx</text>
+  <text x="990" y="332" class="body">src/context/UserContext.tsx</text>
+  <text x="990" y="356" class="body">src/context/PlacesContext.tsx</text>
+  <text x="990" y="380" class="body">src/context/OnboardingCallbackContext.tsx</text>
+  <text x="990" y="404" class="body">src/context/index.ts</text>
+  <text x="990" y="432" class="small">Live state backbone for network, user, places, and onboarding completion.</text>
+
+  <rect class="box-amber" x="1400" y="240" width="500" height="250" />
+  <text x="1430" y="278" class="heading">Onboarding Screens</text>
+  <text x="1430" y="308" class="body">src/screens/Onboarding/SplashVideoScreen.tsx</text>
+  <text x="1430" y="332" class="body">src/screens/Onboarding/EmotionalQuestionScreen.tsx</text>
+  <text x="1430" y="356" class="body">src/screens/Onboarding/MirrorMomentScreen.tsx</text>
+  <text x="1430" y="380" class="body">src/screens/Onboarding/AncestryInputScreen.tsx</text>
+  <text x="1430" y="404" class="body">src/screens/Onboarding/FirstTasteScreen.tsx</text>
+  <text x="1430" y="428" class="body">src/screens/Onboarding/SignupScreen.tsx</text>
+  <text x="1430" y="452" class="body">src/screens/Onboarding/PermissionsScreen.tsx</text>
+  <text x="1430" y="476" class="body">src/screens/Onboarding/WorldOpensScreen.tsx</text>
+
+  <rect class="box-green" x="80" y="560" width="520" height="290" />
+  <text x="110" y="598" class="heading">Main Screens In Active Flow</text>
+  <text x="110" y="628" class="body">src/screens/Main/Home.tsx</text>
+  <text x="110" y="652" class="body">src/screens/Main/Saved.tsx</text>
+  <text x="110" y="676" class="body">src/screens/Main/SettingsScreen.tsx</text>
+  <text x="110" y="700" class="body">src/screens/Main/SiteDetailScreen.tsx</text>
+  <text x="110" y="724" class="body">src/screens/Main/ARExperienceScreen.tsx</text>
+  <text x="110" y="748" class="body">src/screens/Main/PermissionsScreen.tsx</text>
+  <text x="110" y="776" class="body">src/screens/NoInternetScreen.tsx</text>
+  <text x="110" y="804" class="small">These are the screens a user can actually reach with today&apos;s nav setup.</text>
+
+  <rect class="box-muted" x="660" y="560" width="520" height="290" />
+  <text x="690" y="598" class="heading">Present But Not On The Active Path</text>
+  <text x="690" y="628" class="body">src/screens/Main/Explore.tsx</text>
+  <text x="690" y="652" class="body">src/screens/Main/Challenges.tsx</text>
+  <text x="690" y="676" class="body">src/screens/Main/Profile.tsx</text>
+  <text x="690" y="700" class="body">src/screens/Main/NavigationScreen.tsx</text>
+  <text x="690" y="724" class="body">src/components/Camera.tsx</text>
+  <text x="690" y="748" class="body">src/components/Map.tsx</text>
+  <text x="690" y="772" class="body">src/components/Phone.tsx</text>
+  <text x="690" y="800" class="small">Explore and Challenges tabs are registered but intentionally blocked in TabNavigation.</text>
+
+  <rect class="box" x="1240" y="560" width="320" height="290" />
+  <text x="1270" y="598" class="heading">API Layer In Use</text>
+  <text x="1270" y="628" class="body">src/utils/api/auth/*</text>
+  <text x="1270" y="652" class="body">src/utils/api/places/*</text>
+  <text x="1270" y="676" class="body">src/utils/api/user/*</text>
+  <text x="1270" y="700" class="body">src/utils/api/helpers.ts</text>
+  <text x="1270" y="728" class="small">This is the active backend-facing layer today.</text>
+  <text x="1270" y="758" class="body">Key files:</text>
+  <text x="1270" y="782" class="body">Login.ts, Signup.ts, Places.ts, Profile.ts, Stats.ts</text>
+
+  <rect class="box" x="1600" y="560" width="300" height="290" />
+  <text x="1630" y="598" class="heading">Core And Shared Services</text>
+  <text x="1630" y="628" class="body">src/core/config/*</text>
+  <text x="1630" y="652" class="body">src/core/constants/*</text>
+  <text x="1630" y="676" class="body">src/core/types/*</text>
+  <text x="1630" y="700" class="body">src/shared/services/storage.service.ts</text>
+  <text x="1630" y="724" class="body">src/shared/services/permission.service.ts</text>
+  <text x="1630" y="752" class="small">Storage is active. Permission service is partially active.</text>
+
+  <rect class="box" x="80" y="910" width="520" height="300" />
+  <text x="110" y="948" class="heading">Components, Content, And Assets</text>
+  <text x="110" y="978" class="body">src/components/onboarding/*</text>
+  <text x="110" y="1002" class="body">src/components/ui/*</text>
+  <text x="110" y="1026" class="body">src/content/mapstyle.json</text>
+  <text x="110" y="1050" class="body">src/content/countries.json</text>
+  <text x="110" y="1074" class="body">src/assets/fonts/*</text>
+  <text x="110" y="1098" class="body">src/assets/images/*</text>
+  <text x="110" y="1122" class="body">src/assets/video/epocheye_intro.mp4</text>
+  <text x="110" y="1150" class="small">Onboarding components are active; most ui primitives are present but not central to the current flow.</text>
+
+  <rect class="box-muted" x="660" y="910" width="520" height="300" />
+  <text x="690" y="948" class="heading">Dormant Or Transitional Infrastructure</text>
+  <text x="690" y="978" class="body">src/shared/api/*</text>
+  <text x="690" y="1002" class="body">src/shared/hooks/*</text>
+  <text x="690" y="1026" class="body">src/shared/utils/*</text>
+  <text x="690" y="1050" class="body">src/shared/index.ts</text>
+  <text x="690" y="1074" class="body">src/design-system/*</text>
+  <text x="690" y="1098" class="body">src/constants/theme.ts</text>
+  <text x="690" y="1126" class="small">These look like refactor targets or future architecture, but they do not currently drive the live user path.</text>
+
+  <rect class="box" x="1240" y="910" width="660" height="300" />
+  <text x="1270" y="948" class="heading">Native, Docs, And Verification</text>
+  <text x="1270" y="978" class="body">android/*</text>
+  <text x="1270" y="1002" class="body">ios/*</text>
+  <text x="1270" y="1026" class="body">docs/architecture/HIGH_LEVEL_DESIGN.md</text>
+  <text x="1270" y="1050" class="body">docs/architecture/LOW_LEVEL_DESIGN.md</text>
+  <text x="1270" y="1074" class="body">docs/architecture/CURRENT_PROJECT_FLOW.md</text>
+  <text x="1270" y="1098" class="body">__tests__/App.test.tsx</text>
+  <text x="1270" y="1126" class="small">The native folders support the RN app. Existing docs describe a cleaner target architecture than what is currently wired.</text>
+
+  <path class="line" d="M440 330 L520 330" />
+  <path class="line" d="M440 360 L960 360" />
+  <path class="line-amber" d="M880 330 L1400 330" />
+  <path class="line-green" d="M700 440 L340 560" />
+  <path class="line-green" d="M1140 460 L340 560" />
+  <path class="line" d="M1140 460 L1400 560" />
+  <path class="line" d="M1140 460 L1600 560" />
+  <path class="line" d="M1560 490 L1560 560" />
+  <path class="line" d="M340 850 L340 910" />
+  <path class="line-muted" d="M920 850 L920 910" />
+  <path class="line" d="M1400 850 L1400 910" />
+  <path class="line" d="M1750 850 L1750 910" />
+
+  <text x="70" y="1268" class="small">Recommended reading path:</text>
+  <text x="250" y="1268" class="body">index.js -&gt; App.tsx -&gt; navigation -&gt; contexts -&gt; SignupScreen -&gt; Home/Saved/Settings -&gt; API files</text>
+</svg>

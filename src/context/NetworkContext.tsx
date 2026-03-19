@@ -28,7 +28,6 @@ const NetworkContext = createContext<NetworkContextType>({
   checkConnection: async () => true,
 });
 
-const LAST_ROUTE_KEY = '@epocheye/last_route';
 const LAST_STATE_KEY = '@epocheye/last_navigation_state';
 
 /**

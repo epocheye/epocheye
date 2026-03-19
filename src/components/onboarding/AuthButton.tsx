@@ -8,6 +8,7 @@ import {
   ViewStyle,
   Image,
 } from 'react-native';
+import { FONTS, COLORS, RADIUS, FONT_SIZES } from '../../core/constants/theme';
 
 type AuthVariant = 'google' | 'apple' | 'email';
 
@@ -21,8 +22,8 @@ interface AuthButtonProps {
 const GoogleIcon = require('../../assets/images/Google.webp');
 
 /**
- * Auth button for the Signup screen.
- * Three variants: google (white bg), apple (black bg), email (ghost).
+ * Auth button for the Signup/Login screens.
+ * Three variants: google (white bg), apple (black bg), email (ghost with border).
  */
 const AuthButton: React.FC<AuthButtonProps> = ({
   title,
@@ -63,16 +64,15 @@ const AuthButton: React.FC<AuthButtonProps> = ({
     ]).start();
   }, [scaleAnim, bgAnim]);
 
-  // Email: amber ripple on press. Google/Apple: simple scale only.
   const animatedBg =
     variant === 'email'
       ? bgAnim.interpolate({
           inputRange: [0, 1],
-          outputRange: ['rgba(212,134,10,0)', 'rgba(212,134,10,0.2)'],
+          outputRange: ['rgba(212,134,10,0)', 'rgba(212,134,10,0.15)'],
         })
       : variant === 'google'
-      ? '#FFFFFF'
-      : '#000000';
+      ? COLORS.google
+      : COLORS.apple;
 
   return (
     <TouchableOpacity
@@ -116,21 +116,22 @@ const AuthButton: React.FC<AuthButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 40,
+    borderRadius: RADIUS.pill,
     height: 56,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 20,
   },
   googleButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.google,
   },
   appleButton: {
-    backgroundColor: '#000000',
+    backgroundColor: COLORS.apple,
   },
   emailButton: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: COLORS.border,
   },
   iconImage: {
     width: 20,
@@ -139,7 +140,7 @@ const styles = StyleSheet.create({
   },
   appleIconText: {
     fontSize: 20,
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
     marginRight: 12,
   },
   emailIconContainer: {
@@ -150,17 +151,17 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   emailIconText: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 16,
-    color: '#FFFFFF',
+    fontFamily: FONTS.medium,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.textPrimary,
   },
   text: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 16,
-    color: '#FFFFFF',
+    fontFamily: FONTS.medium,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.textPrimary,
   },
   googleText: {
-    color: '#1A1612',
+    color: COLORS.bgWarm,
   },
 });
 
