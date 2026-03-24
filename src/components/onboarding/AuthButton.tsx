@@ -82,7 +82,9 @@ const AuthButton: React.FC<AuthButtonProps> = ({
     >
       <Animated.View
         className={`h-14 flex-row items-center justify-center rounded-full px-5 ${
-          variant === 'email' ? 'border border-[rgba(255,255,255,0.24)]' : ''
+          variant === 'email' || variant === 'apple'
+            ? 'border border-[rgba(255,255,255,0.24)]'
+            : ''
         }`}
         style={[
           style,
