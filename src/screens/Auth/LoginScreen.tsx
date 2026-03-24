@@ -110,7 +110,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         ) : (
           <View className="gap-5">
             <TextInput
-              className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)] bg-[#241D16] px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
+              className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
               placeholder="Email"
               placeholderTextColor={COLORS.textTertiary}
               value={email}
@@ -120,7 +120,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               autoCorrect={false}
             />
             <TextInput
-              className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)] bg-[#241D16] px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
+              className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
               placeholder="Password"
               placeholderTextColor={COLORS.textTertiary}
               value={password}

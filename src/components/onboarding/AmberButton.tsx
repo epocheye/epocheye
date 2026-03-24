@@ -67,7 +67,7 @@ const AmberButton: React.FC<AmberButtonProps> = ({
       disabled={disabled}
     >
       <Animated.View
-        className="h-14 items-center justify-center rounded-full bg-[#D4860A]"
+        className="h-14 items-center justify-center rounded-full bg-[#ffffff]"
         style={[
           style,
           disabled && { opacity: 0.5 },
@@ -75,7 +75,7 @@ const AmberButton: React.FC<AmberButtonProps> = ({
         ]}
       >
         <Text
-          className="font-['MontserratAlternates-SemiBold'] text-lg tracking-[0.3px] text-[#F5E9D8]"
+          className="font-['MontserratAlternates-SemiBold'] text-lg tracking-[0.3px] "
           style={textStyle}
         >
           {title}
