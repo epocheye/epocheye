@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -81,8 +81,8 @@ const DustMote: React.FC<DustMoteProps> = ({ particle }) => {
 
   return (
     <Animated.View
+      className="absolute bg-white"
       style={[
-        styles.mote,
         animatedStyle,
         {
           left: `${particle.startX}%`,
@@ -103,23 +103,12 @@ const DustMote: React.FC<DustMoteProps> = ({ particle }) => {
  */
 const DustMotes: React.FC = () => {
   return (
-    <View style={styles.container} pointerEvents="none">
+    <View className="absolute inset-0 overflow-hidden" pointerEvents="none">
       {PARTICLES.map(p => (
         <DustMote key={p.id} particle={p} />
       ))}
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  mote: {
-    position: 'absolute',
-    backgroundColor: '#FFFFFF',
-  },
-});
 
 export default DustMotes;

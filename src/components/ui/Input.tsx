@@ -3,19 +3,12 @@ import {
   View,
   TextInput,
   Text,
-  StyleSheet,
   TextInputProps,
   TouchableOpacity,
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import {
-  Colors,
-  Typography,
-  Layout,
-  BorderRadius,
-  Spacing,
-} from '../../constants/theme';
+import { Colors } from '../../constants/theme';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -53,31 +46,37 @@ const Input: React.FC<InputProps> = ({
   };
 
   const isSecure = secureTextEntry && !isPasswordVisible;
+  const focusClass = isFocused
+    ? 'border-[#D4860A]'
+    : error
+    ? 'border-[#D9534F]'
+    : 'border-transparent';
 
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View className="mb-4" style={containerStyle}>
       {label && (
-        <Text style={[styles.label, labelStyle]} accessibilityLabel={label}>
+        <Text
+          className="mb-2 text-base font-['MontserratAlternates-Medium'] text-[#F5E9D8]"
+          style={labelStyle}
+          accessibilityLabel={label}
+        >
           {label}
-          {required && <Text style={styles.required}> *</Text>}
+          {required && <Text className="text-[#D9534F]"> *</Text>}
         </Text>
       )}
 
       <View
-        style={[
-          styles.inputContainer,
-          isFocused && styles.inputContainerFocused,
-          error && styles.inputContainerError,
-        ]}
+        className={`flex-row items-center rounded-xl border bg-[#1F1B16] px-4 ${focusClass}`}
       >
-        {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
+        {leftIcon && (
+          <View className="items-center justify-center">{leftIcon}</View>
+        )}
 
         <TextInput
-          style={[
-            styles.input,
-            inputStyle,
-            leftIcon ? styles.inputWithLeftIcon : null,
-          ]}
+          className={`h-14 flex-1 text-base font-['MontserratAlternates-Regular'] text-[#F5E9D8] ${
+            leftIcon ? 'ml-2' : ''
+          }`}
+          style={inputStyle}
           placeholderTextColor={Colors.placeholder}
           secureTextEntry={isSecure}
           onFocus={() => setIsFocused(true)}
@@ -91,98 +90,37 @@ const Input: React.FC<InputProps> = ({
         {showPasswordToggle && secureTextEntry && (
           <TouchableOpacity
             onPress={togglePasswordVisibility}
-            style={styles.iconRight}
+            className="items-center justify-center pl-2"
             accessibilityLabel={
               isPasswordVisible ? 'Hide password' : 'Show password'
             }
             accessibilityRole="button"
           >
-            <Text style={styles.toggleText}>
-              {isPasswordVisible ? '👁️' : '👁️‍🗨️'}
-            </Text>
+            <Text className="text-xl">{isPasswordVisible ? '👁️' : '👁️‍🗨️'}</Text>
           </TouchableOpacity>
         )}
 
         {rightIcon && !showPasswordToggle && (
-          <View style={styles.iconRight}>{rightIcon}</View>
+          <View className="items-center justify-center pl-2">{rightIcon}</View>
         )}
       </View>
 
       {error && (
-        <Text style={styles.errorText} accessibilityLiveRegion="polite">
+        <Text
+          className="mt-1 text-sm font-['MontserratAlternates-Regular'] text-[#D9534F]"
+          accessibilityLiveRegion="polite"
+        >
           {error}
         </Text>
       )}
 
       {helperText && !error && (
-        <Text style={styles.helperText}>{helperText}</Text>
+        <Text className="mt-1 text-sm font-['MontserratAlternates-Regular'] text-[#B8AF9E]">
+          {helperText}
+        </Text>
       )}
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: Spacing.md,
-  },
-  label: {
-    fontSize: Typography.fontSize.base,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.text,
-    marginBottom: Spacing.sm,
-  },
-  required: {
-    color: Colors.error,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundInput,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.transparent,
-    paddingHorizontal: Spacing.md,
-  },
-  inputContainerFocused: {
-    borderColor: Colors.secondary,
-  },
-  inputContainerError: {
-    borderColor: Colors.error,
-  },
-  input: {
-    flex: 1,
-    height: Layout.inputHeight,
-    fontSize: Typography.fontSize.base,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.text,
-  },
-  inputWithLeftIcon: {
-    marginLeft: Spacing.sm,
-  },
-  iconLeft: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconRight: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingLeft: Spacing.sm,
-  },
-  toggleText: {
-    fontSize: Typography.fontSize.xl,
-  },
-  errorText: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.error,
-    marginTop: Spacing.xs,
-  },
-  helperText: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
-  },
-});
 
 export default Input;

@@ -6,9 +6,26 @@ import {
   FlatList,
   ImageBackground,
 } from 'react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, MapPin, ArrowRight, X, Loader } from 'lucide-react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withRepeat,
+  withSequence,
+  Easing,
+  withSpring,
+} from 'react-native-reanimated';
+import {
+  Bell,
+  MapPin,
+  ArrowRight,
+  X,
+  Sparkles,
+  Compass,
+} from 'lucide-react-native';
 import { usePermissionCheck } from '../../utils/usePermissionCheck';
 import { usePlaces } from '../../context';
 import { useUser } from '../../context';
@@ -50,6 +67,111 @@ function getPlaceImage(categories: string[]): string {
 
 type Props = TabScreenProps<'Home'>;
 
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+interface PlaceCardProps {
+  place: Place;
+  onPress: (place: Place) => void;
+}
+
+const PlaceCard: React.FC<PlaceCardProps> = ({ place, onPress }) => {
+  const scale = useSharedValue(1);
+  const imageUri = getPlaceImage(place.categories);
+  const distanceKm = (place.distance_meters / 1000).toFixed(1);
+  const shortDescription = place.categories[0] || 'Historic site';
+
+  const animatedCardStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+  };
+
+  return (
+    <AnimatedTouchable
+      style={[styles.placeCardContainer, animatedCardStyle]}
+      onPress={() => onPress(place)}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={0.9}
+      accessibilityRole="button"
+      accessibilityLabel={`Visit ${place.name}, ${distanceKm} km away`}
+      accessibilityHint="Opens the site details screen"
+    >
+      <ImageBackground
+        source={{ uri: imageUri }}
+        style={styles.placeImage}
+        imageStyle={styles.placeImageMask}
+      >
+        <LinearGradient
+          colors={['rgba(8,8,8,0.12)', 'rgba(8,8,8,0.88)']}
+          style={styles.placeGradient}
+        >
+          <View style={styles.distancePill}>
+            <Compass color="#C9A84C" size={14} />
+            <Text style={styles.distanceText}>{distanceKm} km away</Text>
+          </View>
+
+          <View>
+            <Text style={styles.placeTitle} numberOfLines={2}>
+              {place.name}
+            </Text>
+            <View style={styles.placeLocationRow}>
+              <MapPin color="#B8AF9E" size={15} />
+              <Text style={styles.placeLocationText} numberOfLines={1}>
+                {place.city}, {place.country}
+              </Text>
+            </View>
+
+            <Text style={styles.placeDescription} numberOfLines={2}>
+              {shortDescription}
+            </Text>
+
+            <View style={styles.explorePill}>
+              <Text style={styles.explorePillText}>Explore the Era</Text>
+              <ArrowRight color="#0A0A0A" size={14} />
+            </View>
+          </View>
+        </LinearGradient>
+      </ImageBackground>
+    </AnimatedTouchable>
+  );
+};
+
+const SkeletonCard: React.FC = () => {
+  const pulse = useSharedValue(0.55);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0.55, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+      ),
+      -1,
+      false,
+    );
+  }, [pulse]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: pulse.value,
+  }));
+
+  return (
+    <Animated.View style={[styles.skeletonCard, animatedStyle]}>
+      <View style={styles.skeletonPill} />
+      <View style={styles.skeletonTitle} />
+      <View style={styles.skeletonLine} />
+      <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+      <View style={styles.skeletonCta} />
+    </Animated.View>
+  );
+};
+
 const Home = ({ navigation }: Props) => {
   // Trigger a permission check whenever this screen is active
   usePermissionCheck();
@@ -59,6 +181,18 @@ const Home = ({ navigation }: Props) => {
 
   const [factIndex, setFactIndex] = useState(0);
   const [factVisible, setFactVisible] = useState(true);
+  const entrance = useSharedValue(24);
+  const contentOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    entrance.value = withSpring(0, { damping: 20, stiffness: 200 });
+    contentOpacity.value = withTiming(1, { duration: 400 });
+  }, [contentOpacity, entrance]);
+
+  const entranceStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+    transform: [{ translateY: entrance.value }],
+  }));
 
   // Greeting changes based on time of day and is recalculated only once per
   // mount (the hour won't change while the user reads the screen)
@@ -111,176 +245,387 @@ const Home = ({ navigation }: Props) => {
     navigation.navigate('SiteDetail', { site: siteData });
   };
 
-  const renderPlaceCard = ({ item: place }: { item: Place }) => {
-    const imageUri = getPlaceImage(place.categories);
-    const distanceKm = (place.distance_meters / 1000).toFixed(1);
-    const shortDescription = place.categories[0] || 'Historic site';
-
-    return (
-      <ImageBackground
-        source={{ uri: imageUri }}
-        style={{ width: 220, height: 260, marginRight: 16 }}
-        imageStyle={{ borderRadius: 28 }}
-      >
-        <TouchableOpacity
-          className="flex-1 justify-between rounded-[28px] p-4 bg-black/45"
-          onPress={() => handleVisitPlace(place)}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={`Visit ${place.name}, ${distanceKm} km away`}
-          accessibilityHint="Opens the site details screen"
-        >
-          <View className="bg-white/20 rounded-full px-4 py-1 self-start">
-            <Text className="text-white text-xs font-montserrat-semibold">
-              {distanceKm} km away
-            </Text>
-          </View>
-          <View>
-            <Text
-              className="text-white text-2xl font-montserrat-bold"
-              numberOfLines={2}
-            >
-              {place.name}
-            </Text>
-            <View className="flex-row items-center mt-2">
-              <MapPin color="#FFFFFF" size={16} />
-              <Text
-                className="text-white text-sm font-montserrat-medium ml-1"
-                numberOfLines={1}
-              >
-                {place.city}, {place.country}
-              </Text>
-            </View>
-            <Text
-              className="text-white/85 text-sm font-montserrat-regular mt-3"
-              numberOfLines={2}
-            >
-              {shortDescription}
-            </Text>
-            <View className="mt-4 bg-white/90 rounded-full py-2 px-4 flex-row items-center self-start">
-              <Text className="text-black text-sm font-montserrat-semibold">
-                Explore
-              </Text>
-              <ArrowRight color="#000000" size={16} className="ml-2" />
-            </View>
-          </View>
-        </TouchableOpacity>
-      </ImageBackground>
-    );
-  };
-
   const userName = profile?.name || 'Explorer';
 
   return (
-    <SafeAreaView className="flex-1 bg-[#070709]">
+    <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
-
-      {/* Top Greeting Bar */}
-      <View
-        className="flex-row items-center justify-between mt-4 mb-6 px-5"
-        accessibilityRole="header"
+      <LinearGradient
+        colors={['#0A0A0A', '#12100D', '#0A0A0A']}
+        locations={[0, 0.5, 1]}
+        style={styles.gradient}
       >
-        <View className="flex-1 pr-4">
-          <Text className="text-[#BEBEC2] text-sm font-montserrat-medium uppercase tracking-widest">
-            {greeting},
-          </Text>
-          <Text className="text-white text-3xl font-montserrat-bold mt-1">
-            {userName}
-          </Text>
-          <Text className="text-[#8D8D92] text-base font-montserrat-medium mt-1">
-            Ready to unlock a new monument?
-          </Text>
-        </View>
-        <View className="flex-row items-center gap-3">
-          <TouchableOpacity
-            className="w-11 h-11 rounded-full bg-[#12121A] border border-[#272730] items-center justify-center"
-            accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            accessibilityHint="Opens your notification centre"
-          >
-            <Bell color="#FFFFFF" size={22} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Nearby Places Section */}
-      <View className="mb-4 px-5">
-        <Text className="text-white text-xl font-montserrat-semibold">
-          Nearby Highlights
-        </Text>
-        {nearbyError && (
-          <Text className="text-red-400 text-sm font-montserrat-medium mt-2">
-            {nearbyError}
-          </Text>
-        )}
-      </View>
-
-      {isLoadingNearby ? (
-        <View className="h-64 items-center justify-center">
-          <Loader color="#FF7A18" size={32} />
-          <Text className="text-[#9A9AAF] text-sm font-montserrat-medium mt-4">
-            Finding nearby places...
-          </Text>
-        </View>
-      ) : !nearbyPlaces || nearbyPlaces.length === 0 ? (
-        <View className="h-64 items-center justify-center px-5">
-          <MapPin color="#FF7A18" size={48} />
-          <Text className="text-white text-lg font-montserrat-semibold mt-4">
-            No nearby places found
-          </Text>
-          <Text className="text-[#9A9AAF] text-sm font-montserrat-medium mt-2 text-center px-8">
-            Try moving to a different location or check your permissions
-          </Text>
-        </View>
-      ) : (
-        // FlatList provides virtualisation so this list stays performant even
-        // if the API returns a large number of places.
-        <FlatList
-          horizontal
-          data={nearbyPlaces.slice(0, 20)}
-          renderItem={renderPlaceCard}
-          keyExtractor={item => item.id}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingLeft: 20, paddingRight: 12 }}
-          style={{ marginBottom: 0 }}
-        />
-      )}
-
-      {/* Daily Fact Card */}
-      {factVisible && (
-        <View className="bg-[#14141D] rounded-[30px] mt-8 mx-5 p-6 border border-[#232330]">
-          <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-white text-lg font-montserrat-semibold">
-              Daily Fact
-            </Text>
-            <TouchableOpacity
-              onPress={() => setFactVisible(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Dismiss daily fact"
-            >
-              <X color="#7A7A85" size={22} />
-            </TouchableOpacity>
-          </View>
-          <Text className="text-[#D8D8E0] text-base font-montserrat-medium leading-6">
-            {currentFact}
-          </Text>
-          <View className="flex-row items-center justify-end mt-4">
-            <TouchableOpacity
-              onPress={handleNextFact}
-              className="flex-row items-center"
-              accessibilityRole="button"
-              accessibilityLabel="Show next fact"
-            >
-              <Text className="text-[#FF7A18] text-sm font-montserrat-semibold mr-2">
-                Next Tip
+        <Animated.View style={[styles.content, entranceStyle]}>
+          <View style={styles.topRow} accessibilityRole="header">
+            <View style={styles.greetingWrap}>
+              <Text style={styles.greetingLabel}>{greeting}</Text>
+              <Text style={styles.userName}>{userName}</Text>
+              <Text style={styles.subtitle}>
+                Ready to uncover history today?
               </Text>
-              <ArrowRight color="#FF7A18" size={18} />
+            </View>
+            <TouchableOpacity
+              style={styles.iconButton}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+              accessibilityHint="Opens your notification centre"
+            >
+              <Bell color="#F5F0E8" size={20} />
             </TouchableOpacity>
           </View>
-        </View>
-      )}
+
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Sparkles color="#C9A84C" size={18} />
+              <Text style={styles.sectionTitle}>Nearby Highlights</Text>
+            </View>
+            <Text style={styles.sectionSubtitle}>
+              Curated sites around your location
+            </Text>
+            {nearbyError && <Text style={styles.errorText}>{nearbyError}</Text>}
+          </View>
+
+          {isLoadingNearby ? (
+            <View style={styles.skeletonRow}>
+              <SkeletonCard />
+              <SkeletonCard />
+            </View>
+          ) : !nearbyPlaces || nearbyPlaces.length === 0 ? (
+            <View style={styles.emptyStateCard}>
+              <MapPin color="#C9A84C" size={36} />
+              <Text style={styles.emptyStateTitle}>
+                No monuments discovered nearby yet
+              </Text>
+              <Text style={styles.emptyStateBody}>
+                Try moving to a nearby heritage district or check location
+                permissions.
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              horizontal
+              data={nearbyPlaces.slice(0, 20)}
+              renderItem={({ item }) => (
+                <PlaceCard place={item} onPress={handleVisitPlace} />
+              )}
+              keyExtractor={item => item.id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.placeListContent}
+            />
+          )}
+
+          {factVisible && (
+            <View style={styles.factCard}>
+              <View style={styles.factHeaderRow}>
+                <Text style={styles.factHeading}>Artifact of the Day</Text>
+                <TouchableOpacity
+                  onPress={() => setFactVisible(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Dismiss daily fact"
+                >
+                  <X color="#6B6357" size={20} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.factBody}>{currentFact}</Text>
+              <TouchableOpacity
+                onPress={handleNextFact}
+                style={styles.factAction}
+                accessibilityRole="button"
+                accessibilityLabel="Show next fact"
+              >
+                <Text style={styles.factActionText}>Uncover Another</Text>
+                <ArrowRight color="#C9A84C" size={16} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </Animated.View>
+      </LinearGradient>
     </SafeAreaView>
   );
+};
+
+const styles = {
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#0A0A0A',
+  },
+  gradient: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    paddingTop: 16,
+    paddingHorizontal: 20,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  greetingWrap: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  greetingLabel: {
+    color: '#B8AF9E',
+    fontSize: 12,
+    fontFamily: 'MontserratAlternates-SemiBold',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  userName: {
+    color: '#F5F0E8',
+    fontSize: 32,
+    lineHeight: 40,
+    fontFamily: 'MontserratAlternates-Bold',
+    marginTop: 4,
+  },
+  subtitle: {
+    color: '#B8AF9E',
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: 'MontserratAlternates-Medium',
+    marginTop: 4,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    backgroundColor: '#1C1C1C',
+    borderWidth: 1,
+    borderColor: 'rgba(201, 168, 76, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionHeader: {
+    marginBottom: 16,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionTitle: {
+    color: '#F5F0E8',
+    fontSize: 22,
+    lineHeight: 30,
+    fontFamily: 'MontserratAlternates-SemiBold',
+  },
+  sectionSubtitle: {
+    color: '#6B6357',
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: 'MontserratAlternates-Regular',
+    marginTop: 4,
+  },
+  errorText: {
+    color: '#E05C5C',
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: 'MontserratAlternates-Medium',
+    marginTop: 8,
+  },
+  placeListContent: {
+    paddingRight: 8,
+    paddingBottom: 8,
+  },
+  placeCardContainer: {
+    width: 238,
+    height: 292,
+    marginRight: 16,
+  },
+  placeImage: {
+    flex: 1,
+  },
+  placeImageMask: {
+    borderRadius: 20,
+  },
+  placeGradient: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    padding: 16,
+    justifyContent: 'space-between',
+  },
+  distancePill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(10,10,10,0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(201,168,76,0.35)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  distanceText: {
+    color: '#F5F0E8',
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: 'MontserratAlternates-SemiBold',
+  },
+  placeTitle: {
+    color: '#F5F0E8',
+    fontSize: 24,
+    lineHeight: 32,
+    fontFamily: 'MontserratAlternates-Bold',
+  },
+  placeLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+  },
+  placeLocationText: {
+    color: '#B8AF9E',
+    fontSize: 13,
+    lineHeight: 18,
+    flexShrink: 1,
+    fontFamily: 'MontserratAlternates-Medium',
+  },
+  placeDescription: {
+    color: '#B8AF9E',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 12,
+    fontFamily: 'MontserratAlternates-Regular',
+  },
+  explorePill: {
+    marginTop: 16,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    backgroundColor: '#C9A84C',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  explorePillText: {
+    color: '#0A0A0A',
+    fontSize: 12,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    fontFamily: 'MontserratAlternates-SemiBold',
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  skeletonCard: {
+    width: 210,
+    height: 248,
+    borderRadius: 16,
+    backgroundColor: '#141414',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 16,
+    justifyContent: 'flex-end',
+  },
+  skeletonPill: {
+    width: 86,
+    height: 24,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 12,
+  },
+  skeletonTitle: {
+    width: '75%',
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    marginBottom: 8,
+  },
+  skeletonLine: {
+    width: '100%',
+    height: 14,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginBottom: 8,
+  },
+  skeletonLineShort: {
+    width: '64%',
+  },
+  skeletonCta: {
+    marginTop: 8,
+    width: 124,
+    height: 30,
+    borderRadius: 999,
+    backgroundColor: 'rgba(201,168,76,0.25)',
+  },
+  emptyStateCard: {
+    marginBottom: 16,
+    borderRadius: 20,
+    backgroundColor: '#141414',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  emptyStateTitle: {
+    color: '#F5F0E8',
+    fontSize: 18,
+    lineHeight: 24,
+    textAlign: 'center',
+    fontFamily: 'MontserratAlternates-SemiBold',
+  },
+  emptyStateBody: {
+    color: '#B8AF9E',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    fontFamily: 'MontserratAlternates-Regular',
+  },
+  factCard: {
+    marginTop: 24,
+    marginBottom: 12,
+    borderRadius: 20,
+    backgroundColor: '#141414',
+    borderWidth: 1,
+    borderColor: 'rgba(201, 168, 76, 0.3)',
+    padding: 20,
+  },
+  factHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  factHeading: {
+    color: '#F5F0E8',
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: 'MontserratAlternates-SemiBold',
+  },
+  factBody: {
+    color: '#B8AF9E',
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: 'MontserratAlternates-Regular',
+  },
+  factAction: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 4,
+  },
+  factActionText: {
+    color: '#C9A84C',
+    fontSize: 12,
+    lineHeight: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    fontFamily: 'MontserratAlternates-SemiBold',
+  },
 };
 
 export default Home;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavigationContainer, NavigationState } from '@react-navigation/native';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigation from './MainNavigation';
@@ -110,7 +110,7 @@ const AppNavigator: React.FC = () => {
 
   if (appState === 'loading') {
     return (
-      <View style={styles.loading}>
+      <View className="flex-1 items-center justify-center bg-[#0A0A0A]">
         <ActivityIndicator size="large" color={COLORS.textPrimary} />
       </View>
     );
@@ -139,14 +139,5 @@ const AppNavigator: React.FC = () => {
     </NavigationContainer>
   );
 };
-
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
 
 export default AppNavigator;

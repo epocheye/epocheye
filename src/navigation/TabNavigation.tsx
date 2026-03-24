@@ -29,28 +29,33 @@ const TAB_ICON_SIZE = 22;
  * Named constants here so changes to branding only need one touchpoint.
  */
 const TAB_COLORS = {
-  /** Dark background for the tab bar strip */
-  barBackground: '#111111',
-  /** Subtle navy separator above the tab bar */
-  barBorder: '#151526',
+  /** Elevated dark background for the tab bar strip */
+  barBackground: '#141414',
+  /** Gold-tinted separator above the tab bar */
+  barBorder: 'rgba(201, 168, 76, 0.28)',
   /** Icon/label color for the active (selected) tab */
-  activeTint: '#FFFFFF',
+  activeTint: '#C9A84C',
   /** Icon/label color for inactive tabs */
-  inactiveTint: '#777777',
+  inactiveTint: '#6B6357',
 } as const;
 
 /** Tab bar style constants */
 const TAB_BAR_STYLE = {
   backgroundColor: TAB_COLORS.barBackground,
   borderTopColor: TAB_COLORS.barBorder,
-  paddingVertical: 6,
-  height: 60,
+  borderTopWidth: 1,
+  paddingTop: 8,
+  paddingBottom: 8,
+  height: 68,
 } as const;
 
 /** Tab bar label style constants */
 const TAB_BAR_LABEL_STYLE = {
-  fontSize: 12,
-  marginBottom: 4,
+  fontFamily: 'MontserratAlternates-SemiBold',
+  textTransform: 'uppercase',
+  letterSpacing: 0.5,
+  fontSize: 10,
+  marginBottom: 2,
 } as const;
 
 interface TabNavigationProps {
@@ -110,17 +115,17 @@ const ComingSoonTabButton: React.FC<BottomTabBarButtonProps> = props => {
           borderRadius: 8,
         }}
       >
-        <Sparkles size={16} color="#FFD700" />
+        <Sparkles size={16} color="#C9A84C" />
         <Text
           style={{
-            color: '#FFD700',
+            color: '#C9A84C',
             fontSize: 8,
             fontWeight: '600',
             marginTop: 2,
             textAlign: 'center',
           }}
         >
-          New{'\n'}Features
+          Coming{'\n'}Soon
         </Text>
       </View>
     </PlatformPressable>

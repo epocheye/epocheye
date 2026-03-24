@@ -3,17 +3,11 @@ import {
   TouchableOpacity,
   View,
   Text,
-  StyleSheet,
   ViewStyle,
   TextStyle,
   AccessibilityRole,
 } from 'react-native';
-import {
-  Colors,
-  Typography,
-  Spacing,
-  BorderRadius,
-} from '../../constants/theme';
+import {} from '../../constants/theme';
 
 interface CheckboxProps {
   label?: string | React.ReactNode;
@@ -61,7 +55,8 @@ const Checkbox: React.FC<CheckboxProps> = ({
 
   return (
     <TouchableOpacity
-      style={[styles.container, containerStyle]}
+      className="my-2 flex-row items-center"
+      style={containerStyle}
       onPress={handlePress}
       disabled={disabled}
       activeOpacity={0.7}
@@ -72,15 +67,18 @@ const Checkbox: React.FC<CheckboxProps> = ({
       accessibilityState={{ checked, disabled }}
     >
       <View
-        style={[
-          styles.checkbox,
-          { width: checkboxSize, height: checkboxSize },
-          checked && styles.checkboxChecked,
-          disabled && styles.checkboxDisabled,
-        ]}
+        className={`items-center justify-center rounded border-2 ${
+          checked
+            ? 'border-[#D4860A] bg-[#D4860A]'
+            : 'border-[rgba(255,255,255,0.2)] bg-[#1F1B16]'
+        } ${disabled ? 'opacity-50' : ''}`}
+        style={[{ width: checkboxSize, height: checkboxSize }]}
       >
         {checked && (
-          <Text style={[styles.checkmark, { fontSize: checkboxSize * 0.7 }]}>
+          <Text
+            className="font-['MontserratAlternates-Bold'] text-[#F5E9D8]"
+            style={{ fontSize: checkboxSize * 0.7 }}
+          >
             ✓
           </Text>
         )}
@@ -88,67 +86,24 @@ const Checkbox: React.FC<CheckboxProps> = ({
       {label &&
         (typeof label === 'string' ? (
           <Text
-            style={[
-              styles.label,
-              styles[`label_${size}`],
-              disabled && styles.labelDisabled,
-              labelStyle,
-            ]}
+            className={`ml-4 flex-1 font-['MontserratAlternates-Regular'] text-[#F5E9D8] ${
+              size === 'small'
+                ? 'text-sm'
+                : size === 'large'
+                ? 'text-lg'
+                : 'text-base'
+            } ${disabled ? 'opacity-50' : ''}`}
+            style={[labelStyle]}
           >
             {label}
           </Text>
         ) : (
-          <View style={[styles.label, disabled && styles.labelDisabled]}>
+          <View className={`ml-4 flex-1 ${disabled ? 'opacity-50' : ''}`}>
             {label}
           </View>
         ))}
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: Spacing.sm,
-  },
-  checkbox: {
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.backgroundInput,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: Colors.secondary,
-    borderColor: Colors.secondary,
-  },
-  checkboxDisabled: {
-    opacity: 0.5,
-  },
-  checkmark: {
-    color: Colors.text,
-    fontFamily: Typography.fontFamily.bold,
-  },
-  label: {
-    marginLeft: Spacing.md,
-    color: Colors.text,
-    fontFamily: Typography.fontFamily.regular,
-    flex: 1,
-  },
-  label_small: {
-    fontSize: Typography.fontSize.sm,
-  },
-  label_medium: {
-    fontSize: Typography.fontSize.base,
-  },
-  label_large: {
-    fontSize: Typography.fontSize.lg,
-  },
-  labelDisabled: {
-    opacity: 0.5,
-  },
-});
 
 export default Checkbox;

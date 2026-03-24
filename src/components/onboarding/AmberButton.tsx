@@ -2,12 +2,10 @@ import React, { useCallback } from 'react';
 import {
   TouchableOpacity,
   Text,
-  StyleSheet,
   Animated,
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { FONTS, COLORS, RADIUS, FONT_SIZES } from '../../core/constants/theme';
 
 interface AmberButtonProps {
   title: string;
@@ -69,36 +67,22 @@ const AmberButton: React.FC<AmberButtonProps> = ({
       disabled={disabled}
     >
       <Animated.View
+        className="h-14 items-center justify-center rounded-full bg-[#D4860A]"
         style={[
-          styles.button,
           style,
-          disabled && styles.disabled,
+          disabled && { opacity: 0.5 },
           { transform: [{ scale: scaleAnim }], opacity: opacityAnim },
         ]}
       >
-        <Text style={[styles.text, textStyle]}>{title}</Text>
+        <Text
+          className="font-['MontserratAlternates-SemiBold'] text-lg tracking-[0.3px] text-[#F5E9D8]"
+          style={textStyle}
+        >
+          {title}
+        </Text>
       </Animated.View>
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  button: {
-    backgroundColor: COLORS.amber,
-    borderRadius: RADIUS.pill,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  text: {
-    fontFamily: FONTS.semiBold,
-    fontSize: FONT_SIZES.button,
-    color: COLORS.textPrimary,
-    letterSpacing: 0.3,
-  },
-});
 
 export default AmberButton;

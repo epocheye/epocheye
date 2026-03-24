@@ -1,10 +1,4 @@
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Dimensions,
-} from 'react-native';
+import { Text, View, TouchableOpacity, Dimensions } from 'react-native';
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Camera as VisionCamera,
@@ -44,7 +38,10 @@ const Camera = () => {
 
   if (!hasPermission) {
     return (
-      <View style={styles.container}>
+      <View
+        className="items-center justify-center overflow-hidden rounded-[20px] bg-[#1a1a1a]"
+        style={{ width: width - 40, height: height * 0.65 }}
+      >
         <Text className="text-white text-center font-montserrat-medium">
           Camera permission is required
         </Text>
@@ -62,7 +59,10 @@ const Camera = () => {
 
   if (!device) {
     return (
-      <View style={styles.container}>
+      <View
+        className="items-center justify-center overflow-hidden rounded-[20px] bg-[#1a1a1a]"
+        style={{ width: width - 40, height: height * 0.65 }}
+      >
         <Text className="text-white text-center font-montserrat-medium">
           No camera device found
         </Text>
@@ -71,11 +71,14 @@ const Camera = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <View
+      className="items-center justify-center overflow-hidden rounded-[20px] bg-[#1a1a1a]"
+      style={{ width: width - 40, height: height * 0.65 }}
+    >
       {isCameraActive ? (
         <VisionCamera
           ref={camera}
-          style={styles.camera}
+          className="absolute inset-0"
           device={device}
           isActive={isCameraActive}
           photo={true}
@@ -92,7 +95,7 @@ const Camera = () => {
         </View>
       )}
 
-      <View style={styles.controls}>
+      <View className="absolute bottom-[30px] w-full flex-row items-center justify-center">
         <TouchableOpacity
           onPress={toggleTorch}
           disabled={!canUseTorch || !isCameraActive}
@@ -119,27 +122,3 @@ const Camera = () => {
 };
 
 export default Camera;
-
-const styles = StyleSheet.create({
-  container: {
-    width: width - 40,
-    height: height * 0.65,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  camera: {
-    ...StyleSheet.absoluteFillObject,
-  },
-
-  controls: {
-    position: 'absolute',
-    bottom: 30,
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

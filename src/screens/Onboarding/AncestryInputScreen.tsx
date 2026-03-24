@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   StatusBar,
   ScrollView,
   TouchableOpacity,
@@ -12,7 +11,6 @@ import LinearGradient from 'react-native-linear-gradient';
 import AncestryCard from '../../components/onboarding/AncestryCard';
 import AmberButton from '../../components/onboarding/AmberButton';
 import { REGIONS, type Region } from '../../constants/onboarding/regions';
-import { FONTS, COLORS, FONT_SIZES, SPACING } from '../../core/constants/theme';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants/routes';
 
@@ -50,7 +48,7 @@ const AncestryInputScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-[#1A1612]">
       <StatusBar
         barStyle="light-content"
         translucent
@@ -60,23 +58,36 @@ const AncestryInputScreen: React.FC<Props> = ({ navigation }) => {
       <LinearGradient
         colors={['#1A1612', '#2A1A00', '#1A1612']}
         locations={[0, 0.5, 1]}
-        style={StyleSheet.absoluteFill}
+        className="absolute inset-0"
       />
 
       {/* Skip link — top right, intentionally low contrast */}
-      <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-        <Text style={styles.skipText}>Skip</Text>
+      <TouchableOpacity
+        className="absolute right-8 top-14 z-10 px-1 py-2"
+        onPress={handleSkip}
+      >
+        <Text className="font-['MontserratAlternates-Medium'] text-sm text-[#6B6357]">
+          Skip
+        </Text>
       </TouchableOpacity>
 
-      <View style={styles.content}>
-        <Text style={styles.header}>Where is your{'\n'}family from?</Text>
-        <Text style={styles.subText}>This shapes the stories you'll find.</Text>
+      <View className="flex-1 pt-[100px]">
+        <Text className="mb-3 px-8 font-['MontserratAlternates-Bold'] text-[44px] leading-[48px] tracking-[-0.5px] text-[#F5E9D8]">
+          Where is your{''}family from?
+        </Text>
+        <Text className="mb-10 px-8 font-['MontserratAlternates-Regular'] text-[15px] text-[#B8AF9E]">
+          This shapes the stories you'll find.
+        </Text>
 
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          style={styles.scrollView}
+          contentContainerStyle={{
+            paddingHorizontal: 32,
+            paddingBottom: 8,
+            gap: 12,
+          }}
+          className="grow-0"
           decelerationRate="fast"
           snapToInterval={152}
           snapToAlignment="start"
@@ -91,65 +102,15 @@ const AncestryInputScreen: React.FC<Props> = ({ navigation }) => {
           ))}
         </ScrollView>
 
-        <Animated.View style={[styles.ctaContainer, { opacity: ctaOpacity }]}>
+        <Animated.View
+          className="mb-10 mt-10 px-8"
+          style={{ opacity: ctaOpacity }}
+        >
           <AmberButton title="Continue" onPress={handleContinue} />
         </Animated.View>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bgWarm,
-  },
-  skipButton: {
-    position: 'absolute',
-    top: 56,
-    right: SPACING.xxl,
-    zIndex: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-  skipText: {
-    fontFamily: FONTS.medium,
-    fontSize: FONT_SIZES.small,
-    color: COLORS.textMuted,
-  },
-  content: {
-    flex: 1,
-    paddingTop: 100,
-  },
-  header: {
-    fontFamily: FONTS.bold,
-    fontSize: FONT_SIZES.display,
-    color: COLORS.textPrimary,
-    paddingHorizontal: SPACING.xxl,
-    marginBottom: SPACING.md,
-    lineHeight: 48,
-    letterSpacing: -0.5,
-  },
-  subText: {
-    fontFamily: FONTS.regular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textSecondary,
-    paddingHorizontal: SPACING.xxl,
-    marginBottom: SPACING.xxxl,
-  },
-  scrollView: {
-    flexGrow: 0,
-  },
-  scrollContent: {
-    paddingHorizontal: SPACING.xxl,
-    paddingBottom: SPACING.sm,
-    gap: 12,
-  },
-  ctaContainer: {
-    paddingHorizontal: SPACING.xxl,
-    marginTop: SPACING.xxxl,
-    marginBottom: SPACING.xxxl,
-  },
-});
 
 export default AncestryInputScreen;

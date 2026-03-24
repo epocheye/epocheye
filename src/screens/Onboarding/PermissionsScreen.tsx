@@ -2,7 +2,6 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   StatusBar,
   ImageBackground,
   Platform,
@@ -70,7 +69,7 @@ const PermissionsScreen: React.FC<Props> = ({ navigation }) => {
   }, [navigation]);
 
   return (
-    <ImageBackground source={bgImage} style={styles.container}>
+    <ImageBackground source={bgImage} className="flex-1 bg-[#1A1612]">
       <StatusBar
         barStyle="light-content"
         translucent
@@ -80,16 +79,16 @@ const PermissionsScreen: React.FC<Props> = ({ navigation }) => {
       {/* Dark overlay to keep text legible over the background image */}
       <LinearGradient
         colors={['rgba(0,0,0,0.55)', 'rgba(26,22,18,0.85)']}
-        style={StyleSheet.absoluteFill}
+        className="absolute inset-0"
       />
 
-      <View style={styles.content}>
+      <View className="flex-1 justify-center px-6">
         {step === 'location' ? (
           <>
-            <Text style={styles.heading}>
+            <Text className="mb-12 text-center font-['CormorantGaramond-SemiBold'] text-[38px] leading-[50px] text-white">
               Let EpochEye find the history around you.
             </Text>
-            <View style={styles.ctaContainer}>
+            <View>
               <AmberButton
                 title="Allow Location Access"
                 onPress={handleLocationPermission}
@@ -98,10 +97,10 @@ const PermissionsScreen: React.FC<Props> = ({ navigation }) => {
           </>
         ) : (
           <>
-            <Text style={styles.heading}>
+            <Text className="mb-12 text-center font-['CormorantGaramond-SemiBold'] text-[38px] leading-[50px] text-white">
               We'll tell you when you're near a story.
             </Text>
-            <View style={styles.ctaContainer}>
+            <View>
               <AmberButton
                 title="Notify Me"
                 onPress={handleNotificationPermission}
@@ -113,28 +112,5 @@ const PermissionsScreen: React.FC<Props> = ({ navigation }) => {
     </ImageBackground>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1A1612',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  heading: {
-    fontFamily: 'CormorantGaramond-SemiBold',
-    fontSize: 38,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    lineHeight: 50,
-    marginBottom: 48,
-  },
-  ctaContainer: {
-    paddingHorizontal: 0,
-  },
-});
 
 export default PermissionsScreen;

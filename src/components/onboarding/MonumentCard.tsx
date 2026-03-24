@@ -1,11 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Dimensions,
-  Image,
-} from 'react-native';
+import { View, Text, Dimensions, Image } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -14,7 +8,6 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
-import { FONTS, COLORS, FONT_SIZES, RADIUS } from '../../core/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -87,20 +80,23 @@ const MonumentCard: React.FC<MonumentCardProps> = ({
   }, []); // intentionally empty — must run only once on mount
 
   return (
-    <View style={styles.card}>
+    <View
+      className="h-[440px] self-center overflow-hidden rounded-[20px]"
+      style={{ width: CARD_WIDTH }}
+    >
       {/* Background with Ken Burns animation */}
-      <Animated.View style={[styles.imageBg, imageAnimStyle]}>
+      <Animated.View className="absolute inset-0" style={imageAnimStyle}>
         {imageUrl ? (
           <>
             {!imageLoaded && (
               <LinearGradient
                 colors={['#3A2A1A', '#2A1A0A', '#1A1208']}
-                style={StyleSheet.absoluteFill}
+                className="absolute inset-0"
               />
             )}
             <Image
               source={{ uri: imageUrl }}
-              style={StyleSheet.absoluteFill}
+              className="absolute inset-0"
               resizeMode="cover"
               onLoad={() => setImageLoaded(true)}
             />
@@ -108,7 +104,7 @@ const MonumentCard: React.FC<MonumentCardProps> = ({
         ) : (
           <LinearGradient
             colors={['#3A2A1A', '#2A1A0A', '#1A1208']}
-            style={StyleSheet.absoluteFill}
+            className="absolute inset-0"
           />
         )}
       </Animated.View>
@@ -117,87 +113,33 @@ const MonumentCard: React.FC<MonumentCardProps> = ({
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.88)']}
         locations={[0.15, 0.65]}
-        style={styles.overlay}
+        className="absolute inset-0"
       />
 
       {/* Monument name — top left */}
-      <View style={styles.monumentTag}>
-        <Text style={styles.monumentName}>{monumentName}</Text>
+      <View className="absolute left-4 top-4 rounded-md bg-[rgba(0,0,0,0.45)] px-2.5 py-1">
+        <Text className="font-['MontserratAlternates-SemiBold'] text-[12px] uppercase tracking-[1.5px] text-[#D4860A]">
+          {monumentName}
+        </Text>
       </View>
 
       {/* Year badge — top right */}
-      <View style={styles.yearTag}>
-        <Text style={styles.yearBadge}>{year}</Text>
+      <View className="absolute right-4 top-4 rounded-md bg-[rgba(0,0,0,0.45)] px-2.5 py-1">
+        <Text className="font-['MontserratAlternates-SemiBold'] text-[12px] tracking-[1.5px] text-[#D4860A]">
+          {year}
+        </Text>
       </View>
 
       {/* Typewriter story text — bottom */}
-      <View style={styles.storyContainer}>
-        <Text style={styles.storyText}>{displayedText}</Text>
+      <View className="absolute bottom-0 left-0 right-0 p-5">
+        <Text className="font-['MontserratAlternates-Regular'] text-[18px] leading-7 text-[#F5E9D8]">
+          {displayedText}
+        </Text>
       </View>
     </View>
   );
 };
 
 const CARD_WIDTH = SCREEN_WIDTH - 48;
-
-const styles = StyleSheet.create({
-  card: {
-    width: CARD_WIDTH,
-    height: 440,
-    borderRadius: RADIUS.xl,
-    overflow: 'hidden',
-    alignSelf: 'center',
-  },
-  imageBg: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  monumentTag: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  monumentName: {
-    fontFamily: FONTS.semiBold,
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.amber,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  yearTag: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  yearBadge: {
-    fontFamily: FONTS.semiBold,
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.amber,
-    letterSpacing: 1.5,
-  },
-  storyContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-  },
-  storyText: {
-    fontFamily: FONTS.regular,
-    fontSize: FONT_SIZES.subtitle,
-    color: COLORS.textPrimary,
-    lineHeight: 28,
-  },
-});
 
 export default MonumentCard;

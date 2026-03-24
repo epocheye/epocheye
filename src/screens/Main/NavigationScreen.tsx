@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Platform,
   Linking,
-  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, {
@@ -257,7 +256,7 @@ const NavigationScreen: React.FC<Props> = ({ navigation, route }) => {
           <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
-            style={styles.map}
+            className="flex-1"
             initialRegion={{
               latitude: currentLocation?.latitude || 28.6139,
               longitude: currentLocation?.longitude || 77.209,
@@ -356,11 +355,5 @@ const NavigationScreen: React.FC<Props> = ({ navigation, route }) => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  map: {
-    flex: 1,
-  },
-});
 
 export default NavigationScreen;

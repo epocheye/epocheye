@@ -11,7 +11,6 @@ import {
   Animated,
   Easing,
   StatusBar,
-  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Wifi, RefreshCcw, Signal, Radio } from 'lucide-react-native';
@@ -157,14 +156,14 @@ const NoInternetScreen: React.FC = () => {
   });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView className="flex-1 bg-[#0A0A0F]">
       <StatusBar barStyle="light-content" backgroundColor="#0A0A0F" />
 
-      <View style={styles.content}>
+      <View className="flex-1 items-center justify-center px-8">
         {/* Radar Animation Container */}
         <Animated.View
+          className="mb-12 h-[180px] w-[180px] items-center justify-center"
           style={[
-            styles.radarContainer,
             {
               opacity: fadeAnim,
               transform: [{ scale: scaleAnim }],
@@ -173,42 +172,48 @@ const NoInternetScreen: React.FC = () => {
         >
           {/* Wave rings */}
           <Animated.View
-            style={[styles.waveRing, styles.wave1, createWaveStyle(wave1Anim)]}
+            className="absolute h-20 w-20 rounded-full border-[1.5px] border-[#6366F1]"
+            style={createWaveStyle(wave1Anim)}
           />
           <Animated.View
-            style={[styles.waveRing, styles.wave2, createWaveStyle(wave2Anim)]}
+            className="absolute h-20 w-20 rounded-full border-[1.5px] border-[#6366F1]"
+            style={createWaveStyle(wave2Anim)}
           />
           <Animated.View
-            style={[styles.waveRing, styles.wave3, createWaveStyle(wave3Anim)]}
+            className="absolute h-20 w-20 rounded-full border-[1.5px] border-[#6366F1]"
+            style={createWaveStyle(wave3Anim)}
           />
 
           {/* Center icon */}
           <Animated.View
-            style={[
-              styles.iconContainer,
-              { transform: [{ scale: iconPulse }] },
-            ]}
+            className="h-20 w-20 items-center justify-center rounded-full border-2 border-[#2A2A3A] bg-[#1A1A24]"
+            style={{ transform: [{ scale: iconPulse }] }}
           >
-            <View style={styles.iconInner}>
+            <View className="relative items-center justify-center">
               <Wifi color="#FFFFFF" size={32} strokeWidth={2} />
               {/* X overlay */}
-              <View style={styles.crossLine} />
+              <View
+                className="absolute h-[3px] w-11 rounded-[2px] bg-[#EF4444]"
+                style={{ transform: [{ rotate: '45deg' }] }}
+              />
             </View>
           </Animated.View>
         </Animated.View>
 
         {/* Text Content */}
         <Animated.View
+          className="mb-6 items-center"
           style={[
-            styles.textContainer,
             {
               opacity: fadeAnim,
               transform: [{ scale: scaleAnim }],
             },
           ]}
         >
-          <Text style={styles.title}>No Connection</Text>
-          <Text style={styles.subtitle}>
+          <Text className="mb-3 text-center font-['Montserrat-Bold'] text-[28px] text-white">
+            No Connection
+          </Text>
+          <Text className="px-4 text-center font-['Montserrat-Regular'] text-[15px] leading-[22px] text-[#71717A]">
             Looks like you're offline. Check your internet connection and try
             again.
           </Text>
@@ -216,15 +221,15 @@ const NoInternetScreen: React.FC = () => {
 
         {/* Status indicator */}
         <Animated.View
+          className="mb-10 flex-row items-center rounded-[20px] bg-[#18181B] px-4 py-2.5"
           style={[
-            styles.statusContainer,
             {
               opacity: fadeAnim,
             },
           ]}
         >
-          <View style={styles.statusDot} />
-          <Text style={styles.statusText}>
+          <View className="mr-2.5 h-2 w-2 rounded-full bg-[#FBBF24]" />
+          <Text className="font-['Montserrat-Medium'] text-[13px] text-[#A1A1AA]">
             Searching for network
             <Animated.Text>{dots}</Animated.Text>
           </Text>
@@ -232,8 +237,8 @@ const NoInternetScreen: React.FC = () => {
 
         {/* Action Buttons */}
         <Animated.View
+          className="w-full items-center"
           style={[
-            styles.buttonContainer,
             {
               opacity: fadeAnim,
               transform: [{ scale: scaleAnim }],
@@ -244,194 +249,45 @@ const NoInternetScreen: React.FC = () => {
           <TouchableOpacity
             onPress={handleRetry}
             disabled={isRefreshing}
-            style={[styles.retryButton, isRefreshing && styles.buttonDisabled]}
+            className={`mb-6 w-full max-w-[280px] flex-row items-center justify-center gap-2.5 rounded-2xl bg-white px-8 py-4 ${
+              isRefreshing ? 'opacity-70' : ''
+            }`}
             activeOpacity={0.8}
           >
             <Animated.View style={{ transform: [{ rotate: spin }] }}>
               <RefreshCcw color="#0A0A0F" size={20} strokeWidth={2.5} />
             </Animated.View>
-            <Text style={styles.retryButtonText}>
+            <Text className="font-['Montserrat-SemiBold'] text-base text-[#0A0A0F]">
               {isRefreshing ? 'Connecting' : 'Try Again'}
             </Text>
           </TouchableOpacity>
 
           {/* Secondary info cards */}
-          <View style={styles.infoCards}>
-            <View style={styles.infoCard}>
+          <View className="flex-row gap-3">
+            <View className="flex-row items-center gap-2 rounded-xl border border-[#27272A] bg-[#18181B] px-4 py-3">
               <Signal color="#6366F1" size={18} />
-              <Text style={styles.infoCardText}>Check signal</Text>
+              <Text className="font-['Montserrat-Medium'] text-[13px] text-[#A1A1AA]">
+                Check signal
+              </Text>
             </View>
-            <View style={styles.infoCard}>
+            <View className="flex-row items-center gap-2 rounded-xl border border-[#27272A] bg-[#18181B] px-4 py-3">
               <Radio color="#10B981" size={18} />
-              <Text style={styles.infoCardText}>WiFi settings</Text>
+              <Text className="font-['Montserrat-Medium'] text-[13px] text-[#A1A1AA]">
+                WiFi settings
+              </Text>
             </View>
           </View>
         </Animated.View>
       </View>
 
       {/* Bottom text */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
+      <View className="items-center pb-6">
+        <Text className="font-['Montserrat-Regular'] text-xs text-[#3F3F46]">
           Connection will restore automatically
         </Text>
       </View>
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0A0A0F',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  radarContainer: {
-    width: 180,
-    height: 180,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 48,
-  },
-  waveRing: {
-    position: 'absolute',
-    borderRadius: 100,
-    borderWidth: 1.5,
-    borderColor: '#6366F1',
-  },
-  wave1: {
-    width: 80,
-    height: 80,
-  },
-  wave2: {
-    width: 80,
-    height: 80,
-  },
-  wave3: {
-    width: 80,
-    height: 80,
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#1A1A24',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#2A2A3A',
-  },
-  iconInner: {
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  crossLine: {
-    position: 'absolute',
-    width: 44,
-    height: 3,
-    backgroundColor: '#EF4444',
-    borderRadius: 2,
-    transform: [{ rotate: '45deg' }],
-  },
-  textContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontFamily: 'Montserrat-Bold',
-    color: '#FFFFFF',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 15,
-    fontFamily: 'Montserrat-Regular',
-    color: '#71717A',
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 16,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 40,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#18181B',
-    borderRadius: 20,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FBBF24',
-    marginRight: 10,
-  },
-  statusText: {
-    fontSize: 13,
-    fontFamily: 'Montserrat-Medium',
-    color: '#A1A1AA',
-  },
-  buttonContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 16,
-    gap: 10,
-    width: '100%',
-    maxWidth: 280,
-    marginBottom: 24,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  retryButtonText: {
-    fontSize: 16,
-    fontFamily: 'Montserrat-SemiBold',
-    color: '#0A0A0F',
-  },
-  infoCards: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#18181B',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#27272A',
-  },
-  infoCardText: {
-    fontSize: 13,
-    fontFamily: 'Montserrat-Medium',
-    color: '#A1A1AA',
-  },
-  footer: {
-    paddingBottom: 24,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 12,
-    fontFamily: 'Montserrat-Regular',
-    color: '#3F3F46',
-  },
-});
 
 export default NoInternetScreen;

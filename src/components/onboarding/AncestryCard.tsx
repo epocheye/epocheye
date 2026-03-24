@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 import {
   TouchableOpacity,
   Text,
-  StyleSheet,
   View,
   Image,
   ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { FONTS, COLORS, RADIUS, FONT_SIZES } from '../../core/constants/theme';
+import { COLORS } from '../../core/constants/theme';
 import type { Region } from '../../constants/onboarding/regions';
 
 interface AncestryCardProps {
@@ -34,19 +33,35 @@ const AncestryCard: React.FC<AncestryCardProps> = ({
     <TouchableOpacity
       activeOpacity={0.8}
       onPress={() => onSelect(region)}
-      style={[styles.card, isSelected && styles.cardSelected]}
+      className="h-[180px] w-[140px] overflow-hidden rounded-xl border border-[rgba(255,255,255,0.24)] bg-[#241D16]"
+      style={
+        isSelected
+          ? {
+              borderColor: '#D4860A',
+              borderWidth: 2,
+              shadowColor: '#D4860A',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.4,
+              shadowRadius: 12,
+              elevation: 8,
+            }
+          : undefined
+      }
     >
       {/* CDN Image background */}
       {region.imageUrl && !imageError ? (
-        <View style={styles.imageContainer}>
+        <View className="flex-1">
           {!imageLoaded && (
-            <View style={[styles.placeholder, { backgroundColor: region.color }]}>
+            <View
+              className="absolute inset-0 items-center justify-center"
+              style={{ backgroundColor: region.color }}
+            >
               <ActivityIndicator size="small" color={COLORS.textPrimary} />
             </View>
           )}
           <Image
             source={{ uri: region.imageUrl }}
-            style={styles.image}
+            className="absolute inset-0"
             resizeMode="cover"
             onLoad={() => setImageLoaded(true)}
             onError={() => setImageError(true)}
@@ -54,78 +69,31 @@ const AncestryCard: React.FC<AncestryCardProps> = ({
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.8)']}
             locations={[0.3, 1]}
-            style={styles.imageGradient}
+            className="absolute inset-0"
           />
         </View>
       ) : (
-        <View style={[styles.placeholder, { backgroundColor: region.color }]}>
-          <Text style={styles.abbreviation}>{region.abbreviation}</Text>
+        <View
+          className="absolute inset-0 items-center justify-center"
+          style={{ backgroundColor: region.color }}
+        >
+          <Text className="font-['MontserratAlternates-Bold'] text-[28px] text-[#F5E9D8]/85">
+            {region.abbreviation}
+          </Text>
         </View>
       )}
 
       {/* Region name at the bottom */}
-      <View style={styles.nameContainer}>
-        <Text style={styles.name} numberOfLines={1}>
+      <View className="absolute bottom-0 left-0 right-0 px-2.5 py-2.5">
+        <Text
+          className="text-center font-['MontserratAlternates-SemiBold'] text-sm text-[#F5E9D8]"
+          numberOfLines={1}
+        >
           {region.name}
         </Text>
       </View>
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    width: 140,
-    height: 180,
-    borderRadius: RADIUS.lg,
-    backgroundColor: COLORS.bgCard,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    overflow: 'hidden',
-  },
-  cardSelected: {
-    borderColor: COLORS.amber,
-    borderWidth: 2,
-    shadowColor: COLORS.amber,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  imageContainer: {
-    flex: 1,
-  },
-  image: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  imageGradient: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  placeholder: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  abbreviation: {
-    fontFamily: FONTS.bold,
-    fontSize: 28,
-    color: COLORS.textPrimary,
-    opacity: 0.85,
-  },
-  nameContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-  },
-  name: {
-    fontFamily: FONTS.semiBold,
-    fontSize: FONT_SIZES.small,
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-  },
-});
 
 export default AncestryCard;

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, StatusBar, Animated } from 'react-native';
+import { View, Text, StatusBar, Animated } from 'react-native';
 import Video, { OnProgressData } from 'react-native-video';
 import GhostButton from '../../components/onboarding/GhostButton';
 import { FONTS, COLORS, FONT_SIZES } from '../../core/constants/theme';
@@ -43,7 +43,7 @@ const SplashVideoScreen: React.FC<Props> = ({ navigation }) => {
   }, [navigateNext]);
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-[#1A1612]">
       <StatusBar
         barStyle="light-content"
         translucent
@@ -52,7 +52,7 @@ const SplashVideoScreen: React.FC<Props> = ({ navigation }) => {
 
       <Video
         source={require('../../assets/video/epocheye_intro.mp4')}
-        style={StyleSheet.absoluteFill}
+        style={{ position: 'absolute', inset: 0 }}
         resizeMode="cover"
         muted
         repeat={false}
@@ -62,9 +62,14 @@ const SplashVideoScreen: React.FC<Props> = ({ navigation }) => {
       />
 
       {showOverlay && (
-        <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-          <Text style={styles.heroText}>What if you could go back?</Text>
-          <View style={styles.buttonContainer}>
+        <Animated.View
+          className="absolute inset-0 items-center justify-end px-6 pb-24"
+          style={{ opacity: fadeAnim }}
+        >
+          <Text className="mb-8 text-center font-['MontserratAlternates-SemiBold'] text-[36px] leading-[44px] tracking-[0.3px] text-[#F5E9D8]">
+            What if you could go back?
+          </Text>
+          <View className="w-full px-10">
             <GhostButton title="Begin" onPress={navigateNext} />
           </View>
         </Animated.View>
@@ -72,32 +77,5 @@ const SplashVideoScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bgWarm,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 96,
-    paddingHorizontal: 24,
-  },
-  heroText: {
-    fontFamily: FONTS.semiBold,
-    fontSize: FONT_SIZES.hero,
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    lineHeight: 44,
-    marginBottom: 32,
-    letterSpacing: 0.3,
-  },
-  buttonContainer: {
-    width: '100%',
-    paddingHorizontal: 40,
-  },
-});
 
 export default SplashVideoScreen;

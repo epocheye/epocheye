@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, StatusBar } from 'react-native';
+import { View, StatusBar } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -61,14 +61,14 @@ const FirstTasteScreen: React.FC<Props> = ({ navigation, route }) => {
   }));
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-[#1A1612]">
       <StatusBar
         barStyle="light-content"
         translucent
         backgroundColor="transparent"
       />
 
-      <View style={styles.content}>
+      <View className="flex-1 justify-center px-8">
         <MonumentCard
           story={story}
           monumentName={monument.name}
@@ -78,7 +78,7 @@ const FirstTasteScreen: React.FC<Props> = ({ navigation, route }) => {
         />
 
         {showCta && (
-          <Animated.View style={[styles.ctaContainer, ctaAnimStyle]}>
+          <Animated.View className="mt-10" style={ctaAnimStyle}>
             <AmberButton
               title="This is my story. Let me in."
               onPress={() => navigation.navigate(ROUTES.ONBOARDING.SIGNUP)}
@@ -89,20 +89,5 @@ const FirstTasteScreen: React.FC<Props> = ({ navigation, route }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bgWarm,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.xxl,
-  },
-  ctaContainer: {
-    marginTop: SPACING.xxxl,
-  },
-});
 
 export default FirstTasteScreen;

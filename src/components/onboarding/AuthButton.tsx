@@ -2,13 +2,12 @@ import React, { useCallback } from 'react';
 import {
   TouchableOpacity,
   Text,
-  StyleSheet,
   Animated,
   View,
   ViewStyle,
   Image,
 } from 'react-native';
-import { FONTS, COLORS, RADIUS, FONT_SIZES } from '../../core/constants/theme';
+import { COLORS } from '../../core/constants/theme';
 
 type AuthVariant = 'google' | 'apple' | 'email';
 
@@ -82,11 +81,10 @@ const AuthButton: React.FC<AuthButtonProps> = ({
       onPress={onPress}
     >
       <Animated.View
+        className={`h-14 flex-row items-center justify-center rounded-full px-5 ${
+          variant === 'email' ? 'border border-[rgba(255,255,255,0.24)]' : ''
+        }`}
         style={[
-          styles.button,
-          variant === 'google' && styles.googleButton,
-          variant === 'apple' && styles.appleButton,
-          variant === 'email' && styles.emailButton,
           style,
           { transform: [{ scale: scaleAnim }], backgroundColor: animatedBg },
         ]}
@@ -94,75 +92,34 @@ const AuthButton: React.FC<AuthButtonProps> = ({
         {variant === 'google' && (
           <Image
             source={GoogleIcon}
-            style={styles.iconImage}
+            className="mr-3 h-5 w-5"
             resizeMode="contain"
           />
         )}
         {variant === 'apple' && (
-          <Text style={styles.appleIconText}>{'\uF8FF'}</Text>
+          <Image
+            source={require('../../assets/images/Apple.webp')}
+            className="mr-3 h-5 w-5"
+            resizeMode="contain"
+          />
         )}
         {variant === 'email' && (
-          <View style={styles.emailIconContainer}>
-            <Text style={styles.emailIconText}>@</Text>
+          <View className="mr-3 h-6 w-6 items-center justify-center">
+            <Text className="font-['MontserratAlternates-Medium'] text-lg text-[#F5E9D8]">
+              @
+            </Text>
           </View>
         )}
-        <Text style={[styles.text, variant === 'google' && styles.googleText]}>
+        <Text
+          className={`font-['MontserratAlternates-Medium'] text-lg ${
+            variant === 'google' ? 'text-[#1A1612]' : 'text-[#F5E9D8]'
+          }`}
+        >
           {title}
         </Text>
       </Animated.View>
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  button: {
-    borderRadius: RADIUS.pill,
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  googleButton: {
-    backgroundColor: COLORS.google,
-  },
-  appleButton: {
-    backgroundColor: COLORS.apple,
-  },
-  emailButton: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  iconImage: {
-    width: 20,
-    height: 20,
-    marginRight: 12,
-  },
-  appleIconText: {
-    fontSize: 20,
-    color: COLORS.textPrimary,
-    marginRight: 12,
-  },
-  emailIconContainer: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  emailIconText: {
-    fontFamily: FONTS.medium,
-    fontSize: FONT_SIZES.button,
-    color: COLORS.textPrimary,
-  },
-  text: {
-    fontFamily: FONTS.medium,
-    fontSize: FONT_SIZES.button,
-    color: COLORS.textPrimary,
-  },
-  googleText: {
-    color: COLORS.bgWarm,
-  },
-});
 
 export default AuthButton;

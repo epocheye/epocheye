@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, StatusBar, Animated } from 'react-native';
+import { View, Text, StatusBar, Animated } from 'react-native';
 import { useOnboardingComplete } from '../../context/OnboardingCallbackContext';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
@@ -58,7 +58,7 @@ const WorldOpensScreen: React.FC<Props> = () => {
   }, [bannerTranslateY, bannerOpacity, completeOnboarding]);
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 items-center justify-end bg-[#1A1612] pb-[60px]">
       <StatusBar
         barStyle="light-content"
         translucent
@@ -66,43 +66,20 @@ const WorldOpensScreen: React.FC<Props> = () => {
       />
 
       <Animated.View
+        className="max-w-[85%] rounded-[30px] bg-[rgba(212,134,10,0.92)] px-6 py-3.5"
         style={[
-          styles.banner,
           {
             transform: [{ translateY: bannerTranslateY }],
             opacity: bannerOpacity,
           },
         ]}
       >
-        <Text style={styles.bannerText}>
+        <Text className="text-center font-['DMSans-Medium'] text-[15px] text-white">
           You're 2.3km from a story that belongs to you.
         </Text>
       </Animated.View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1A1612',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 60,
-  },
-  banner: {
-    backgroundColor: 'rgba(212,134,10,0.92)',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    maxWidth: '85%',
-  },
-  bannerText: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 15,
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-});
 
 export default WorldOpensScreen;

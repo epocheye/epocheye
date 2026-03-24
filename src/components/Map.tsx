@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Region } from 'react-native-maps';
@@ -29,11 +29,12 @@ const Map = () => {
 
   return (
     <View
-      style={[styles.container, { width: width - 40, height: height * 0.65 }]}
+      className="items-center justify-center overflow-hidden rounded-[20px]"
+      style={{ width: width - 40, height: height * 0.65 }}
     >
       <MapView
         provider={PROVIDER_GOOGLE}
-        style={styles.map}
+        className="absolute inset-0"
         initialRegion={DEFAULT_REGION}
         customMapStyle={mapStyle}
         showsUserLocation
@@ -51,15 +52,3 @@ const Map = () => {
 };
 
 export default Map;
-
-const styles = StyleSheet.create({
-  container: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-  },
-});

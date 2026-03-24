@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  StatusBar,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StatusBar, TouchableOpacity } from 'react-native';
 import DustMotes from '../../components/onboarding/DustMotes';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants/routes';
@@ -22,7 +16,7 @@ const EmotionalQuestionScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-[#1A1612]">
       <StatusBar
         barStyle="light-content"
         translucent
@@ -30,72 +24,35 @@ const EmotionalQuestionScreen: React.FC<Props> = ({ navigation }) => {
       />
       <DustMotes />
 
-      <View style={styles.content}>
-        <Text style={styles.question}>
+      <View className="flex-1 items-center justify-center px-6">
+        <Text className="mb-12 max-w-[300px] text-center font-['CormorantGaramond-SemiBold'] text-[44px] leading-[56px] text-white">
           Have you ever stood at a monument and felt… nothing?
         </Text>
 
-        <View style={styles.cards}>
+        <View className="w-full gap-4">
           <TouchableOpacity
-            style={styles.card}
+            className="h-14 w-full items-center justify-center rounded-xl border border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.05)]"
             activeOpacity={0.7}
             onPress={() => handleAnswer('yes')}
           >
-            <Text style={styles.cardText}>Yes, honestly</Text>
+            <Text className="font-['DMSans-Medium'] text-base text-white">
+              Yes, honestly
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.card}
+            className="h-14 w-full items-center justify-center rounded-xl border border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.05)]"
             activeOpacity={0.7}
             onPress={() => handleAnswer('no')}
           >
-            <Text style={styles.cardText}>No, history moves me</Text>
+            <Text className="font-['DMSans-Medium'] text-base text-white">
+              No, history moves me
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1A1612',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  question: {
-    fontFamily: 'CormorantGaramond-SemiBold',
-    fontSize: 44,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    maxWidth: 300,
-    marginBottom: 48,
-    lineHeight: 56,
-  },
-  cards: {
-    width: '100%',
-    gap: 16,
-  },
-  card: {
-    width: '100%',
-    height: 56,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardText: {
-    fontFamily: 'DMSans-Medium',
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-});
 
 export default EmotionalQuestionScreen;

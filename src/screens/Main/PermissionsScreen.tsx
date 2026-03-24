@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import {
   requestAllPermissions,
@@ -28,72 +28,38 @@ const PermissionsScreen: React.FC = () => {
   }, [navigation]);
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-[#1A1612]">
       <StatusBar
         barStyle="light-content"
         translucent
         backgroundColor="transparent"
       />
 
-      <View style={styles.content}>
-        <Text style={styles.heading}>
+      <View className="flex-1 justify-center px-6">
+        <Text className="mb-4 text-center font-['MontserratAlternates-SemiBold'] text-[32px] leading-[42px] text-white">
           EpochEye needs access to your location and camera
         </Text>
-        <Text style={styles.subText}>
+        <Text className="mb-10 text-center font-['MontserratAlternates-Regular'] text-base leading-6 text-[rgba(255,255,255,0.6)]">
           To show you heritage sites nearby and enable AR experiences, we need a
           few permissions.
         </Text>
 
-        <View style={styles.buttonContainer}>
+        <View className="mb-5">
           <AmberButton
             title="Grant Permissions"
             onPress={handleRequestPermissions}
           />
         </View>
 
-        <Text style={styles.skipText} onPress={handleSkip}>
+        <Text
+          className="text-center font-['MontserratAlternates-Regular'] text-sm text-[rgba(255,255,255,0.4)]"
+          onPress={handleSkip}
+        >
           Not now
         </Text>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1A1612',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  heading: {
-    fontFamily: 'MontserratAlternates-SemiBold',
-    fontSize: 32,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    lineHeight: 42,
-    marginBottom: 16,
-  },
-  subText: {
-    fontFamily: 'MontserratAlternates-Regular',
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.6)',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 40,
-  },
-  buttonContainer: {
-    marginBottom: 20,
-  },
-  skipText: {
-    fontFamily: 'MontserratAlternates-Regular',
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.4)',
-    textAlign: 'center',
-  },
-});
 
 export default PermissionsScreen;

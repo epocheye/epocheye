@@ -2,12 +2,10 @@ import React, { useCallback } from 'react';
 import {
   TouchableOpacity,
   Text,
-  StyleSheet,
   Animated,
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { FONTS, COLORS, RADIUS, FONT_SIZES } from '../../core/constants/theme';
 
 interface GhostButtonProps {
   title: string;
@@ -72,35 +70,18 @@ const GhostButton: React.FC<GhostButtonProps> = ({
       onPress={onPress}
     >
       <Animated.View
-        style={[
-          styles.button,
-          style,
-          { transform: [{ scale: scaleAnim }], backgroundColor },
-        ]}
+        className="h-14 self-center rounded-full border-[1.5px] border-[rgba(255,255,255,0.3)] px-10 items-center justify-center"
+        style={[style, { transform: [{ scale: scaleAnim }], backgroundColor }]}
       >
-        <Text style={[styles.text, textStyle]}>{title}</Text>
+        <Text
+          className="font-['MontserratAlternates-Medium'] text-lg tracking-[0.3px] text-[#F5E9D8]"
+          style={textStyle}
+        >
+          {title}
+        </Text>
       </Animated.View>
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  button: {
-    borderWidth: 1.5,
-    borderColor: COLORS.borderFocus,
-    borderRadius: RADIUS.pill,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    paddingHorizontal: 40,
-  },
-  text: {
-    fontFamily: FONTS.medium,
-    fontSize: FONT_SIZES.button,
-    color: COLORS.textPrimary,
-    letterSpacing: 0.3,
-  },
-});
 
 export default GhostButton;

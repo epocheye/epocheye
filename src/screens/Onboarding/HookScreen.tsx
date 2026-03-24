@@ -2,20 +2,12 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   StatusBar,
   TouchableOpacity,
   Animated,
 } from 'react-native';
 import DustMotes from '../../components/onboarding/DustMotes';
 import AmberButton from '../../components/onboarding/AmberButton';
-import {
-  FONTS,
-  COLORS,
-  FONT_SIZES,
-  SPACING,
-  RADIUS,
-} from '../../core/constants/theme';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants/routes';
 
@@ -96,7 +88,7 @@ const HookScreen: React.FC<Props> = ({ navigation }) => {
     "EpochEye shows you who your ancestors were — at the monument you're standing at. Right now.";
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-[#1A1612]">
       <StatusBar
         barStyle="light-content"
         translucent
@@ -104,31 +96,36 @@ const HookScreen: React.FC<Props> = ({ navigation }) => {
       />
       <DustMotes />
 
-      <View style={styles.content}>
+      <View className="flex-1 justify-center px-8">
         {/* Step 1: Question */}
         {step === 'question' && (
           <Animated.View
-            style={[styles.questionContainer, { opacity: questionOpacity }]}
+            className="items-center"
+            style={{ opacity: questionOpacity }}
           >
-            <Text style={styles.question}>
+            <Text className="mb-10 max-w-[320px] text-center font-['MontserratAlternates-SemiBold'] text-[32px] leading-[38px] text-[#F5E9D8]">
               Have you ever stood at a monument and felt… nothing?
             </Text>
 
-            <View style={styles.cards}>
+            <View className="w-full gap-5">
               <TouchableOpacity
-                style={styles.card}
+                className="h-14 w-full items-center justify-center rounded-xl border border-[rgba(255,255,255,0.2)] bg-[#241D16]"
                 activeOpacity={0.7}
                 onPress={() => handleAnswer('yes')}
               >
-                <Text style={styles.cardText}>Yes, honestly</Text>
+                <Text className="font-['MontserratAlternates-Medium'] text-lg text-[#F5E9D8]">
+                  Yes, honestly
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.card}
+                className="h-14 w-full items-center justify-center rounded-xl border border-[rgba(255,255,255,0.2)] bg-[#241D16]"
                 activeOpacity={0.7}
                 onPress={() => handleAnswer('no')}
               >
-                <Text style={styles.cardText}>No, history moves me</Text>
+                <Text className="font-['MontserratAlternates-Medium'] text-lg text-[#F5E9D8]">
+                  No, history moves me
+                </Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -137,19 +134,28 @@ const HookScreen: React.FC<Props> = ({ navigation }) => {
         {/* Step 2: Mirror + Payoff + CTA */}
         {step === 'mirror' && (
           <Animated.View
-            style={[styles.mirrorContainer, { opacity: mirrorOpacity }]}
+            className="items-center px-2"
+            style={{ opacity: mirrorOpacity }}
           >
-            <Text style={styles.mirrorText}>{mirrorText}</Text>
+            <Text className="text-center font-['MontserratAlternates-SemiBold'] text-[28px] leading-[34px] text-[#F5E9D8]">
+              {mirrorText}
+            </Text>
 
             {showPayoff && (
-              <Animated.View style={{ opacity: payoffOpacity, marginTop: 28 }}>
-                <Text style={styles.payoffText}>{payoffText}</Text>
+              <Animated.View
+                className="mt-7"
+                style={{ opacity: payoffOpacity }}
+              >
+                <Text className="text-center font-['MontserratAlternates-Regular'] text-[15px] leading-6 text-[#B8AF9E]">
+                  {payoffText}
+                </Text>
               </Animated.View>
             )}
 
             {showCta && (
               <Animated.View
-                style={[styles.ctaContainer, { opacity: ctaOpacity }]}
+                className="mt-10 w-full px-8"
+                style={{ opacity: ctaOpacity }}
               >
                 <AmberButton
                   title="Show me how"
@@ -165,71 +171,5 @@ const HookScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bgWarm,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.xxl,
-  },
-  questionContainer: {
-    alignItems: 'center',
-  },
-  question: {
-    fontFamily: FONTS.semiBold,
-    fontSize: FONT_SIZES.heading,
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    lineHeight: 38,
-    maxWidth: 320,
-    marginBottom: SPACING.section,
-  },
-  cards: {
-    width: '100%',
-    gap: SPACING.lg,
-  },
-  card: {
-    width: '100%',
-    height: 56,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.bgCard,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardText: {
-    fontFamily: FONTS.medium,
-    fontSize: FONT_SIZES.button,
-    color: COLORS.textPrimary,
-  },
-  mirrorContainer: {
-    alignItems: 'center',
-    paddingHorizontal: SPACING.sm,
-  },
-  mirrorText: {
-    fontFamily: FONTS.semiBold,
-    fontSize: FONT_SIZES.title,
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    lineHeight: 34,
-  },
-  payoffText: {
-    fontFamily: FONTS.regular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  ctaContainer: {
-    marginTop: SPACING.section,
-    width: '100%',
-    paddingHorizontal: SPACING.xxl,
-  },
-});
 
 export default HookScreen;

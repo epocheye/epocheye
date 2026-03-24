@@ -3,17 +3,11 @@ import {
   TouchableOpacity,
   Text,
   ActivityIndicator,
-  StyleSheet,
   ViewStyle,
   TextStyle,
   AccessibilityRole,
 } from 'react-native';
-import {
-  Colors,
-  Typography,
-  Layout,
-  BorderRadius,
-} from '../../constants/theme';
+import { Colors } from '../../constants/theme';
 
 interface ButtonProps {
   title: string;
@@ -46,59 +40,33 @@ const Button: React.FC<ButtonProps> = ({
   accessibilityLabel,
   accessibilityHint,
 }) => {
-  const getButtonStyle = (): ViewStyle => {
-    const baseStyle: ViewStyle = {
-      ...styles.button,
-      ...styles[`button_${size}`],
-    };
-
-    if (fullWidth) {
-      baseStyle.width = '100%';
-    }
-
-    switch (variant) {
-      case 'primary':
-        return { ...baseStyle, backgroundColor: Colors.primary };
-      case 'secondary':
-        return { ...baseStyle, backgroundColor: Colors.secondary };
-      case 'outline':
-        return {
-          ...baseStyle,
-          backgroundColor: Colors.transparent,
-          borderWidth: 1,
-          borderColor: Colors.border,
-        };
-      case 'ghost':
-        return { ...baseStyle, backgroundColor: Colors.transparent };
-      default:
-        return baseStyle;
-    }
-  };
-
-  const getTextStyle = (): TextStyle => {
-    const baseTextStyle: TextStyle = {
-      ...styles.text,
-      ...styles[`text_${size}`],
-    };
-
-    switch (variant) {
-      case 'primary':
-        return { ...baseTextStyle, color: Colors.background };
-      case 'secondary':
-        return { ...baseTextStyle, color: Colors.text };
-      case 'outline':
-      case 'ghost':
-        return { ...baseTextStyle, color: Colors.text };
-      default:
-        return baseTextStyle;
-    }
-  };
+  const sizeClass =
+    size === 'small'
+      ? 'h-10 px-4 py-2'
+      : size === 'large'
+      ? 'h-[60px] px-8 py-4'
+      : 'h-14 px-6 py-3';
+  const variantClass =
+    variant === 'primary'
+      ? 'bg-[#D4860A]'
+      : variant === 'secondary'
+      ? 'bg-[#2B2520]'
+      : variant === 'outline'
+      ? 'border border-[rgba(255,255,255,0.2)] bg-transparent'
+      : 'bg-transparent';
+  const textSizeClass =
+    size === 'small' ? 'text-sm' : size === 'large' ? 'text-xl' : 'text-lg';
+  const textColorClass =
+    variant === 'primary' ? 'text-[#1A1612]' : 'text-[#F5E9D8]';
 
   const isDisabled = disabled || loading;
 
   return (
     <TouchableOpacity
-      style={[getButtonStyle(), isDisabled && styles.disabled, style]}
+      className={`flex-row items-center justify-center gap-2 rounded-xl ${sizeClass} ${variantClass} ${
+        fullWidth ? 'w-full' : ''
+      } ${isDisabled ? 'opacity-50' : ''}`}
+      style={style}
       onPress={onPress}
       disabled={isDisabled}
       activeOpacity={0.7}
@@ -116,53 +84,17 @@ const Button: React.FC<ButtonProps> = ({
       ) : (
         <>
           {icon && iconPosition === 'left' && icon}
-          <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+          <Text
+            className={`text-center font-['MontserratAlternates-SemiBold'] ${textSizeClass} ${textColorClass}`}
+            style={textStyle}
+          >
+            {title}
+          </Text>
           {icon && iconPosition === 'right' && icon}
         </>
       )}
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: BorderRadius.lg,
-    gap: 8,
-  },
-  button_small: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    height: 40,
-  },
-  button_medium: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    height: Layout.buttonHeight,
-  },
-  button_large: {
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    height: 60,
-  },
-  text: {
-    fontFamily: Typography.fontFamily.semiBold,
-    textAlign: 'center',
-  },
-  text_small: {
-    fontSize: Typography.fontSize.sm,
-  },
-  text_medium: {
-    fontSize: Typography.fontSize.lg,
-  },
-  text_large: {
-    fontSize: Typography.fontSize.xl,
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-});
 
 export default Button;

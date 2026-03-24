@@ -84,4 +84,4 @@ export const FONT_SIZES = {
 
 /** CDN base for monument/region images */
 export const CDN_BASE =
-  'https://cdn.jsdelivr.net/gh/epocheye/epocheye/src/assets/monuments';
+  'https://cdn.jsdelivr.net/gh/epocheye/epocheye/src/assets/';

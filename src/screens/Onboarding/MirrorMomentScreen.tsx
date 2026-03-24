@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, StatusBar, Animated } from 'react-native';
+import { View, Text, StatusBar, Animated } from 'react-native';
 import AmberButton from '../../components/onboarding/AmberButton';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants/routes';
@@ -50,19 +50,21 @@ const MirrorMomentScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [payoffFade, ctaFade]);
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-[#1A1612]">
       <StatusBar
         barStyle="light-content"
         translucent
         backgroundColor="transparent"
       />
 
-      <View style={styles.content}>
-        <Text style={styles.mirrorText}>{mirrorText}</Text>
+      <View className="flex-1 justify-center px-6">
+        <Text className="text-center font-['CormorantGaramond-SemiBold'] text-[28px] leading-10 text-white">
+          {mirrorText}
+        </Text>
 
         {showPayoff && (
-          <Animated.View style={{ opacity: payoffFade, marginTop: 32 }}>
-            <Text style={styles.payoffText}>
+          <Animated.View className="mt-8" style={{ opacity: payoffFade }}>
+            <Text className="text-center font-['DMSans-Regular'] text-[17px] leading-[26px] text-[rgba(255,255,255,0.75)]">
               EpochEye shows you who your ancestors were at the monument you're
               standing at. Right now. In real time.
             </Text>
@@ -70,7 +72,7 @@ const MirrorMomentScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         {showCta && (
-          <Animated.View style={[styles.ctaContainer, { opacity: ctaFade }]}>
+          <Animated.View className="mt-10 px-6" style={{ opacity: ctaFade }}>
             <AmberButton
               title="Show me how"
               onPress={() =>
@@ -83,35 +85,5 @@ const MirrorMomentScreen: React.FC<Props> = ({ navigation, route }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1A1612',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  mirrorText: {
-    fontFamily: 'CormorantGaramond-SemiBold',
-    fontSize: 28,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    lineHeight: 40,
-  },
-  payoffText: {
-    fontFamily: 'DMSans-Regular',
-    fontSize: 17,
-    color: 'rgba(255,255,255,0.75)',
-    textAlign: 'center',
-    lineHeight: 26,
-  },
-  ctaContainer: {
-    marginTop: 40,
-    paddingHorizontal: 24,
-  },
-});
 
 export default MirrorMomentScreen;

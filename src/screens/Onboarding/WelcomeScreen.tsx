@@ -2,7 +2,6 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   StatusBar,
   Platform,
   PermissionsAndroid,
@@ -11,7 +10,6 @@ import {
 import { request, PERMISSIONS } from 'react-native-permissions';
 import AmberButton from '../../components/onboarding/AmberButton';
 import { useOnboardingComplete } from '../../context/OnboardingCallbackContext';
-import { FONTS, COLORS, FONT_SIZES, SPACING } from '../../core/constants/theme';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'Welcome'>;
@@ -134,23 +132,26 @@ const WelcomeScreen: React.FC<Props> = () => {
     onPress: () => void,
   ) => (
     <Animated.View
-      style={[styles.permissionContent, { opacity: contentOpacity }]}
+      className="flex-1 items-center justify-center px-10"
+      style={{ opacity: contentOpacity }}
     >
-      <View style={styles.iconCircle}>
-        <Text style={styles.iconEmoji}>
-          {step === 'location' ? '📍' : '🔔'}
-        </Text>
+      <View className="mb-8 h-[72px] w-[72px] items-center justify-center rounded-full bg-[rgba(201,168,76,0.15)]">
+        <Text className="text-[32px]">{step === 'location' ? '📍' : '🔔'}</Text>
       </View>
-      <Text style={styles.heading}>{heading}</Text>
-      <Text style={styles.description}>{description}</Text>
-      <View style={styles.ctaContainer}>
+      <Text className="mb-5 text-center font-['MontserratAlternates-Bold'] text-[32px] leading-[38px] text-[#F5E9D8]">
+        {heading}
+      </Text>
+      <Text className="mb-10 text-center font-['MontserratAlternates-Regular'] text-[15px] leading-[22px] text-[#B8AF9E]">
+        {description}
+      </Text>
+      <View className="w-full px-5">
         <AmberButton title={buttonTitle} onPress={onPress} />
       </View>
     </Animated.View>
   );
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-[#1A1612]">
       <StatusBar
         barStyle="light-content"
         translucent
@@ -174,17 +175,17 @@ const WelcomeScreen: React.FC<Props> = () => {
         )}
 
       {step === 'ready' && (
-        <View style={styles.readyContainer}>
+        <View className="flex-1 items-center justify-end pb-20">
           <Animated.View
+            className="max-w-[85%] rounded-[28px] bg-[#D4860A] px-8 py-4"
             style={[
-              styles.banner,
               {
                 transform: [{ translateY: bannerTranslateY }],
                 opacity: bannerOpacity,
               },
             ]}
           >
-            <Text style={styles.bannerText}>
+            <Text className="text-center font-['MontserratAlternates-SemiBold'] text-[15px] text-[#F5E9D8]">
               You're 2.3km from a story that belongs to you.
             </Text>
           </Animated.View>
@@ -193,69 +194,5 @@ const WelcomeScreen: React.FC<Props> = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bgWarm,
-  },
-  permissionContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xxxl,
-  },
-  iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: COLORS.amberSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xxl,
-  },
-  iconEmoji: {
-    fontSize: 32,
-  },
-  heading: {
-    fontFamily: FONTS.bold,
-    fontSize: FONT_SIZES.heading,
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    lineHeight: 38,
-    marginBottom: SPACING.lg,
-  },
-  description: {
-    fontFamily: FONTS.regular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: SPACING.section,
-  },
-  ctaContainer: {
-    width: '100%',
-    paddingHorizontal: SPACING.lg,
-  },
-  readyContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 80,
-  },
-  banner: {
-    backgroundColor: COLORS.amber,
-    paddingVertical: 16,
-    paddingHorizontal: SPACING.xxl,
-    borderRadius: 28,
-    maxWidth: '85%',
-  },
-  bannerText: {
-    fontFamily: FONTS.semiBold,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-  },
-});
 
 export default WelcomeScreen;

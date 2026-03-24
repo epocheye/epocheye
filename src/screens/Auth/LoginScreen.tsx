@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  StyleSheet,
   StatusBar,
   Alert,
   ActivityIndicator,
@@ -11,19 +10,14 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AmberButton from '../../components/onboarding/AmberButton';
 import AuthButton from '../../components/onboarding/AuthButton';
 import { login } from '../../utils/api/auth';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
-import {
-  FONTS,
-  COLORS,
-  FONT_SIZES,
-  SPACING,
-  RADIUS,
-} from '../../core/constants/theme';
+import { COLORS } from '../../core/constants/theme';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -68,7 +62,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      className="flex-1 bg-black"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar
@@ -78,16 +72,25 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       />
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: 'center',
+          paddingHorizontal: 32,
+        }}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.logoSection}>
-          <Text style={styles.appName}>EpochEye</Text>
-          <Text style={styles.tagline}>Welcome back</Text>
+        <View className="mb-16 items-center">
+          <Image
+            source={require('../../assets/images/logo-white.png')}
+            className="size-20 my-5"
+          />
+          <Text className="font-['MontserratAlternates-Regular'] text-[18px] text-[#B8AF9E]">
+            Welcome back
+          </Text>
         </View>
 
         {!showEmailForm ? (
-          <View style={styles.authButtons}>
+          <View className="gap-5">
             <AuthButton
               title="Continue with Google"
               variant="google"
@@ -105,9 +108,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             />
           </View>
         ) : (
-          <View style={styles.form}>
+          <View className="gap-5">
             <TextInput
-              style={styles.input}
+              className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)] bg-[#241D16] px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
               placeholder="Email"
               placeholderTextColor={COLORS.textTertiary}
               value={email}
@@ -117,7 +120,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               autoCorrect={false}
             />
             <TextInput
-              style={styles.input}
+              className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)] bg-[#241D16] px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
               placeholder="Password"
               placeholderTextColor={COLORS.textTertiary}
               value={password}
@@ -126,9 +129,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             />
 
             {loading ? (
-              <View style={styles.loadingContainer}>
+              <View className="h-14 flex-row items-center justify-center gap-3">
                 <ActivityIndicator color={COLORS.amber} size="small" />
-                <Text style={styles.loadingText}>Signing in...</Text>
+                <Text className="font-['MontserratAlternates-Regular'] text-sm text-[#B8AF9E]">
+                  Signing in...
+                </Text>
               </View>
             ) : (
               <AmberButton title="Sign In" onPress={handleSubmit} />
@@ -136,93 +141,21 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
             <TouchableOpacity
               onPress={() => setShowEmailForm(false)}
-              style={styles.backButton}
+              className="mt-2 items-center"
             >
-              <Text style={styles.backText}>Back to options</Text>
+              <Text className="font-['MontserratAlternates-Medium'] text-sm text-[#8F8576]">
+                Back to options
+              </Text>
             </TouchableOpacity>
           </View>
         )}
 
-        <Text style={styles.footnote}>
+        <Text className="mb-8 mt-10 text-center font-['MontserratAlternates-Regular'] text-xs text-[#6B6357]">
           By continuing, you agree to our Terms & Privacy Policy
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bgWarm,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.xxl,
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: SPACING.screen,
-  },
-  appName: {
-    fontFamily: FONTS.bold,
-    fontSize: FONT_SIZES.hero,
-    color: COLORS.amber,
-    letterSpacing: 1,
-    marginBottom: SPACING.sm,
-  },
-  tagline: {
-    fontFamily: FONTS.regular,
-    fontSize: FONT_SIZES.subtitle,
-    color: COLORS.textSecondary,
-  },
-  authButtons: {
-    gap: SPACING.lg,
-  },
-  form: {
-    gap: SPACING.lg,
-  },
-  input: {
-    height: 56,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.bgCard,
-    paddingHorizontal: SPACING.xl,
-    fontFamily: FONTS.regular,
-    fontSize: FONT_SIZES.button,
-    color: COLORS.textPrimary,
-  },
-  loadingContainer: {
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  loadingText: {
-    fontFamily: FONTS.regular,
-    fontSize: FONT_SIZES.small,
-    color: COLORS.textSecondary,
-  },
-  backButton: {
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-  },
-  backText: {
-    fontFamily: FONTS.medium,
-    fontSize: FONT_SIZES.small,
-    color: COLORS.textTertiary,
-  },
-  footnote: {
-    fontFamily: FONTS.regular,
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginTop: SPACING.section,
-    marginBottom: SPACING.xxl,
-  },
-});
 
 export default LoginScreen;
