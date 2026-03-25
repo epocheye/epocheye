@@ -331,3 +331,8 @@ For every task, your deliverables are:
 - Error messages are calm and human, never technical
 - Empty states are evocative: "No monuments discovered nearby yet" with an illustration prompt
 - Loading states use skeleton screens, never spinners (except in modals)
+- You should go and check UI websites and learn the designs from the web and use them.
+- No generic type of UI which is mostly done by the AIs, you should be creative and make sure to follow the design language of the app.
+
+- ALways use PLAN mode first , then start to implement the changes.
+- Everytime you have something to ask,just ask and wait for the answer, do not assume anything.
