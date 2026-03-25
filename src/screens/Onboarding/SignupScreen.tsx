@@ -14,6 +14,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthButton from '../../components/onboarding/AuthButton';
 import AmberButton from '../../components/onboarding/AmberButton';
+import AuthLiquidBackground from '../../components/onboarding/AuthLiquidBackground';
 import { login, signup } from '../../utils/api/auth';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { COLORS } from '../../core/constants/theme';
@@ -22,6 +23,12 @@ import { ROUTES } from '../../core/constants/routes';
 
 type Props = OnboardingScreenProps<'Signup'>;
 type AuthMode = 'initial' | 'login' | 'register';
+
+const scrollContentStyle = {
+  flexGrow: 1,
+  justifyContent: 'center' as const,
+  paddingHorizontal: 32,
+};
 
 /**
  * Screen 5 — Signup/Login screen.
@@ -173,42 +180,40 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-[#1A1612]"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <StatusBar
-        barStyle="light-content"
-        translucent
-        backgroundColor="transparent"
-      />
-
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: 'center',
-          paddingHorizontal: 32,
-        }}
-        keyboardShouldPersistTaps="handled"
+    <AuthLiquidBackground>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View className="mb-10">
-          <Text className="mb-2 font-['MontserratAlternates-Bold'] text-[36px] leading-[44px] text-[#F5E9D8]">
-            {mode === 'register' ? 'Create your account.' : 'Welcome back.'}
-          </Text>
-          {mode === 'initial' && (
-            <Text className="font-['MontserratAlternates-Regular'] text-[18px] text-[#B8AF9E]">
-              Save your story. Keep exploring.
+        <StatusBar
+          barStyle="light-content"
+          translucent
+          backgroundColor="transparent"
+        />
+
+        <ScrollView
+          contentContainerStyle={scrollContentStyle}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View className="mb-10">
+            <Text className="mb-2 font-['MontserratAlternates-Bold'] text-[36px] leading-[44px] text-[#F5E9D8]">
+              {mode === 'register' ? 'Create your account.' : 'Welcome back.'}
             </Text>
-          )}
-        </View>
+            {mode === 'initial' && (
+              <Text className="font-['MontserratAlternates-Regular'] text-[18px] text-[#B8AF9E]">
+                Save your story. Keep exploring.
+              </Text>
+            )}
+          </View>
 
-        {mode === 'initial' ? renderInitial() : renderForm()}
+          {mode === 'initial' ? renderInitial() : renderForm()}
 
-        <Text className="mb-8 mt-10 text-center font-['MontserratAlternates-Regular'] text-xs text-[#6B6357]">
-          By continuing, you agree to our Terms & Privacy Policy
-        </Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <Text className="mb-8 mt-10 text-center font-['MontserratAlternates-Regular'] text-xs text-[#6B6357]">
+            By continuing, you agree to our Terms & Privacy Policy
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </AuthLiquidBackground>
   );
 };
 
