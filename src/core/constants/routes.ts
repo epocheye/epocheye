@@ -23,6 +23,7 @@ export const ROUTES = {
     OB08_DEMO_STORY: 'OB08_DemoStory',
     OB09_REACTION: 'OB09_Reaction',
     OB10_SIGNUP: 'OB10_SignUp',
+    OB10_LOGIN: 'OB10_Login',
     OB11_NOTIFICATIONS: 'OB11_Notifications',
     OB12_ARRIVAL: 'OB12_Arrival',
   },

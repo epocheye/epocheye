@@ -1,22 +1,22 @@
-import React, {useEffect} from 'react';
-import {View, Text, StyleSheet, StatusBar, ImageBackground} from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, StatusBar, ImageBackground } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import {OB_COLORS} from '../../constants/onboarding';
-import {FONTS, CDN_BASE} from '../../core/constants/theme';
+import { OB_COLORS } from '../../constants/onboarding';
+import { FONTS, CDN_BASE } from '../../core/constants/theme';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
-import {track} from '../../services/analytics';
-import type {OnboardingScreenProps} from '../../core/types/navigation.types';
+import { track } from '../../services/analytics';
+import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB01_Welcome'>;
 
 const MONUMENT_BG = `${CDN_BASE}monuments/Konarka_Temple-2.jpg`;
 
-const OB01_Welcome: React.FC<Props> = ({navigation}) => {
+const OB01_Welcome: React.FC<Props> = ({ navigation }) => {
   const line1 = useSharedValue(0);
   const line2 = useSharedValue(0);
   const line3 = useSharedValue(0);
@@ -26,18 +26,18 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
   useEffect(() => {
     track('onboarding_started');
 
-    line1.value = withTiming(1, {duration: 500});
-    line2.value = withDelay(400, withTiming(1, {duration: 500}));
-    line3.value = withDelay(900, withTiming(1, {duration: 500}));
-    subLine.value = withDelay(1400, withTiming(1, {duration: 400}));
-    ctaOpacity.value = withDelay(1600, withTiming(1, {duration: 400}));
+    line1.value = withTiming(1, { duration: 500 });
+    line2.value = withDelay(400, withTiming(1, { duration: 500 }));
+    line3.value = withDelay(900, withTiming(1, { duration: 500 }));
+    subLine.value = withDelay(1400, withTiming(1, { duration: 400 }));
+    ctaOpacity.value = withDelay(1600, withTiming(1, { duration: 400 }));
   }, [line1, line2, line3, subLine, ctaOpacity]);
 
-  const s1 = useAnimatedStyle(() => ({opacity: line1.value}));
-  const s2 = useAnimatedStyle(() => ({opacity: line2.value}));
-  const s3 = useAnimatedStyle(() => ({opacity: line3.value}));
-  const s4 = useAnimatedStyle(() => ({opacity: subLine.value}));
-  const s5 = useAnimatedStyle(() => ({opacity: ctaOpacity.value}));
+  const s1 = useAnimatedStyle(() => ({ opacity: line1.value }));
+  const s2 = useAnimatedStyle(() => ({ opacity: line2.value }));
+  const s3 = useAnimatedStyle(() => ({ opacity: line3.value }));
+  const s4 = useAnimatedStyle(() => ({ opacity: subLine.value }));
+  const s5 = useAnimatedStyle(() => ({ opacity: ctaOpacity.value }));
 
   return (
     <View style={styles.container}>
@@ -47,9 +47,10 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
         backgroundColor="transparent"
       />
       <ImageBackground
-        source={{uri: MONUMENT_BG}}
+        source={{ uri: MONUMENT_BG }}
         style={styles.bg}
-        resizeMode="cover">
+        resizeMode="cover"
+      >
         <View style={styles.overlay} />
 
         <View style={styles.bottomContent}>

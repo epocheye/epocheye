@@ -144,8 +144,11 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
   return (
     <Tab.Navigator
       initialRouteName={ROUTES.TABS.HOME}
+      detachInactiveScreens
       screenOptions={({ route }) => ({
         headerShown: false,
+        freezeOnBlur: true,
+        lazy: true,
         tabBarShowLabel: true,
         tabBarActiveTintColor: TAB_COLORS.activeTint,
         tabBarInactiveTintColor: TAB_COLORS.inactiveTint,

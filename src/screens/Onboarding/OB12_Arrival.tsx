@@ -1,32 +1,38 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {View, Text, StyleSheet, StatusBar, Dimensions, Image} from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+  Dimensions,
+  Image,
+} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ConfettiCannon from 'react-native-confetti-cannon';
-import {OB_COLORS} from '../../constants/onboarding';
-import {FONTS, CDN_BASE} from '../../core/constants/theme';
-import {useOnboardingStore} from '../../stores/onboardingStore';
-import {useOnboardingComplete} from '../../context/OnboardingCallbackContext';
-import {track} from '../../services/analytics';
+import { OB_COLORS } from '../../constants/onboarding';
+import { FONTS, CDN_BASE } from '../../core/constants/theme';
+import { useOnboardingStore } from '../../stores/onboardingStore';
+import { useOnboardingComplete } from '../../context/OnboardingCallbackContext';
+import { track } from '../../services/analytics';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSkipLink from '../../components/onboarding/OBSkipLink';
-import type {OnboardingScreenProps} from '../../core/types/navigation.types';
-import {BACKEND_URL} from '../../constants/onboarding';
-import {getValidAccessToken} from '../../utils/api/auth';
+import type { OnboardingScreenProps } from '../../core/types/navigation.types';
+import { BACKEND_URL } from '../../constants/onboarding';
+import { getValidAccessToken } from '../../utils/api/auth';
 
 type Props = OnboardingScreenProps<'OB12_Arrival'>;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 const OB12_Arrival: React.FC<Props> = () => {
-  const {firstName, onboardingComplete} = useOnboardingStore();
-  const completeOnboarding = useOnboardingStore((s) => s.completeOnboarding);
+  const { firstName } = useOnboardingStore();
+  const completeOnboarding = useOnboardingStore(s => s.completeOnboarding);
   const onOnboardingComplete = useOnboardingComplete();
   const insets = useSafeAreaInsets();
   const confettiRef = useRef<ConfettiCannon | null>(null);
@@ -78,16 +84,16 @@ const OB12_Arrival: React.FC<Props> = () => {
     confettiRef.current?.start();
 
     // Staggered text reveals
-    h1.value = withDelay(600, withTiming(1, {duration: 500}));
-    h2.value = withDelay(1200, withTiming(1, {duration: 500}));
-    h3.value = withDelay(2000, withTiming(1, {duration: 500}));
-    h4.value = withDelay(2600, withTiming(1, {duration: 500}));
+    h1.value = withDelay(600, withTiming(1, { duration: 500 }));
+    h2.value = withDelay(1200, withTiming(1, { duration: 500 }));
+    h3.value = withDelay(2000, withTiming(1, { duration: 500 }));
+    h4.value = withDelay(2600, withTiming(1, { duration: 500 }));
   }, [completeOnboarding, h1, h2, h3, h4]);
 
-  const s1 = useAnimatedStyle(() => ({opacity: h1.value}));
-  const s2 = useAnimatedStyle(() => ({opacity: h2.value}));
-  const s3 = useAnimatedStyle(() => ({opacity: h3.value}));
-  const s4 = useAnimatedStyle(() => ({opacity: h4.value}));
+  const s1 = useAnimatedStyle(() => ({ opacity: h1.value }));
+  const s2 = useAnimatedStyle(() => ({ opacity: h2.value }));
+  const s3 = useAnimatedStyle(() => ({ opacity: h3.value }));
+  const s4 = useAnimatedStyle(() => ({ opacity: h4.value }));
 
   return (
     <View style={styles.container}>
@@ -97,7 +103,7 @@ const OB12_Arrival: React.FC<Props> = () => {
         backgroundColor="transparent"
       />
 
-      <View style={[styles.content, {paddingBottom: insets.bottom + 24}]}>
+      <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.centerArea}>
           <Animated.Text style={[styles.heroText, s1]}>
             {firstName}, your lineage is ready.
@@ -110,7 +116,7 @@ const OB12_Arrival: React.FC<Props> = () => {
           {/* Map placeholder */}
           <Animated.View style={[styles.mapPlaceholder, s3]}>
             <Image
-              source={{uri: `${CDN_BASE}monuments/Konarka_Temple-2.jpg`}}
+              source={{ uri: `${CDN_BASE}monuments/Konarka_Temple-2.jpg` }}
               style={styles.mapImage}
               resizeMode="cover"
             />
@@ -135,7 +141,7 @@ const OB12_Arrival: React.FC<Props> = () => {
       <ConfettiCannon
         ref={confettiRef}
         count={150}
-        origin={{x: SCREEN_WIDTH / 2, y: -10}}
+        origin={{ x: SCREEN_WIDTH / 2, y: -10 }}
         colors={['#E8A020', '#FFD700', '#FFFFFF', '#FFA500']}
         autoStart={false}
         fadeOut

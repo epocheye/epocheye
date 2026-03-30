@@ -1,5 +1,5 @@
-import React, {useEffect} from 'react';
-import {View, Text, StyleSheet, StatusBar, Platform} from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, StatusBar } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -7,33 +7,33 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {BellRing} from 'lucide-react-native';
-import {requestNotifications} from 'react-native-permissions';
-import {OB_COLORS, OB_TYPOGRAPHY} from '../../constants/onboarding';
-import {FONTS} from '../../core/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BellRing } from 'lucide-react-native';
+import { requestNotifications } from 'react-native-permissions';
+import { OB_COLORS, OB_TYPOGRAPHY } from '../../constants/onboarding';
+import { FONTS } from '../../core/constants/theme';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSkipLink from '../../components/onboarding/OBSkipLink';
-import type {OnboardingScreenProps} from '../../core/types/navigation.types';
+import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB11_Notifications'>;
 
-const OB11_Notifications: React.FC<Props> = ({navigation}) => {
+const OB11_Notifications: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
 
   // Pulsing scale for bell icon
   const scale = useSharedValue(0.95);
   useEffect(() => {
     scale.value = withRepeat(
-      withTiming(1.05, {duration: 1500, easing: Easing.inOut(Easing.ease)}),
+      withTiming(1.05, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
       -1,
       true,
     );
   }, [scale]);
 
   const bellStyle = useAnimatedStyle(() => ({
-    transform: [{scale: scale.value}],
+    transform: [{ scale: scale.value }],
   }));
 
   const handleEnable = async () => {
@@ -52,7 +52,7 @@ const OB11_Notifications: React.FC<Props> = ({navigation}) => {
       />
       <OBProgressBar current={10} total={10} />
 
-      <View style={[styles.content, {paddingBottom: insets.bottom + 24}]}>
+      <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.header}>
           <Text style={OB_TYPOGRAPHY.heading}>
             Know when history is near you.

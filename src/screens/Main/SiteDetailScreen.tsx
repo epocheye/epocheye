@@ -7,10 +7,10 @@ import {
   Image,
   StatusBar,
   Dimensions,
-  ActivityIndicator,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
@@ -300,7 +300,12 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 style={styles.heroIconButton}
               >
                 {isSaving ? (
-                  <ActivityIndicator size="small" color="#C9A84C" />
+                  <AnimatedLogo
+                    size={16}
+                    variant="white"
+                    motion="pulse"
+                    showRing={false}
+                  />
                 ) : (
                   <Bookmark
                     color={isSaved ? '#C9A84C' : '#F5F0E8'}

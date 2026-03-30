@@ -2,12 +2,11 @@ import React from 'react';
 import {
   TouchableOpacity,
   Text,
-  ActivityIndicator,
   ViewStyle,
   TextStyle,
   AccessibilityRole,
 } from 'react-native';
-import { Colors } from '../../constants/theme';
+import AnimatedLogo from './AnimatedLogo';
 
 interface ButtonProps {
   title: string;
@@ -77,9 +76,11 @@ const Button: React.FC<ButtonProps> = ({
       accessibilityState={{ disabled: isDisabled }}
     >
       {loading ? (
-        <ActivityIndicator
-          color={variant === 'primary' ? Colors.background : Colors.text}
-          size="small"
+        <AnimatedLogo
+          size={18}
+          variant={variant === 'primary' ? 'black' : 'white'}
+          motion="pulse"
+          showRing={false}
         />
       ) : (
         <>

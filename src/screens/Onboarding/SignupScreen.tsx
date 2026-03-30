@@ -1,11 +1,10 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   StatusBar,
   Alert,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,13 +15,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthButton from '../../components/onboarding/AuthButton';
 import AmberButton from '../../components/onboarding/AmberButton';
 import AuthLiquidBackground from '../../components/onboarding/AuthLiquidBackground';
-import OBSkipLink from '../../components/onboarding/OBSkipLink';
-import {login, signup} from '../../utils/api/auth';
-import {STORAGE_KEYS} from '../../core/constants/storage-keys';
-import {COLORS} from '../../core/constants/theme';
-import {useOnboardingStore} from '../../stores/onboardingStore';
-import {track} from '../../services/analytics';
-import type {OnboardingScreenProps} from '../../core/types/navigation.types';
+import AnimatedLogo from '../../components/ui/AnimatedLogo';
+import { login, signup } from '../../utils/api/auth';
+import { STORAGE_KEYS } from '../../core/constants/storage-keys';
+import { COLORS } from '../../core/constants/theme';
+import { useOnboardingStore } from '../../stores/onboardingStore';
+import { track } from '../../services/analytics';
+import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB10_SignUp'>;
 
@@ -32,10 +31,9 @@ const scrollContentStyle = {
   paddingHorizontal: 32,
 };
 
-const SignupScreen: React.FC<Props> = ({navigation, route}) => {
+const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const fromOnboarding = route.params?.fromOnboarding ?? false;
-  const storeFirstName = useOnboardingStore((s) => s.firstName);
-  const setGuestMode = useOnboardingStore((s) => s.setGuestMode);
+  const storeFirstName = useOnboardingStore(s => s.firstName);
 
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState('');
@@ -80,7 +78,7 @@ const SignupScreen: React.FC<Props> = ({navigation, route}) => {
       return;
     }
 
-    const loginResult = await login({email: email.trim(), password});
+    const loginResult = await login({ email: email.trim(), password });
     setLoading(false);
 
     if (fromOnboarding) {
@@ -101,15 +99,9 @@ const SignupScreen: React.FC<Props> = ({navigation, route}) => {
     }
   };
 
-  const handleSkip = () => {
-    track('onboarding_signup_skipped');
-    setGuestMode(true);
-    navigation.navigate('OB12_Arrival');
-  };
-
   // Heading text
   const headingText = fromOnboarding
-    ? `Save ${storeFirstName}'s story.`
+    ? `Save ${storeFirstName || 'your'} story.`
     : 'Create your account';
 
   const renderInitial = () => (
@@ -164,7 +156,12 @@ const SignupScreen: React.FC<Props> = ({navigation, route}) => {
 
       {loading ? (
         <View className="h-14 flex-row items-center justify-center gap-3">
-          <ActivityIndicator color={COLORS.amber} size="small" />
+          <AnimatedLogo
+            variant="white"
+            size={22}
+            motion="orbit"
+            showRing={false}
+          />
           <Text className="font-['MontserratAlternates-Regular'] text-sm text-[#B8AF9E]">
             Creating account...
           </Text>
@@ -175,7 +172,8 @@ const SignupScreen: React.FC<Props> = ({navigation, route}) => {
 
       <TouchableOpacity
         onPress={() => setShowEmailForm(false)}
-        className="mt-2 items-center">
+        className="mt-2 items-center"
+      >
         <Text className="font-['MontserratAlternates-Medium'] text-sm text-[#8F8576]">
           Back to options
         </Text>
@@ -187,7 +185,8 @@ const SignupScreen: React.FC<Props> = ({navigation, route}) => {
     <AuthLiquidBackground>
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <StatusBar
           barStyle="light-content"
           translucent
@@ -196,7 +195,8 @@ const SignupScreen: React.FC<Props> = ({navigation, route}) => {
 
         <ScrollView
           contentContainerStyle={scrollContentStyle}
-          keyboardShouldPersistTaps="handled">
+          keyboardShouldPersistTaps="handled"
+        >
           <View className="mb-16 items-center">
             <Image
               source={require('../../assets/images/logo-white.png')}
@@ -215,6 +215,20 @@ const SignupScreen: React.FC<Props> = ({navigation, route}) => {
           {!showEmailForm ? renderInitial() : renderForm()}
 
           {fromOnboarding && (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('OB10_Login')}
+              className="mt-8 items-center"
+            >
+              <Text className="font-['MontserratAlternates-Regular'] text-sm text-[#8F8576]">
+                Already have an account?{' '}
+                <Text className="font-['MontserratAlternates-SemiBold'] text-[#D4860A]">
+                  Log in
+                </Text>
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {fromOnboarding && (
             <Text className="mt-4 text-center font-['MontserratAlternates-Regular'] text-[11px] text-[#8C93A0]">
               Takes 10 seconds. No spam. Your data is never sold.
             </Text>
@@ -223,10 +237,6 @@ const SignupScreen: React.FC<Props> = ({navigation, route}) => {
           <Text className="mb-8 mt-10 text-center font-['MontserratAlternates-Regular'] text-xs text-[#6B6357]">
             By continuing, you agree to our Terms & Privacy Policy
           </Text>
-
-          {fromOnboarding && (
-            <OBSkipLink label="Skip for now" onPress={handleSkip} />
-          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </AuthLiquidBackground>

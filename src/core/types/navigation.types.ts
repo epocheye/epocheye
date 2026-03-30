@@ -39,6 +39,7 @@ export type OnboardingStackParamList = {
   OB08_DemoStory: undefined;
   OB09_Reaction: undefined;
   OB10_SignUp: {fromOnboarding?: boolean} | undefined;
+  OB10_Login: undefined;
   OB11_Notifications: undefined;
   OB12_Arrival: undefined;
 };

@@ -10,10 +10,10 @@ import {
   LayoutAnimation,
   UIManager,
   Platform,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { MapPin, Trash2, Play, X, Camera, Bookmark } from 'lucide-react-native';
+import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import { usePlaces } from '../../context';
 import type { TabScreenProps } from '../../core/types/navigation.types';
 import type { SavedPlace, Place } from '../../utils/api/places/types';
@@ -219,7 +219,12 @@ const Saved = ({ navigation }: Props) => {
             accessibilityLabel={`Remove ${place.name} from saved places`}
           >
             {isRemoving ? (
-              <ActivityIndicator size="small" color="#FF6262" />
+              <AnimatedLogo
+                size={16}
+                variant="white"
+                motion="pulse"
+                showRing={false}
+              />
             ) : (
               <Trash2 color="#FF6262" size={18} />
             )}
@@ -289,7 +294,7 @@ const Saved = ({ navigation }: Props) => {
 
       {isLoadingSaved && (
         <View className="h-64 items-center justify-center">
-          <ActivityIndicator size="large" color="#FF7A18" />
+          <AnimatedLogo size={58} variant="white" motion="orbit" />
           <Text className="text-[#9A9AAF] text-sm font-montserrat-medium mt-4">
             Loading saved places...
           </Text>

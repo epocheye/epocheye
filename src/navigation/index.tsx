@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavigationContainer, NavigationState } from '@react-navigation/native';
-import { View, ActivityIndicator } from 'react-native';
+import { View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigation from './MainNavigation';
@@ -8,7 +8,7 @@ import LoginScreen from '../screens/Auth/LoginScreen';
 import { isAuthenticated } from '../utils/api/auth';
 import { StorageService } from '../shared/services';
 import { STORAGE_KEYS } from '../core/constants';
-import { COLORS } from '../core/constants/theme';
+import AnimatedLogo from '../components/ui/AnimatedLogo';
 import { usePlaces } from '../context';
 import { OnboardingCallbackProvider } from '../context/OnboardingCallbackContext';
 
@@ -26,6 +26,10 @@ const AppNavigator: React.FC = () => {
     NavigationState | undefined
   >(undefined);
   const navigationRef = useRef<any>(null);
+  const navStateSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const pendingNavStateRef = useRef<NavigationState | undefined>(undefined);
   const { setAuthenticated } = usePlaces();
 
   useEffect(() => {
@@ -95,23 +99,54 @@ const AppNavigator: React.FC = () => {
     setAppState('main');
   }, [setAuthenticated]);
 
+  const persistNavigationState = useCallback(async () => {
+    if (!pendingNavStateRef.current) {
+      return;
+    }
+
+    try {
+      await StorageService.set(
+        STORAGE_KEYS.NAVIGATION.STATE,
+        pendingNavStateRef.current,
+      );
+    } catch {
+      // Navigation state saving failed silently
+    }
+  }, []);
+
   const handleStateChange = useCallback(
-    async (state: NavigationState | undefined) => {
-      if (state) {
-        try {
-          await StorageService.set(STORAGE_KEYS.NAVIGATION.STATE, state);
-        } catch {
-          // Navigation state saving failed silently
-        }
+    (state: NavigationState | undefined) => {
+      pendingNavStateRef.current = state;
+
+      if (navStateSaveTimerRef.current) {
+        clearTimeout(navStateSaveTimerRef.current);
       }
+
+      // Debounce AsyncStorage writes to avoid jank during rapid transitions.
+      navStateSaveTimerRef.current = setTimeout(() => {
+        persistNavigationState().catch(() => {
+          // Navigation state saving failed silently
+        });
+      }, 250);
     },
-    [],
+    [persistNavigationState],
   );
+
+  useEffect(() => {
+    return () => {
+      if (navStateSaveTimerRef.current) {
+        clearTimeout(navStateSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   if (appState === 'loading') {
     return (
       <View className="flex-1 items-center justify-center bg-[#0A0A0A]">
-        <ActivityIndicator size="large" color={COLORS.textPrimary} />
+        <AnimatedLogo size={92} motion="orbit" variant="white" />
+        <Text className="mt-5 font-['MontserratAlternates-Regular'] text-sm text-[#B8AF9E]">
+          Preparing your journey...
+        </Text>
       </View>
     );
   }

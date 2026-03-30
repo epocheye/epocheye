@@ -19,20 +19,20 @@ interface MainNavigationProps {
  */
 const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
   return (
-    <Stack.Navigator initialRouteName={ROUTES.MAIN.TABS}>
-      <Stack.Screen
-        name={ROUTES.MAIN.TABS}
-        options={{
-          headerShown: false,
-        }}
-      >
+    <Stack.Navigator
+      initialRouteName={ROUTES.MAIN.TABS}
+      screenOptions={{
+        headerShown: false,
+        freezeOnBlur: true,
+      }}
+    >
+      <Stack.Screen name={ROUTES.MAIN.TABS}>
         {props => <TabNavigation {...props} onLogout={onLogout} />}
       </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.PERMISSIONS}
         component={Permissions}
         options={{
-          headerShown: false,
           presentation: 'fullScreenModal',
         }}
       />
@@ -40,7 +40,6 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         name={ROUTES.MAIN.SITE_DETAIL}
         component={SiteDetailScreen}
         options={{
-          headerShown: false,
           animation: 'slide_from_right',
         }}
       />
@@ -48,7 +47,6 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         name={ROUTES.MAIN.AR_EXPERIENCE}
         component={ARExperienceScreen}
         options={{
-          headerShown: false,
           animation: 'fade',
           presentation: 'fullScreenModal',
         }}

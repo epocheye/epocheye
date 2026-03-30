@@ -6,7 +6,6 @@ import {
   Alert,
   TextInput,
   Image,
-  ActivityIndicator,
   Linking,
 } from 'react-native';
 import React, { useState, useEffect, useCallback } from 'react';
@@ -25,6 +24,7 @@ import {
   Download,
   Save,
 } from 'lucide-react-native';
+import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import { PermissionService } from '../../shared/services/permission.service';
 import { APP_CONFIG } from '../../core/config';
 import type { TabScreenProps } from '../../core/types/navigation.types';
@@ -226,7 +226,7 @@ const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
             className="mx-5 mb-6 rounded-[32px] border border-white/10 bg-[#12121B] p-5 items-center justify-center"
             style={{ height: 280 }}
           >
-            <ActivityIndicator size="large" color="#3B82F6" />
+            <AnimatedLogo size={58} variant="white" motion="orbit" />
             <Text className="text-[#9A9AAF] text-sm font-montserrat-regular mt-3">
               Loading profile...
             </Text>
@@ -322,7 +322,12 @@ const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
                 accessibilityHint="Saves your updated name, email, and phone number"
               >
                 {isSaving ? (
-                  <ActivityIndicator size="small" color="white" />
+                  <AnimatedLogo
+                    size={18}
+                    variant="white"
+                    motion="pulse"
+                    showRing={false}
+                  />
                 ) : (
                   <>
                     <Save size={18} color="white" />

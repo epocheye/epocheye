@@ -1,13 +1,7 @@
 import React, { useState } from 'react';
-import {
-  TouchableOpacity,
-  Text,
-  View,
-  Image,
-  ActivityIndicator,
-} from 'react-native';
+import { TouchableOpacity, Text, View, Image } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { COLORS } from '../../core/constants/theme';
+import AnimatedLogo from '../ui/AnimatedLogo';
 import type { Region } from '../../constants/onboarding/regions';
 
 interface AncestryCardProps {
@@ -56,7 +50,12 @@ const AncestryCard: React.FC<AncestryCardProps> = ({
               className="absolute inset-0 items-center justify-center"
               style={{ backgroundColor: region.color }}
             >
-              <ActivityIndicator size="small" color={COLORS.textPrimary} />
+              <AnimatedLogo
+                size={18}
+                variant="white"
+                motion="pulse"
+                showRing={false}
+              />
             </View>
           )}
           <Image

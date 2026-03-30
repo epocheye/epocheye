@@ -50,6 +50,43 @@ export interface UserStats {
 }
 
 /**
+ * Personalized historical fact generated for a user.
+ */
+export interface PersonalizedFact {
+  id: string;
+  headline: string;
+  summary: string;
+  detail?: string;
+  monument?: string;
+}
+
+/**
+ * Response payload for personalized facts endpoint.
+ */
+export interface PersonalizedFactsResponse {
+  facts: PersonalizedFact[];
+}
+
+/**
+ * Request payload for fact elaboration endpoint.
+ */
+export interface ElaborateFactRequest {
+  factId: string;
+  headline: string;
+  summary: string;
+  userName?: string;
+  nearbyPlaceName?: string;
+}
+
+/**
+ * Elaborated detail response for a fact.
+ */
+export interface ElaboratedFact {
+  id: string;
+  detail: string;
+}
+
+/**
  * Generic result type for user API operations
  */
 export interface UserError {

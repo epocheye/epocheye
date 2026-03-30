@@ -5,7 +5,6 @@ import {
   TextInput,
   StatusBar,
   Alert,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,12 +15,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import AmberButton from '../../components/onboarding/AmberButton';
 import AuthButton from '../../components/onboarding/AuthButton';
 import AuthLiquidBackground from '../../components/onboarding/AuthLiquidBackground';
+import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import { login } from '../../utils/api/auth';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { COLORS } from '../../core/constants/theme';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
+  headingText?: string;
+  subheadingText?: string;
+  secondaryActionLabel?: string;
+  onSecondaryActionPress?: () => void;
 }
 
 const scrollContentStyle = {
@@ -35,7 +39,13 @@ const scrollContentStyle = {
  * Shown when a user has completed onboarding but is not authenticated.
  * Skips the entire onboarding flow and goes directly to the main app on success.
  */
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({
+  onLoginSuccess,
+  headingText = 'Welcome back',
+  subheadingText,
+  secondaryActionLabel,
+  onSecondaryActionPress,
+}) => {
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -89,8 +99,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               className="size-20 my-5"
             />
             <Text className="font-['MontserratAlternates-Regular'] text-[18px] text-[#B8AF9E]">
-              Welcome back
+              {headingText}
             </Text>
+            {subheadingText ? (
+              <Text className="mt-2 text-center font-['MontserratAlternates-Regular'] text-sm text-[#8C93A0]">
+                {subheadingText}
+              </Text>
+            ) : null}
           </View>
 
           {!showEmailForm ? (
@@ -134,7 +149,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
               {loading ? (
                 <View className="h-14 flex-row items-center justify-center gap-3">
-                  <ActivityIndicator color={COLORS.amber} size="small" />
+                  <AnimatedLogo
+                    variant="white"
+                    size={22}
+                    motion="orbit"
+                    showRing={false}
+                  />
                   <Text className="font-['MontserratAlternates-Regular'] text-sm text-[#B8AF9E]">
                     Signing in...
                   </Text>
@@ -153,6 +173,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               </TouchableOpacity>
             </View>
           )}
+
+          {secondaryActionLabel && onSecondaryActionPress ? (
+            <TouchableOpacity
+              onPress={onSecondaryActionPress}
+              className="mt-8 items-center"
+            >
+              <Text className="font-['MontserratAlternates-Regular'] text-sm text-[#8F8576]">
+                {secondaryActionLabel}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
 
           <Text className="mb-8 mt-10 text-center font-['MontserratAlternates-Regular'] text-xs text-[#6B6357]">
             By continuing, you agree to our Terms & Privacy Policy
