@@ -3,7 +3,14 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { checkAllPermissions, areAllPermissionsGranted } from './permissions';
 
 // Screens that should not check for permissions
-const EXCLUDED_SCREENS = ['SplashVideo', 'EmotionalQuestion', 'MirrorMoment', 'AncestryInput', 'FirstTaste', 'Signup', 'OnboardingPermissions', 'WorldOpens'];
+const EXCLUDED_SCREENS = [
+  'SplashVideo',
+  'Hook',
+  'AncestryInput',
+  'FirstTaste',
+  'Signup',
+  'Welcome',
+];
 
 export const usePermissionCheck = () => {
   const navigation = useNavigation();

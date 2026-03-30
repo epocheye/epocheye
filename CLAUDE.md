@@ -50,11 +50,11 @@ SafeAreaProvider
 
 `AppNavigator` resolves to one of three states on startup:
 
-| State | Condition | Renders |
-|---|---|---|
-| `onboarding` | `onboarding_complete` not set | `OnboardingNavigator` (wrapped in `OnboardingCallbackProvider`) |
-| `login` | Onboarding done but tokens expired | `LoginScreen` (outside `NavigationContainer`) |
-| `main` | Authenticated | `MainNavigation` inside `NavigationContainer` |
+| State        | Condition                          | Renders                                                         |
+| ------------ | ---------------------------------- | --------------------------------------------------------------- |
+| `onboarding` | `onboarding_complete` not set      | `OnboardingNavigator` (wrapped in `OnboardingCallbackProvider`) |
+| `login`      | Onboarding done but tokens expired | `LoginScreen` (outside `NavigationContainer`)                   |
+| `main`       | Authenticated                      | `MainNavigation` inside `NavigationContainer`                   |
 
 Auth/onboarding transitions are driven by callbacks (`onLoginSuccess`, `handleOnboardingComplete`, `handleLogout`), not by polling. `PlacesContext.setAuthenticated()` must be called to start/stop geo-tracking.
 
@@ -66,11 +66,11 @@ Six screens, all fade-transition, no headers:
 SplashVideo → Hook → AncestryInput → FirstTaste → Signup → Welcome
 ```
 
-`WelcomeScreen` calls `onOnboardingComplete` from `OnboardingCallbackContext` to transition to `main`. The deprecated screen files (`EmotionalQuestionScreen`, `MirrorMomentScreen`, `PermissionsScreen`, `WorldOpensScreen`) still exist but are not registered in the navigator.
+`WelcomeScreen` calls `onOnboardingComplete` from `OnboardingCallbackContext` to transition to `main`. The legacy onboarding steps were consolidated into `HookScreen` and `WelcomeScreen`.
 
 ### Main Navigation (`src/navigation/MainNavigation.tsx`)
 
-A native stack containing `TabNavigation` (5 tabs: Home, Explore, Challenges, Saved, Settings) plus modal/push screens: `SiteDetail`, `ARExperience`, `NavigationScreen`, `Permissions`.
+A native stack containing `TabNavigation` (5 tabs: Home, Explore, Challenges, Saved, Settings) plus modal/push screens: `SiteDetail`, `ARExperience`, `Permissions`.
 
 ---
 
@@ -79,12 +79,12 @@ A native stack containing `TabNavigation` (5 tabs: Home, Explore, Challenges, Sa
 **Single source of truth:** `src/core/constants/theme.ts`
 
 ```ts
-COLORS   // brand amber (#D4860A), dark backgrounds, text hierarchy
-FONTS    // MontserratAlternates-{Light|Regular|Medium|SemiBold|Bold|ExtraBold|Italic|MediumItalic}
-SPACING  // xs(4) → screen(48)
-RADIUS   // sm(8) → pill(40)
-FONT_SIZES  // caption(12) → display(40)
-CDN_BASE // 'https://cdn.jsdelivr.net/gh/epocheye/epocheye/src/assets/'
+COLORS; // brand amber (#D4860A), dark backgrounds, text hierarchy
+FONTS; // MontserratAlternates-{Light|Regular|Medium|SemiBold|Bold|ExtraBold|Italic|MediumItalic}
+SPACING; // xs(4) → screen(48)
+RADIUS; // sm(8) → pill(40)
+FONT_SIZES; // caption(12) → display(40)
+CDN_BASE; // 'https://cdn.jsdelivr.net/gh/epocheye/epocheye/src/assets/'
 ```
 
 An extended token set lives in `src/design-system/tokens/` (`typography.ts`, `colors.ts`, `spacing.ts`) — same values, more granular variants. Use `src/core/constants/theme.ts` imports for most screens.
@@ -99,12 +99,12 @@ An extended token set lives in `src/design-system/tokens/` (`typography.ts`, `co
 
 ## Context Layer (`src/context/`)
 
-| Context | Hook | Purpose |
-|---|---|---|
-| `PlacesContext` | `usePlaces()` | Nearby places (cascading radius 1→5→10→20km), saved places, geo-tracking with 1-min API cooldown |
-| `UserContext` | `useUser()` | User profile + stats, fetched in parallel on auth |
-| `NetworkContext` | `useNetwork()` | `isConnected` / `isInternetReachable` from NetInfo |
-| `OnboardingCallbackContext` | `useOnboardingCallback()` | Bridge from `WelcomeScreen` to root navigator |
+| Context                     | Hook                      | Purpose                                                                                          |
+| --------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `PlacesContext`             | `usePlaces()`             | Nearby places (cascading radius 1→5→10→20km), saved places, geo-tracking with 1-min API cooldown |
+| `UserContext`               | `useUser()`               | User profile + stats, fetched in parallel on auth                                                |
+| `NetworkContext`            | `useNetwork()`            | `isConnected` / `isInternetReachable` from NetInfo                                               |
+| `OnboardingCallbackContext` | `useOnboardingCallback()` | Bridge from `WelcomeScreen` to root navigator                                                    |
 
 ---
 
@@ -113,6 +113,7 @@ An extended token set lives in `src/design-system/tokens/` (`typography.ts`, `co
 Each subdirectory (auth, places, user, challenges) exports typed functions. All API calls return a discriminated union result: `{ success: true, data: T }` or `{ success: false, error: { message: string } }`.
 
 **Auth utilities** (`src/utils/api/auth/`):
+
 - `isAuthenticated()` — checks token validity
 - `getValidAccessToken()` — refreshes if expired
 - `createAuthenticatedClient()` — axios instance with auto-refresh interceptor
@@ -141,13 +142,13 @@ Use the typed screen props rather than `any`:
 
 ```ts
 // Onboarding screens
-type Props = OnboardingScreenProps<'AncestryInput'>
+type Props = OnboardingScreenProps<'AncestryInput'>;
 
 // Main screens
-type Props = MainScreenProps<'SiteDetail'>
+type Props = MainScreenProps<'SiteDetail'>;
 
 // Tab screens (composite prop — can also push to main stack)
-type Props = TabScreenProps<'Home'>
+type Props = TabScreenProps<'Home'>;
 ```
 
 ---

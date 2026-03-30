@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(ls src/components/onboarding/OB*.tsx)",
+      "Bash(ls src/constants/onboarding.ts src/stores/onboardingStore.ts src/services/*.ts)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

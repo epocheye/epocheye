@@ -24,20 +24,23 @@ export interface PlaceNavParam {
 
 /**
  * Onboarding Stack Parameter List
- * 6-screen first-launch flow:
- * SplashVideo → Hook → AncestryInput → FirstTaste → Signup → Welcome
+ * 12-screen Duolingo-style flow:
+ * OB00_Splash → OB01_Welcome → ... → OB12_Arrival
  */
 export type OnboardingStackParamList = {
-  SplashVideo: undefined;
-  Hook: undefined;
-  EmotionalQuestion: undefined;
-  MirrorMoment: { answer: 'yes' | 'no' };
-  AncestryInput: undefined;
-  FirstTaste: { region: string | null };
-  Signup: undefined;
-  OnboardingPermissions: undefined;
-  WorldOpens: undefined;
-  Welcome: undefined;
+  OB00_Splash: undefined;
+  OB01_Welcome: undefined;
+  OB02_Motivation: undefined;
+  OB03_Frequency: undefined;
+  OB04_Goal: undefined;
+  OB05_Region: undefined;
+  OB06_Name: undefined;
+  OB07_Promise: undefined;
+  OB08_DemoStory: undefined;
+  OB09_Reaction: undefined;
+  OB10_SignUp: {fromOnboarding?: boolean} | undefined;
+  OB11_Notifications: undefined;
+  OB12_Arrival: undefined;
 };
 
 /**
@@ -47,7 +50,6 @@ export type MainStackParamList = {
   MainTabs: undefined;
   SiteDetail: { site: PlaceNavParam };
   ARExperience: { site: PlaceNavParam };
-  NavigationScreen: { site: PlaceNavParam };
   Permissions: undefined;
 };
 

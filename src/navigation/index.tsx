@@ -83,7 +83,7 @@ const AppNavigator: React.FC = () => {
     setAppState('login');
   }, [setAuthenticated]);
 
-  // Called by WelcomeScreen after the banner animation completes
+  // Called by OB12_Arrival when onboarding completes
   const handleOnboardingComplete = useCallback(() => {
     setAuthenticated(true);
     setAppState('main');

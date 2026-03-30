@@ -1,0 +1,125 @@
+/**
+ * SSE service for AI-generated ancestor stories.
+ * Uses XMLHttpRequest for streaming in React Native (fetch doesn't support ReadableStream).
+ * Called from OB07_Promise on mount.
+ */
+
+import {BACKEND_URL} from '../constants/onboarding';
+
+interface StreamParams {
+  firstName: string;
+  regions: string[];
+  motivation: string;
+  visitFrequency: string;
+  goal: string;
+  onChunk: (text: string) => void;
+  onDone: (monument: string) => void;
+  onError: () => void;
+}
+
+export function streamAncestorStory({
+  firstName,
+  regions,
+  motivation,
+  visitFrequency,
+  goal,
+  onChunk,
+  onDone,
+  onError,
+}: StreamParams): () => void {
+  let hasErrored = false;
+  let lastProcessedIndex = 0;
+
+  const safeOnError = () => {
+    if (hasErrored) {
+      return;
+    }
+    hasErrored = true;
+    onError();
+  };
+
+  const handleMessage = (rawData: string) => {
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawData);
+    } catch {
+      return;
+    }
+
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return;
+    }
+
+    const message = payload as {
+      type?: string;
+      text?: string;
+      monument?: string;
+    };
+
+    if (message.type === 'chunk' && typeof message.text === 'string') {
+      onChunk(message.text);
+      return;
+    }
+
+    if (message.type === 'done') {
+      onDone(message.monument ?? 'Unknown Monument');
+      return;
+    }
+
+    if (message.type === 'error') {
+      safeOnError();
+    }
+  };
+
+  const processBuffer = (text: string) => {
+    const newText = text.slice(lastProcessedIndex);
+    lastProcessedIndex = text.length;
+
+    const lines = newText.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('data:')) {
+        const data = trimmed.replace(/^data:\s?/, '');
+        handleMessage(data);
+      }
+    }
+  };
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', `${BACKEND_URL}/api/onboarding/ancestor-story`);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+
+  xhr.onprogress = () => {
+    try {
+      processBuffer(xhr.responseText);
+    } catch {
+      // Partial response, will retry on next progress event
+    }
+  };
+
+  xhr.onload = () => {
+    try {
+      processBuffer(xhr.responseText);
+    } catch {
+      safeOnError();
+    }
+  };
+
+  xhr.onerror = () => {
+    safeOnError();
+  };
+
+  xhr.ontimeout = () => {
+    safeOnError();
+  };
+
+  xhr.timeout = 30000;
+  xhr.send(
+    JSON.stringify({firstName, regions, motivation, visitFrequency, goal}),
+  );
+
+  // Return abort function for cleanup
+  return () => {
+    xhr.abort();
+  };
+}

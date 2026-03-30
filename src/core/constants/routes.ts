@@ -8,20 +8,23 @@
  */
 export const ROUTES = {
   /**
-   * Onboarding Stack Routes (first-launch flow)
-   * SplashVideo → Hook → AncestryInput → FirstTaste → Signup → Welcome
+   * Onboarding Stack Routes (12-screen Duolingo-style flow)
+   * OB00_Splash → OB01_Welcome → ... → OB12_Arrival
    */
   ONBOARDING: {
-    SPLASH_VIDEO: 'SplashVideo',
-    HOOK: 'Hook',
-    EMOTIONAL_QUESTION: 'EmotionalQuestion',
-    MIRROR_MOMENT: 'MirrorMoment',
-    ANCESTRY_INPUT: 'AncestryInput',
-    FIRST_TASTE: 'FirstTaste',
-    SIGNUP: 'Signup',
-    ONBOARDING_PERMISSIONS: 'OnboardingPermissions',
-    WORLD_OPENS: 'WorldOpens',
-    WELCOME: 'Welcome',
+    OB00_SPLASH: 'OB00_Splash',
+    OB01_WELCOME: 'OB01_Welcome',
+    OB02_MOTIVATION: 'OB02_Motivation',
+    OB03_FREQUENCY: 'OB03_Frequency',
+    OB04_GOAL: 'OB04_Goal',
+    OB05_REGION: 'OB05_Region',
+    OB06_NAME: 'OB06_Name',
+    OB07_PROMISE: 'OB07_Promise',
+    OB08_DEMO_STORY: 'OB08_DemoStory',
+    OB09_REACTION: 'OB09_Reaction',
+    OB10_SIGNUP: 'OB10_SignUp',
+    OB11_NOTIFICATIONS: 'OB11_Notifications',
+    OB12_ARRIVAL: 'OB12_Arrival',
   },
 
   /**
@@ -31,7 +34,6 @@ export const ROUTES = {
     TABS: 'MainTabs',
     SITE_DETAIL: 'SiteDetail',
     AR_EXPERIENCE: 'ARExperience',
-    NAVIGATION: 'NavigationScreen',
     PERMISSIONS: 'Permissions',
   },
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -10,19 +10,21 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthButton from '../../components/onboarding/AuthButton';
 import AmberButton from '../../components/onboarding/AmberButton';
 import AuthLiquidBackground from '../../components/onboarding/AuthLiquidBackground';
-import { login, signup } from '../../utils/api/auth';
-import { STORAGE_KEYS } from '../../core/constants/storage-keys';
-import { COLORS } from '../../core/constants/theme';
-import type { OnboardingScreenProps } from '../../core/types/navigation.types';
-import { ROUTES } from '../../core/constants/routes';
+import OBSkipLink from '../../components/onboarding/OBSkipLink';
+import {login, signup} from '../../utils/api/auth';
+import {STORAGE_KEYS} from '../../core/constants/storage-keys';
+import {COLORS} from '../../core/constants/theme';
+import {useOnboardingStore} from '../../stores/onboardingStore';
+import {track} from '../../services/analytics';
+import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
-type Props = OnboardingScreenProps<'Signup'>;
-type AuthMode = 'initial' | 'login' | 'register';
+type Props = OnboardingScreenProps<'OB10_SignUp'>;
 
 const scrollContentStyle = {
   flexGrow: 1,
@@ -30,18 +32,22 @@ const scrollContentStyle = {
   paddingHorizontal: 32,
 };
 
-/**
- * Screen 5 — Signup/Login screen.
- * Three auth options: Google, Apple, Email. Google/Apple alerts "Coming Soon".
- * Email opens an inline form with a login/register toggle.
- * On success, stores onboarding complete flag and navigates to Welcome.
- */
-const SignupScreen: React.FC<Props> = ({ navigation }) => {
-  const [mode, setMode] = useState<AuthMode>('initial');
+const SignupScreen: React.FC<Props> = ({navigation, route}) => {
+  const fromOnboarding = route.params?.fromOnboarding ?? false;
+  const storeFirstName = useOnboardingStore((s) => s.firstName);
+  const setGuestMode = useOnboardingStore((s) => s.setGuestMode);
+
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (fromOnboarding) {
+      track('onboarding_signup_shown');
+    }
+  }, [fromOnboarding]);
 
   const handleGoogleAuth = () => {
     Alert.alert('Coming Soon', 'Google sign-in will be available soon.');
@@ -52,89 +58,93 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleSubmit = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Missing fields', 'Please enter your email and password.');
-      return;
-    }
-
-    if (mode === 'register' && !name.trim()) {
-      Alert.alert('Missing fields', 'Please enter your name.');
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      Alert.alert(
+        'Missing fields',
+        'Please enter your name, email, and password.',
+      );
       return;
     }
 
     setLoading(true);
 
-    if (mode === 'login') {
-      const result = await login({ email: email.trim(), password });
-      setLoading(false);
+    const signupResult = await signup({
+      email: email.trim(),
+      name: name.trim(),
+      password,
+    });
 
-      if (result.success) {
-        await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.COMPLETED, 'true');
-        navigation.navigate(ROUTES.ONBOARDING.WELCOME);
-      } else {
-        Alert.alert('Login failed', result.error.message);
-      }
+    if (!signupResult.success) {
+      setLoading(false);
+      Alert.alert('Signup failed', signupResult.error.message);
+      return;
+    }
+
+    const loginResult = await login({email: email.trim(), password});
+    setLoading(false);
+
+    if (fromOnboarding) {
+      // In onboarding flow: navigate to notifications screen
+      navigation.navigate('OB11_Notifications');
     } else {
-      const result = await signup({
-        email: email.trim(),
-        name: name.trim(),
-        password,
-      });
-      setLoading(false);
-
-      if (result.success) {
-        const loginResult = await login({ email: email.trim(), password });
-        if (loginResult.success) {
-          await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.COMPLETED, 'true');
-          navigation.navigate(ROUTES.ONBOARDING.WELCOME);
-        } else {
-          Alert.alert(
-            'Account created',
-            'Please log in with your new credentials.',
-          );
-          setMode('login');
-        }
+      // Legacy: store onboarding complete and navigate to welcome
+      await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.COMPLETED, 'true');
+      if (loginResult.success) {
+        navigation.navigate('OB11_Notifications');
       } else {
-        Alert.alert('Signup failed', result.error.message);
+        Alert.alert(
+          'Account created',
+          'Your account was created. Please sign in from the login screen if needed.',
+        );
+        navigation.navigate('OB11_Notifications');
       }
     }
   };
 
+  const handleSkip = () => {
+    track('onboarding_signup_skipped');
+    setGuestMode(true);
+    navigation.navigate('OB12_Arrival');
+  };
+
+  // Heading text
+  const headingText = fromOnboarding
+    ? `Save ${storeFirstName}'s story.`
+    : 'Create your account';
+
   const renderInitial = () => (
     <View className="gap-5">
       <AuthButton
-        title="Continue with Google"
+        title="Sign up with Google"
         variant="google"
         onPress={handleGoogleAuth}
       />
       <AuthButton
-        title="Continue with Apple"
+        title="Sign up with Apple"
         variant="apple"
         onPress={handleAppleAuth}
       />
       <AuthButton
-        title="Continue with Email"
+        title="Sign up with Email"
         variant="email"
-        onPress={() => setMode('login')}
+        onPress={() => setShowEmailForm(true)}
       />
     </View>
   );
 
   const renderForm = () => (
     <View className="gap-5">
-      {mode === 'register' && (
-        <TextInput
-          className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)] bg-[#241D16] px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
-          placeholder="Your name"
-          placeholderTextColor={COLORS.textTertiary}
-          value={name}
-          onChangeText={setName}
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
-      )}
       <TextInput
-        className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)] bg-[#241D16] px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
+        className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
+        placeholder="Your name"
+        placeholderTextColor={COLORS.textTertiary}
+        value={name}
+        onChangeText={setName}
+        autoCapitalize="words"
+        autoCorrect={false}
+      />
+      <TextInput
+        className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
         placeholder="Email"
         placeholderTextColor={COLORS.textTertiary}
         value={email}
@@ -144,7 +154,7 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
         autoCorrect={false}
       />
       <TextInput
-        className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)] bg-[#241D16] px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
+        className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
         placeholder="Password"
         placeholderTextColor={COLORS.textTertiary}
         value={password}
@@ -156,24 +166,18 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
         <View className="h-14 flex-row items-center justify-center gap-3">
           <ActivityIndicator color={COLORS.amber} size="small" />
           <Text className="font-['MontserratAlternates-Regular'] text-sm text-[#B8AF9E]">
-            {mode === 'login' ? 'Signing in...' : 'Creating account...'}
+            Creating account...
           </Text>
         </View>
       ) : (
-        <AmberButton
-          title={mode === 'login' ? 'Sign In' : 'Create Account'}
-          onPress={handleSubmit}
-        />
+        <AmberButton title="Create Account" onPress={handleSubmit} />
       )}
 
       <TouchableOpacity
-        onPress={() => setMode(mode === 'login' ? 'register' : 'login')}
-        className="items-center py-2"
-      >
-        <Text className="font-['MontserratAlternates-Medium'] text-sm text-[#D4860A]">
-          {mode === 'login'
-            ? "Don't have an account? Sign up"
-            : 'Already have an account? Sign in'}
+        onPress={() => setShowEmailForm(false)}
+        className="mt-2 items-center">
+        <Text className="font-['MontserratAlternates-Medium'] text-sm text-[#8F8576]">
+          Back to options
         </Text>
       </TouchableOpacity>
     </View>
@@ -183,8 +187,7 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
     <AuthLiquidBackground>
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <StatusBar
           barStyle="light-content"
           translucent
@@ -193,24 +196,37 @@ const SignupScreen: React.FC<Props> = ({ navigation }) => {
 
         <ScrollView
           contentContainerStyle={scrollContentStyle}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View className="mb-10">
-            <Text className="mb-2 font-['MontserratAlternates-Bold'] text-[36px] leading-[44px] text-[#F5E9D8]">
-              {mode === 'register' ? 'Create your account.' : 'Welcome back.'}
+          keyboardShouldPersistTaps="handled">
+          <View className="mb-16 items-center">
+            <Image
+              source={require('../../assets/images/logo-white.png')}
+              className="size-20 my-5"
+            />
+            <Text className="font-['MontserratAlternates-Regular'] text-[18px] text-[#B8AF9E]">
+              {headingText}
             </Text>
-            {mode === 'initial' && (
-              <Text className="font-['MontserratAlternates-Regular'] text-[18px] text-[#B8AF9E]">
-                Save your story. Keep exploring.
+            {fromOnboarding && (
+              <Text className="mt-2 font-['MontserratAlternates-Regular'] text-sm text-[#8C93A0]">
+                Create a free account to keep your ancestor.
               </Text>
             )}
           </View>
 
-          {mode === 'initial' ? renderInitial() : renderForm()}
+          {!showEmailForm ? renderInitial() : renderForm()}
+
+          {fromOnboarding && (
+            <Text className="mt-4 text-center font-['MontserratAlternates-Regular'] text-[11px] text-[#8C93A0]">
+              Takes 10 seconds. No spam. Your data is never sold.
+            </Text>
+          )}
 
           <Text className="mb-8 mt-10 text-center font-['MontserratAlternates-Regular'] text-xs text-[#6B6357]">
             By continuing, you agree to our Terms & Privacy Policy
           </Text>
+
+          {fromOnboarding && (
+            <OBSkipLink label="Skip for now" onPress={handleSkip} />
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </AuthLiquidBackground>
