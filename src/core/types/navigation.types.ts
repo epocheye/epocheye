@@ -49,6 +49,7 @@ export type OnboardingStackParamList = {
  */
 export type MainStackParamList = {
   MainTabs: undefined;
+  Lens: undefined;
   SiteDetail: { site: PlaceNavParam };
   ARExperience: { site: PlaceNavParam };
   Permissions: undefined;

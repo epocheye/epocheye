@@ -5,6 +5,7 @@
  */
 
 import {BACKEND_URL} from '../constants/onboarding';
+import {createSSEStream} from './sseStreamService';
 
 interface StreamParams {
   firstName: string;
@@ -29,7 +30,6 @@ export function streamAncestorStory({
 }: StreamParams): () => void {
   let hasErrored = false;
   let hasDone = false;
-  let lastProcessedIndex = 0;
 
   const safeOnError = () => {
     if (hasErrored || hasDone) {
@@ -40,18 +40,7 @@ export function streamAncestorStory({
     onError();
   };
 
-  const handleMessage = (rawData: string) => {
-    let payload: unknown;
-    try {
-      payload = JSON.parse(rawData);
-    } catch {
-      return;
-    }
-
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      return;
-    }
-
+  const handleMessage = (payload: Record<string, unknown>) => {
     const message = payload as {
       type?: string;
       text?: string;
@@ -75,70 +64,15 @@ export function streamAncestorStory({
     }
   };
 
-  const processBuffer = (text: string) => {
-    const newText = text.slice(lastProcessedIndex);
-    lastProcessedIndex = text.length;
-
-    const lines = newText.split('\n');
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('data:')) {
-        const data = trimmed.replace(/^data:\s?/, '');
-        handleMessage(data);
-      }
-    }
-  };
-
-  const xhr = new XMLHttpRequest();
-  xhr.open('POST', `${BACKEND_URL}/api/onboarding/ancestor-story`);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-
-  xhr.onprogress = () => {
-    try {
-      processBuffer(xhr.responseText);
-    } catch {
-      // Partial response — will retry on next progress event
-    }
-  };
-
-  xhr.onload = () => {
-    // Non-2xx responses (404, 500, etc.) must trigger fallback
-    if (xhr.status < 200 || xhr.status >= 300) {
-      console.log('[AncestorStory] HTTP', xhr.status, '— falling back to local story');
-      safeOnError();
-      return;
-    }
-
-    try {
-      processBuffer(xhr.responseText);
-    } catch {
-      safeOnError();
-      return;
-    }
-
-    // If the response completed but no 'done' event arrived, treat as error
-    if (!hasDone && !hasErrored) {
-      console.log('[AncestorStory] No done event received — falling back to local story');
-      safeOnError();
-    }
-  };
-
-  xhr.onerror = () => {
-    console.log('[AncestorStory] Network error — falling back to local story');
-    safeOnError();
-  };
-
-  xhr.ontimeout = () => {
-    console.log('[AncestorStory] Timeout — falling back to local story');
-    safeOnError();
-  };
-
-  xhr.timeout = 30000;
-  xhr.send(
-    JSON.stringify({firstName, regions, motivation, visitFrequency, goal}),
-  );
+  const abort = createSSEStream({
+    url: `${BACKEND_URL}/api/onboarding/ancestor-story`,
+    body: {firstName, regions, motivation, visitFrequency, goal},
+    timeout: 30000,
+    onMessage: handleMessage,
+    onError: safeOnError,
+  });
 
   return () => {
-    xhr.abort();
+    abort();
   };
 }

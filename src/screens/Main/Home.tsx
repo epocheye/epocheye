@@ -26,12 +26,15 @@ import {
   Sparkles,
   Compass,
   RefreshCw,
+  ScanEye,
 } from 'lucide-react-native';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import { usePermissionCheck } from '../../utils/usePermissionCheck';
 import { usePlaces } from '../../context';
 import { useUser } from '../../context';
 import type { TabScreenProps } from '../../core/types/navigation.types';
+import { ROUTES } from '../../core/constants';
 import type { Place } from '../../utils/api/places/types';
 import {
   getPersonalizedFacts,
@@ -235,6 +238,7 @@ const Home = ({ navigation }: Props) => {
   const [factLoadingLineIndex, setFactLoadingLineIndex] = useState(0);
   const entrance = useSharedValue(24);
   const contentOpacity = useSharedValue(0);
+  const lensFabScale = useSharedValue(1);
 
   useEffect(() => {
     entrance.value = withSpring(0, { damping: 20, stiffness: 200 });
@@ -245,6 +249,31 @@ const Home = ({ navigation }: Props) => {
     opacity: contentOpacity.value,
     transform: [{ translateY: entrance.value }],
   }));
+
+  const lensFabStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: lensFabScale.value }],
+  }));
+
+  const handleLensPressIn = () => {
+    lensFabScale.value = withSpring(0.92, { damping: 15, stiffness: 300 });
+  };
+
+  const handleLensPressOut = () => {
+    lensFabScale.value = withSpring(1, { damping: 15, stiffness: 300 });
+  };
+
+  const handleOpenLens = useCallback(() => {
+    try {
+      ReactNativeHapticFeedback.trigger('impactMedium', {
+        enableVibrateFallback: true,
+        ignoreAndroidSystemSettings: false,
+      });
+    } catch {
+      // Haptics are best-effort.
+    }
+
+    navigation.navigate(ROUTES.MAIN.LENS);
+  }, [navigation]);
 
   // Greeting changes based on time of day and is recalculated only once per
   // mount (the hour won't change while the user reads the screen)
@@ -588,6 +617,19 @@ const Home = ({ navigation }: Props) => {
             </View>
           )}
         </Animated.View>
+
+        <AnimatedTouchable
+          style={[styles.lensFab, lensFabStyle]}
+          onPress={handleOpenLens}
+          onPressIn={handleLensPressIn}
+          onPressOut={handleLensPressOut}
+          activeOpacity={0.9}
+          accessibilityRole="button"
+          accessibilityLabel="Open Lens"
+          accessibilityHint="Opens the Lens camera to detect nearby monuments"
+        >
+          <ScanEye color="#0A0A0A" size={24} />
+        </AnimatedTouchable>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -974,6 +1016,19 @@ const styles = {
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     fontFamily: 'MontserratAlternates-SemiBold',
+  },
+  lensFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 88,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E8A020',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(10,10,10,0.2)',
   },
 };
 

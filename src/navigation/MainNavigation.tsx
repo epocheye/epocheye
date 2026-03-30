@@ -4,6 +4,7 @@ import TabNavigation from './TabNavigation';
 import Permissions from '../screens/Main/PermissionsScreen';
 import SiteDetailScreen from '../screens/Main/SiteDetailScreen';
 import ARExperienceScreen from '../screens/Main/ARExperienceScreen';
+import LensScreen from '../screens/Lens/LensScreen';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
 
@@ -41,6 +42,14 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         component={SiteDetailScreen}
         options={{
           animation: 'slide_from_right',
+        }}
+      />
+      <Stack.Screen
+        name={ROUTES.MAIN.LENS}
+        component={LensScreen}
+        options={{
+          animation: 'fade',
+          presentation: 'fullScreenModal',
         }}
       />
       <Stack.Screen
