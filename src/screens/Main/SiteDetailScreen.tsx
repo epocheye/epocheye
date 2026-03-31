@@ -196,7 +196,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     };
   });
 
-  const handleToggleSave = async () => {
+  const handleToggleSave = useCallback(async () => {
     if (isSaving) {
       return;
     }
@@ -222,19 +222,19 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [isSaving, site, toggleSavePlace]);
 
   const handleStartARExperience = useCallback(() => {
     navigation.navigate('ARExperience', { site });
   }, [navigation, site]);
 
-  const handleImageScroll = (
-    event: NativeSyntheticEvent<NativeScrollEvent>,
-  ) => {
-    const offset = event.nativeEvent.contentOffset.x;
-    const index = Math.round(offset / SCREEN_WIDTH);
-    setCurrentImageIndex(index);
-  };
+  const handleImageScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offset = event.nativeEvent.contentOffset.x;
+      setCurrentImageIndex(Math.round(offset / SCREEN_WIDTH));
+    },
+    [],
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

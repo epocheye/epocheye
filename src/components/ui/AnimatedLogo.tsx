@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Image, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
@@ -9,6 +9,9 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+
+import LogoWhite from '../../assets/images/logo-white.svg';
+import LogoBlack from '../../assets/images/logo-black.svg';
 
 type LogoVariant = 'white' | 'black';
 type LogoMotion = 'pulse' | 'orbit' | 'drift';
@@ -20,9 +23,6 @@ interface AnimatedLogoProps {
   showRing?: boolean;
   style?: StyleProp<ViewStyle>;
 }
-
-const LOGO_WHITE = require('../../assets/images/logo-white.png');
-const LOGO_BLACK = require('../../assets/images/logo-black.png');
 
 const AnimatedLogo: React.FC<AnimatedLogoProps> = ({
   variant = 'white',
@@ -100,6 +100,8 @@ const AnimatedLogo: React.FC<AnimatedLogoProps> = ({
       ? 'rgba(245, 240, 232, 0.34)'
       : 'rgba(12, 12, 12, 0.34)';
 
+  const LogoComponent = variant === 'black' ? LogoBlack : LogoWhite;
+
   return (
     <View style={[styles.wrapper, { width: size, height: size }, style]}>
       {showRing && (
@@ -116,11 +118,7 @@ const AnimatedLogo: React.FC<AnimatedLogoProps> = ({
         />
       )}
       <Animated.View style={logoStyle}>
-        <Image
-          source={variant === 'black' ? LOGO_BLACK : LOGO_WHITE}
-          style={{ width: size, height: size }}
-          resizeMode="contain"
-        />
+        <LogoComponent width={size} height={size} />
       </Animated.View>
     </View>
   );

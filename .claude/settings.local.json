@@ -4,7 +4,12 @@
       "Bash(npm install:*)",
       "Bash(ls src/components/onboarding/OB*.tsx)",
       "Bash(ls src/constants/onboarding.ts src/stores/onboardingStore.ts src/services/*.ts)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(ls -lh /e/epocheye/src/assets/images/logo-*.svg)",
+      "Bash(file /e/epocheye/src/assets/images/logo-*.svg)",
+      "Bash(grep -r className= /e/epocheye/src/screens/Main/ --include=*.tsx)",
+      "Bash(grep -r style={styles. /e/epocheye/src/screens/Main/ --include=*.tsx)",
+      "Bash(ls:*)"
     ]
   }
 }

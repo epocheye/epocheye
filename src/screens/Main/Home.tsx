@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   FlatList,
   ImageBackground,
+  ScrollView,
 } from 'react-native';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +31,7 @@ import {
 } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
+import ThinkingDots from '../../components/ui/ThinkingDots';
 import { usePermissionCheck } from '../../utils/usePermissionCheck';
 import { usePlaces } from '../../context';
 import { useUser } from '../../context';
@@ -43,13 +45,13 @@ import {
 import type { PersonalizedFact } from '../../utils/api/user';
 
 const FACT_LOADING_LINES = [
-  'Gemini is tailoring facts to your journey...',
-  'Cross-referencing your profile with heritage context...',
-  'Preparing expandable insights you can explore...',
+  'Tracing your heritage...',
+  'Weaving nearby context...',
+  'Preparing your insights...',
+  'Connecting the threads...',
+  'Reading the monuments...',
 ];
 
-// Map a place's first category to a relevant stock image on Unsplash.
-// This is a temporary measure until the backend supplies its own images.
 const CATEGORY_IMAGE_MAP: Record<string, string> = {
   temple:
     'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80',
@@ -62,7 +64,6 @@ const CATEGORY_IMAGE_MAP: Record<string, string> = {
 const FALLBACK_PLACE_IMAGE =
   'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80';
 
-/** Returns a representative image URI for a place based on its categories. */
 function getPlaceImage(categories: string[]): string {
   const first = categories[0]?.toLowerCase() ?? '';
   for (const [keyword, uri] of Object.entries(CATEGORY_IMAGE_MAP)) {
@@ -87,7 +88,7 @@ function buildFallbackFacts(
       headline: 'Your route holds hidden layers',
       summary: `${userName}, ${nearestName} is linked to lesser-known ${firstCategory.toLowerCase()} traditions that shifted over generations.`,
       detail:
-        'Gemini could not be reached right now, so this is a local backup insight. Tap refresh shortly to fetch a live personalized expansion.',
+        `${nearestName} carries traces of daily rituals and civic memory that most visitors walk past. Look closely at the layout and ornament — the stories are already there.`,
     },
     {
       id: 'fallback-2',
@@ -95,7 +96,7 @@ function buildFallbackFacts(
       summary:
         'Many preserved sites encode daily rituals, trade patterns, and migration stories in plain sight through layout and ornament.',
       detail:
-        'When Gemini is available, this fact will expand with region-specific context based on your nearby places and profile history.',
+        'The placement of doorways, the height of columns, the orientation of courtyards — each was a deliberate choice that reflected the values and relationships of its builders.',
     },
     {
       id: 'fallback-3',
@@ -103,7 +104,7 @@ function buildFallbackFacts(
       summary:
         'Historical sites were active civic hubs, not static relics; ceremonies, decisions, and storytelling happened there regularly.',
       detail:
-        'Use refresh to generate a deeper personalized thread that connects this pattern to places around you right now.',
+        'Pull up any of the nearby sites and you can start to trace those threads — the overlapping eras, the repurposed walls, the names that stuck even as the original meaning faded.',
     },
   ];
 }
@@ -137,7 +138,7 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, onPress }) => {
 
   return (
     <AnimatedTouchable
-      style={[styles.placeCardContainer, animatedCardStyle]}
+      style={[cardStyles.container, animatedCardStyle]}
       onPress={() => onPress(place)}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
@@ -148,35 +149,48 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, onPress }) => {
     >
       <ImageBackground
         source={{ uri: imageUri }}
-        style={styles.placeImage}
-        imageStyle={styles.placeImageMask}
+        style={cardStyles.image}
+        imageStyle={cardStyles.imageMask}
       >
         <LinearGradient
           colors={['rgba(8,8,8,0.12)', 'rgba(8,8,8,0.88)']}
-          style={styles.placeGradient}
+          style={cardStyles.gradient}
         >
-          <View style={styles.distancePill}>
+          <View className="self-start flex-row items-center gap-1 rounded-full bg-[rgba(10,10,10,0.7)] border border-[rgba(201,168,76,0.35)] px-3 py-1.5">
             <Compass color="#C9A84C" size={14} />
-            <Text style={styles.distanceText}>{distanceKm} km away</Text>
+            <Text className="text-[#F5F0E8] text-xs leading-4 font-['MontserratAlternates-SemiBold']">
+              {distanceKm} km away
+            </Text>
           </View>
 
           <View>
-            <Text style={styles.placeTitle} numberOfLines={2}>
+            <Text
+              className="text-[#F5F0E8] text-2xl leading-8 font-['MontserratAlternates-Bold']"
+              numberOfLines={2}
+            >
               {place.name}
             </Text>
-            <View style={styles.placeLocationRow}>
+            <View className="flex-row items-center gap-1 mt-2">
               <MapPin color="#B8AF9E" size={15} />
-              <Text style={styles.placeLocationText} numberOfLines={1}>
+              <Text
+                className="text-[#B8AF9E] text-[13px] leading-[18px] font-['MontserratAlternates-Medium'] flex-shrink"
+                numberOfLines={1}
+              >
                 {place.city}, {place.country}
               </Text>
             </View>
 
-            <Text style={styles.placeDescription} numberOfLines={2}>
+            <Text
+              className="text-[#B8AF9E] text-sm leading-5 mt-3 font-['MontserratAlternates-Regular']"
+              numberOfLines={2}
+            >
               {shortDescription}
             </Text>
 
-            <View style={styles.explorePill}>
-              <Text style={styles.explorePillText}>Explore the Era</Text>
+            <View className="mt-4 self-start flex-row items-center gap-1 rounded-full bg-[#C9A84C] px-3 py-2">
+              <Text className="text-[#0A0A0A] text-xs leading-4 uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+                Explore the Era
+              </Text>
               <ArrowRight color="#0A0A0A" size={14} />
             </View>
           </View>
@@ -207,18 +221,17 @@ const SkeletonCard: React.FC = () => {
   }));
 
   return (
-    <Animated.View style={[styles.skeletonCard, animatedStyle]}>
-      <View style={styles.skeletonPill} />
-      <View style={styles.skeletonTitle} />
-      <View style={styles.skeletonLine} />
-      <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
-      <View style={styles.skeletonCta} />
+    <Animated.View style={[skeletonStyles.card, animatedStyle]}>
+      <View style={skeletonStyles.pill} />
+      <View style={skeletonStyles.title} />
+      <View style={skeletonStyles.line} />
+      <View style={[skeletonStyles.line, skeletonStyles.lineShort]} />
+      <View style={skeletonStyles.cta} />
     </Animated.View>
   );
 };
 
 const Home = ({ navigation }: Props) => {
-  // Trigger a permission check whenever this screen is active
   usePermissionCheck();
 
   const { nearbyPlaces, isLoadingNearby, nearbyError } = usePlaces();
@@ -229,13 +242,9 @@ const Home = ({ navigation }: Props) => {
   const [factsError, setFactsError] = useState<string | null>(null);
   const [facts, setFacts] = useState<PersonalizedFact[]>([]);
   const [activeFactId, setActiveFactId] = useState<string | null>(null);
-  const [elaboratingFactId, setElaboratingFactId] = useState<string | null>(
-    null,
-  );
-  const [factDetailsById, setFactDetailsById] = useState<
-    Record<string, string>
-  >({});
-  const [factLoadingLineIndex, setFactLoadingLineIndex] = useState(0);
+  const [elaboratingFactId, setElaboratingFactId] = useState<string | null>(null);
+  const [factDetailsById, setFactDetailsById] = useState<Record<string, string>>({});
+
   const entrance = useSharedValue(24);
   const contentOpacity = useSharedValue(0);
   const lensFabScale = useSharedValue(1);
@@ -271,12 +280,9 @@ const Home = ({ navigation }: Props) => {
     } catch {
       // Haptics are best-effort.
     }
-
     navigation.navigate(ROUTES.MAIN.LENS);
   }, [navigation]);
 
-  // Greeting changes based on time of day and is recalculated only once per
-  // mount (the hour won't change while the user reads the screen)
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -290,9 +296,6 @@ const Home = ({ navigation }: Props) => {
     [nearbyPlaces],
   );
 
-  // Build the SiteDetail navigation param from a Place API object.
-  // All fields the SiteDetail screen needs are derived here so the screen
-  // itself never has to reach back into the raw API shape.
   const handleVisitPlace = useCallback(
     (place: Place) => {
       const siteData = {
@@ -304,7 +307,6 @@ const Home = ({ navigation }: Props) => {
         yearBuilt: 'Unknown',
         distance: `${(place.distance_meters / 1000).toFixed(1)} km`,
         estimatedTime: '45 min',
-        // Placeholder hero images until the backend provides its own CDN URLs
         heroImages: [getPlaceImage(place.categories)],
         shortDescription: `Explore ${place.name} located at ${place.formatted}.`,
         fullDescription: `${place.name} is a historic site located at ${place.formatted}. Discover its rich history and cultural significance.`,
@@ -322,7 +324,6 @@ const Home = ({ navigation }: Props) => {
         city: place.city,
         country: place.country,
       };
-
       navigation.navigate('SiteDetail', { site: siteData });
     },
     [navigation],
@@ -350,8 +351,8 @@ const Home = ({ navigation }: Props) => {
     setFacts(buildFallbackFacts(userName, topNearbyPlaces));
     setFactsError(
       result.success
-        ? 'No personalized Gemini facts were returned yet. Showing curated fallback insights.'
-        : 'Gemini is currently unavailable. Showing curated fallback insights.',
+        ? 'Showing curated insights for now.'
+        : 'Showing curated insights for your area.',
     );
     setFactDetailsById({});
     setActiveFactId(null);
@@ -361,18 +362,6 @@ const Home = ({ navigation }: Props) => {
   useEffect(() => {
     loadPersonalizedFacts();
   }, [loadPersonalizedFacts]);
-
-  useEffect(() => {
-    if (!isLoadingFacts) {
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setFactLoadingLineIndex(prev => (prev + 1) % FACT_LOADING_LINES.length);
-    }, 1700);
-
-    return () => clearInterval(timer);
-  }, [isLoadingFacts]);
 
   const handleFactPress = useCallback(
     async (fact: PersonalizedFact) => {
@@ -387,10 +376,7 @@ const Home = ({ navigation }: Props) => {
       const existingDetail = factDetailsById[fact.id] ?? fact.detail;
       if (existingDetail) {
         if (!factDetailsById[fact.id]) {
-          setFactDetailsById(prev => ({
-            ...prev,
-            [fact.id]: existingDetail,
-          }));
+          setFactDetailsById(prev => ({ ...prev, [fact.id]: existingDetail }));
         }
         return;
       }
@@ -406,16 +392,13 @@ const Home = ({ navigation }: Props) => {
       setElaboratingFactId(null);
 
       if (result.success) {
-        setFactDetailsById(prev => ({
-          ...prev,
-          [fact.id]: result.data.detail,
-        }));
+        setFactDetailsById(prev => ({ ...prev, [fact.id]: result.data.detail }));
         return;
       }
 
       setFactDetailsById(prev => ({
         ...prev,
-        [fact.id]: `${fact.summary} This likely connects to ${
+        [fact.id]: `${fact.summary} This connects to ${
           topNearbyPlaces[0]?.name ?? 'nearby heritage sites'
         } through shared routes, ritual patterns, and artisan exchange across generations.`,
       }));
@@ -431,195 +414,209 @@ const Home = ({ navigation }: Props) => {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView className="flex-1 bg-[#0A0A0A]">
       <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={['#0A0A0A', '#12100D', '#0A0A0A']}
         locations={[0, 0.5, 1]}
-        style={styles.gradient}
+        style={{ flex: 1 }}
       >
-        <Animated.View style={[styles.content, entranceStyle]}>
-          <View style={styles.topRow} accessibilityRole="header">
-            <View style={styles.greetingWrap}>
-              <Text style={styles.greetingLabel}>{greeting}</Text>
-              <Text style={styles.userName}>{userName}</Text>
-              <Text style={styles.subtitle}>
-                Ready to uncover history today?
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.iconButton}
-              accessibilityRole="button"
-              accessibilityLabel="Notifications"
-              accessibilityHint="Opens your notification centre"
+        <Animated.View style={[{ flex: 1 }, entranceStyle]}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 120 }}
+          >
+            {/* Header */}
+            <View
+              className="flex-row items-center justify-between mb-6"
+              accessibilityRole="header"
             >
-              <Bell color="#F5F0E8" size={20} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <Sparkles color="#C9A84C" size={18} />
-              <Text style={styles.sectionTitle}>Nearby Highlights</Text>
-            </View>
-            <Text style={styles.sectionSubtitle}>
-              Curated sites around your location
-            </Text>
-            {nearbyError && <Text style={styles.errorText}>{nearbyError}</Text>}
-          </View>
-
-          {isLoadingNearby ? (
-            <View style={styles.skeletonRow}>
-              <SkeletonCard />
-              <SkeletonCard />
-            </View>
-          ) : topNearbyPlaces.length === 0 ? (
-            <View style={styles.emptyStateCard}>
-              <MapPin color="#C9A84C" size={36} />
-              <Text style={styles.emptyStateTitle}>
-                No monuments discovered nearby yet
-              </Text>
-              <Text style={styles.emptyStateBody}>
-                Try moving to a nearby heritage district or check location
-                permissions.
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              horizontal
-              data={topNearbyPlaces}
-              renderItem={renderPlaceItem}
-              keyExtractor={item => item.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.placeListContent}
-            />
-          )}
-
-          {factsVisible && (
-            <View style={styles.factCard}>
-              <View style={styles.factHeaderRow}>
-                <Text style={styles.factHeading}>Gemini Facts For You</Text>
-                <TouchableOpacity
-                  onPress={() => setFactsVisible(false)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Dismiss personalized facts"
-                >
-                  <X color="#6B6357" size={20} />
-                </TouchableOpacity>
+              <View className="flex-1 pr-4">
+                <Text className="text-[#B8AF9E] text-xs uppercase tracking-[1px] font-['MontserratAlternates-SemiBold']">
+                  {greeting}
+                </Text>
+                <Text className="text-[#F5F0E8] text-[32px] leading-10 font-['MontserratAlternates-Bold'] mt-1">
+                  {userName}
+                </Text>
+                <Text className="text-[#B8AF9E] text-[15px] leading-[22px] font-['MontserratAlternates-Medium'] mt-1">
+                  Ready to uncover history today?
+                </Text>
               </View>
+              <TouchableOpacity
+                className="w-11 h-11 rounded-full bg-[#1C1C1C] border border-[rgba(201,168,76,0.3)] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Notifications"
+                accessibilityHint="Opens your notification centre"
+              >
+                <Bell color="#F5F0E8" size={20} />
+              </TouchableOpacity>
+            </View>
 
-              {isLoadingFacts ? (
-                <View style={styles.factLoadingWrap}>
-                  <AnimatedLogo size={58} motion="orbit" variant="white" />
-                  <Text style={styles.factLoadingText}>
-                    {FACT_LOADING_LINES[factLoadingLineIndex]}
+            {/* Nearby Highlights */}
+            <View className="mb-4">
+              <View className="flex-row items-center gap-2">
+                <Sparkles color="#C9A84C" size={18} />
+                <Text className="text-[#F5F0E8] text-[22px] leading-[30px] font-['MontserratAlternates-SemiBold']">
+                  Nearby Highlights
+                </Text>
+              </View>
+              <Text className="text-[#6B6357] text-[13px] leading-[18px] font-['MontserratAlternates-Regular'] mt-1">
+                Curated sites around your location
+              </Text>
+              {nearbyError ? (
+                <Text className="text-[#E05C5C] text-[13px] leading-[18px] font-['MontserratAlternates-Medium'] mt-2">
+                  {nearbyError}
+                </Text>
+              ) : null}
+            </View>
+
+            {isLoadingNearby ? (
+              <View className="flex-row gap-3 mb-4">
+                <SkeletonCard />
+                <SkeletonCard />
+              </View>
+            ) : topNearbyPlaces.length === 0 ? (
+              <View className="mb-4 rounded-[20px] bg-[#141414] border border-[rgba(255,255,255,0.08)] py-7 px-5 items-center justify-center gap-2">
+                <MapPin color="#C9A84C" size={36} />
+                <Text className="text-[#F5F0E8] text-lg leading-6 text-center font-['MontserratAlternates-SemiBold']">
+                  No monuments discovered nearby yet
+                </Text>
+                <Text className="text-[#B8AF9E] text-sm leading-5 text-center font-['MontserratAlternates-Regular']">
+                  Try moving to a nearby heritage district or check location
+                  permissions.
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                horizontal
+                data={topNearbyPlaces}
+                renderItem={renderPlaceItem}
+                keyExtractor={item => item.id}
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled
+                contentContainerStyle={{ paddingRight: 8, paddingBottom: 8 }}
+              />
+            )}
+
+            {/* Insights card */}
+            {factsVisible && (
+              <View className="mt-6 mb-3 rounded-[20px] bg-[#141414] border border-[rgba(201,168,76,0.3)] p-5">
+                <View className="flex-row items-center justify-between mb-2.5">
+                  <Text className="text-[#F5F0E8] text-lg leading-6 font-['MontserratAlternates-SemiBold']">
+                    Insights For You
                   </Text>
-                  <Text style={styles.factLoadingSubtext}>
-                    Preparing expandable details you can tap into.
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.factListWrap}>
-                  {factsError ? (
-                    <Text style={styles.factErrorText}>{factsError}</Text>
-                  ) : null}
-
-                  {facts.map((fact, index) => {
-                    const isExpanded = activeFactId === fact.id;
-                    const isElaborating = elaboratingFactId === fact.id;
-                    const detailText = factDetailsById[fact.id] ?? fact.detail;
-
-                    return (
-                      <TouchableOpacity
-                        key={fact.id}
-                        style={styles.factItem}
-                        onPress={() => {
-                          handleFactPress(fact).catch(() => {
-                            setFactDetailsById(prev => ({
-                              ...prev,
-                              [fact.id]: `${
-                                fact.summary
-                              } This likely connects to ${
-                                topNearbyPlaces[0]?.name ??
-                                'nearby heritage sites'
-                              } through shared routes, ritual patterns, and artisan exchange across generations.`,
-                            }));
-                          });
-                        }}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Open fact ${index + 1}`}
-                        accessibilityHint="Shows detailed explanation for this personalized fact"
-                      >
-                        <View style={styles.factItemHeader}>
-                          <View style={styles.factIndexBadge}>
-                            <Text style={styles.factIndexText}>
-                              {index + 1}
-                            </Text>
-                          </View>
-                          <View style={styles.factItemHeadingWrap}>
-                            <Text style={styles.factItemHeading}>
-                              {fact.headline}
-                            </Text>
-                            <Text style={styles.factItemSummary}>
-                              {fact.summary}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {isExpanded ? (
-                          <View style={styles.factExpandedWrap}>
-                            {isElaborating ? (
-                              <View style={styles.factElaboratingRow}>
-                                <AnimatedLogo
-                                  size={20}
-                                  motion="pulse"
-                                  variant="white"
-                                  showRing={false}
-                                />
-                                <Text style={styles.factElaboratingText}>
-                                  Gemini is elaborating this insight...
-                                </Text>
-                              </View>
-                            ) : detailText ? (
-                              <Text style={styles.factExpandedText}>
-                                {detailText}
-                              </Text>
-                            ) : null}
-                          </View>
-                        ) : null}
-
-                        <Text style={styles.factTapHint}>
-                          {isExpanded ? 'Tap to collapse' : 'Tap to elaborate'}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-
                   <TouchableOpacity
-                    onPress={() => {
-                      loadPersonalizedFacts().catch(() => {
-                        setFacts(buildFallbackFacts(userName, topNearbyPlaces));
-                        setFactsError(
-                          'Gemini is currently unavailable. Showing curated fallback insights.',
-                        );
-                        setIsLoadingFacts(false);
-                      });
-                    }}
-                    style={styles.factAction}
+                    onPress={() => setFactsVisible(false)}
                     accessibilityRole="button"
-                    accessibilityLabel="Refresh personalized facts"
+                    accessibilityLabel="Dismiss insights"
                   >
-                    <Text style={styles.factActionText}>Refresh Facts</Text>
-                    <RefreshCw color="#C9A84C" size={16} />
+                    <X color="#6B6357" size={20} />
                   </TouchableOpacity>
                 </View>
-              )}
-            </View>
-          )}
+
+                {isLoadingFacts ? (
+                  <View className="items-center py-4 gap-4">
+                    <AnimatedLogo size={58} motion="orbit" variant="white" />
+                    <ThinkingDots messages={FACT_LOADING_LINES} />
+                    <Text className="text-[#B8AF9E] text-xs leading-[18px] text-center font-['MontserratAlternates-Regular']">
+                      Preparing expandable details you can tap into.
+                    </Text>
+                  </View>
+                ) : (
+                  <View className="gap-2.5 mt-1">
+                    {factsError ? (
+                      <Text className="text-[#8F8576] text-[11px] leading-4 mb-0.5 font-['MontserratAlternates-Regular']">
+                        {factsError}
+                      </Text>
+                    ) : null}
+
+                    {facts.map((fact, index) => {
+                      const isExpanded = activeFactId === fact.id;
+                      const isElaborating = elaboratingFactId === fact.id;
+                      const detailText = factDetailsById[fact.id] ?? fact.detail;
+
+                      return (
+                        <TouchableOpacity
+                          key={fact.id}
+                          className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-3"
+                          onPress={() => {
+                            handleFactPress(fact).catch(() => {
+                              setFactDetailsById(prev => ({
+                                ...prev,
+                                [fact.id]: `${fact.summary} This connects to ${
+                                  topNearbyPlaces[0]?.name ?? 'nearby heritage sites'
+                                } through shared routes, ritual patterns, and artisan exchange across generations.`,
+                              }));
+                            });
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Open insight ${index + 1}`}
+                          accessibilityHint="Shows a detailed explanation"
+                        >
+                          <View className="flex-row items-start gap-2.5">
+                            <View className="w-[22px] h-[22px] rounded-full bg-[rgba(201,168,76,0.2)] border border-[rgba(201,168,76,0.45)] items-center justify-center mt-0.5">
+                              <Text className="text-[#E8A33A] text-[11px] font-['MontserratAlternates-SemiBold']">
+                                {index + 1}
+                              </Text>
+                            </View>
+                            <View className="flex-1">
+                              <Text className="text-[#F5F0E8] text-sm leading-5 font-['MontserratAlternates-SemiBold']">
+                                {fact.headline}
+                              </Text>
+                              <Text className="text-[#B8AF9E] text-[13px] leading-[19px] mt-1 font-['MontserratAlternates-Regular']">
+                                {fact.summary}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {isExpanded ? (
+                            <View className="mt-2.5 pt-2.5 border-t border-[rgba(255,255,255,0.08)]">
+                              {isElaborating ? (
+                                <ThinkingDots
+                                  messages={['Expanding this insight...']}
+                                  color="#B8AF9E"
+                                />
+                              ) : detailText ? (
+                                <Text className="text-[#E6DFC7] text-[13px] leading-5 font-['MontserratAlternates-Regular']">
+                                  {detailText}
+                                </Text>
+                              ) : null}
+                            </View>
+                          ) : null}
+
+                          <Text className="mt-2 text-[#8C7F6B] text-[10px] leading-[14px] uppercase tracking-[0.7px] font-['MontserratAlternates-SemiBold']">
+                            {isExpanded ? 'Tap to collapse' : 'Tap to expand'}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        loadPersonalizedFacts().catch(() => {
+                          setFacts(buildFallbackFacts(userName, topNearbyPlaces));
+                          setFactsError('Showing curated insights for your area.');
+                          setIsLoadingFacts(false);
+                        });
+                      }}
+                      className="mt-2 flex-row items-center self-end gap-1"
+                      accessibilityRole="button"
+                      accessibilityLabel="Refresh insights"
+                    >
+                      <Text className="text-[#C9A84C] text-xs leading-4 uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+                        Refresh Insights
+                      </Text>
+                      <RefreshCw color="#C9A84C" size={16} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+          </ScrollView>
         </Animated.View>
 
         <AnimatedTouchable
-          style={[styles.lensFab, lensFabStyle]}
+          style={[fabStyle.fab, lensFabStyle]}
           onPress={handleOpenLens}
           onPressIn={handleLensPressIn}
           onPressOut={handleLensPressOut}
@@ -635,180 +632,31 @@ const Home = ({ navigation }: Props) => {
   );
 };
 
-const styles = {
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#0A0A0A',
-  },
-  gradient: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    paddingTop: 16,
-    paddingHorizontal: 20,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  greetingWrap: {
-    flex: 1,
-    paddingRight: 16,
-  },
-  greetingLabel: {
-    color: '#B8AF9E',
-    fontSize: 12,
-    fontFamily: 'MontserratAlternates-SemiBold',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  userName: {
-    color: '#F5F0E8',
-    fontSize: 32,
-    lineHeight: 40,
-    fontFamily: 'MontserratAlternates-Bold',
-    marginTop: 4,
-  },
-  subtitle: {
-    color: '#B8AF9E',
-    fontSize: 15,
-    lineHeight: 22,
-    fontFamily: 'MontserratAlternates-Medium',
-    marginTop: 4,
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    backgroundColor: '#1C1C1C',
-    borderWidth: 1,
-    borderColor: 'rgba(201, 168, 76, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionHeader: {
-    marginBottom: 16,
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sectionTitle: {
-    color: '#F5F0E8',
-    fontSize: 22,
-    lineHeight: 30,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  sectionSubtitle: {
-    color: '#6B6357',
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: 'MontserratAlternates-Regular',
-    marginTop: 4,
-  },
-  errorText: {
-    color: '#E05C5C',
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: 'MontserratAlternates-Medium',
-    marginTop: 8,
-  },
-  placeListContent: {
-    paddingRight: 8,
-    paddingBottom: 8,
-  },
-  placeCardContainer: {
+// Only styles that cannot be expressed as className (animated views, image masks, FAB position)
+const cardStyles = {
+  container: {
     width: 238,
     height: 292,
     marginRight: 16,
   },
-  placeImage: {
+  image: {
     flex: 1,
   },
-  placeImageMask: {
+  imageMask: {
     borderRadius: 20,
   },
-  placeGradient: {
+  gradient: {
     flex: 1,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     padding: 16,
-    justifyContent: 'space-between',
+    justifyContent: 'space-between' as const,
   },
-  distancePill: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(10,10,10,0.7)',
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.35)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  distanceText: {
-    color: '#F5F0E8',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  placeTitle: {
-    color: '#F5F0E8',
-    fontSize: 24,
-    lineHeight: 32,
-    fontFamily: 'MontserratAlternates-Bold',
-  },
-  placeLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-  },
-  placeLocationText: {
-    color: '#B8AF9E',
-    fontSize: 13,
-    lineHeight: 18,
-    flexShrink: 1,
-    fontFamily: 'MontserratAlternates-Medium',
-  },
-  placeDescription: {
-    color: '#B8AF9E',
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 12,
-    fontFamily: 'MontserratAlternates-Regular',
-  },
-  explorePill: {
-    marginTop: 16,
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: 999,
-    backgroundColor: '#C9A84C',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  explorePillText: {
-    color: '#0A0A0A',
-    fontSize: 12,
-    lineHeight: 16,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  skeletonRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  skeletonCard: {
+};
+
+const skeletonStyles = {
+  card: {
     width: 210,
     height: 248,
     borderRadius: 16,
@@ -816,217 +664,52 @@ const styles = {
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     padding: 16,
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-end' as const,
   },
-  skeletonPill: {
+  pill: {
     width: 86,
     height: 24,
     borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.1)',
     marginBottom: 12,
   },
-  skeletonTitle: {
-    width: '75%',
+  title: {
+    width: '75%' as const,
     height: 28,
     borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.14)',
     marginBottom: 8,
   },
-  skeletonLine: {
-    width: '100%',
+  line: {
+    width: '100%' as const,
     height: 14,
     borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.12)',
     marginBottom: 8,
   },
-  skeletonLineShort: {
-    width: '64%',
+  lineShort: {
+    width: '64%' as const,
   },
-  skeletonCta: {
+  cta: {
     marginTop: 8,
     width: 124,
     height: 30,
     borderRadius: 999,
     backgroundColor: 'rgba(201,168,76,0.25)',
   },
-  emptyStateCard: {
-    marginBottom: 16,
-    borderRadius: 20,
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingVertical: 28,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  emptyStateTitle: {
-    color: '#F5F0E8',
-    fontSize: 18,
-    lineHeight: 24,
-    textAlign: 'center',
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  emptyStateBody: {
-    color: '#B8AF9E',
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-    fontFamily: 'MontserratAlternates-Regular',
-  },
-  factCard: {
-    marginTop: 24,
-    marginBottom: 12,
-    borderRadius: 20,
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: 'rgba(201, 168, 76, 0.3)',
-    padding: 20,
-  },
-  factHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  factHeading: {
-    color: '#F5F0E8',
-    fontSize: 18,
-    lineHeight: 24,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  factLoadingWrap: {
-    alignItems: 'center',
-    paddingVertical: 10,
-    gap: 8,
-  },
-  factLoadingText: {
-    color: '#E8A33A',
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  factLoadingSubtext: {
-    color: '#B8AF9E',
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center',
-    fontFamily: 'MontserratAlternates-Regular',
-  },
-  factListWrap: {
-    gap: 10,
-    marginTop: 4,
-  },
-  factErrorText: {
-    color: '#8F8576',
-    fontSize: 11,
-    lineHeight: 16,
-    marginBottom: 2,
-    fontFamily: 'MontserratAlternates-Regular',
-  },
-  factItem: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    padding: 12,
-  },
-  factItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  factIndexBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 999,
-    backgroundColor: 'rgba(201, 168, 76, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(201, 168, 76, 0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  factIndexText: {
-    color: '#E8A33A',
-    fontSize: 11,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  factItemHeadingWrap: {
-    flex: 1,
-  },
-  factItemHeading: {
-    color: '#F5F0E8',
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  factItemSummary: {
-    color: '#B8AF9E',
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 4,
-    fontFamily: 'MontserratAlternates-Regular',
-  },
-  factExpandedWrap: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-  },
-  factExpandedText: {
-    color: '#E6DFC7',
-    fontSize: 13,
-    lineHeight: 20,
-    fontFamily: 'MontserratAlternates-Regular',
-  },
-  factElaboratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  factElaboratingText: {
-    color: '#B8AF9E',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'MontserratAlternates-Regular',
-  },
-  factTapHint: {
-    marginTop: 8,
-    color: '#8C7F6B',
-    fontSize: 10,
-    lineHeight: 14,
-    textTransform: 'uppercase',
-    letterSpacing: 0.7,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  factAction: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    gap: 4,
-  },
-  factActionText: {
-    color: '#C9A84C',
-    fontSize: 12,
-    lineHeight: 16,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  lensFab: {
-    position: 'absolute',
+};
+
+const fabStyle = {
+  fab: {
+    position: 'absolute' as const,
     right: 20,
     bottom: 88,
     width: 56,
     height: 56,
     borderRadius: 28,
     backgroundColor: '#E8A020',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     borderWidth: 1,
     borderColor: 'rgba(10,10,10,0.2)',
   },
