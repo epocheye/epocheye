@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { ScanSearch } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
 import type { Place } from '../../../utils/api/places';
 import { FONTS } from '../../../core/constants/theme';
 
@@ -62,6 +63,14 @@ const BottomCard: React.FC<BottomCardProps> = ({
 
       {state === 'matched' && place ? (
         <View>
+          <ResolvedSubjectImage
+            subject={place.name}
+            context={`${place.city} ${place.country} lens match`}
+            style={styles.matchedVisual}
+            imageStyle={styles.matchedVisual}
+            loadingLabel="Loading monument visual..."
+          />
+
           <Text style={styles.placeName}>{place.name}</Text>
           <Text style={styles.placeSubline}>{formatPlaceSubline(place)}</Text>
           <Text style={styles.ancestorLine}>Your ancestor was here.</Text>
@@ -142,6 +151,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8C93A0',
     fontFamily: FONTS.regular,
+  },
+  matchedVisual: {
+    width: '100%',
+    height: 112,
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: '#1A1A1A',
   },
   placeName: {
     color: '#FFFFFF',

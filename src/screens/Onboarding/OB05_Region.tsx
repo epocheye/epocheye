@@ -1,6 +1,6 @@
 import React from 'react';
-import {View, Text, StyleSheet, StatusBar, Dimensions} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, StatusBar, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Mountain,
   Sun,
@@ -10,14 +10,15 @@ import {
   Star,
   Palmtree,
 } from 'lucide-react-native';
-import {OB_COLORS, OB_TYPOGRAPHY} from '../../constants/onboarding';
-import {FONTS} from '../../core/constants/theme';
-import {useOnboardingStore} from '../../stores/onboardingStore';
+import { OB_COLORS, OB_TYPOGRAPHY } from '../../constants/onboarding';
+import { FONTS } from '../../core/constants/theme';
+import { useOnboardingStore } from '../../stores/onboardingStore';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSelectionTile from '../../components/onboarding/OBSelectionTile';
-import {track} from '../../services/analytics';
-import type {OnboardingScreenProps} from '../../core/types/navigation.types';
+import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
+import { track } from '../../services/analytics';
+import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB05_Region'>;
 
@@ -25,19 +26,23 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const TILE_WIDTH = (SCREEN_WIDTH - 48 - 10) / 2;
 
 const REGIONS = [
-  {label: 'South Asia', Icon: Mountain},
-  {label: 'Africa', Icon: Sun},
-  {label: 'East Asia & Pacific', Icon: Flower2},
-  {label: 'Europe', Icon: Castle},
-  {label: 'Americas', Icon: TreePine},
-  {label: 'Middle East & Central Asia', Icon: Star},
-  {label: 'Southeast Asia', Icon: Palmtree},
+  { label: 'South Asia', Icon: Mountain },
+  { label: 'Africa', Icon: Sun },
+  { label: 'East Asia & Pacific', Icon: Flower2 },
+  { label: 'Europe', Icon: Castle },
+  { label: 'Americas', Icon: TreePine },
+  { label: 'Middle East & Central Asia', Icon: Star },
+  { label: 'Southeast Asia', Icon: Palmtree },
 ] as const;
 
-const OB05_Region: React.FC<Props> = ({navigation}) => {
-  const regions = useOnboardingStore((s) => s.regions);
-  const toggleRegion = useOnboardingStore((s) => s.toggleRegion);
+const OB05_Region: React.FC<Props> = ({ navigation }) => {
+  const regions = useOnboardingStore(s => s.regions);
+  const toggleRegion = useOnboardingStore(s => s.toggleRegion);
   const insets = useSafeAreaInsets();
+  const subject =
+    regions.length > 0
+      ? `${regions.slice(0, 2).join(' and ')} heritage monuments`
+      : 'World heritage regions and monuments';
 
   return (
     <View style={styles.container}>
@@ -48,7 +53,7 @@ const OB05_Region: React.FC<Props> = ({navigation}) => {
       />
       <OBProgressBar current={4} total={10} />
 
-      <View style={[styles.content, {paddingBottom: insets.bottom + 24}]}>
+      <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.header}>
           <Text style={[OB_TYPOGRAPHY.heading, styles.heading]}>
             Where does your lineage come from?
@@ -56,11 +61,19 @@ const OB05_Region: React.FC<Props> = ({navigation}) => {
           <Text style={OB_TYPOGRAPHY.sub}>Select all that apply.</Text>
         </View>
 
+        <View style={styles.visualWrap}>
+          <OnboardingResolvedVisual
+            subject={subject}
+            context="onboarding lineage region selection"
+            height={160}
+          />
+        </View>
+
         <View style={styles.tilesWrap}>
-          {REGIONS.map((r) => {
+          {REGIONS.map(r => {
             const selected = regions.includes(r.label);
             return (
-              <View key={r.label} style={{width: TILE_WIDTH}}>
+              <View key={r.label} style={{ width: TILE_WIDTH }}>
                 <OBSelectionTile
                   icon={
                     <r.Icon
@@ -89,7 +102,7 @@ const OB05_Region: React.FC<Props> = ({navigation}) => {
             label="This is my heritage →"
             disabled={regions.length === 0}
             onPress={() => {
-              track('onboarding_region_set', {regions});
+              track('onboarding_region_set', { regions });
               navigation.navigate('OB06_Name');
             }}
           />
@@ -120,6 +133,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     paddingHorizontal: 24,
+  },
+  visualWrap: {
+    paddingHorizontal: 24,
+    marginTop: 8,
   },
   preview: {
     color: '#8C93A0',

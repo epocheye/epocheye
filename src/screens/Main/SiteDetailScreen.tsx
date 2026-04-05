@@ -36,6 +36,8 @@ import {
   Bookmark,
 } from 'lucide-react-native';
 import { usePlaces } from '../../context';
+import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
+import { useResolvedSubjectImage } from '../../shared/hooks';
 import type {
   MainScreenProps,
   PlaceNavParam,
@@ -176,6 +178,23 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const { url: resolvedHeroImage } = useResolvedSubjectImage({
+    subject: site.name,
+    context: `${site.location} ${site.era} ${site.style}`,
+    enabled: !!site.name,
+  });
+  const heroImages = useMemo(() => {
+    const existing = site.heroImages;
+    if (!resolvedHeroImage) {
+      return existing;
+    }
+
+    if (existing.includes(resolvedHeroImage)) {
+      return existing;
+    }
+
+    return [resolvedHeroImage, ...existing];
+  }, [resolvedHeroImage, site.heroImages]);
 
   const scrollY = useSharedValue(0);
   const isSaved = isPlaceSaved(site.id);
@@ -260,7 +279,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={handleImageScroll}
           >
-            {site.heroImages.map((image, index) => (
+            {heroImages.map((image, index) => (
               <Image
                 key={`${image}-${index}`}
                 source={{ uri: image }}
@@ -331,7 +350,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
 
             <View style={styles.heroDots}>
-              {site.heroImages.map((_, index) => (
+              {heroImages.map((_, index) => (
                 <View
                   key={`dot-${index}`}
                   style={[
@@ -475,10 +494,13 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   style={styles.relatedCard}
                   activeOpacity={0.86}
                 >
-                  <Image
-                    source={{ uri: related.image }}
+                  <ResolvedSubjectImage
+                    subject={related.name}
+                    context={`${related.location} related heritage site`}
+                    fallbackUri={related.image}
                     style={styles.relatedImage}
-                    resizeMode="cover"
+                    imageStyle={styles.relatedImage}
+                    loadingLabel="Loading related site..."
                   />
                   <Text style={styles.relatedTitle} numberOfLines={1}>
                     {related.name}

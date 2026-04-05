@@ -18,8 +18,19 @@ export {
 } from './api';
 
 // Services
-export { StorageService, PermissionService } from './services';
-export type { PermissionResult, PermissionName } from './services';
+export {
+  StorageService,
+  PermissionService,
+  resolveSubjectImage,
+  getResolvedSubjectImageFromCache,
+  clearResolvedSubjectImageCache,
+} from './services';
+export type {
+  PermissionResult,
+  PermissionName,
+  ResolveSubjectImageParams,
+  ResolveSubjectImageResponse,
+} from './services';
 
 // Hooks
 export {
@@ -27,6 +38,7 @@ export {
   useAsync,
   useGeolocation,
   useMounted,
+  useResolvedSubjectImage,
 } from './hooks';
 export type {
   AsyncState,
@@ -34,6 +46,8 @@ export type {
   GeolocationOptions,
   GeolocationState,
   UseGeolocationReturn,
+  UseResolvedSubjectImageOptions,
+  UseResolvedSubjectImageResult,
 } from './hooks';
 
 // Utilities

@@ -1,28 +1,39 @@
 import React from 'react';
-import {View, Text, StyleSheet, StatusBar} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {Landmark, Globe, TreePine, BookOpen} from 'lucide-react-native';
-import {OB_COLORS, OB_TYPOGRAPHY} from '../../constants/onboarding';
-import {useOnboardingStore} from '../../stores/onboardingStore';
+import { View, Text, StyleSheet, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Landmark, Globe, TreePine, BookOpen } from 'lucide-react-native';
+import { OB_COLORS, OB_TYPOGRAPHY } from '../../constants/onboarding';
+import { useOnboardingStore } from '../../stores/onboardingStore';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSelectionTile from '../../components/onboarding/OBSelectionTile';
-import {track} from '../../services/analytics';
-import type {OnboardingScreenProps} from '../../core/types/navigation.types';
+import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
+import { track } from '../../services/analytics';
+import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB02_Motivation'>;
 
 const OPTIONS = [
-  {id: 'heritage_visitor', label: 'I visit heritage sites', Icon: Landmark},
-  {id: 'traveller', label: 'I love to travel', Icon: Globe},
-  {id: 'roots', label: 'I want to know my roots', Icon: TreePine},
-  {id: 'history_lover', label: 'I love history', Icon: BookOpen},
+  { id: 'heritage_visitor', label: 'I visit heritage sites', Icon: Landmark },
+  { id: 'traveller', label: 'I love to travel', Icon: Globe },
+  { id: 'roots', label: 'I want to know my roots', Icon: TreePine },
+  { id: 'history_lover', label: 'I love history', Icon: BookOpen },
 ] as const;
 
-const OB02_Motivation: React.FC<Props> = ({navigation}) => {
-  const motivation = useOnboardingStore((s) => s.motivation);
-  const setMotivation = useOnboardingStore((s) => s.setMotivation);
+const MOTIVATION_SUBJECTS: Record<(typeof OPTIONS)[number]['id'], string> = {
+  heritage_visitor: 'Traveler at a heritage monument',
+  traveller: 'Historic world travel landmarks',
+  roots: 'Ancestral family lineage portrait',
+  history_lover: 'Ancient manuscript and monuments',
+};
+
+const OB02_Motivation: React.FC<Props> = ({ navigation }) => {
+  const motivation = useOnboardingStore(s => s.motivation);
+  const setMotivation = useOnboardingStore(s => s.setMotivation);
   const insets = useSafeAreaInsets();
+  const subject = motivation
+    ? MOTIVATION_SUBJECTS[motivation]
+    : 'Heritage travel and ancestry discovery';
 
   return (
     <View style={styles.container}>
@@ -33,7 +44,7 @@ const OB02_Motivation: React.FC<Props> = ({navigation}) => {
       />
       <OBProgressBar current={1} total={10} />
 
-      <View style={[styles.content, {paddingBottom: insets.bottom + 24}]}>
+      <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.header}>
           <Text style={[OB_TYPOGRAPHY.heading, styles.heading]}>
             What brings you here?
@@ -43,8 +54,16 @@ const OB02_Motivation: React.FC<Props> = ({navigation}) => {
           </Text>
         </View>
 
+        <View style={styles.visualWrap}>
+          <OnboardingResolvedVisual
+            subject={subject}
+            context="onboarding motivation selection"
+            height={150}
+          />
+        </View>
+
         <View style={styles.grid}>
-          {OPTIONS.map((opt) => (
+          {OPTIONS.map(opt => (
             <OBSelectionTile
               key={opt.id}
               icon={
@@ -66,7 +85,7 @@ const OB02_Motivation: React.FC<Props> = ({navigation}) => {
             label="Continue →"
             disabled={!motivation}
             onPress={() => {
-              track('onboarding_motivation_set', {motivation});
+              track('onboarding_motivation_set', { motivation });
               navigation.navigate('OB03_Frequency');
             }}
           />
@@ -98,6 +117,10 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 24,
     justifyContent: 'center',
+  },
+  visualWrap: {
+    paddingHorizontal: 24,
+    marginTop: 8,
   },
   ctaWrap: {
     marginTop: 24,

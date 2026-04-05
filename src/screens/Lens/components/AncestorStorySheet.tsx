@@ -18,6 +18,7 @@ import {
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Landmark, Lock } from 'lucide-react-native';
 import { FONTS } from '../../../core/constants/theme';
+import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
 
 interface IdentifiedObject {
   name: string;
@@ -163,6 +164,14 @@ const AncestorStorySheet = forwardRef<
             YOUR ANCESTOR AT {monumentName.toUpperCase()}
           </Text>
 
+          <ResolvedSubjectImage
+            subject={monumentName}
+            context="lens ancestor story sheet"
+            style={styles.storyImage}
+            imageStyle={styles.storyImage}
+            loadingLabel="Loading monument visual..."
+          />
+
           {showObjectChip && identifiedObject ? (
             <Animated.View
               style={[styles.objectChip, { opacity: chipOpacity }]}
@@ -200,6 +209,7 @@ const AncestorStorySheet = forwardRef<
               <Lock size={16} color="#8C93A0" />
               <Text style={styles.lockedTitle}>AR Timeline · Coming Soon</Text>
             </View>
+            {/* TODO(video): Show a short historical timeline clip for this monument in this locked section. */}
             <Text style={styles.lockedBody}>
               Walk through centuries of this monument in augmented reality.
             </Text>
@@ -231,6 +241,13 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: 'uppercase',
     fontFamily: FONTS.medium,
+  },
+  storyImage: {
+    width: '100%',
+    height: 132,
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: '#1A1A1A',
   },
   objectChip: {
     alignSelf: 'flex-start',

@@ -5,7 +5,6 @@ import {
   View,
   FlatList,
   TouchableOpacity,
-  ImageBackground,
   Modal,
   LayoutAnimation,
   UIManager,
@@ -14,6 +13,7 @@ import {
 } from 'react-native';
 import { MapPin, Trash2, Play, X, Camera, Bookmark } from 'lucide-react-native';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
+import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import { usePlaces } from '../../context';
 import type { TabScreenProps } from '../../core/types/navigation.types';
 import type { SavedPlace, Place } from '../../utils/api/places/types';
@@ -166,10 +166,15 @@ const Saved = ({ navigation }: Props) => {
         accessibilityLabel={`Saved place: ${place.name}`}
         accessibilityHint="Opens place details"
       >
-        <ImageBackground
-          source={{ uri: imageUri }}
-          style={{ height: 190 }}
+        <ResolvedSubjectImage
+          subject={place.name}
+          context={`${place.city} ${place.country} ${place.categories.join(
+            ', ',
+          )}`}
+          fallbackUri={imageUri}
+          style={{ height: 190, borderRadius: 26 }}
           imageStyle={{ borderRadius: 26 }}
+          loadingLabel="Loading place visual..."
         >
           <View className="flex-1 justify-between bg-black/35 rounded-[26px] p-4">
             <View className="bg-white/20 rounded-full px-3 py-1 self-start">
@@ -198,7 +203,7 @@ const Saved = ({ navigation }: Props) => {
               </View>
             </View>
           </View>
-        </ImageBackground>
+        </ResolvedSubjectImage>
         <View className="flex-row items-center justify-between mt-3">
           <TouchableOpacity
             className="flex-row items-center bg-[#171722] rounded-full px-3 py-2"
@@ -382,11 +387,15 @@ const Saved = ({ navigation }: Props) => {
                     <X color="#7D7D8F" size={26} />
                   </TouchableOpacity>
                 </View>
-                <ImageBackground
-                  source={{
-                    uri: getPlaceImage(selectedPlace.place_data.categories),
-                  }}
+                <ResolvedSubjectImage
+                  subject={selectedPlace.place_data.name}
+                  context={`${selectedPlace.place_data.city} ${selectedPlace.place_data.country}`}
+                  fallbackUri={getPlaceImage(
+                    selectedPlace.place_data.categories,
+                  )}
                   style={{ height: 180, borderRadius: 24, overflow: 'hidden' }}
+                  imageStyle={{ borderRadius: 24 }}
+                  loadingLabel="Loading place visual..."
                 >
                   <View className="flex-1 bg-black/35 justify-end p-4">
                     <View className="flex-row items-center">
@@ -399,7 +408,7 @@ const Saved = ({ navigation }: Props) => {
                       </Text>
                     </View>
                   </View>
-                </ImageBackground>
+                </ResolvedSubjectImage>
                 <View className="mt-4">
                   <Text className="text-[#7E7E8F] text-xs font-montserrat-semibold uppercase mb-2">
                     Categories

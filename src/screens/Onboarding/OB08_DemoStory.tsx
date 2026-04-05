@@ -5,7 +5,6 @@ import {
   StyleSheet,
   StatusBar,
   ScrollView,
-  ImageBackground,
   Platform,
 } from 'react-native';
 import Animated, {
@@ -18,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OB_COLORS, OB_TYPOGRAPHY } from '../../constants/onboarding';
 import { FONTS, CDN_BASE } from '../../core/constants/theme';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
+import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { track } from '../../services/analytics';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
@@ -37,8 +37,6 @@ const MONUMENT_IMAGES: Record<string, string> = {
   'Angkor Wat': `${CDN_BASE}monuments/tamil.jpg`,
 };
 
-const DEFAULT_IMAGE = `${CDN_BASE}monuments/Konarka_Temple-2.jpg`;
-
 const STORY_WAIT_MESSAGES = [
   'Dusting off centuries of whispers...',
   'Matching your lineage with living monuments...',
@@ -56,7 +54,7 @@ const STORY_WAIT_STEPS = [
 ];
 
 const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
-  const { firstName, demoStory, demoMonument } = useOnboardingStore();
+  const { firstName, demoStory, demoMonument, regions } = useOnboardingStore();
   const insets = useSafeAreaInsets();
   const [isStreaming, setIsStreaming] = useState(true);
   const [showEndCard, setShowEndCard] = useState(false);
@@ -149,7 +147,14 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
   }, [showEndCard, cardOpacity]);
   const cardStyle = useAnimatedStyle(() => ({ opacity: cardOpacity.value }));
 
-  const monumentImage = MONUMENT_IMAGES[demoMonument] ?? DEFAULT_IMAGE;
+  const fallbackMonumentImage = demoMonument
+    ? MONUMENT_IMAGES[demoMonument]
+    : undefined;
+  const imageSubject =
+    demoMonument ||
+    (regions.length > 0
+      ? `${regions[0]} heritage monument`
+      : 'Historic monument and ancestry');
 
   return (
     <View style={styles.container}>
@@ -161,11 +166,19 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
       <OBProgressBar current={7} total={10} />
 
       {/* Monument image header */}
-      <ImageBackground
-        source={{ uri: monumentImage }}
-        style={styles.imageHeader}
-        resizeMode="cover"
-      >
+      <View style={styles.imageHeader}>
+        {/* TODO(video): Replace this still header with a subtle monument cinematic loop tied to the generated story. */}
+        <ResolvedSubjectImage
+          subject={imageSubject}
+          context={`onboarding demo story monument ${
+            demoMonument || 'generated'
+          }`}
+          fallbackUri={fallbackMonumentImage}
+          style={StyleSheet.absoluteFill}
+          imageStyle={styles.imageFill}
+          loadingLabel="Resolving monument visual..."
+          showSkeletonWhileLoading
+        />
         <LinearGradient
           colors={['transparent', 'rgba(13,13,13,0.9)']}
           style={styles.imageGradient}
@@ -176,7 +189,7 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
             </View>
           ) : null}
         </LinearGradient>
-      </ImageBackground>
+      </View>
 
       {/* Story content */}
       <View style={styles.storySection}>
@@ -251,6 +264,11 @@ const styles = StyleSheet.create({
   },
   imageHeader: {
     height: '38%',
+    backgroundColor: '#141414',
+  },
+  imageFill: {
+    width: '100%',
+    height: '100%',
   },
   imageGradient: {
     flex: 1,

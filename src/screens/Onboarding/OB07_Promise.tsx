@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OB_COLORS } from '../../constants/onboarding';
 import { FONTS } from '../../core/constants/theme';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
+import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { streamAncestorStory } from '../../services/ancestorStoryService';
 import { getFallbackStory } from '../../services/fallbackStories';
@@ -27,6 +28,10 @@ const OB07_Promise: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [showCta, setShowCta] = useState(false);
   const apiStarted = useRef(false);
+  const visualSubject =
+    regions.length > 0
+      ? `${firstName || 'Ancestor'} from ${regions[0]} at a heritage monument`
+      : `${firstName || 'Ancestor'} at a heritage monument`;
 
   // Text stagger
   const t1 = useSharedValue(0);
@@ -100,6 +105,15 @@ const OB07_Promise: React.FC<Props> = ({ navigation }) => {
 
       <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.centerArea}>
+          {/* TODO(video): Replace this still visual with a subtle cinematic lineage intro clip. */}
+          <View style={styles.visualWrap}>
+            <OnboardingResolvedVisual
+              subject={visualSubject}
+              context="onboarding promise and anticipation"
+              height={150}
+            />
+          </View>
+
           <View style={styles.silhouetteWrap}>
             <AnimatedLogo size={116} motion="orbit" variant="white" />
           </View>
@@ -143,6 +157,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
+  },
+  visualWrap: {
+    width: '100%',
+    marginBottom: 18,
   },
   silhouetteWrap: {
     width: 132,

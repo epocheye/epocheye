@@ -56,6 +56,11 @@ export const API_CONFIG = {
       AVATAR: '/api/user/avatar',
       SETTINGS: '/api/user/settings',
     },
+    IMAGES: {
+      // TODO: Replace these endpoint paths if backend routes change.
+      RESOLVE: '/api/v1/images/resolve',
+      RESOLVE_STATUS: '/api/v1/images/resolve/status',
+    },
   },
 } as const;
 

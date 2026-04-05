@@ -26,6 +26,7 @@ import {
   ChevronRight,
   Shield,
 } from 'lucide-react-native';
+import { useResolvedSubjectImage } from '../../shared/hooks';
 
 // Demo monument placeholder
 const CAMERA_PLACEHOLDER =
@@ -61,6 +62,12 @@ const ARExperienceScreen: React.FC<ARExperienceScreenProps> = ({
   const [activeFeature, setActiveFeature] = useState<string | null>(null);
   const [showFeatureModal, setShowFeatureModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const { url: resolvedArImage } = useResolvedSubjectImage({
+    subject: site?.name || "Humayun's Tomb",
+    context: `${site?.location || 'unknown location'} AR monument visual`,
+    enabled: true,
+  });
+  const cameraPlaceholderUri = resolvedArImage ?? CAMERA_PLACEHOLDER;
 
   const scanProgressAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -148,7 +155,7 @@ const ARExperienceScreen: React.FC<ARExperienceScreenProps> = ({
           content: `Experience ${
             site?.name || "Humayun's Tomb"
           } as it looked in 1570 CE, right after its construction. The pristine white marble and red sandstone gleamed under the Mughal sun. Emperor Akbar himself visited here to pay respects to his father.\n\nThe gardens were meticulously maintained with Persian-style water channels (Char Bagh), featuring blooming roses, jasmine, and fruit trees that provided shade to visitors and royal guests.`,
-          image: CAMERA_PLACEHOLDER,
+          image: cameraPlaceholderUri,
         };
       case 'facts':
         return {
@@ -324,7 +331,7 @@ const ARExperienceScreen: React.FC<ARExperienceScreenProps> = ({
 
         {/* Camera Placeholder */}
         <Image
-          source={{ uri: CAMERA_PLACEHOLDER }}
+          source={{ uri: cameraPlaceholderUri }}
           className="absolute inset-0 w-full h-full"
           resizeMode="cover"
         />
@@ -471,9 +478,10 @@ const ARExperienceScreen: React.FC<ARExperienceScreenProps> = ({
     <View className="flex-1 bg-[#070709]">
       <StatusBar barStyle="light-content" />
 
+      {/* TODO(video): Use a short looping monument flyover clip here for richer AR context. */}
       {/* Camera Placeholder with AR Overlay Effect */}
       <Image
-        source={{ uri: CAMERA_PLACEHOLDER }}
+        source={{ uri: cameraPlaceholderUri }}
         className="absolute inset-0 w-full h-full"
         resizeMode="cover"
       />

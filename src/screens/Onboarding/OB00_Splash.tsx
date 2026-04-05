@@ -8,9 +8,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { OB_COLORS } from '../../constants/onboarding';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
+import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB00_Splash'>;
+
+const SPLASH_SUBJECT = 'Ancient monument at sunrise';
 
 const OB00_Splash: React.FC<Props> = ({ navigation }) => {
   const opacity = useSharedValue(0);
@@ -36,6 +39,16 @@ const OB00_Splash: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+      <ResolvedSubjectImage
+        subject={SPLASH_SUBJECT}
+        context="onboarding splash cinematic opening"
+        style={styles.backdrop}
+        loadingLabel="Loading opening visual..."
+        showSkeletonWhileLoading
+      />
+      {/* TODO(video): Replace this backdrop with a branded intro clip for a stronger opening moment. */}
+      <View style={styles.backdropTint} />
+
       <StatusBar
         barStyle="light-content"
         translucent
@@ -54,6 +67,13 @@ const styles = StyleSheet.create({
     backgroundColor: OB_COLORS.bg,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  backdropTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(13,13,13,0.7)',
   },
 });
 

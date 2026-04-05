@@ -10,6 +10,7 @@ import BottomSheet, {
   BottomSheetFlatList,
   BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
+import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
 import type { Place } from '../../../utils/api/places';
 import { FONTS } from '../../../core/constants/theme';
 
@@ -91,11 +92,23 @@ const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
                   sheetRef.current?.close();
                 }}
               >
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemMeta}>
-                  {item.city} · {(item.distance_meters / 1000).toFixed(1)} km
-                  away
-                </Text>
+                <ResolvedSubjectImage
+                  subject={item.name}
+                  context={`${item.city} ${item.country} ${item.categories.join(
+                    ', ',
+                  )}`}
+                  style={styles.itemImage}
+                  imageStyle={styles.itemImage}
+                  loadingLabel="Loading..."
+                />
+
+                <View style={styles.itemTextWrap}>
+                  <Text style={styles.itemName}>{item.name}</Text>
+                  <Text style={styles.itemMeta}>
+                    {item.city} · {(item.distance_meters / 1000).toFixed(1)} km
+                    away
+                  </Text>
+                </View>
               </Pressable>
             )}
             ListEmptyComponent={
@@ -138,9 +151,21 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   item: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
     paddingVertical: 14,
+  },
+  itemImage: {
+    width: 54,
+    height: 54,
+    borderRadius: 10,
+    backgroundColor: '#1A1A1A',
+  },
+  itemTextWrap: {
+    flex: 1,
+    marginLeft: 12,
   },
   itemName: {
     color: '#FFFFFF',

@@ -15,6 +15,7 @@ import { FONTS } from '../../core/constants/theme';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSkipLink from '../../components/onboarding/OBSkipLink';
+import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB11_Notifications'>;
@@ -62,6 +63,14 @@ const OB11_Notifications: React.FC<Props> = ({ navigation }) => {
           </Text>
         </View>
 
+        <View style={styles.visualWrap}>
+          <OnboardingResolvedVisual
+            subject="Ancestor waiting near a heritage monument"
+            context="onboarding notifications prompt"
+            height={150}
+          />
+        </View>
+
         <View style={styles.centerArea}>
           <Animated.View style={bellStyle}>
             <BellRing size={64} color="#E8A020" />
@@ -103,6 +112,10 @@ const styles = StyleSheet.create({
   centerArea: {
     alignItems: 'center',
     gap: 24,
+  },
+  visualWrap: {
+    paddingHorizontal: 24,
+    marginTop: 8,
   },
   description: {
     color: '#8C93A0',

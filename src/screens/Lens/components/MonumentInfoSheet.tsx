@@ -2,6 +2,7 @@ import React, { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { MapPin } from 'lucide-react-native';
+import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
 import type { Place } from '../../../utils/api/places';
 import { FONTS } from '../../../core/constants/theme';
 
@@ -51,6 +52,17 @@ const MonumentInfoSheet = forwardRef<
     >
       <BottomSheetScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>{place?.name ?? 'Monument'}</Text>
+
+        {place?.name ? (
+          <ResolvedSubjectImage
+            subject={place.name}
+            context={`${place.city} ${place.country} monument info`}
+            style={styles.infoImage}
+            imageStyle={styles.infoImage}
+            loadingLabel="Loading monument visual..."
+          />
+        ) : null}
+
         <Text style={styles.address}>{fullAddress}</Text>
 
         <View style={styles.categoriesWrap}>
@@ -89,6 +101,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 28,
     fontFamily: FONTS.bold,
+  },
+  infoImage: {
+    marginTop: 12,
+    width: '100%',
+    height: 140,
+    borderRadius: 12,
+    backgroundColor: '#1A1A1A',
   },
   address: {
     marginTop: 10,

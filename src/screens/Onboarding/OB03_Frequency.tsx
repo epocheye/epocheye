@@ -1,13 +1,14 @@
 import React from 'react';
-import {View, Text, StyleSheet, StatusBar} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {Luggage, CalendarDays, Sprout} from 'lucide-react-native';
-import {OB_COLORS, OB_TYPOGRAPHY} from '../../constants/onboarding';
-import {useOnboardingStore} from '../../stores/onboardingStore';
+import { View, Text, StyleSheet, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Luggage, CalendarDays, Sprout } from 'lucide-react-native';
+import { OB_COLORS, OB_TYPOGRAPHY } from '../../constants/onboarding';
+import { useOnboardingStore } from '../../stores/onboardingStore';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSelectionTile from '../../components/onboarding/OBSelectionTile';
-import type {OnboardingScreenProps} from '../../core/types/navigation.types';
+import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
+import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB03_Frequency'>;
 
@@ -32,10 +33,19 @@ const OPTIONS = [
   },
 ] as const;
 
-const OB03_Frequency: React.FC<Props> = ({navigation}) => {
-  const visitFrequency = useOnboardingStore((s) => s.visitFrequency);
-  const setVisitFrequency = useOnboardingStore((s) => s.setVisitFrequency);
+const FREQUENCY_SUBJECTS: Record<(typeof OPTIONS)[number]['id'], string> = {
+  frequent: 'Frequent heritage site explorer',
+  occasional: 'Seasonal cultural travel itinerary',
+  rarely: 'First-time monument visitor inspiration',
+};
+
+const OB03_Frequency: React.FC<Props> = ({ navigation }) => {
+  const visitFrequency = useOnboardingStore(s => s.visitFrequency);
+  const setVisitFrequency = useOnboardingStore(s => s.setVisitFrequency);
   const insets = useSafeAreaInsets();
+  const subject = visitFrequency
+    ? FREQUENCY_SUBJECTS[visitFrequency]
+    : 'People exploring monuments across time';
 
   return (
     <View style={styles.container}>
@@ -46,15 +56,23 @@ const OB03_Frequency: React.FC<Props> = ({navigation}) => {
       />
       <OBProgressBar current={2} total={10} />
 
-      <View style={[styles.content, {paddingBottom: insets.bottom + 24}]}>
+      <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.header}>
           <Text style={OB_TYPOGRAPHY.heading}>
             How often do you explore history?
           </Text>
         </View>
 
+        <View style={styles.visualWrap}>
+          <OnboardingResolvedVisual
+            subject={subject}
+            context="onboarding frequency selection"
+            height={150}
+          />
+        </View>
+
         <View style={styles.tiles}>
-          {OPTIONS.map((opt) => (
+          {OPTIONS.map(opt => (
             <OBSelectionTile
               key={opt.id}
               icon={
@@ -99,6 +117,10 @@ const styles = StyleSheet.create({
   },
   tiles: {
     gap: 12,
+  },
+  visualWrap: {
+    paddingHorizontal: 24,
+    marginTop: 8,
   },
   ctaWrap: {
     marginTop: 24,

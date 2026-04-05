@@ -7,3 +7,13 @@ export { StorageService } from './storage.service';
 
 export { PermissionService } from './permission.service';
 export type { PermissionResult, PermissionName } from './permission.service';
+
+export {
+	resolveSubjectImage,
+	getResolvedSubjectImageFromCache,
+	clearResolvedSubjectImageCache,
+} from './image-resolve.service';
+export type {
+	ResolveSubjectImageParams,
+	ResolveSubjectImageResponse,
+} from './image-resolve.service';

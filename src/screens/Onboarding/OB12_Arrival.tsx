@@ -1,12 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  StatusBar,
-  Dimensions,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, StatusBar, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -22,6 +15,7 @@ import { useOnboardingComplete } from '../../context/OnboardingCallbackContext';
 import { track } from '../../services/analytics';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSkipLink from '../../components/onboarding/OBSkipLink';
+import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 import { BACKEND_URL } from '../../constants/onboarding';
 import { getValidAccessToken } from '../../utils/api/auth';
@@ -31,7 +25,7 @@ type Props = OnboardingScreenProps<'OB12_Arrival'>;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const OB12_Arrival: React.FC<Props> = () => {
-  const { firstName } = useOnboardingStore();
+  const { firstName, demoMonument, regions } = useOnboardingStore();
   const completeOnboarding = useOnboardingStore(s => s.completeOnboarding);
   const onOnboardingComplete = useOnboardingComplete();
   const insets = useSafeAreaInsets();
@@ -94,6 +88,11 @@ const OB12_Arrival: React.FC<Props> = () => {
   const s2 = useAnimatedStyle(() => ({ opacity: h2.value }));
   const s3 = useAnimatedStyle(() => ({ opacity: h3.value }));
   const s4 = useAnimatedStyle(() => ({ opacity: h4.value }));
+  const visualSubject =
+    demoMonument ||
+    (regions.length > 0
+      ? `${regions[0]} heritage monument`
+      : 'Heritage monument near your location');
 
   return (
     <View style={styles.container}>
@@ -113,12 +112,17 @@ const OB12_Arrival: React.FC<Props> = () => {
             Head to any heritage site and your ancestor will be waiting.
           </Animated.Text>
 
+          {/* TODO(video): Replace this static destination preview with a short guided arrival clip. */}
           {/* Map placeholder */}
           <Animated.View style={[styles.mapPlaceholder, s3]}>
-            <Image
-              source={{ uri: `${CDN_BASE}monuments/Konarka_Temple-2.jpg` }}
+            <ResolvedSubjectImage
+              subject={visualSubject}
+              context="onboarding final arrival destination"
+              fallbackUri={`${CDN_BASE}monuments/Konarka_Temple-2.jpg`}
               style={styles.mapImage}
-              resizeMode="cover"
+              imageStyle={styles.mapImage}
+              loadingLabel="Loading your destination visual..."
+              showSkeletonWhileLoading
             />
             <View style={styles.mapOverlay}>
               <Text style={styles.mapText}>Explore nearby monuments</Text>

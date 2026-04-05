@@ -7,12 +7,7 @@ import {
   ImageBackground,
   ScrollView,
 } from 'react-native';
-import React, {
-  useMemo,
-  useState,
-  useEffect,
-  useCallback,
-} from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
@@ -37,9 +32,11 @@ import {
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import ThinkingDots from '../../components/ui/ThinkingDots';
+import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import { usePermissionCheck } from '../../utils/usePermissionCheck';
 import { usePlaces } from '../../context';
 import { useUser } from '../../context';
+import { useResolvedSubjectImage } from '../../shared/hooks';
 import type { TabScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
 import type { Place } from '../../utils/api/places/types';
@@ -124,7 +121,13 @@ interface PlaceCardProps {
 
 const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, onPress }) => {
   const scale = useSharedValue(1);
-  const imageUri = getPlaceImage(place.categories);
+  const fallbackImageUri = getPlaceImage(place.categories);
+  const { url: resolvedImageUri } = useResolvedSubjectImage({
+    subject: place.name,
+    context: `${place.city} ${place.country} ${place.categories.join(', ')}`,
+    enabled: !!place.name,
+  });
+  const imageUri = resolvedImageUri ?? fallbackImageUri;
   const distanceKm = (place.distance_meters / 1000).toFixed(1);
   const shortDescription = place.categories[0] || 'Historic site';
 
@@ -261,7 +264,6 @@ const Home = ({ navigation }: Props) => {
     contentOpacity.value = withTiming(1, { duration: 400 });
   }, [contentOpacity, entrance]);
 
-
   const entranceStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
     transform: [{ translateY: entrance.value }],
@@ -303,6 +305,11 @@ const Home = ({ navigation }: Props) => {
     () => (nearbyPlaces || []).slice(0, 20),
     [nearbyPlaces],
   );
+  const insightSubject =
+    facts[0]?.monument || topNearbyPlaces[0]?.name || 'Heritage monument';
+  const insightFallbackImage = topNearbyPlaces[0]
+    ? getPlaceImage(topNearbyPlaces[0].categories)
+    : undefined;
 
   const handleVisitPlace = useCallback(
     (place: Place) => {
@@ -529,6 +536,15 @@ const Home = ({ navigation }: Props) => {
                   </TouchableOpacity>
                 </View>
 
+                <ResolvedSubjectImage
+                  subject={insightSubject}
+                  context="home personalized insights"
+                  fallbackUri={insightFallbackImage}
+                  style={homeStyles.insightVisual}
+                  imageStyle={homeStyles.insightVisualImage}
+                  loadingLabel="Loading insight visual..."
+                />
+
                 {isLoadingFacts ? (
                   <View className="items-center py-4 gap-4">
                     <AnimatedLogo size={58} motion="orbit" variant="white" />
@@ -717,6 +733,17 @@ const skeletonStyles = {
     height: 30,
     borderRadius: 999,
     backgroundColor: 'rgba(201,168,76,0.25)',
+  },
+};
+
+const homeStyles = {
+  insightVisual: {
+    height: 132,
+    borderRadius: 16,
+    marginBottom: 14,
+  },
+  insightVisualImage: {
+    borderRadius: 16,
   },
 };
 

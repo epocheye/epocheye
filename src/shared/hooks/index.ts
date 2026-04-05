@@ -16,3 +16,9 @@ export type {
 } from './useGeolocation';
 
 export { useMounted } from './useMounted';
+
+export { useResolvedSubjectImage } from './useResolvedSubjectImage';
+export type {
+  UseResolvedSubjectImageOptions,
+  UseResolvedSubjectImageResult,
+} from './useResolvedSubjectImage';

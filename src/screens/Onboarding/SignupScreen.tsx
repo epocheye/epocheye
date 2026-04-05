@@ -16,6 +16,7 @@ import AuthButton from '../../components/onboarding/AuthButton';
 import AmberButton from '../../components/onboarding/AmberButton';
 import AuthLiquidBackground from '../../components/onboarding/AuthLiquidBackground';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
+import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
 import { login, signup } from '../../utils/api/auth';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { COLORS } from '../../core/constants/theme';
@@ -34,6 +35,8 @@ const scrollContentStyle = {
 const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const fromOnboarding = route.params?.fromOnboarding ?? false;
   const storeFirstName = useOnboardingStore(s => s.firstName);
+  const storeDemoMonument = useOnboardingStore(s => s.demoMonument);
+  const storeRegions = useOnboardingStore(s => s.regions);
 
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState('');
@@ -103,6 +106,11 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const headingText = fromOnboarding
     ? `Save ${storeFirstName || 'your'} story.`
     : 'Create your account';
+  const visualSubject = storeDemoMonument
+    ? `${storeDemoMonument} heritage monument`
+    : storeRegions.length > 0
+    ? `${storeRegions[0]} heritage monument`
+    : 'Heritage monument and ancestry story';
 
   const renderInitial = () => (
     <View className="gap-5">
@@ -197,6 +205,16 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
           contentContainerStyle={scrollContentStyle}
           keyboardShouldPersistTaps="handled"
         >
+          {fromOnboarding ? (
+            <View className="mb-8">
+              <OnboardingResolvedVisual
+                subject={visualSubject}
+                context="onboarding signup emotional continuity"
+                height={170}
+              />
+            </View>
+          ) : null}
+
           <View className="mb-16 items-center">
             <Image
               source={require('../../assets/images/logo-white.png')}

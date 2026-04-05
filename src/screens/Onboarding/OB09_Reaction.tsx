@@ -22,6 +22,7 @@ import { FONTS } from '../../core/constants/theme';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
+import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
 import { track } from '../../services/analytics';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
@@ -64,7 +65,10 @@ const ReactionTile: React.FC<ReactionTileProps> = ({
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(selected ? 1.03 : 1, { damping: 14, stiffness: 260 });
+    scale.value = withSpring(selected ? 1.03 : 1, {
+      damping: 14,
+      stiffness: 260,
+    });
   };
 
   return (
@@ -97,13 +101,14 @@ const ReactionTile: React.FC<ReactionTileProps> = ({
 };
 
 const OB09_Reaction: React.FC<Props> = ({ navigation }) => {
-  const { demoStory, reactionEmoji } = useOnboardingStore();
+  const { demoStory, demoMonument, reactionEmoji } = useOnboardingStore();
   const setReaction = useOnboardingStore(s => s.setReaction);
   const insets = useSafeAreaInsets();
   const confettiRef = useRef<ConfettiCannon | null>(null);
 
   const previewText =
     demoStory.length > 130 ? demoStory.slice(0, 130) + '...' : demoStory;
+  const subject = demoMonument || 'Ancestor story and heritage monument';
 
   const handleReaction = useCallback(
     (id: string) => {
@@ -128,7 +133,11 @@ const OB09_Reaction: React.FC<Props> = ({ navigation }) => {
       colors={['#0D0B08', '#0F0D0A', '#0A0A0A']}
       style={styles.container}
     >
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
 
       {/* Atmospheric amber glow */}
       <View style={styles.ambientGlow} />
@@ -151,6 +160,14 @@ const OB09_Reaction: React.FC<Props> = ({ navigation }) => {
               style={styles.previewFade}
             />
           </View>
+        </View>
+
+        <View style={styles.visualWrap}>
+          <OnboardingResolvedVisual
+            subject={subject}
+            context="onboarding reaction story context"
+            height={140}
+          />
         </View>
 
         {/* Heading */}
@@ -182,7 +199,9 @@ const OB09_Reaction: React.FC<Props> = ({ navigation }) => {
 
         <OBPrimaryButton
           label="Continue →"
-          onPress={() => navigation.navigate('OB10_SignUp', { fromOnboarding: true })}
+          onPress={() =>
+            navigation.navigate('OB10_SignUp', { fromOnboarding: true })
+          }
         />
       </View>
 
@@ -219,6 +238,9 @@ const styles = StyleSheet.create({
   previewSection: {
     paddingHorizontal: 24,
     gap: 10,
+  },
+  visualWrap: {
+    paddingHorizontal: 24,
   },
   chapterPill: {
     flexDirection: 'row',

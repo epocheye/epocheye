@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, StatusBar, ImageBackground } from 'react-native';
+import { View, StyleSheet, StatusBar } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -9,12 +9,14 @@ import Animated, {
 import { OB_COLORS } from '../../constants/onboarding';
 import { FONTS, CDN_BASE } from '../../core/constants/theme';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
+import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import { track } from '../../services/analytics';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB01_Welcome'>;
 
 const MONUMENT_BG = `${CDN_BASE}monuments/Konarka_Temple-2.jpg`;
+const WELCOME_SUBJECT = 'Konark Sun Temple';
 
 const OB01_Welcome: React.FC<Props> = ({ navigation }) => {
   const line1 = useSharedValue(0);
@@ -46,10 +48,14 @@ const OB01_Welcome: React.FC<Props> = ({ navigation }) => {
         translucent
         backgroundColor="transparent"
       />
-      <ImageBackground
-        source={{ uri: MONUMENT_BG }}
+      <ResolvedSubjectImage
+        subject={WELCOME_SUBJECT}
+        context="onboarding welcome first impression"
+        fallbackUri={MONUMENT_BG}
         style={styles.bg}
-        resizeMode="cover"
+        imageStyle={styles.bg}
+        loadingLabel="Finding your first monument..."
+        showSkeletonWhileLoading
       >
         <View style={styles.overlay} />
 
@@ -74,7 +80,7 @@ const OB01_Welcome: React.FC<Props> = ({ navigation }) => {
             />
           </Animated.View>
         </View>
-      </ImageBackground>
+      </ResolvedSubjectImage>
     </View>
   );
 };

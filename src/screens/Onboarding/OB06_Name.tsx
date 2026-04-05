@@ -8,20 +8,24 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {OB_COLORS, OB_TYPOGRAPHY} from '../../constants/onboarding';
-import {FONTS} from '../../core/constants/theme';
-import {useOnboardingStore} from '../../stores/onboardingStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { OB_COLORS, OB_TYPOGRAPHY } from '../../constants/onboarding';
+import { FONTS } from '../../core/constants/theme';
+import { useOnboardingStore } from '../../stores/onboardingStore';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
-import type {OnboardingScreenProps} from '../../core/types/navigation.types';
+import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
+import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB06_Name'>;
 
-const OB06_Name: React.FC<Props> = ({navigation}) => {
-  const firstName = useOnboardingStore((s) => s.firstName);
-  const setFirstName = useOnboardingStore((s) => s.setFirstName);
+const OB06_Name: React.FC<Props> = ({ navigation }) => {
+  const firstName = useOnboardingStore(s => s.firstName);
+  const setFirstName = useOnboardingStore(s => s.setFirstName);
   const insets = useSafeAreaInsets();
+  const subject = firstName.trim().length
+    ? `${firstName} ancestor portrait and monument`
+    : 'Ancestral storyteller and monument silhouette';
 
   return (
     <View style={styles.container}>
@@ -34,15 +38,22 @@ const OB06_Name: React.FC<Props> = ({navigation}) => {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={[styles.content, {paddingBottom: insets.bottom + 24}]}>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
           <View style={styles.header}>
-            <Text style={OB_TYPOGRAPHY.heading}>
-              What should we call you?
-            </Text>
+            <Text style={OB_TYPOGRAPHY.heading}>What should we call you?</Text>
             <Text style={[OB_TYPOGRAPHY.sub, styles.sub]}>
               Your ancestor will speak to you by name.
             </Text>
+          </View>
+
+          <View style={styles.visualWrap}>
+            <OnboardingResolvedVisual
+              subject={subject}
+              context="onboarding first name personalization"
+              height={150}
+            />
           </View>
 
           <View style={styles.inputArea}>
@@ -95,6 +106,10 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   sub: {
+    marginTop: 8,
+  },
+  visualWrap: {
+    paddingHorizontal: 24,
     marginTop: 8,
   },
   inputArea: {

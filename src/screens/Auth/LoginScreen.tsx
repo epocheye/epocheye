@@ -16,6 +16,7 @@ import AmberButton from '../../components/onboarding/AmberButton';
 import AuthButton from '../../components/onboarding/AuthButton';
 import AuthLiquidBackground from '../../components/onboarding/AuthLiquidBackground';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
+import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
 import { login } from '../../utils/api/auth';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { COLORS } from '../../core/constants/theme';
@@ -24,6 +25,8 @@ interface LoginScreenProps {
   onLoginSuccess: () => void;
   headingText?: string;
   subheadingText?: string;
+  visualSubject?: string;
+  visualContext?: string;
   secondaryActionLabel?: string;
   onSecondaryActionPress?: () => void;
 }
@@ -43,6 +46,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
   onLoginSuccess,
   headingText = 'Welcome back',
   subheadingText,
+  visualSubject,
+  visualContext,
   secondaryActionLabel,
   onSecondaryActionPress,
 }) => {
@@ -93,6 +98,16 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
           contentContainerStyle={scrollContentStyle}
           keyboardShouldPersistTaps="handled"
         >
+          {visualSubject ? (
+            <View className="mb-8">
+              <OnboardingResolvedVisual
+                subject={visualSubject}
+                context={visualContext || 'login screen heritage context'}
+                height={170}
+              />
+            </View>
+          ) : null}
+
           <View className="mb-16 items-center">
             <Image
               source={require('../../assets/images/logo-white.png')}
