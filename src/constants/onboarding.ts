@@ -3,8 +3,8 @@
  * Used across all OB00–OB12 onboarding screens.
  */
 
-import { baseUrl } from '@env';
 import { FONTS } from '../core/constants/theme';
+import { API_CONFIG } from '../core/config';
 
 export const OB_COLORS = {
   bg: '#0D0D0D',
@@ -52,5 +52,4 @@ export const OB_TYPOGRAPHY = {
   },
 } as const;
 
-const parsedBaseUrl = typeof baseUrl === 'string' ? baseUrl.trim() : '';
-export const BACKEND_URL = parsedBaseUrl.length > 0 ? parsedBaseUrl : 'http://localhost:8080';
+export const BACKEND_URL = API_CONFIG.BASE_URL;

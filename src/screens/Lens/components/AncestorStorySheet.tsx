@@ -9,14 +9,21 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Platform,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { Lock } from 'lucide-react-native';
+import { Landmark, Lock } from 'lucide-react-native';
 import { FONTS } from '../../../core/constants/theme';
+
+interface IdentifiedObject {
+  name: string;
+  era: string;
+  objectType: string;
+}
 
 export interface AncestorStorySheetRef {
   open: () => void;
@@ -30,6 +37,8 @@ interface AncestorStorySheetProps {
   storyText: string;
   isStreaming: boolean;
   isLoading: boolean;
+  mode?: 'monument' | 'object_scan';
+  identifiedObject?: IdentifiedObject | null;
   onArTeaserSeen?: () => void;
 }
 
@@ -44,6 +53,8 @@ const AncestorStorySheet = forwardRef<
       storyText,
       isStreaming,
       isLoading,
+      mode = 'monument',
+      identifiedObject,
       onArTeaserSeen,
     },
     ref,
@@ -52,8 +63,15 @@ const AncestorStorySheet = forwardRef<
     const hasTrackedTeaser = useRef(false);
     const [cursorVisible, setCursorVisible] = useState(true);
     const [showLineage, setShowLineage] = useState(false);
+    const chipOpacity = useRef(new Animated.Value(0)).current;
 
     const snapPoints = useMemo(() => ['60%', '95%'], []);
+    const showObjectChip =
+      mode === 'object_scan' &&
+      typeof identifiedObject?.name === 'string' &&
+      identifiedObject.name.length > 0 &&
+      typeof identifiedObject?.era === 'string' &&
+      identifiedObject.era.length > 0;
 
     useImperativeHandle(ref, () => ({
       open: () => {
@@ -94,6 +112,25 @@ const AncestorStorySheet = forwardRef<
       return;
     }, [isStreaming, storyText.length]);
 
+    useEffect(() => {
+      if (!showObjectChip) {
+        chipOpacity.setValue(0);
+        return;
+      }
+
+      chipOpacity.setValue(0);
+      Animated.timing(chipOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }, [
+      chipOpacity,
+      showObjectChip,
+      identifiedObject?.name,
+      identifiedObject?.era,
+    ]);
+
     const handleSheetChange = useCallback(
       (index: number) => {
         if (index >= 0 && !hasTrackedTeaser.current) {
@@ -125,6 +162,17 @@ const AncestorStorySheet = forwardRef<
           <Text style={styles.label}>
             YOUR ANCESTOR AT {monumentName.toUpperCase()}
           </Text>
+
+          {showObjectChip && identifiedObject ? (
+            <Animated.View
+              style={[styles.objectChip, { opacity: chipOpacity }]}
+            >
+              <Landmark size={14} color="#E8A020" />
+              <Text style={styles.objectChipText}>
+                {identifiedObject.name} · {identifiedObject.era}
+              </Text>
+            </Animated.View>
+          ) : null}
 
           {isLoading && storyText.length === 0 ? (
             <View style={styles.loadingArea}>
@@ -182,6 +230,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 2,
     textTransform: 'uppercase',
+    fontFamily: FONTS.medium,
+  },
+  objectChip: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 10,
+    columnGap: 6,
+  },
+  objectChipText: {
+    color: '#8C93A0',
+    fontSize: 12,
     fontFamily: FONTS.medium,
   },
   storyText: {

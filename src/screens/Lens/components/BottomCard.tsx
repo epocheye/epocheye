@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { ScanSearch } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Place } from '../../../utils/api/places';
 import { FONTS } from '../../../core/constants/theme';
@@ -19,8 +20,23 @@ interface BottomCardProps {
   locationDenied: boolean;
   onOpenStory: () => void;
   onOpenInfo: () => void;
+  onScanObject: () => void;
   onBrowseMonuments: () => void;
   onSearchManually: () => void;
+}
+
+function formatPlaceSubline(place: Place): string {
+  const year = (place as Place & { year?: string | number }).year;
+
+  if (typeof year === 'number') {
+    return `${place.city} · ${year}`;
+  }
+
+  if (typeof year === 'string' && year.trim().length > 0) {
+    return `${place.city} · ${year}`;
+  }
+
+  return place.city;
 }
 
 const BottomCard: React.FC<BottomCardProps> = ({
@@ -29,6 +45,7 @@ const BottomCard: React.FC<BottomCardProps> = ({
   locationDenied,
   onOpenStory,
   onOpenInfo,
+  onScanObject,
   onBrowseMonuments,
   onSearchManually,
 }) => {
@@ -46,7 +63,7 @@ const BottomCard: React.FC<BottomCardProps> = ({
       {state === 'matched' && place ? (
         <View>
           <Text style={styles.placeName}>{place.name}</Text>
-          <Text style={styles.placeSubline}>{place.city}</Text>
+          <Text style={styles.placeSubline}>{formatPlaceSubline(place)}</Text>
           <Text style={styles.ancestorLine}>Your ancestor was here.</Text>
 
           <View style={styles.buttonRow}>
@@ -64,6 +81,14 @@ const BottomCard: React.FC<BottomCardProps> = ({
               <Text style={styles.secondaryButtonText}>Monument Info</Text>
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={styles.scanObjectButton}
+            onPress={onScanObject}
+          >
+            <ScanSearch size={18} color="#E8A020" />
+            <Text style={styles.scanObjectText}>Scan an object inside →</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
 
@@ -167,6 +192,24 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#E8A020',
     fontSize: 15,
+    fontFamily: FONTS.semiBold,
+  },
+  scanObjectButton: {
+    marginTop: 12,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E8A020',
+    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: 8,
+  },
+  scanObjectText: {
+    color: '#E8A020',
+    fontSize: 14,
+    fontWeight: '600',
     fontFamily: FONTS.semiBold,
   },
   notFoundTitle: {

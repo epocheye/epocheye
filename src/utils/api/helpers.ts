@@ -4,9 +4,9 @@
  */
 
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { baseUrl } from '@env';
+import { API_CONFIG } from '../../core/config';
 
-export const API_TIMEOUT_MS = 30000;
+export const API_TIMEOUT_MS = API_CONFIG.TIMEOUT_MS;
 
 /**
  * Extracts error message from axios error
@@ -39,11 +39,11 @@ export function getStatusCode(error: AxiosError): number {
  */
 export function createBaseClient(): AxiosInstance {
   return axios.create({
-    baseURL: baseUrl,
-    timeout: API_TIMEOUT_MS,
+    baseURL: API_CONFIG.BASE_URL,
+    timeout: API_CONFIG.TIMEOUT_MS,
     headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+      'Content-Type': API_CONFIG.HEADERS.CONTENT_TYPE,
+      Accept: API_CONFIG.HEADERS.ACCEPT,
     },
   });
 }

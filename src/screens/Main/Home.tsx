@@ -7,7 +7,13 @@ import {
   ImageBackground,
   ScrollView,
 } from 'react-native';
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
@@ -43,6 +49,7 @@ import {
   elaboratePersonalizedFact,
 } from '../../utils/api/user';
 import type { PersonalizedFact } from '../../utils/api/user';
+import { runGeminiHealthCheck } from '../../shared/api';
 
 const FACT_LOADING_LINES = [
   'Tracing your heritage...',
@@ -87,8 +94,7 @@ function buildFallbackFacts(
       id: 'fallback-1',
       headline: 'Your route holds hidden layers',
       summary: `${userName}, ${nearestName} is linked to lesser-known ${firstCategory.toLowerCase()} traditions that shifted over generations.`,
-      detail:
-        `${nearestName} carries traces of daily rituals and civic memory that most visitors walk past. Look closely at the layout and ornament — the stories are already there.`,
+      detail: `${nearestName} carries traces of daily rituals and civic memory that most visitors walk past. Look closely at the layout and ornament — the stories are already there.`,
     },
     {
       id: 'fallback-2',
@@ -233,6 +239,7 @@ const SkeletonCard: React.FC = () => {
 
 const Home = ({ navigation }: Props) => {
   usePermissionCheck();
+  const hasRunGeminiHealthCheck = useRef(false);
 
   const { nearbyPlaces, isLoadingNearby, nearbyError } = usePlaces();
   const { profile } = useUser();
@@ -242,8 +249,12 @@ const Home = ({ navigation }: Props) => {
   const [factsError, setFactsError] = useState<string | null>(null);
   const [facts, setFacts] = useState<PersonalizedFact[]>([]);
   const [activeFactId, setActiveFactId] = useState<string | null>(null);
-  const [elaboratingFactId, setElaboratingFactId] = useState<string | null>(null);
-  const [factDetailsById, setFactDetailsById] = useState<Record<string, string>>({});
+  const [elaboratingFactId, setElaboratingFactId] = useState<string | null>(
+    null,
+  );
+  const [factDetailsById, setFactDetailsById] = useState<
+    Record<string, string>
+  >({});
 
   const entrance = useSharedValue(24);
   const contentOpacity = useSharedValue(0);
@@ -253,6 +264,18 @@ const Home = ({ navigation }: Props) => {
     entrance.value = withSpring(0, { damping: 20, stiffness: 200 });
     contentOpacity.value = withTiming(1, { duration: 400 });
   }, [contentOpacity, entrance]);
+
+  useEffect(() => {
+    if (!__DEV__ || hasRunGeminiHealthCheck.current) {
+      return;
+    }
+
+    hasRunGeminiHealthCheck.current = true;
+    runGeminiHealthCheck().catch(error => {
+      const reason = error instanceof Error ? error.message : 'unknown error';
+      console.warn(`[Gemini] Health check crashed: ${reason}`);
+    });
+  }, []);
 
   const entranceStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
@@ -392,7 +415,10 @@ const Home = ({ navigation }: Props) => {
       setElaboratingFactId(null);
 
       if (result.success) {
-        setFactDetailsById(prev => ({ ...prev, [fact.id]: result.data.detail }));
+        setFactDetailsById(prev => ({
+          ...prev,
+          [fact.id]: result.data.detail,
+        }));
         return;
       }
 
@@ -424,7 +450,11 @@ const Home = ({ navigation }: Props) => {
         <Animated.View style={[{ flex: 1 }, entranceStyle]}>
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 120 }}
+            contentContainerStyle={{
+              paddingHorizontal: 20,
+              paddingTop: 16,
+              paddingBottom: 120,
+            }}
           >
             {/* Header */}
             <View
@@ -533,7 +563,8 @@ const Home = ({ navigation }: Props) => {
                     {facts.map((fact, index) => {
                       const isExpanded = activeFactId === fact.id;
                       const isElaborating = elaboratingFactId === fact.id;
-                      const detailText = factDetailsById[fact.id] ?? fact.detail;
+                      const detailText =
+                        factDetailsById[fact.id] ?? fact.detail;
 
                       return (
                         <TouchableOpacity
@@ -544,7 +575,8 @@ const Home = ({ navigation }: Props) => {
                               setFactDetailsById(prev => ({
                                 ...prev,
                                 [fact.id]: `${fact.summary} This connects to ${
-                                  topNearbyPlaces[0]?.name ?? 'nearby heritage sites'
+                                  topNearbyPlaces[0]?.name ??
+                                  'nearby heritage sites'
                                 } through shared routes, ritual patterns, and artisan exchange across generations.`,
                               }));
                             });
@@ -594,8 +626,12 @@ const Home = ({ navigation }: Props) => {
                     <TouchableOpacity
                       onPress={() => {
                         loadPersonalizedFacts().catch(() => {
-                          setFacts(buildFallbackFacts(userName, topNearbyPlaces));
-                          setFactsError('Showing curated insights for your area.');
+                          setFacts(
+                            buildFallbackFacts(userName, topNearbyPlaces),
+                          );
+                          setFactsError(
+                            'Showing curated insights for your area.',
+                          );
                           setIsLoadingFacts(false);
                         });
                       }}

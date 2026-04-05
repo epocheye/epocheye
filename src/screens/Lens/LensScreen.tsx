@@ -18,7 +18,10 @@ import { ScanEye, X } from 'lucide-react-native';
 import { track } from '../../services/analytics';
 import { findPlaces, type Place } from '../../utils/api/places';
 import { getFallbackStory } from '../../services/fallbackStories';
-import { streamLensStory } from '../../services/lensStoryService';
+import {
+  streamLensStory,
+  type LensIdentifiedObject,
+} from '../../services/lensStoryService';
 import { usePlaces, useUser } from '../../context';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import type { MainScreenProps } from '../../core/types/navigation.types';
@@ -76,6 +79,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   const { profile } = useUser();
   const { nearbyPlaces } = usePlaces();
   const storeFirstName = useOnboardingStore(state => state.firstName);
+  const storeMotivation = useOnboardingStore(state => state.motivation);
   const storeRegions = useOnboardingStore(state => state.regions);
 
   const { hasPermission, requestPermission } = useCameraPermission();
@@ -98,6 +102,11 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   const [storyText, setStoryText] = useState('');
   const [storyLoading, setStoryLoading] = useState(false);
   const [storyStreaming, setStoryStreaming] = useState(false);
+  const [storyMode, setStoryMode] = useState<'monument' | 'object_scan'>(
+    'monument',
+  );
+  const [identifiedObject, setIdentifiedObject] =
+    useState<LensIdentifiedObject | null>(null);
 
   const firstName = useMemo(() => {
     const fromProfile = profile?.name?.trim();
@@ -112,6 +121,11 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   const regions = useMemo(
     () => (storeRegions.length > 0 ? storeRegions : ['South Asia']),
     [storeRegions],
+  );
+
+  const motivation = useMemo(
+    () => storeMotivation ?? 'heritage_visitor',
+    [storeMotivation],
   );
 
   const transitionToNotFound = useCallback((isLocationDenied: boolean) => {
@@ -232,6 +246,8 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     setStoryText('');
     setStoryLoading(true);
     setStoryStreaming(true);
+    setStoryMode('monument');
+    setIdentifiedObject(null);
     storySheetRef.current?.open();
 
     try {
@@ -248,6 +264,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         monumentName: matchedPlace.name,
         firstName,
         regions,
+        mode: 'monument',
         onChunk: chunk => {
           setStoryLoading(false);
           setStoryText(previous => previous + chunk);
@@ -273,6 +290,81 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       });
     }
   }, [firstName, matchedPlace, regions]);
+
+  const handleScanObject = useCallback(async () => {
+    if (!matchedPlace) {
+      return;
+    }
+
+    track('lens_object_scan_triggered', {
+      monument: matchedPlace.name,
+    });
+
+    storyAbortRef.current?.();
+    setStoryText('');
+    setStoryLoading(true);
+    setStoryStreaming(true);
+    setStoryMode('object_scan');
+    setIdentifiedObject(null);
+
+    try {
+      const photo = await cameraRef.current?.takePhoto();
+
+      if (!photo) {
+        throw new Error('Photo capture failed');
+      }
+
+      const imageUri = normalizePhotoUri(photo.path);
+      storySheetRef.current?.open();
+
+      storyAbortRef.current = streamLensStory({
+        imageUri,
+        monumentName: matchedPlace.name,
+        firstName,
+        regions,
+        motivation,
+        mode: 'object_scan',
+        onChunk: chunk => {
+          setStoryLoading(false);
+          setStoryText(previous => previous + chunk);
+        },
+        onDone: (monument, object) => {
+          setStoryLoading(false);
+          setStoryStreaming(false);
+          setIdentifiedObject(object ?? null);
+
+          if (object) {
+            track('lens_object_identified', {
+              monument: matchedPlace.name,
+              objectName: object?.name ?? 'unknown',
+              confidence: 'from_done_event_if_available',
+            });
+          }
+
+          track('lens_story_generated', {
+            value: monument,
+            mode: 'object_scan',
+          });
+        },
+        onError: () => {
+          setStoryLoading(false);
+          setStoryStreaming(false);
+        },
+      });
+    } catch {
+      const fallback = getFallbackStory(regions[0] ?? 'South Asia', firstName);
+      setStoryText(fallback.story);
+      setStoryLoading(false);
+      setStoryStreaming(false);
+      setIdentifiedObject(null);
+      storySheetRef.current?.open();
+      track('lens_story_generated', {
+        value: fallback.monument,
+        source: 'fallback',
+        mode: 'object_scan',
+      });
+    }
+  }, [firstName, matchedPlace, motivation, regions]);
 
   const handleOpenInfo = useCallback(() => {
     if (!matchedPlace) {
@@ -404,6 +496,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           locationDenied={locationDenied}
           onOpenStory={handleOpenStory}
           onOpenInfo={handleOpenInfo}
+          onScanObject={handleScanObject}
           onBrowseMonuments={handleBrowseMonuments}
           onSearchManually={handleSearchManually}
         />
@@ -415,6 +508,8 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           storyText={storyText}
           isStreaming={storyStreaming}
           isLoading={storyLoading}
+          mode={storyMode}
+          identifiedObject={identifiedObject}
           onArTeaserSeen={handleArTeaserSeen}
         />
 

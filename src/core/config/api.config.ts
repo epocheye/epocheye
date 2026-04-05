@@ -5,6 +5,9 @@
 
 import { baseUrl } from '@env';
 
+const parsedBaseUrl =
+  typeof baseUrl === 'string' ? baseUrl.trim().replace(/\/+$/, '') : '';
+
 /**
  * Default API timeout in milliseconds
  */
@@ -17,7 +20,7 @@ export const API_CONFIG = {
   /**
    * Base URL for all API requests
    */
-  BASE_URL: baseUrl,
+  BASE_URL: parsedBaseUrl,
 
   /**
    * Default request timeout
