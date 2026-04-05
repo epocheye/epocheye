@@ -3,7 +3,6 @@
  * Fetches Gemini-backed personalized facts and elaborates on demand.
  */
 
-import { generateGeminiText } from '../../../shared/api/gemini.client';
 import { createAuthenticatedClient } from '../auth/Login';
 import { createErrorResult } from '../helpers';
 import type {
@@ -110,100 +109,6 @@ function parseFactsFromModelText(text: string): PersonalizedFactsResponse {
   return { facts: normalized };
 }
 
-function buildFactsPrompt(payload: PersonalizedFactsRequestPayload): string {
-  const userName =
-    typeof payload.userName === 'string' && payload.userName.trim().length > 0
-      ? payload.userName.trim()
-      : 'Explorer';
-  const regionHint =
-    typeof payload.regionHint === 'string' && payload.regionHint.trim().length > 0
-      ? payload.regionHint.trim()
-      : 'Unknown';
-  const nearbyPlaces =
-    Array.isArray(payload.nearbyPlaces) && payload.nearbyPlaces.length > 0
-      ? payload.nearbyPlaces.slice(0, 5).join(', ')
-      : 'None provided';
-  const factLimit = clampFactLimit(payload.limit);
-
-  return [
-    'Create personalized heritage facts for one mobile app user.',
-    `User name: ${userName}.`,
-    `Region hint: ${regionHint}.`,
-    `Nearby monuments: ${nearbyPlaces}.`,
-    `Return exactly ${factLimit} facts.`,
-    'Return only valid JSON with this shape:',
-    '{"facts":[{"id":"fact-1","headline":"...","summary":"..."}]}',
-    'Rules:',
-    '- headline must be short (max 8 words).',
-    '- summary must be one sentence under 35 words.',
-    '- no markdown and no code fences.',
-  ].join('\n');
-}
-
-function buildElaborationPrompt(payload: ElaborateFactRequest): string {
-  const userName =
-    typeof payload.userName === 'string' && payload.userName.trim().length > 0
-      ? payload.userName.trim()
-      : 'Explorer';
-  const nearbyPlace =
-    typeof payload.nearbyPlaceName === 'string' &&
-    payload.nearbyPlaceName.trim().length > 0
-      ? payload.nearbyPlaceName.trim()
-      : 'nearby heritage sites';
-
-  return [
-    'Expand one personalized heritage fact into a richer explanation.',
-    `User: ${userName}.`,
-    `Nearby reference: ${nearbyPlace}.`,
-    `Headline: ${payload.headline}.`,
-    `Summary: ${payload.summary}.`,
-    'Return one plain-text paragraph (3-5 sentences) with historical context.',
-    'No markdown, no bullet points, no title.',
-  ].join('\n');
-}
-
-async function fetchGeminiFactsFallback(
-  payload: PersonalizedFactsRequestPayload,
-): Promise<PersonalizedFactsResponse | null> {
-  const generated = await generateGeminiText({
-    prompt: buildFactsPrompt(payload),
-    systemInstruction:
-      'You are a precise heritage assistant. Follow output format instructions exactly.',
-    temperature: 0.7,
-    maxOutputTokens: 420,
-  });
-
-  if (!generated) {
-    return null;
-  }
-
-  const normalized = parseFactsFromModelText(generated);
-  if (normalized.facts.length === 0) {
-    return null;
-  }
-
-  return {
-    facts: normalized.facts.slice(0, clampFactLimit(payload.limit)),
-  };
-}
-
-async function fetchGeminiElaborationFallback(
-  payload: ElaborateFactRequest,
-): Promise<ElaboratedFact | null> {
-  const generated = await generateGeminiText({
-    prompt: buildElaborationPrompt(payload),
-    systemInstruction:
-      'You are a historian guide. Keep responses factual-leaning, concise, and plain text.',
-    temperature: 0.65,
-    maxOutputTokens: 320,
-  });
-
-  if (!generated) {
-    return null;
-  }
-
-  return normalizeElaboration(generated, payload.factId);
-}
 
 function normalizeFact(input: unknown, index: number): PersonalizedFact | null {
   if (typeof input === 'string') {
@@ -363,19 +268,7 @@ export async function getPersonalizedFacts(payload: {
       }
     }
 
-    logFactsDebug('Backend facts endpoints failed. Trying direct Gemini fallback.');
-    const geminiFallback = await fetchGeminiFactsFallback(payload);
-    if (geminiFallback && geminiFallback.facts.length > 0) {
-      logFactsDebug(
-        `Gemini fallback returned ${geminiFallback.facts.length} personalized facts.`,
-      );
-      return {
-        success: true,
-        data: geminiFallback,
-      };
-    }
-
-    logFactsDebug('Gemini fallback did not return personalized facts.');
+    logFactsDebug('Backend facts endpoints failed.');
 
     if (lastError) {
       return createErrorResult(lastError);
@@ -428,17 +321,7 @@ export async function elaboratePersonalizedFact(
       }
     }
 
-    logFactsDebug('Backend elaboration endpoints failed. Trying direct Gemini fallback.');
-    const geminiFallback = await fetchGeminiElaborationFallback(payload);
-    if (geminiFallback) {
-      logFactsDebug('Gemini fallback returned elaboration successfully.');
-      return {
-        success: true,
-        data: geminiFallback,
-      };
-    }
-
-    logFactsDebug('Gemini fallback did not return elaboration.');
+    logFactsDebug('Backend elaboration endpoints failed.');
 
     if (lastError) {
       return createErrorResult(lastError);

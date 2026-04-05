@@ -21,10 +21,3 @@ export {
   wrapApiCall,
 } from './error-handler';
 
-// Gemini direct client helpers
-export {
-  generateGeminiText,
-  runGeminiHealthCheck,
-  streamGeminiText,
-} from './gemini.client';
-export type { GeminiHealthCheckResult } from './gemini.client';

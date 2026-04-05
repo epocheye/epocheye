@@ -5,7 +5,6 @@
  */
 
 import {BACKEND_URL} from '../constants/onboarding';
-import {streamGeminiText} from '../shared/api/gemini.client';
 import {getFallbackStory} from './fallbackStories';
 import {createSSEStream} from './sseStreamService';
 
@@ -71,8 +70,6 @@ export function streamAncestorStory({
 
   let hasErrored = false;
   let hasDone = false;
-  let hasReceivedChunk = false;
-  let hasStartedDirectGemini = false;
   let activeAbort: (() => void) | null = null;
 
   const safeOnError = () => {
@@ -98,38 +95,7 @@ export function streamAncestorStory({
       return;
     }
 
-    hasReceivedChunk = true;
     onChunk(text);
-  };
-
-  const startDirectGeminiFallback = () => {
-    if (hasStartedDirectGemini || hasErrored || hasDone) {
-      return;
-    }
-
-    hasStartedDirectGemini = true;
-    console.log('[AncestorStory] Backend stream failed, retrying with direct Gemini');
-
-    activeAbort = streamGeminiText({
-      prompt: buildAncestorPrompt({
-        firstName: safeFirstName,
-        regions,
-        motivation,
-        visitFrequency,
-        goal,
-        monument: fallbackMonument,
-      }),
-      systemInstruction:
-        'You are a careful heritage storyteller. Keep output vivid, respectful, and plain text.',
-      temperature: 0.8,
-      maxOutputTokens: 420,
-      timeout: 30000,
-      onChunk: handleChunk,
-      onDone: () => {
-        safeOnDone(fallbackMonument);
-      },
-      onError: safeOnError,
-    });
   };
 
   const handleBackendFailure = () => {
@@ -137,13 +103,7 @@ export function streamAncestorStory({
       return;
     }
 
-    // Avoid blending two partially-generated narratives.
-    if (hasReceivedChunk) {
-      safeOnError();
-      return;
-    }
-
-    startDirectGeminiFallback();
+    safeOnError();
   };
 
   const handleBackendMessage = (payload: Record<string, unknown>) => {

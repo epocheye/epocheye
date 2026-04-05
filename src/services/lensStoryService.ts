@@ -1,5 +1,4 @@
 import {BACKEND_URL} from '../constants/onboarding';
-import {streamGeminiText} from '../shared/api/gemini.client';
 import {getFallbackStory} from './fallbackStories';
 import {createSSEStream} from './sseStreamService';
 
@@ -51,6 +50,7 @@ function buildLensFormData({
   formData.append('monumentName', monumentName);
   formData.append('firstName', firstName);
   formData.append('regions', JSON.stringify(regions));
+  formData.append('mode', 'monument');
 
   return formData;
 }
@@ -115,27 +115,6 @@ function parseIdentifiedObject(
   };
 }
 
-function buildLensPrompt({
-  monumentName,
-  firstName,
-  regions,
-}: Pick<LensStoryParams, 'monumentName' | 'firstName' | 'regions'>): string {
-  const selectedRegions = regions.length > 0 ? regions.join(', ') : 'South Asia';
-  const safeMonumentName = monumentName.trim().length > 0 ? monumentName : 'a nearby monument';
-  const safeFirstName = firstName.trim().length > 0 ? firstName : 'Explorer';
-
-  return [
-    `Write one cinematic ancestor story for ${safeFirstName}.`,
-    `Monument focus: ${safeMonumentName}.`,
-    `Lineage region hints: ${selectedRegions}.`,
-    'Constraints:',
-    '- 150 to 210 words.',
-    '- Use second-person voice and historically plausible details.',
-    '- Keep tone reflective and emotionally grounded.',
-    '- Return plain text only, no markdown and no bullet points.',
-  ].join('\n');
-}
-
 export function streamLensStory({
   imageUri,
   monumentName,
@@ -151,8 +130,6 @@ export function streamLensStory({
 
   let hasErrored = false;
   let hasDone = false;
-  let hasReceivedChunk = false;
-  let hasStartedDirectGemini = false;
   let activeAbort: (() => void) | null = null;
 
   const safeFallback = () => {
@@ -173,7 +150,6 @@ export function streamLensStory({
       return;
     }
 
-    hasReceivedChunk = true;
     onChunk(text);
   };
 
@@ -186,44 +162,12 @@ export function streamLensStory({
     onDone(monument, object);
   };
 
-  const startDirectGeminiFallback = () => {
-    if (hasStartedDirectGemini || hasErrored || hasDone) {
-      return;
-    }
-
-    hasStartedDirectGemini = true;
-    console.log('[LensStory] Backend stream failed, retrying with direct Gemini');
-
-    activeAbort = streamGeminiText({
-      prompt: buildLensPrompt({
-        monumentName: safeMonumentName,
-        firstName,
-        regions,
-      }),
-      systemInstruction:
-        'You are a heritage guide. Keep output vivid, historically grounded, and plain text.',
-      temperature: 0.75,
-      maxOutputTokens: 360,
-      timeout: 30000,
-      onChunk: handleChunk,
-      onDone: () => {
-        safeOnDone(safeMonumentName, undefined);
-      },
-      onError: safeFallback,
-    });
-  };
-
   const handleBackendFailure = () => {
     if (hasErrored || hasDone) {
       return;
     }
 
-    if (hasReceivedChunk) {
-      safeFallback();
-      return;
-    }
-
-    startDirectGeminiFallback();
+    safeFallback();
   };
 
   const handleMessage = (payload: Record<string, unknown>) => {

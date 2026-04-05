@@ -12,7 +12,6 @@ import React, {
   useState,
   useEffect,
   useCallback,
-  useRef,
 } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -49,7 +48,6 @@ import {
   elaboratePersonalizedFact,
 } from '../../utils/api/user';
 import type { PersonalizedFact } from '../../utils/api/user';
-import { runGeminiHealthCheck } from '../../shared/api';
 
 const FACT_LOADING_LINES = [
   'Tracing your heritage...',
@@ -239,8 +237,6 @@ const SkeletonCard: React.FC = () => {
 
 const Home = ({ navigation }: Props) => {
   usePermissionCheck();
-  const hasRunGeminiHealthCheck = useRef(false);
-
   const { nearbyPlaces, isLoadingNearby, nearbyError } = usePlaces();
   const { profile } = useUser();
 
@@ -265,17 +261,6 @@ const Home = ({ navigation }: Props) => {
     contentOpacity.value = withTiming(1, { duration: 400 });
   }, [contentOpacity, entrance]);
 
-  useEffect(() => {
-    if (!__DEV__ || hasRunGeminiHealthCheck.current) {
-      return;
-    }
-
-    hasRunGeminiHealthCheck.current = true;
-    runGeminiHealthCheck().catch(error => {
-      const reason = error instanceof Error ? error.message : 'unknown error';
-      console.warn(`[Gemini] Health check crashed: ${reason}`);
-    });
-  }, []);
 
   const entranceStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
