@@ -9,7 +9,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { OB_COLORS } from '../../constants/onboarding';
-import { FONTS, CDN_BASE } from '../../core/constants/theme';
+import { FONTS } from '../../core/constants/theme';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useOnboardingComplete } from '../../context/OnboardingCallbackContext';
 import { track } from '../../services/analytics';
@@ -19,6 +19,7 @@ import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 import { BACKEND_URL } from '../../constants/onboarding';
 import { getValidAccessToken } from '../../utils/api/auth';
+import { getOnboardingVisualFallback } from '../../components/onboarding/visual-fallbacks';
 
 type Props = OnboardingScreenProps<'OB12_Arrival'>;
 
@@ -118,7 +119,10 @@ const OB12_Arrival: React.FC<Props> = () => {
             <ResolvedSubjectImage
               subject={visualSubject}
               context="onboarding final arrival destination"
-              fallbackUri={`${CDN_BASE}monuments/Konarka_Temple-2.jpg`}
+              fallbackUri={getOnboardingVisualFallback(
+                visualSubject,
+                'onboarding final arrival destination',
+              )}
               style={styles.mapImage}
               imageStyle={styles.mapImage}
               loadingLabel="Loading your destination visual..."
@@ -144,7 +148,7 @@ const OB12_Arrival: React.FC<Props> = () => {
 
       <ConfettiCannon
         ref={confettiRef}
-        count={150}
+        count={60}
         origin={{ x: SCREEN_WIDTH / 2, y: -10 }}
         colors={['#E8A020', '#FFD700', '#FFFFFF', '#FFA500']}
         autoStart={false}

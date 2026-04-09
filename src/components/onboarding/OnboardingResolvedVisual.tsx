@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleProp, StyleSheet, ViewStyle } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import ResolvedSubjectImage from '../ui/ResolvedSubjectImage';
+import { getOnboardingVisualFallback } from './visual-fallbacks';
 
 interface OnboardingResolvedVisualProps {
   subject?: string | null;
@@ -22,7 +23,9 @@ const OnboardingResolvedVisual: React.FC<OnboardingResolvedVisualProps> = ({
     <ResolvedSubjectImage
       subject={subject}
       context={context}
-      fallbackUri={fallbackUri}
+      fallbackUri={
+        fallbackUri ?? getOnboardingVisualFallback(subject, context)
+      }
       style={[styles.base, { height }, style]}
       imageStyle={styles.image}
       loadingLabel="Preparing your visual..."

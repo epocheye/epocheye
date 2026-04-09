@@ -13,13 +13,6 @@ import type {
   UserResult,
 } from './types';
 
-type PersonalizedFactsRequestPayload = {
-  limit?: number;
-  userName?: string;
-  nearbyPlaces?: string[];
-  regionHint?: string;
-};
-
 type FactsResponseShape = {
   facts?: unknown;
   items?: unknown;
@@ -42,25 +35,15 @@ const ELABORATE_ENDPOINTS = [
   '/api/user/personalized-facts/elaborate',
 ] as const;
 
-const DEFAULT_FACT_LIMIT = 3;
-const MAX_FACT_LIMIT = 6;
-
 function logFactsDebug(message: string): void {
-  if (__DEV__) {
-    console.log(`[Facts] ${message}`);
+  if (__DEV__ && false) {
+    // Intentionally disabled during performance hardening.
+    console.debug(message);
   }
 }
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'request failed';
-}
-
-function clampFactLimit(limit?: number): number {
-  if (typeof limit !== 'number' || !Number.isFinite(limit)) {
-    return DEFAULT_FACT_LIMIT;
-  }
-
-  return Math.min(MAX_FACT_LIMIT, Math.max(1, Math.floor(limit)));
 }
 
 function stripCodeFence(value: string): string {
@@ -80,35 +63,6 @@ function extractJsonObject(value: string): string | null {
 
   return stripped.slice(firstCurly, lastCurly + 1);
 }
-
-function parseFactsFromModelText(text: string): PersonalizedFactsResponse {
-  const normalizedText = stripCodeFence(text);
-  const jsonCandidate = extractJsonObject(normalizedText);
-
-  if (jsonCandidate) {
-    try {
-      const parsed: unknown = JSON.parse(jsonCandidate);
-      const normalized = normalizeFactsResponse(parsed);
-      if (normalized.facts.length > 0) {
-        return normalized;
-      }
-    } catch {
-      // Fall back to line-based parsing below.
-    }
-  }
-
-  const lines = normalizedText
-    .split('\n')
-    .map(line => line.replace(/^[-*0-9.)\s]+/, '').trim())
-    .filter(Boolean);
-
-  const normalized = lines
-    .map((line, index) => normalizeFact(line, index))
-    .filter((fact): fact is PersonalizedFact => !!fact);
-
-  return { facts: normalized };
-}
-
 
 function normalizeFact(input: unknown, index: number): PersonalizedFact | null {
   if (typeof input === 'string') {

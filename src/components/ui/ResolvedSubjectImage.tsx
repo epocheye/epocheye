@@ -23,6 +23,7 @@ interface ResolvedSubjectImageProps {
   resizeMode?: ImageResizeMode;
   loadingLabel?: string;
   showSkeletonWhileLoading?: boolean;
+  enableRemoteResolve?: boolean;
   children?: React.ReactNode;
 }
 
@@ -35,12 +36,14 @@ const ResolvedSubjectImage: React.FC<ResolvedSubjectImageProps> = ({
   resizeMode = 'cover',
   loadingLabel = 'Resolving visual context...',
   showSkeletonWhileLoading = false,
+  enableRemoteResolve = false,
   children,
 }) => {
   const { url, loading } = useResolvedSubjectImage({
     subject,
     context,
     enabled: !!subject,
+    remote: enableRemoteResolve,
   });
 
   const [primaryFailed, setPrimaryFailed] = useState(false);
@@ -98,7 +101,7 @@ const ResolvedSubjectImage: React.FC<ResolvedSubjectImageProps> = ({
           <AnimatedLogo
             size={26}
             variant="white"
-            motion="orbit"
+            motion="pulse"
             showRing={false}
           />
           <Text style={styles.loadingText}>{loadingLabel}</Text>

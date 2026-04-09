@@ -19,6 +19,7 @@ import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Landmark, Lock } from 'lucide-react-native';
 import { FONTS } from '../../../core/constants/theme';
 import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
+import { getOnboardingVisualFallback } from '../../../components/onboarding/visual-fallbacks';
 
 interface IdentifiedObject {
   name: string;
@@ -167,6 +168,11 @@ const AncestorStorySheet = forwardRef<
           <ResolvedSubjectImage
             subject={monumentName}
             context="lens ancestor story sheet"
+            fallbackUri={getOnboardingVisualFallback(
+              monumentName,
+              'lens ancestor story sheet',
+            )}
+            enableRemoteResolve
             style={styles.storyImage}
             imageStyle={styles.storyImage}
             loadingLabel="Loading monument visual..."

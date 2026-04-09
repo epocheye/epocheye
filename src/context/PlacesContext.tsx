@@ -11,6 +11,7 @@ import React, {
   useEffect,
   useCallback,
   useRef,
+  useMemo,
   ReactNode,
 } from 'react';
 import Geolocation, {
@@ -83,7 +84,6 @@ const SEARCH_RADIUS_METERS = 1000;
 const SEARCH_RADIUS_FALLBACKS = [1000, 5000, 10000, 20000]; // 1km, 5km, 10km, 20km
 const SEARCH_LIMIT = 50;
 const API_CALL_COOLDOWN_MS = 60000; // 1 minute
-const LOCATION_CHECK_INTERVAL_MS = 5000; // 5 seconds
 
 /**
  * Calculate distance between two coordinates using Haversine formula
@@ -139,9 +139,6 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
   const lastApiCallLocation = useRef<LocationData | null>(null);
   const lastApiCallTime = useRef<number>(0);
   const locationWatchId = useRef<number | null>(null);
-  const locationCheckInterval = useRef<ReturnType<typeof setInterval> | null>(
-    null,
-  );
 
   /**
    * Check if user has moved outside the original search radius
@@ -320,7 +317,9 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
   );
 
   /**
-   * Start location tracking
+   * Start location tracking using native watchPosition with distance filter.
+   * The OS only fires callbacks when the user has physically moved, avoiding
+   * the previous 5-second polling interval that burned CPU.
    */
   const startLocationTracking = useCallback(() => {
     // Get initial location
@@ -340,14 +339,17 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
       { enableHighAccuracy: false, timeout: 15000, maximumAge: 10000 },
     );
 
-    // Set up periodic location checks
-    locationCheckInterval.current = setInterval(() => {
-      Geolocation.getCurrentPosition(handleLocationUpdate, () => {}, {
+    // Use native distance-based watching instead of polling
+    locationWatchId.current = Geolocation.watchPosition(
+      handleLocationUpdate,
+      () => {},
+      {
         enableHighAccuracy: false,
-        timeout: 10000,
-        maximumAge: 5000,
-      });
-    }, LOCATION_CHECK_INTERVAL_MS);
+        distanceFilter: 100,
+        interval: 30000,
+        fastestInterval: 15000,
+      },
+    );
   }, [handleLocationUpdate, fetchNearbyPlaces]);
 
   /**
@@ -357,11 +359,6 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
     if (locationWatchId.current !== null) {
       Geolocation.clearWatch(locationWatchId.current);
       locationWatchId.current = null;
-    }
-
-    if (locationCheckInterval.current) {
-      clearInterval(locationCheckInterval.current);
-      locationCheckInterval.current = null;
     }
   }, []);
 
@@ -470,22 +467,37 @@ export const PlacesProvider: React.FC<PlacesProviderProps> = ({ children }) => {
     fetchSavedPlaces,
   ]);
 
-  const value: PlacesContextType = {
-    nearbyPlaces,
-    isLoadingNearby,
-    nearbyError,
-    savedPlaces,
-    isLoadingSaved,
-    savedError,
-    currentLocation,
-    refreshNearbyPlaces,
-    refreshSavedPlaces,
-    toggleSavePlace,
-    isPlaceSaved,
-    clearPlacesData,
-    // Called by the navigation root after login/logout to avoid polling
-    setAuthenticated: setIsUserAuthenticated,
-  };
+  const value = useMemo<PlacesContextType>(
+    () => ({
+      nearbyPlaces,
+      isLoadingNearby,
+      nearbyError,
+      savedPlaces,
+      isLoadingSaved,
+      savedError,
+      currentLocation,
+      refreshNearbyPlaces,
+      refreshSavedPlaces,
+      toggleSavePlace,
+      isPlaceSaved,
+      clearPlacesData,
+      setAuthenticated: setIsUserAuthenticated,
+    }),
+    [
+      nearbyPlaces,
+      isLoadingNearby,
+      nearbyError,
+      savedPlaces,
+      isLoadingSaved,
+      savedError,
+      currentLocation,
+      refreshNearbyPlaces,
+      refreshSavedPlaces,
+      toggleSavePlace,
+      isPlaceSaved,
+      clearPlacesData,
+    ],
+  );
 
   return (
     <PlacesContext.Provider value={value}>{children}</PlacesContext.Provider>

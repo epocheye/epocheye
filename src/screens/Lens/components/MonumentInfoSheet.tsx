@@ -5,6 +5,7 @@ import { MapPin } from 'lucide-react-native';
 import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
 import type { Place } from '../../../utils/api/places';
 import { FONTS } from '../../../core/constants/theme';
+import { getPlaceImage } from '../../../shared/utils';
 
 export interface MonumentInfoSheetRef {
   open: () => void;
@@ -57,6 +58,8 @@ const MonumentInfoSheet = forwardRef<
           <ResolvedSubjectImage
             subject={place.name}
             context={`${place.city} ${place.country} monument info`}
+            fallbackUri={getPlaceImage(place.categories)}
+            enableRemoteResolve
             style={styles.infoImage}
             imageStyle={styles.infoImage}
             loadingLabel="Loading monument visual..."

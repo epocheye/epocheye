@@ -46,6 +46,7 @@ export interface ResolveSubjectImageResponse {
   fromMemoryCache: boolean;
 }
 
+const MAX_CACHE_SIZE = 100;
 const resolvedCache = new Map<string, ResolveSubjectImageResponse>();
 const inflightCache = new Map<string, Promise<ResolveSubjectImageResponse>>();
 
@@ -219,6 +220,13 @@ export async function resolveSubjectImage(
   const requestPromise = resolveFromApi(params)
     .then(result => {
       resolvedCache.set(cacheKey, result);
+      // Evict oldest entry when cache exceeds limit
+      if (resolvedCache.size > MAX_CACHE_SIZE) {
+        const firstKey = resolvedCache.keys().next().value;
+        if (firstKey !== undefined) {
+          resolvedCache.delete(firstKey);
+        }
+      }
       return result;
     })
     .finally(() => {

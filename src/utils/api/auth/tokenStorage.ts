@@ -1,17 +1,67 @@
-/**
- * Token Storage Module
- * Handles secure storage and retrieval of authentication tokens using AsyncStorage
- */
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthTokens } from './types';
+import { STORAGE_KEYS } from '../../../core/constants/storage-keys';
 
-const STORAGE_KEYS = {
-  ACCESS_TOKEN: '@epocheye/access_token',
-  REFRESH_TOKEN: '@epocheye/refresh_token',
-  ACCESS_EXPIRES: '@epocheye/access_expires',
-  USER_ID: '@epocheye/user_id',
-} as const;
+type SessionCache = AuthTokens | null;
+
+let sessionCache: SessionCache = null;
+let sessionHydrationPromise: Promise<SessionCache> | null = null;
+let hasHydratedSession = false;
+
+function cloneTokens(tokens: AuthTokens | null): AuthTokens | null {
+  return tokens ? { ...tokens } : null;
+}
+
+function updateSessionCache(tokens: SessionCache): void {
+  sessionCache = cloneTokens(tokens);
+  hasHydratedSession = true;
+}
+
+async function hydrateSessionCache(): Promise<SessionCache> {
+  const results = await AsyncStorage.multiGet([
+    STORAGE_KEYS.AUTH.ACCESS_TOKEN,
+    STORAGE_KEYS.AUTH.REFRESH_TOKEN,
+    STORAGE_KEYS.AUTH.ACCESS_EXPIRES,
+    STORAGE_KEYS.AUTH.USER_ID,
+  ]);
+
+  const [accessToken, refreshToken, accessExpires, uid] = results.map(
+    ([, value]) => value,
+  );
+
+  if (!accessToken || !refreshToken || !accessExpires || !uid) {
+    updateSessionCache(null);
+    return null;
+  }
+
+  const tokens: AuthTokens = {
+    accessToken,
+    refreshToken,
+    accessExpires,
+    uid,
+  };
+
+  updateSessionCache(tokens);
+  return cloneTokens(tokens);
+}
+
+export async function bootstrapAuthSession(): Promise<AuthTokens | null> {
+  if (hasHydratedSession) {
+    return cloneTokens(sessionCache);
+  }
+
+  if (!sessionHydrationPromise) {
+    sessionHydrationPromise = hydrateSessionCache().finally(() => {
+      sessionHydrationPromise = null;
+    });
+  }
+
+  return sessionHydrationPromise;
+}
+
+export function getCachedTokens(): AuthTokens | null {
+  return cloneTokens(sessionCache);
+}
 
 /**
  * Stores authentication tokens securely in AsyncStorage
@@ -20,13 +70,14 @@ const STORAGE_KEYS = {
 export async function storeTokens(tokens: AuthTokens): Promise<void> {
   try {
     const entries: [string, string][] = [
-      [STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken],
-      [STORAGE_KEYS.REFRESH_TOKEN, tokens.refreshToken],
-      [STORAGE_KEYS.ACCESS_EXPIRES, tokens.accessExpires],
-      [STORAGE_KEYS.USER_ID, tokens.uid],
+      [STORAGE_KEYS.AUTH.ACCESS_TOKEN, tokens.accessToken],
+      [STORAGE_KEYS.AUTH.REFRESH_TOKEN, tokens.refreshToken],
+      [STORAGE_KEYS.AUTH.ACCESS_EXPIRES, tokens.accessExpires],
+      [STORAGE_KEYS.AUTH.USER_ID, tokens.uid],
     ];
 
     await AsyncStorage.multiSet(entries);
+    updateSessionCache(tokens);
   } catch {
     throw new Error('Failed to store authentication tokens');
   }
@@ -43,11 +94,20 @@ export async function updateAccessToken(
 ): Promise<void> {
   try {
     const entries: [string, string][] = [
-      [STORAGE_KEYS.ACCESS_TOKEN, accessToken],
-      [STORAGE_KEYS.ACCESS_EXPIRES, accessExpires],
+      [STORAGE_KEYS.AUTH.ACCESS_TOKEN, accessToken],
+      [STORAGE_KEYS.AUTH.ACCESS_EXPIRES, accessExpires],
     ];
 
     await AsyncStorage.multiSet(entries);
+    updateSessionCache(
+      sessionCache
+        ? {
+            ...sessionCache,
+            accessToken,
+            accessExpires,
+          }
+        : null,
+    );
   } catch {
     throw new Error('Failed to update access token');
   }
@@ -59,29 +119,10 @@ export async function updateAccessToken(
  */
 export async function getTokens(): Promise<AuthTokens | null> {
   try {
-    const keys = [
-      STORAGE_KEYS.ACCESS_TOKEN,
-      STORAGE_KEYS.REFRESH_TOKEN,
-      STORAGE_KEYS.ACCESS_EXPIRES,
-      STORAGE_KEYS.USER_ID,
-    ];
-
-    const results = await AsyncStorage.multiGet(keys);
-
-    const [accessToken, refreshToken, accessExpires, uid] = results.map(
-      ([, value]) => value
-    );
-
-    if (!accessToken || !refreshToken || !accessExpires || !uid) {
-      return null;
+    if (hasHydratedSession) {
+      return cloneTokens(sessionCache);
     }
-
-    return {
-      accessToken,
-      refreshToken,
-      accessExpires,
-      uid,
-    };
+    return bootstrapAuthSession();
   } catch {
     return null;
   }
@@ -93,7 +134,8 @@ export async function getTokens(): Promise<AuthTokens | null> {
  */
 export async function getAccessToken(): Promise<string | null> {
   try {
-    return await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    const tokens = await getTokens();
+    return tokens?.accessToken ?? null;
   } catch {
     return null;
   }
@@ -105,7 +147,8 @@ export async function getAccessToken(): Promise<string | null> {
  */
 export async function getRefreshToken(): Promise<string | null> {
   try {
-    return await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+    const tokens = await getTokens();
+    return tokens?.refreshToken ?? null;
   } catch {
     return null;
   }
@@ -117,7 +160,8 @@ export async function getRefreshToken(): Promise<string | null> {
  */
 export async function getUserId(): Promise<string | null> {
   try {
-    return await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
+    const tokens = await getTokens();
+    return tokens?.uid ?? null;
   } catch {
     return null;
   }
@@ -129,7 +173,8 @@ export async function getUserId(): Promise<string | null> {
  */
 export async function isAccessTokenExpired(): Promise<boolean> {
   try {
-    const expiresAt = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_EXPIRES);
+    const tokens = await getTokens();
+    const expiresAt = tokens?.accessExpires;
 
     if (!expiresAt) {
       return true;
@@ -151,8 +196,9 @@ export async function isAccessTokenExpired(): Promise<boolean> {
  */
 export async function clearTokens(): Promise<void> {
   try {
-    const keys = Object.values(STORAGE_KEYS);
+    const keys = Object.values(STORAGE_KEYS.AUTH);
     await AsyncStorage.multiRemove(keys);
+    updateSessionCache(null);
   } catch {
     throw new Error('Failed to clear authentication tokens');
   }

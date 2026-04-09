@@ -13,6 +13,7 @@ import BottomSheet, {
 import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
 import type { Place } from '../../../utils/api/places';
 import { FONTS } from '../../../core/constants/theme';
+import { getPlaceImage } from '../../../shared/utils';
 
 export interface SearchSheetRef {
   open: () => void;
@@ -97,6 +98,7 @@ const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
                   context={`${item.city} ${item.country} ${item.categories.join(
                     ', ',
                   )}`}
+                  fallbackUri={getPlaceImage(item.categories)}
                   style={styles.itemImage}
                   imageStyle={styles.itemImage}
                   loadingLabel="Loading..."

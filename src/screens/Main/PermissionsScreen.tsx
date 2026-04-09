@@ -1,26 +1,28 @@
 import React, { useCallback } from 'react';
 import { View, Text, StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import {
-  requestAllPermissions,
-  areAllPermissionsGranted,
-} from '../../utils/permissions';
 import AmberButton from '../../components/onboarding/AmberButton';
+import { PermissionService } from '../../shared/services';
 
 /**
  * Permissions screen shown within the main app when required permissions
- * (location, camera, storage) are missing. Triggered by usePermissionCheck hook.
+ * (location, camera, storage) are missing.
  */
 const PermissionsScreen: React.FC = () => {
   const navigation = useNavigation();
 
   const handleRequestPermissions = useCallback(async () => {
-    const result = await requestAllPermissions();
-    if (areAllPermissionsGranted(result)) {
+    const result = await PermissionService.requestAll();
+    if (PermissionService.areAllGranted(result)) {
       navigation.goBack();
+      return;
     }
-    // If not all granted, requestAllPermissions already shows an alert
-    // pointing user to settings. User can go back manually.
+
+    const firstMissingPermission =
+      PermissionService.getMissingPermissions(result)[0];
+    if (firstMissingPermission) {
+      PermissionService.showSettingsAlert(firstMissingPermission);
+    }
   }, [navigation]);
 
   const handleSkip = useCallback(() => {

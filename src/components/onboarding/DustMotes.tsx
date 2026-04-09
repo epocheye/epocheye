@@ -9,7 +9,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
-const PARTICLE_COUNT = 14;
+const PARTICLE_COUNT = 6;
 
 interface Particle {
   id: number;

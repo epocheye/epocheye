@@ -13,6 +13,7 @@ export interface UseResolvedSubjectImageOptions {
   subject?: string | null;
   context?: string;
   enabled?: boolean;
+  remote?: boolean;
 }
 
 export interface UseResolvedSubjectImageResult {
@@ -43,7 +44,7 @@ const EMPTY_STATE: ImageState = {
 export function useResolvedSubjectImage(
   options: UseResolvedSubjectImageOptions,
 ): UseResolvedSubjectImageResult {
-  const { subject, context, enabled = true } = options;
+  const { subject, context, enabled = true, remote = false } = options;
   const normalizedSubject = useMemo(() => subject?.trim() ?? '', [subject]);
   const normalizedContext = useMemo(() => context?.trim(), [context]);
 
@@ -63,7 +64,7 @@ export function useResolvedSubjectImage(
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
 
-    if (!enabled || !normalizedSubject) {
+    if (!enabled || !remote || !normalizedSubject) {
       setState(EMPTY_STATE);
       return;
     }
@@ -99,7 +100,7 @@ export function useResolvedSubjectImage(
       source: resolved.source,
       fromMemoryCache: resolved.fromMemoryCache,
     });
-  }, [enabled, normalizedSubject, params]);
+  }, [enabled, normalizedSubject, params, remote]);
 
   useEffect(() => {
     runResolution().catch(() => {

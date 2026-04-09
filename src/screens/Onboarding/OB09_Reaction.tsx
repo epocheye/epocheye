@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,8 @@ import {
   Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CheckCircle, BookOpen } from 'lucide-react-native';
+import { CheckCircle, BookOpen, Zap, Heart, Search } from 'lucide-react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import ConfettiCannon from 'react-native-confetti-cannon';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, {
   useSharedValue,
@@ -28,19 +27,19 @@ import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB09_Reaction'>;
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_WIDTH = (SCREEN_WIDTH - 48 - 20) / 3;
 
 const REACTIONS = [
-  { id: '🤯', emoji: '🤯', label: 'Mind-blowing', sub: 'Whoa' },
-  { id: '🥹', emoji: '🥹', label: 'Emotional', sub: 'Moved' },
-  { id: '🔍', emoji: '🔍', label: 'I want more', sub: 'Curious' },
+  { id: 'mind_blown', Icon: Zap, label: 'Mind-blowing', sub: 'Whoa' },
+  { id: 'emotional', Icon: Heart, label: 'Emotional', sub: 'Moved' },
+  { id: 'curious', Icon: Search, label: 'I want more', sub: 'Curious' },
 ] as const;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface ReactionTileProps {
-  emoji: string;
+  Icon: React.FC<{ size?: number; color?: string }>;
   label: string;
   sub: string;
   selected: boolean;
@@ -48,7 +47,7 @@ interface ReactionTileProps {
 }
 
 const ReactionTile: React.FC<ReactionTileProps> = ({
-  emoji,
+  Icon,
   label,
   sub,
   selected,
@@ -91,7 +90,7 @@ const ReactionTile: React.FC<ReactionTileProps> = ({
           <CheckCircle size={14} color="#E8A020" />
         </View>
       )}
-      <Text style={styles.tileEmoji}>{emoji}</Text>
+      <Icon size={36} color={selected ? '#E8A020' : '#B8AF9E'} />
       <Text style={styles.tileLabel} numberOfLines={2}>
         {label}
       </Text>
@@ -104,7 +103,6 @@ const OB09_Reaction: React.FC<Props> = ({ navigation }) => {
   const { demoStory, demoMonument, reactionEmoji } = useOnboardingStore();
   const setReaction = useOnboardingStore(s => s.setReaction);
   const insets = useSafeAreaInsets();
-  const confettiRef = useRef<ConfettiCannon | null>(null);
 
   const previewText =
     demoStory.length > 130 ? demoStory.slice(0, 130) + '...' : demoStory;
@@ -119,11 +117,7 @@ const OB09_Reaction: React.FC<Props> = ({ navigation }) => {
           ignoreAndroidSystemSettings: false,
         });
       } catch {}
-      // Defer heavy work so the tile scale animation runs uninterrupted
-      requestAnimationFrame(() => {
-        confettiRef.current?.start();
-        track('onboarding_story_reaction', { reaction: id });
-      });
+      track('onboarding_story_reaction', { reaction: id });
     },
     [setReaction],
   );
@@ -184,7 +178,7 @@ const OB09_Reaction: React.FC<Props> = ({ navigation }) => {
           {REACTIONS.map(r => (
             <ReactionTile
               key={r.id}
-              emoji={r.emoji}
+              Icon={r.Icon}
               label={r.label}
               sub={r.sub}
               selected={reactionEmoji === r.id}
@@ -204,15 +198,6 @@ const OB09_Reaction: React.FC<Props> = ({ navigation }) => {
           }
         />
       </View>
-
-      <ConfettiCannon
-        ref={confettiRef}
-        count={80}
-        origin={{ x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT * 0.6 }}
-        colors={['#E8A020', '#FFFFFF', '#FFD700', '#F5C842']}
-        autoStart={false}
-        fadeOut
-      />
     </LinearGradient>
   );
 };
@@ -323,10 +308,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-  },
-  tileEmoji: {
-    fontSize: 36,
-    lineHeight: 44,
   },
   tileLabel: {
     fontSize: 11,

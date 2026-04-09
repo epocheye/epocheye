@@ -16,7 +16,6 @@ import { getTour } from '../../utils/api/tours';
 import type { Tour } from '../../utils/api/tours';
 import { useTourPurchase } from '../../shared/hooks';
 import type { MainScreenProps } from '../../core/types/navigation.types';
-import { ROUTES } from '../../core/constants';
 
 type Props = MainScreenProps<'TourDetail'>;
 

@@ -27,6 +27,8 @@ export {
   isAccessTokenExpired,
   clearTokens,
   isAuthenticated,
+  bootstrapAuthSession,
+  getCachedTokens,
 } from './tokenStorage';
 
 // Types

@@ -11,7 +11,6 @@ import {
 import React, { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { usePermissionCheck } from '../../utils/usePermissionCheck';
 import { logout } from '../../utils/api/auth';
 import { useUser } from '../../context';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -36,18 +35,13 @@ type RNFile = { uri: string; type: string; name: string };
 type Props = TabScreenProps<'Settings'> & { onLogout?: () => void };
 
 const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
-  // Check permissions on this screen
-  usePermissionCheck();
-
-  // User context
-  const {
-    profile,
-    isLoading,
-    updateProfile,
-    uploadUserAvatar,
-    clearUserData,
-    refreshUserData,
-  } = useUser();
+  const profile = useUser(state => state.profile);
+  const isLoading = useUser(state => state.isLoading);
+  const updateProfile = useUser(state => state.updateProfile);
+  const uploadUserAvatar = useUser(state => state.uploadUserAvatar);
+  const clearUserData = useUser(state => state.clearUserData);
+  const refreshUserData = useUser(state => state.refreshUserData);
+  const ensureUserDataLoaded = useUser(state => state.ensureUserDataLoaded);
 
   // Profile form state
   const [fullName, setFullName] = useState('');
@@ -86,14 +80,15 @@ const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
   // into focus (e.g., returning from device Settings).
   useFocusEffect(
     useCallback(() => {
-      refreshUserData();
+      void ensureUserDataLoaded();
+      void refreshUserData();
       PermissionService.checkAll().then(result => {
         setPermissionStatus({
           camera: result.camera,
           location: result.location,
         });
       });
-    }, [refreshUserData]),
+    }, [ensureUserDataLoaded, refreshUserData]),
   );
 
   const handleSaveChanges = async () => {
@@ -121,7 +116,13 @@ const SettingsScreen: React.FC<Props> = ({ onLogout }) => {
     }
   };
 
-  const handleAvatarUpload = () => {
+  const handleAvatarUpload = async () => {
+    const hasStoragePermission = await PermissionService.request('storage');
+    if (!hasStoragePermission) {
+      PermissionService.showSettingsAlert('storage');
+      return;
+    }
+
     launchImageLibrary(
       {
         mediaType: 'photo',

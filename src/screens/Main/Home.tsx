@@ -7,6 +7,7 @@ import {
   ImageBackground,
   ScrollView,
   Modal,
+  InteractionManager,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
@@ -37,10 +38,8 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import ThinkingDots from '../../components/ui/ThinkingDots';
 import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
-import { usePermissionCheck } from '../../utils/usePermissionCheck';
 import { usePlaces } from '../../context';
 import { useUser } from '../../context';
-import { useResolvedSubjectImage } from '../../shared/hooks';
 import type { TabScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
 import type { Place } from '../../utils/api/places/types';
@@ -52,6 +51,7 @@ import type { PersonalizedFact } from '../../utils/api/user';
 import { getTours, getMyTours } from '../../utils/api/tours';
 import type { Tour, MyTour } from '../../utils/api/tours';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
+import { buildSiteDetailData, getPlaceImage } from '../../shared/utils';
 
 const FACT_LOADING_LINES = [
   'Tracing your heritage...',
@@ -60,28 +60,6 @@ const FACT_LOADING_LINES = [
   'Connecting the threads...',
   'Reading the monuments...',
 ];
-
-const CATEGORY_IMAGE_MAP: Record<string, string> = {
-  temple:
-    'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80',
-  religious:
-    'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80',
-  fort: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80',
-  castle:
-    'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80',
-};
-const FALLBACK_PLACE_IMAGE =
-  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80';
-
-function getPlaceImage(categories: string[]): string {
-  const first = categories[0]?.toLowerCase() ?? '';
-  for (const [keyword, uri] of Object.entries(CATEGORY_IMAGE_MAP)) {
-    if (first.includes(keyword)) {
-      return uri;
-    }
-  }
-  return FALLBACK_PLACE_IMAGE;
-}
 
 function buildFallbackFacts(
   userName: string,
@@ -129,12 +107,6 @@ interface PlaceCardProps {
 const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, onPress }) => {
   const scale = useSharedValue(1);
   const fallbackImageUri = getPlaceImage(place.categories);
-  const { url: resolvedImageUri } = useResolvedSubjectImage({
-    subject: place.name,
-    context: `${place.city} ${place.country} ${place.categories.join(', ')}`,
-    enabled: !!place.name,
-  });
-  const imageUri = resolvedImageUri ?? fallbackImageUri;
   const distanceKm = (place.distance_meters / 1000).toFixed(1);
   const shortDescription = place.categories[0] || 'Historic site';
 
@@ -162,7 +134,7 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, onPress }) => {
       accessibilityHint="Opens the site details screen"
     >
       <ImageBackground
-        source={{ uri: imageUri }}
+        source={{ uri: fallbackImageUri }}
         style={cardStyles.image}
         imageStyle={cardStyles.imageMask}
       >
@@ -246,9 +218,11 @@ const SkeletonCard: React.FC = () => {
 };
 
 const Home = ({ navigation }: Props) => {
-  usePermissionCheck();
-  const { nearbyPlaces, isLoadingNearby, nearbyError } = usePlaces();
-  const { profile } = useUser();
+  const nearbyPlaces = usePlaces(state => state.nearbyPlaces);
+  const isLoadingNearby = usePlaces(state => state.isLoadingNearby);
+  const nearbyError = usePlaces(state => state.nearbyError);
+  const ensureLocationTracking = usePlaces(state => state.ensureLocationTracking);
+  const profile = useUser(state => state.profile);
 
   const [factsVisible, setFactsVisible] = useState(true);
   const [isLoadingFacts, setIsLoadingFacts] = useState(true);
@@ -272,6 +246,10 @@ const Home = ({ navigation }: Props) => {
     entrance.value = withSpring(0, { damping: 20, stiffness: 200 });
     contentOpacity.value = withTiming(1, { duration: 400 });
   }, [contentOpacity, entrance]);
+
+  useEffect(() => {
+    void ensureLocationTracking();
+  }, [ensureLocationTracking]);
 
   const entranceStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
@@ -322,33 +300,9 @@ const Home = ({ navigation }: Props) => {
 
   const handleVisitPlace = useCallback(
     (place: Place) => {
-      const siteData = {
-        id: place.id,
-        name: place.name,
-        location: place.formatted || `${place.city}, ${place.country}`,
-        era: place.categories[0] || 'Historic',
-        style: place.categories.join(', ') || 'Architecture',
-        yearBuilt: 'Unknown',
-        distance: `${(place.distance_meters / 1000).toFixed(1)} km`,
-        estimatedTime: '45 min',
-        heroImages: [getPlaceImage(place.categories)],
-        shortDescription: `Explore ${place.name} located at ${place.formatted}.`,
-        fullDescription: `${place.name} is a historic site located at ${place.formatted}. Discover its rich history and cultural significance.`,
-        funFacts: [],
-        visitorTips: [
-          'Best visited during early morning or late afternoon.',
-          'Carry water and wear comfortable shoes.',
-        ],
-        relatedSites: [],
-        rating: 4.5,
-        reviews: 0,
-        lat: place.lat,
-        lon: place.lon,
-        address_line1: place.address_line1,
-        city: place.city,
-        country: place.country,
-      };
-      navigation.navigate('SiteDetail', { site: siteData });
+      navigation.navigate('SiteDetail', {
+        site: buildSiteDetailData(place),
+      });
     },
     [navigation],
   );
@@ -384,33 +338,63 @@ const Home = ({ navigation }: Props) => {
   }, [topNearbyPlaces, userName]);
 
   useEffect(() => {
-    loadPersonalizedFacts();
+    const task = InteractionManager.runAfterInteractions(() => {
+      void loadPersonalizedFacts();
+    });
+
+    return () => {
+      task.cancel();
+    };
   }, [loadPersonalizedFacts]);
 
   // Load available tours for the Tours section
   useEffect(() => {
-    getTours().then(result => {
-      if (result.success) setTours(result.data.slice(0, 3));
+    const task = InteractionManager.runAfterInteractions(() => {
+      getTours().then(result => {
+        if (result.success) {
+          setTours(result.data.slice(0, 3));
+        }
+      });
     });
+
+    return () => {
+      task.cancel();
+    };
   }, []);
 
   // Check if user has a free tour they haven't seen yet
   useEffect(() => {
-    async function checkFreeTourBanner() {
-      const dismissed = await AsyncStorage.getItem(
-        STORAGE_KEYS.TOURS.FREE_TOUR_BANNER_DISMISSED,
-      );
-      if (dismissed) return;
-      const result = await getMyTours();
-      if (!result.success) return;
-      const freeTour = result.data.find(
-        t =>
-          t.source === 'free_grant' &&
-          new Date(t.expires_at).getTime() > Date.now(),
-      );
-      if (freeTour) setBannerTour(freeTour);
-    }
-    checkFreeTourBanner();
+    const task = InteractionManager.runAfterInteractions(() => {
+      async function checkFreeTourBanner() {
+        const dismissed = await AsyncStorage.getItem(
+          STORAGE_KEYS.TOURS.FREE_TOUR_BANNER_DISMISSED,
+        );
+        if (dismissed) {
+          return;
+        }
+
+        const result = await getMyTours();
+        if (!result.success) {
+          return;
+        }
+
+        const freeTour = result.data.find(
+          tour =>
+            tour.source === 'free_grant' &&
+            new Date(tour.expires_at).getTime() > Date.now(),
+        );
+
+        if (freeTour) {
+          setBannerTour(freeTour);
+        }
+      }
+
+      void checkFreeTourBanner();
+    });
+
+    return () => {
+      task.cancel();
+    };
   }, []);
 
   const handleFactPress = useCallback(
@@ -551,6 +535,9 @@ const Home = ({ navigation }: Props) => {
                 keyExtractor={item => item.id}
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled
+                initialNumToRender={4}
+                maxToRenderPerBatch={3}
+                windowSize={5}
                 contentContainerStyle={{ paddingRight: 8, paddingBottom: 8 }}
               />
             )}

@@ -9,6 +9,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   ReactNode,
 } from 'react';
 import {
@@ -190,17 +191,30 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     initializeUser();
   }, [fetchUserData]);
 
-  const value: UserContextType = {
-    profile,
-    stats,
-    isLoading,
-    isRefreshing,
-    error,
-    refreshUserData,
-    updateProfile,
-    uploadUserAvatar,
-    clearUserData,
-  };
+  const value = useMemo<UserContextType>(
+    () => ({
+      profile,
+      stats,
+      isLoading,
+      isRefreshing,
+      error,
+      refreshUserData,
+      updateProfile,
+      uploadUserAvatar,
+      clearUserData,
+    }),
+    [
+      profile,
+      stats,
+      isLoading,
+      isRefreshing,
+      error,
+      refreshUserData,
+      updateProfile,
+      uploadUserAvatar,
+      clearUserData,
+    ],
+  );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 };

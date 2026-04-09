@@ -9,7 +9,10 @@
       "Bash(file /e/epocheye/src/assets/images/logo-*.svg)",
       "Bash(grep -r className= /e/epocheye/src/screens/Main/ --include=*.tsx)",
       "Bash(grep -r style={styles. /e/epocheye/src/screens/Main/ --include=*.tsx)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(grep -E \"export default.*React\\\\.FC|export default.*React\\\\.FC\" src/components/onboarding/*.tsx)",
+      "Bash(xargs cat:*)",
+      "Bash(grep -r \"useMemo\\\\|useCallback\" /E/epocheye/src/context/*.tsx)"
     ]
   }
 }

@@ -66,6 +66,7 @@ const ARExperienceScreen: React.FC<ARExperienceScreenProps> = ({
     subject: site?.name || "Humayun's Tomb",
     context: `${site?.location || 'unknown location'} AR monument visual`,
     enabled: true,
+    remote: true,
   });
   const cameraPlaceholderUri = resolvedArImage ?? CAMERA_PLACEHOLDER;
 

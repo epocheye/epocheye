@@ -45,21 +45,24 @@ const AnimatedLogo: React.FC<AnimatedLogoProps> = ({
       false,
     );
 
-    rotation.value = withRepeat(
-      withTiming(360, { duration: 6000, easing: Easing.linear }),
-      -1,
-      false,
-    );
+    // Only start rotation and drift for orbit/drift modes to save resources
+    if (motion === 'orbit' || motion === 'drift') {
+      rotation.value = withRepeat(
+        withTiming(360, { duration: 6000, easing: Easing.linear }),
+        -1,
+        false,
+      );
 
-    yDrift.value = withRepeat(
-      withSequence(
-        withTiming(-4, { duration: 900, easing: Easing.inOut(Easing.sin) }),
-        withTiming(4, { duration: 900, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      true,
-    );
-  }, [rotation, scaleProgress, yDrift]);
+      yDrift.value = withRepeat(
+        withSequence(
+          withTiming(-4, { duration: 900, easing: Easing.inOut(Easing.sin) }),
+          withTiming(4, { duration: 900, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
+        true,
+      );
+    }
+  }, [rotation, scaleProgress, yDrift, motion]);
 
   const logoStyle = useAnimatedStyle(() => {
     const pulseScale = interpolate(scaleProgress.value, [0, 1], [0.92, 1.08]);

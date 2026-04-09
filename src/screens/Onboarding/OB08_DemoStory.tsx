@@ -11,6 +11,9 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withRepeat,
+  withSequence,
+  Easing,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +26,7 @@ import { track } from '../../services/analytics';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
+import { getOnboardingVisualFallback } from '../../components/onboarding/visual-fallbacks';
 
 type Props = OnboardingScreenProps<'OB08_DemoStory'>;
 
@@ -58,12 +62,12 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [isStreaming, setIsStreaming] = useState(true);
   const [showEndCard, setShowEndCard] = useState(false);
-  const [cursorVisible, setCursorVisible] = useState(true);
   const [waitMessageIndex, setWaitMessageIndex] = useState(0);
   const [waitStepIndex, setWaitStepIndex] = useState(0);
   const doneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const failsafeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completedRef = useRef(false);
+  const cursorOpacity = useSharedValue(1);
 
   const triggerCompletion = (monument: string) => {
     if (completedRef.current) {
@@ -91,7 +95,6 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     failsafeTimerRef.current = setTimeout(() => {
       if (!completedRef.current) {
-        console.log('[OB08] Failsafe triggered — forcing end card');
         triggerCompletion('');
         setShowEndCard(true);
       }
@@ -108,35 +111,38 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Blinking cursor
+  // Blinking cursor — runs on native thread via Reanimated
   useEffect(() => {
-    if (!isStreaming) {
-      setCursorVisible(false);
-      return;
+    if (isStreaming) {
+      cursorOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0, { duration: 400, easing: Easing.inOut(Easing.quad) }),
+          withTiming(1, { duration: 400, easing: Easing.inOut(Easing.quad) }),
+        ),
+        -1,
+        false,
+      );
+    } else {
+      cursorOpacity.value = withTiming(0, { duration: 200 });
     }
-    const interval = setInterval(() => {
-      setCursorVisible(v => !v);
-    }, 500);
-    return () => clearInterval(interval);
-  }, [isStreaming]);
+  }, [isStreaming, cursorOpacity]);
 
+  const cursorStyle = useAnimatedStyle(() => ({
+    opacity: cursorOpacity.value,
+  }));
+
+  // Single interval for loading state rotation (messages + steps)
   useEffect(() => {
     if (!isStreaming || demoStory.length > 0) {
       return;
     }
 
-    const messageTimer = setInterval(() => {
+    const loadingTimer = setInterval(() => {
       setWaitMessageIndex(prev => (prev + 1) % STORY_WAIT_MESSAGES.length);
+      setWaitStepIndex(prev => (prev + 1) % STORY_WAIT_STEPS.length);
     }, 2400);
 
-    const stepTimer = setInterval(() => {
-      setWaitStepIndex(prev => (prev + 1) % STORY_WAIT_STEPS.length);
-    }, 1800);
-
-    return () => {
-      clearInterval(messageTimer);
-      clearInterval(stepTimer);
-    };
+    return () => clearInterval(loadingTimer);
   }, [demoStory.length, isStreaming]);
 
   const cardOpacity = useSharedValue(0);
@@ -173,7 +179,13 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
           context={`onboarding demo story monument ${
             demoMonument || 'generated'
           }`}
-          fallbackUri={fallbackMonumentImage}
+          fallbackUri={
+            fallbackMonumentImage ??
+            getOnboardingVisualFallback(
+              imageSubject,
+              `onboarding demo story monument ${demoMonument || 'generated'}`,
+            )
+          }
           style={StyleSheet.absoluteFill}
           imageStyle={styles.imageFill}
           loadingLabel="Resolving monument visual..."
@@ -202,7 +214,7 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
         >
           {demoStory.length === 0 ? (
             <View style={styles.loadingArea}>
-              <AnimatedLogo size={72} motion="orbit" variant="white" />
+              <AnimatedLogo size={72} motion="pulse" variant="white" showRing={false} />
               <Text style={styles.loadingHeadline}>
                 {STORY_WAIT_MESSAGES[waitMessageIndex]}
               </Text>
@@ -226,7 +238,9 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
           ) : (
             <Text style={styles.storyText}>
               {demoStory}
-              {isStreaming && cursorVisible ? '|' : ''}
+              {isStreaming ? (
+                <Animated.Text style={cursorStyle}>|</Animated.Text>
+              ) : null}
             </Text>
           )}
         </ScrollView>

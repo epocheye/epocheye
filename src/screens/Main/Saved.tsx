@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Text,
@@ -16,7 +16,8 @@ import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import { usePlaces } from '../../context';
 import type { TabScreenProps } from '../../core/types/navigation.types';
-import type { SavedPlace, Place } from '../../utils/api/places/types';
+import type { SavedPlace } from '../../utils/api/places/types';
+import { buildSiteDetailData, getPlaceImage } from '../../shared/utils';
 
 // Enable LayoutAnimation on Android so card removal is animated.
 // Must be called at module level before the component is rendered.
@@ -27,77 +28,26 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Map a place's first category to a relevant stock image.
-// This is a temporary measure until the backend supplies its own CDN images.
-const CATEGORY_IMAGE_MAP: Record<string, string> = {
-  temple:
-    'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80',
-  religious:
-    'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80',
-  fort: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80',
-  castle:
-    'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80',
-};
-const FALLBACK_PLACE_IMAGE =
-  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80';
-
-/** Returns a representative image URI for a place based on its categories. */
-function getPlaceImage(categories: string[]): string {
-  const first = categories[0]?.toLowerCase() ?? '';
-  for (const [keyword, uri] of Object.entries(CATEGORY_IMAGE_MAP)) {
-    if (first.includes(keyword)) {
-      return uri;
-    }
-  }
-  return FALLBACK_PLACE_IMAGE;
-}
-
-/** Converts a raw Place API object into the shape expected by SiteDetail. */
-function buildSiteData(place: Place) {
-  return {
-    id: place.id,
-    name: place.name,
-    location: place.formatted || `${place.city}, ${place.country}`,
-    era: place.categories[0] || 'Historic',
-    style: place.categories.join(', ') || 'Architecture',
-    yearBuilt: 'Unknown',
-    distance: `${(place.distance_meters / 1000).toFixed(1)} km`,
-    estimatedTime: '45 min',
-    // Placeholder hero image until the backend provides CDN URLs
-    heroImages: [getPlaceImage(place.categories)],
-    shortDescription: `Explore ${place.name} located at ${place.formatted}.`,
-    fullDescription: `${place.name} is a historic site located at ${place.formatted}. Discover its rich history and cultural significance.`,
-    funFacts: [],
-    visitorTips: [
-      'Best visited during early morning or late afternoon.',
-      'Carry water and wear comfortable shoes.',
-    ],
-    relatedSites: [],
-    rating: 4.5,
-    reviews: 0,
-    lat: place.lat,
-    lon: place.lon,
-    address_line1: place.address_line1,
-    city: place.city,
-    country: place.country,
-  };
-}
-
 type Props = TabScreenProps<'Saved'>;
 
 const Saved = ({ navigation }: Props) => {
-  const {
-    savedPlaces,
-    isLoadingSaved,
-    savedError,
-    refreshSavedPlaces,
-    toggleSavePlace,
-  } = usePlaces();
+  const savedPlaces = usePlaces(state => state.savedPlaces);
+  const isLoadingSaved = usePlaces(state => state.isLoadingSaved);
+  const savedError = usePlaces(state => state.savedError);
+  const refreshSavedPlaces = usePlaces(state => state.refreshSavedPlaces);
+  const ensureSavedPlacesLoaded = usePlaces(
+    state => state.ensureSavedPlacesLoaded,
+  );
+  const toggleSavePlace = usePlaces(state => state.toggleSavePlace);
 
   const [activeFilter, setActiveFilter] = useState('All');
   const [selectedPlace, setSelectedPlace] = useState<SavedPlace | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    void ensureSavedPlacesLoaded();
+  }, [ensureSavedPlacesLoaded]);
 
   // Filter out entries that lack a valid place_data shape. The API normalises
   // this in getSavedPlaces(), but we defend here as an extra guard.
@@ -147,7 +97,7 @@ const Saved = ({ navigation }: Props) => {
 
   const handleLaunchPlace = (saved: SavedPlace) => {
     navigation.navigate('SiteDetail', {
-      site: buildSiteData(saved.place_data),
+      site: buildSiteDetailData(saved.place_data),
     });
   };
 

@@ -12,6 +12,7 @@ import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import { track } from '../../services/analytics';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
+import { getOnboardingVisualFallback } from '../../components/onboarding/visual-fallbacks';
 
 type Props = OnboardingScreenProps<'OB01_Welcome'>;
 
@@ -51,7 +52,13 @@ const OB01_Welcome: React.FC<Props> = ({ navigation }) => {
       <ResolvedSubjectImage
         subject={WELCOME_SUBJECT}
         context="onboarding welcome first impression"
-        fallbackUri={MONUMENT_BG}
+        fallbackUri={
+          MONUMENT_BG ??
+          getOnboardingVisualFallback(
+            WELCOME_SUBJECT,
+            'onboarding welcome first impression',
+          )
+        }
         style={styles.bg}
         imageStyle={styles.bg}
         loadingLabel="Finding your first monument..."

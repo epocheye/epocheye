@@ -10,6 +10,7 @@ import { OB_COLORS } from '../../constants/onboarding';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
+import { getOnboardingVisualFallback } from '../../components/onboarding/visual-fallbacks';
 
 type Props = OnboardingScreenProps<'OB00_Splash'>;
 
@@ -42,6 +43,10 @@ const OB00_Splash: React.FC<Props> = ({ navigation }) => {
       <ResolvedSubjectImage
         subject={SPLASH_SUBJECT}
         context="onboarding splash cinematic opening"
+        fallbackUri={getOnboardingVisualFallback(
+          SPLASH_SUBJECT,
+          'onboarding splash cinematic opening',
+        )}
         style={styles.backdrop}
         loadingLabel="Loading opening visual..."
         showSkeletonWhileLoading

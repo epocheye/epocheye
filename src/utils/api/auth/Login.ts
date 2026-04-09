@@ -18,6 +18,7 @@ import {
   isAccessTokenExpired,
   getAccessToken,
   clearTokens,
+  bootstrapAuthSession,
 } from './tokenStorage';
 import {
   createBaseClient,
@@ -27,6 +28,9 @@ import {
 } from '../helpers';
 
 const apiClient: AxiosInstance = createBaseClient();
+let authenticatedClient: AxiosInstance | null = null;
+let refreshRequestPromise: Promise<AuthResult<RefreshTokenResponse>> | null =
+  null;
 
 /**
  * Authenticates user with email and password
@@ -82,6 +86,11 @@ export async function login(
 export async function refreshAccessToken(): Promise<
   AuthResult<RefreshTokenResponse>
 > {
+  if (refreshRequestPromise) {
+    return refreshRequestPromise;
+  }
+
+  refreshRequestPromise = (async () => {
   try {
     const refreshToken = await getRefreshToken();
 
@@ -133,6 +142,13 @@ export async function refreshAccessToken(): Promise<
       },
     };
   }
+  })();
+
+  try {
+    return await refreshRequestPromise;
+  } finally {
+    refreshRequestPromise = null;
+  }
 }
 
 /**
@@ -141,6 +157,8 @@ export async function refreshAccessToken(): Promise<
  * @returns Valid access token or null if authentication failed
  */
 export async function getValidAccessToken(): Promise<string | null> {
+  await bootstrapAuthSession();
+
   const isExpired = await isAccessTokenExpired();
 
   if (isExpired) {
@@ -166,6 +184,10 @@ export async function logout(): Promise<void> {
  * @returns Configured axios instance with auth interceptors
  */
 export function createAuthenticatedClient(): AxiosInstance {
+  if (authenticatedClient) {
+    return authenticatedClient;
+  }
+
   const authClient = createBaseClient();
 
   // Request interceptor to add auth token
@@ -175,6 +197,7 @@ export function createAuthenticatedClient(): AxiosInstance {
       if (!accessToken) {
         throw new Error('Not authenticated. Please login again.');
       }
+      config.headers = config.headers ?? {};
       config.headers.Authorization = `Bearer ${accessToken}`;
       return config;
     },
@@ -198,6 +221,7 @@ export function createAuthenticatedClient(): AxiosInstance {
         const refreshResult = await refreshAccessToken();
 
         if (refreshResult.success) {
+          originalRequest.headers = originalRequest.headers ?? {};
           originalRequest.headers.Authorization = `Bearer ${refreshResult.data.access_token}`;
           return authClient(originalRequest);
         }
@@ -211,6 +235,7 @@ export function createAuthenticatedClient(): AxiosInstance {
     }
   );
 
+  authenticatedClient = authClient;
   return authClient;
 }
 

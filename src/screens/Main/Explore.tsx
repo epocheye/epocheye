@@ -21,62 +21,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ArrowRight, Compass, MapPin, Search, X } from 'lucide-react-native';
 import { usePlaces } from '../../context';
-import { useResolvedSubjectImage } from '../../shared/hooks';
 import { useDebounce } from '../../shared/hooks';
 import type { TabScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
 import type { Place } from '../../utils/api/places/types';
+import { buildSiteDetailData, getPlaceImage } from '../../shared/utils';
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
-const CATEGORY_IMAGE_MAP: Record<string, string> = {
-  temple:
-    'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80',
-  religious:
-    'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=800&q=80',
-  fort: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80',
-  castle:
-    'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=800&q=80',
-};
-const FALLBACK_PLACE_IMAGE =
-  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80';
-
-function getPlaceImage(categories: string[]): string {
-  const first = categories[0]?.toLowerCase() ?? '';
-  for (const [keyword, uri] of Object.entries(CATEGORY_IMAGE_MAP)) {
-    if (first.includes(keyword)) return uri;
-  }
-  return FALLBACK_PLACE_IMAGE;
-}
-
-function buildSiteData(place: Place) {
-  return {
-    id: place.id,
-    name: place.name,
-    location: place.formatted || `${place.city}, ${place.country}`,
-    era: place.categories[0] || 'Historic',
-    style: place.categories.join(', ') || 'Architecture',
-    yearBuilt: 'Unknown',
-    distance: `${(place.distance_meters / 1000).toFixed(1)} km`,
-    estimatedTime: '45 min',
-    heroImages: [getPlaceImage(place.categories)],
-    shortDescription: `Explore ${place.name} located at ${place.formatted}.`,
-    fullDescription: `${place.name} is a historic site located at ${place.formatted}. Discover its rich history and cultural significance.`,
-    funFacts: [],
-    visitorTips: [
-      'Best visited during early morning or late afternoon.',
-      'Carry water and wear comfortable shoes.',
-    ],
-    relatedSites: [],
-    rating: 4.5,
-    reviews: 0,
-    lat: place.lat,
-    lon: place.lon,
-    address_line1: place.address_line1,
-    city: place.city,
-    country: place.country,
-  };
-}
 
 // ─── ExploreCard ──────────────────────────────────────────────────────────────
 
@@ -89,12 +41,6 @@ const ExploreCard: React.FC<ExploreCardProps> = React.memo(
   ({ place, onPress }) => {
     const scale = useSharedValue(1);
     const fallbackUri = getPlaceImage(place.categories);
-    const { url: resolvedUri } = useResolvedSubjectImage({
-      subject: place.name,
-      context: `${place.city} ${place.country} ${place.categories.join(', ')}`,
-      enabled: !!place.name,
-    });
-    const imageUri = resolvedUri ?? fallbackUri;
     const distanceKm = (place.distance_meters / 1000).toFixed(1);
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -116,7 +62,7 @@ const ExploreCard: React.FC<ExploreCardProps> = React.memo(
           accessibilityLabel={`Visit ${place.name}`}
         >
           <ImageBackground
-            source={{ uri: imageUri }}
+            source={{ uri: fallbackUri }}
             style={exploreCardStyles.image}
             imageStyle={exploreCardStyles.imageMask}
           >
@@ -225,7 +171,9 @@ const FilterChip: React.FC<FilterChipProps> = ({ label, active, onPress }) => (
 type Props = TabScreenProps<'Explore'>;
 
 const Explore: React.FC<Props> = ({ navigation }) => {
-  const { nearbyPlaces, isLoadingNearby } = usePlaces();
+  const nearbyPlaces = usePlaces(state => state.nearbyPlaces);
+  const isLoadingNearby = usePlaces(state => state.isLoadingNearby);
+  const ensureLocationTracking = usePlaces(state => state.ensureLocationTracking);
   const [searchText, setSearchText] = useState('');
   const [activeRegion, setActiveRegion] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -237,6 +185,10 @@ const Explore: React.FC<Props> = ({ navigation }) => {
     fadeIn.value = withTiming(1, { duration: 350 });
   }, [fadeIn]);
   const containerStyle = useAnimatedStyle(() => ({ opacity: fadeIn.value }));
+
+  useEffect(() => {
+    void ensureLocationTracking();
+  }, [ensureLocationTracking]);
 
   // Derive unique regions and categories from nearby places.
   const regions = useMemo(() => {
@@ -284,7 +236,9 @@ const Explore: React.FC<Props> = ({ navigation }) => {
 
   const handleCardPress = useCallback(
     (place: Place) => {
-      navigation.navigate(ROUTES.MAIN.SITE_DETAIL, { site: buildSiteData(place) });
+      navigation.navigate(ROUTES.MAIN.SITE_DETAIL, {
+        site: buildSiteDetailData(place),
+      });
     },
     [navigation],
   );
@@ -439,6 +393,10 @@ const Explore: React.FC<Props> = ({ navigation }) => {
               contentContainerStyle={{ paddingBottom: 24, gap: 12 }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              initialNumToRender={6}
+              maxToRenderPerBatch={4}
+              windowSize={5}
+              removeClippedSubviews
             />
           )}
         </Animated.View>

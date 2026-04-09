@@ -76,8 +76,9 @@ async function findNearestPlace(
 
 const LensScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const { profile } = useUser();
-  const { nearbyPlaces } = usePlaces();
+  const profile = useUser(state => state.profile);
+  const nearbyPlaces = usePlaces(state => state.nearbyPlaces);
+  const ensureLocationTracking = usePlaces(state => state.ensureLocationTracking);
   const storeFirstName = useOnboardingStore(state => state.firstName);
   const storeMotivation = useOnboardingStore(state => state.motivation);
   const storeRegions = useOnboardingStore(state => state.regions);
@@ -213,6 +214,10 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     track('lens_opened');
   }, []);
+
+  useEffect(() => {
+    void ensureLocationTracking();
+  }, [ensureLocationTracking]);
 
   useEffect(() => {
     if (!hasPermission && !permissionRequestedRef.current) {

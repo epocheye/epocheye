@@ -1,149 +1,90 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { NavigationContainer, NavigationState } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
 import { View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigation from './MainNavigation';
 import LoginScreen from '../screens/Auth/LoginScreen';
-import { isAuthenticated } from '../utils/api/auth';
-import { StorageService } from '../shared/services';
 import { STORAGE_KEYS } from '../core/constants';
 import AnimatedLogo from '../components/ui/AnimatedLogo';
-import { usePlaces } from '../context';
 import { OnboardingCallbackProvider } from '../context/OnboardingCallbackContext';
+import { useSessionStore } from '../stores/sessionStore';
+import { useUserStore } from '../stores/userStore';
+import { usePlacesStore } from '../stores/placesStore';
 
-/**
- * Three-state root navigator:
- * - 'onboarding': First-time user. Shows OnboardingNavigator.
- * - 'login': Returning user whose tokens expired. Shows LoginScreen.
- * - 'main': Authenticated user. Shows MainNavigation.
- */
 type AppState = 'loading' | 'onboarding' | 'login' | 'main';
 
 const AppNavigator: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('loading');
-  const [initialNavState, setInitialNavState] = useState<
-    NavigationState | undefined
-  >(undefined);
-  const navigationRef = useRef<any>(null);
-  const navStateSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
+  const bootstrapSession = useSessionStore(state => state.bootstrapSession);
+  const setSessionAuthenticated = useSessionStore(
+    state => state.setAuthenticated,
   );
-  const pendingNavStateRef = useRef<NavigationState | undefined>(undefined);
-  const { setAuthenticated } = usePlaces();
 
-  useEffect(() => {
-    const loadNavigationState = async () => {
-      try {
-        const savedState = await StorageService.get<NavigationState>(
-          STORAGE_KEYS.NAVIGATION.STATE,
-        );
-        if (savedState) {
-          setInitialNavState(savedState);
-        }
-      } catch {
-        // Navigation state loading failed silently
-      }
-    };
-
-    loadNavigationState();
+  const clearAuthenticatedState = useCallback(() => {
+    useUserStore.getState().clearUserData();
+    usePlacesStore.getState().clearPlacesData();
   }, []);
 
   const checkAppState = useCallback(async () => {
     try {
       const [onboardingComplete, authenticated] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING.COMPLETED),
-        isAuthenticated(),
+        bootstrapSession(),
       ]);
 
       const hasCompletedOnboarding = onboardingComplete === 'true';
 
       if (hasCompletedOnboarding && authenticated) {
-        // Fully authenticated returning user → skip straight to main app
-        setAuthenticated(true);
+        setSessionAuthenticated(true);
+        void useUserStore.getState().ensureUserDataLoaded();
         setAppState('main');
-      } else if (hasCompletedOnboarding && !authenticated) {
-        // Returning user whose tokens expired → show login screen only
-        setAuthenticated(false);
-        setAppState('login');
-      } else {
-        // First-time user → show full onboarding
-        setAuthenticated(false);
-        setAppState('onboarding');
+        return;
       }
+
+      if (hasCompletedOnboarding) {
+        setSessionAuthenticated(false);
+        clearAuthenticatedState();
+        setAppState('login');
+        return;
+      }
+
+      setSessionAuthenticated(false);
+      clearAuthenticatedState();
+      setAppState('onboarding');
     } catch {
-      setAuthenticated(false);
+      setSessionAuthenticated(false);
+      clearAuthenticatedState();
       setAppState('onboarding');
     }
-  }, [setAuthenticated]);
+  }, [bootstrapSession, clearAuthenticatedState, setSessionAuthenticated]);
 
   useEffect(() => {
-    checkAppState();
+    void checkAppState();
   }, [checkAppState]);
 
   const handleLogout = useCallback(() => {
-    // After logout, returning users see the login screen (not re-onboarding)
-    setAuthenticated(false);
+    setSessionAuthenticated(false);
+    clearAuthenticatedState();
     setAppState('login');
-  }, [setAuthenticated]);
+  }, [clearAuthenticatedState, setSessionAuthenticated]);
 
-  // Called by OB12_Arrival when onboarding completes
   const handleOnboardingComplete = useCallback(() => {
-    setAuthenticated(true);
+    setSessionAuthenticated(true);
+    void useUserStore.getState().ensureUserDataLoaded();
     setAppState('main');
-  }, [setAuthenticated]);
+  }, [setSessionAuthenticated]);
 
-  // Called by LoginScreen on successful sign-in
   const handleLoginSuccess = useCallback(() => {
-    setAuthenticated(true);
+    setSessionAuthenticated(true);
+    void useUserStore.getState().ensureUserDataLoaded();
     setAppState('main');
-  }, [setAuthenticated]);
-
-  const persistNavigationState = useCallback(async () => {
-    if (!pendingNavStateRef.current) {
-      return;
-    }
-
-    try {
-      await StorageService.set(
-        STORAGE_KEYS.NAVIGATION.STATE,
-        pendingNavStateRef.current,
-      );
-    } catch {
-      // Navigation state saving failed silently
-    }
-  }, []);
-
-  const handleStateChange = useCallback(
-    (state: NavigationState | undefined) => {
-      pendingNavStateRef.current = state;
-
-      if (navStateSaveTimerRef.current) {
-        clearTimeout(navStateSaveTimerRef.current);
-      }
-
-      // Debounce AsyncStorage writes to avoid jank during rapid transitions.
-      navStateSaveTimerRef.current = setTimeout(() => {
-        persistNavigationState().catch(() => {
-          // Navigation state saving failed silently
-        });
-      }, 250);
-    },
-    [persistNavigationState],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (navStateSaveTimerRef.current) {
-        clearTimeout(navStateSaveTimerRef.current);
-      }
-    };
-  }, []);
+  }, [setSessionAuthenticated]);
 
   if (appState === 'loading') {
     return (
       <View className="flex-1 items-center justify-center bg-[#0A0A0A]">
-        <AnimatedLogo size={92} motion="orbit" variant="white" />
+        <AnimatedLogo size={92} motion="pulse" variant="white" showRing={false} />
         <Text className="mt-5 font-['MontserratAlternates-Regular'] text-sm text-[#B8AF9E]">
           Preparing your journey...
         </Text>
@@ -151,17 +92,12 @@ const AppNavigator: React.FC = () => {
     );
   }
 
-  // Returning user login — rendered outside NavigationContainer (no navigation needed)
   if (appState === 'login') {
     return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
-    <NavigationContainer
-      ref={navigationRef}
-      initialState={initialNavState}
-      onStateChange={handleStateChange}
-    >
+    <NavigationContainer>
       {appState === 'onboarding' ? (
         <OnboardingCallbackProvider
           value={{ onOnboardingComplete: handleOnboardingComplete }}

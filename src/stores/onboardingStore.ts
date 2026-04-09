@@ -101,6 +101,18 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
     {
       name: 'epocheye-onboarding',
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: state => {
+        return {
+          firstName: state.firstName,
+          motivation: state.motivation,
+          visitFrequency: state.visitFrequency,
+          goal: state.goal,
+          regions: state.regions,
+          reactionEmoji: state.reactionEmoji,
+          onboardingComplete: state.onboardingComplete,
+          guestMode: state.guestMode,
+        } as Partial<OnboardingState & OnboardingActions>;
+      },
     },
   ),
 );

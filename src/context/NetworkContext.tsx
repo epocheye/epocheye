@@ -9,6 +9,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   ReactNode,
 } from 'react';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
@@ -101,15 +102,18 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({
     };
   }, [checkConnection, handleConnectivityChange]);
 
+  const value = useMemo<NetworkContextType>(
+    () => ({
+      isConnected,
+      isInternetReachable,
+      connectionType,
+      checkConnection,
+    }),
+    [isConnected, isInternetReachable, connectionType, checkConnection],
+  );
+
   return (
-    <NetworkContext.Provider
-      value={{
-        isConnected,
-        isInternetReachable,
-        connectionType,
-        checkConnection,
-      }}
-    >
+    <NetworkContext.Provider value={value}>
       {children}
     </NetworkContext.Provider>
   );

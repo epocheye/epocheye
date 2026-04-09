@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
 import type { Place } from '../../../utils/api/places';
 import { FONTS } from '../../../core/constants/theme';
+import { getPlaceImage } from '../../../shared/utils';
 
 export type LensDetectionState = 'searching' | 'matched' | 'not_found';
 
@@ -66,6 +67,7 @@ const BottomCard: React.FC<BottomCardProps> = ({
           <ResolvedSubjectImage
             subject={place.name}
             context={`${place.city} ${place.country} lens match`}
+            fallbackUri={getPlaceImage(place.categories)}
             style={styles.matchedVisual}
             imageStyle={styles.matchedVisual}
             loadingLabel="Loading monument visual..."

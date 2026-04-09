@@ -167,7 +167,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
           <AnimatedLogo
             variant="white"
             size={22}
-            motion="orbit"
+            motion="pulse"
             showRing={false}
           />
           <Text className="font-['MontserratAlternates-Regular'] text-sm text-[#B8AF9E]">

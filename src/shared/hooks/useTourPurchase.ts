@@ -35,7 +35,7 @@ export interface UseTourPurchaseReturn {
 
 export function useTourPurchase(): UseTourPurchaseReturn {
   const [purchasing, setPurchasing] = useState(false);
-  const { profile } = useUser();
+  const profile = useUser(state => state.profile);
 
   const handleBuyTour = useCallback(
     async (

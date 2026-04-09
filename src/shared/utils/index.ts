@@ -40,3 +40,5 @@ export {
   isPositiveNumber,
   isInRange,
 } from './validators';
+
+export { getPlaceImage, buildSiteDetailData } from './place-presenters';

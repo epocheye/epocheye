@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -170,7 +170,8 @@ function normalizeSite(site?: PlaceNavParam): SiteDetailData {
 type Props = MainScreenProps<'SiteDetail'>;
 
 const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { toggleSavePlace, isPlaceSaved } = usePlaces();
+  const toggleSavePlace = usePlaces(state => state.toggleSavePlace);
+  const isPlaceSaved = usePlaces(state => state.isPlaceSaved);
   const site = useMemo(
     () => normalizeSite(route.params?.site),
     [route.params?.site],
@@ -184,6 +185,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     subject: site.name,
     context: `${site.location} ${site.era} ${site.style}`,
     enabled: !!site.name,
+    remote: true,
   });
   const heroImages = useMemo(() => {
     const existing = site.heroImages;
@@ -200,6 +202,12 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const scrollY = useSharedValue(0);
   const isSaved = isPlaceSaved(site.id);
+
+  useEffect(() => {
+    if (resolvedHeroImage) {
+      void Image.prefetch(resolvedHeroImage);
+    }
+  }, [resolvedHeroImage]);
 
   const onScroll = useAnimatedScrollHandler(event => {
     scrollY.value = event.contentOffset.y;

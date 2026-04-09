@@ -139,7 +139,6 @@ export function streamLensStory({
 
     hasErrored = true;
     const fallback = getFallbackStory(regions[0] ?? 'South Asia', firstName);
-    console.log('[LensStory] Using fallback story (API error/unavailable)');
     onChunk(fallback.story);
     onDone(fallback.monument, undefined);
     onError();
