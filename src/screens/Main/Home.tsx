@@ -6,7 +6,9 @@ import {
   FlatList,
   ImageBackground,
   ScrollView,
+  Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -28,6 +30,8 @@ import {
   Compass,
   RefreshCw,
   ScanEye,
+  BookOpen,
+  Clock,
 } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
@@ -45,6 +49,9 @@ import {
   elaboratePersonalizedFact,
 } from '../../utils/api/user';
 import type { PersonalizedFact } from '../../utils/api/user';
+import { getTours, getMyTours } from '../../utils/api/tours';
+import type { Tour, MyTour } from '../../utils/api/tours';
+import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 
 const FACT_LOADING_LINES = [
   'Tracing your heritage...',
@@ -254,6 +261,8 @@ const Home = ({ navigation }: Props) => {
   const [factDetailsById, setFactDetailsById] = useState<
     Record<string, string>
   >({});
+  const [tours, setTours] = useState<Tour[]>([]);
+  const [bannerTour, setBannerTour] = useState<MyTour | null>(null);
 
   const entrance = useSharedValue(24);
   const contentOpacity = useSharedValue(0);
@@ -377,6 +386,32 @@ const Home = ({ navigation }: Props) => {
   useEffect(() => {
     loadPersonalizedFacts();
   }, [loadPersonalizedFacts]);
+
+  // Load available tours for the Tours section
+  useEffect(() => {
+    getTours().then(result => {
+      if (result.success) setTours(result.data.slice(0, 3));
+    });
+  }, []);
+
+  // Check if user has a free tour they haven't seen yet
+  useEffect(() => {
+    async function checkFreeTourBanner() {
+      const dismissed = await AsyncStorage.getItem(
+        STORAGE_KEYS.TOURS.FREE_TOUR_BANNER_DISMISSED,
+      );
+      if (dismissed) return;
+      const result = await getMyTours();
+      if (!result.success) return;
+      const freeTour = result.data.find(
+        t =>
+          t.source === 'free_grant' &&
+          new Date(t.expires_at).getTime() > Date.now(),
+      );
+      if (freeTour) setBannerTour(freeTour);
+    }
+    checkFreeTourBanner();
+  }, []);
 
   const handleFactPress = useCallback(
     async (fact: PersonalizedFact) => {
@@ -518,6 +553,71 @@ const Home = ({ navigation }: Props) => {
                 nestedScrollEnabled
                 contentContainerStyle={{ paddingRight: 8, paddingBottom: 8 }}
               />
+            )}
+
+            {/* Tours section */}
+            {tours.length > 0 && (
+              <View className="mt-6 mb-2">
+                <View className="flex-row items-center justify-between mb-3">
+                  <View className="flex-row items-center gap-2">
+                    <BookOpen color="#D4860A" size={18} />
+                    <Text className="text-[#F5F0E8] text-[22px] leading-[30px] font-['MontserratAlternates-SemiBold']">
+                      Tours
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate(ROUTES.MAIN.TOUR_LIST)}
+                    accessibilityRole="button"
+                  >
+                    <Text className="text-[#D4860A] text-xs font-['MontserratAlternates-SemiBold']">
+                      See all
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 12, paddingRight: 8, paddingBottom: 4 }}
+                >
+                  {tours.map(tour => (
+                    <TouchableOpacity
+                      key={tour.id}
+                      onPress={() =>
+                        navigation.navigate(ROUTES.MAIN.TOUR_LIST, {
+                          monumentId: tour.monument_id,
+                          monumentName: tour.monument_name,
+                        })
+                      }
+                      className="w-44 bg-[#141414] rounded-[16px] p-3 border border-[rgba(255,255,255,0.08)]"
+                      activeOpacity={0.85}
+                    >
+                      <Text className="text-[#D4860A] text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold'] mb-1" numberOfLines={1}>
+                        {tour.monument_name}
+                      </Text>
+                      <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-Bold'] leading-5 mb-2" numberOfLines={2}>
+                        {tour.title}
+                      </Text>
+                      <View className="flex-row items-center gap-1.5">
+                        <Clock color="#6B6357" size={12} />
+                        <Text className="text-[#6B6357] text-[11px] font-['MontserratAlternates-Regular']">
+                          {tour.duration_minutes} min
+                        </Text>
+                        <View className="ml-auto">
+                          {tour.price_paise === 0 ? (
+                            <Text className="text-[#10B981] text-[11px] font-['MontserratAlternates-SemiBold']">
+                              Free
+                            </Text>
+                          ) : (
+                            <Text className="text-[#C9A84C] text-[11px] font-['MontserratAlternates-SemiBold']">
+                              ₹{(tour.price_paise / 100).toFixed(0)}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
             )}
 
             {/* Insights card */}
@@ -665,6 +765,60 @@ const Home = ({ navigation }: Props) => {
           <ScanEye color="#0A0A0A" size={24} />
         </AnimatedTouchable>
       </LinearGradient>
+
+      {/* Free Tour Banner */}
+      {bannerTour && (
+        <Modal visible transparent animationType="slide">
+          <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }}>
+            <View className="bg-[#141414] rounded-t-3xl p-6 border-t border-[rgba(201,168,76,0.3)]">
+              <Text className="text-[#D4860A] text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold'] mb-1">
+                Free Tour Waiting
+              </Text>
+              <Text className="text-[#F5F0E8] text-xl font-['MontserratAlternates-Bold'] mb-1">
+                {bannerTour.title}
+              </Text>
+              <Text className="text-[#B8AF9E] text-sm font-['MontserratAlternates-Regular'] mb-5">
+                {bannerTour.monument_name} · {bannerTour.duration_minutes} min
+              </Text>
+              <TouchableOpacity
+                onPress={async () => {
+                  await AsyncStorage.setItem(
+                    STORAGE_KEYS.TOURS.FREE_TOUR_BANNER_DISMISSED,
+                    'true',
+                  );
+                  setBannerTour(null);
+                  navigation.navigate(ROUTES.MAIN.TOUR_DETAIL, {
+                    tourId: bannerTour.id,
+                    tourTitle: bannerTour.title,
+                  });
+                }}
+                className="bg-[#D4860A] rounded-2xl py-4 items-center mb-3 flex-row justify-center gap-2"
+                accessibilityRole="button"
+              >
+                <BookOpen color="#0A0A0A" size={18} />
+                <Text className="text-[#0A0A0A] text-base font-['MontserratAlternates-Bold']">
+                  Start Tour
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  await AsyncStorage.setItem(
+                    STORAGE_KEYS.TOURS.FREE_TOUR_BANNER_DISMISSED,
+                    'true',
+                  );
+                  setBannerTour(null);
+                }}
+                className="bg-[#1F1F2A] rounded-2xl py-3 items-center border border-[#272730]"
+                accessibilityRole="button"
+              >
+                <Text className="text-[#8D8D92] text-sm font-['MontserratAlternates-SemiBold']">
+                  Later
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 };

@@ -157,11 +157,8 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
         tabBarIcon: ({ color, size }) =>
           getTabIcon(route.name as keyof TabParamList, color, size),
         tabBarButton: (btnProps: BottomTabBarButtonProps) => {
-          // Show "New Features" overlay for Explore and Challenges tabs
-          if (
-            route.name === ROUTES.TABS.EXPLORE ||
-            route.name === ROUTES.TABS.CHALLENGES
-          ) {
+          // Show "Coming Soon" overlay only for Challenges (Explore is now live)
+          if (route.name === ROUTES.TABS.CHALLENGES) {
             return <ComingSoonTabButton {...btnProps} />;
           }
           return <DefaultTabButton {...btnProps} />;
@@ -169,15 +166,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
       })}
     >
       <Tab.Screen name={ROUTES.TABS.HOME} component={Home} />
-      <Tab.Screen
-        name={ROUTES.TABS.EXPLORE}
-        component={Explore}
-        listeners={{
-          tabPress: e => {
-            e.preventDefault();
-          },
-        }}
-      />
+      <Tab.Screen name={ROUTES.TABS.EXPLORE} component={Explore} />
       <Tab.Screen
         name={ROUTES.TABS.CHALLENGES}
         component={Challenges}

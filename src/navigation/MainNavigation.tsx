@@ -5,6 +5,8 @@ import Permissions from '../screens/Main/PermissionsScreen';
 import SiteDetailScreen from '../screens/Main/SiteDetailScreen';
 import ARExperienceScreen from '../screens/Main/ARExperienceScreen';
 import LensScreen from '../screens/Lens/LensScreen';
+import TourListScreen from '../screens/Main/TourListScreen';
+import TourDetailScreen from '../screens/Main/TourDetailScreen';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
 
@@ -59,6 +61,16 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
           animation: 'fade',
           presentation: 'fullScreenModal',
         }}
+      />
+      <Stack.Screen
+        name={ROUTES.MAIN.TOUR_LIST}
+        component={TourListScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name={ROUTES.MAIN.TOUR_DETAIL}
+        component={TourDetailScreen}
+        options={{ animation: 'slide_from_right' }}
       />
     </Stack.Navigator>
   );

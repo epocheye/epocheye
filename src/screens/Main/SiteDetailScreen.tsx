@@ -34,7 +34,9 @@ import {
   Users,
   Star,
   Bookmark,
+  BookOpen,
 } from 'lucide-react-native';
+import { ROUTES } from '../../core/constants';
 import { usePlaces } from '../../context';
 import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import { useResolvedSubjectImage } from '../../shared/hooks';
@@ -416,6 +418,20 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.ctaText}>Begin Your Journey</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate(ROUTES.MAIN.TOUR_LIST, {
+                monumentId: site.id,
+                monumentName: site.name,
+              })
+            }
+            style={styles.toursButton}
+            activeOpacity={0.88}
+          >
+            <BookOpen color="#D4860A" size={18} />
+            <Text style={styles.toursButtonText}>View Tours</Text>
+          </TouchableOpacity>
+
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Historical Overview</Text>
             <Text
@@ -754,6 +770,24 @@ const styles = {
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     fontFamily: 'MontserratAlternates-Bold',
+  },
+  toursButton: {
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(212,134,10,0.45)',
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  toursButtonText: {
+    color: '#D4860A',
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: 'MontserratAlternates-SemiBold',
   },
   sectionWrap: {
     gap: 12,

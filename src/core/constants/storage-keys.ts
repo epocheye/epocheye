@@ -55,14 +55,22 @@ export const STORAGE_KEYS = {
     SAVED_PLACES: `${STORAGE_PREFIX}/saved_places_cache`,
     USER_PROFILE: `${STORAGE_PREFIX}/user_profile_cache`,
   },
+
+  /**
+   * Tours keys
+   */
+  TOURS: {
+    FREE_TOUR_BANNER_DISMISSED: `${STORAGE_PREFIX}/free_tour_banner_dismissed`,
+  },
 } as const;
 
 /**
  * Type helper for storage keys
  */
-export type StorageKey = 
+export type StorageKey =
   | (typeof STORAGE_KEYS.AUTH)[keyof typeof STORAGE_KEYS.AUTH]
   | (typeof STORAGE_KEYS.NAVIGATION)[keyof typeof STORAGE_KEYS.NAVIGATION]
   | (typeof STORAGE_KEYS.PREFERENCES)[keyof typeof STORAGE_KEYS.PREFERENCES]
   | (typeof STORAGE_KEYS.ONBOARDING)[keyof typeof STORAGE_KEYS.ONBOARDING]
-  | (typeof STORAGE_KEYS.CACHE)[keyof typeof STORAGE_KEYS.CACHE];
+  | (typeof STORAGE_KEYS.CACHE)[keyof typeof STORAGE_KEYS.CACHE]
+  | (typeof STORAGE_KEYS.TOURS)[keyof typeof STORAGE_KEYS.TOURS];

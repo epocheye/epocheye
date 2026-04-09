@@ -60,17 +60,34 @@ Auth/onboarding transitions are driven by callbacks (`onLoginSuccess`, `handleOn
 
 ### Onboarding Flow (`src/navigation/OnboardingNavigator.tsx`)
 
-Six screens, all fade-transition, no headers:
+13-screen Duolingo-style flow, no headers:
 
 ```
-SplashVideo → Hook → AncestryInput → FirstTaste → Signup → Welcome
+OB00_Splash → OB01_Welcome → OB02_Motivation → OB03_Frequency → OB04_Goal
+→ OB05_Region → OB06_Name → OB07_Promise → OB08_DemoStory → OB09_Reaction
+→ OB10_SignUp (or OB10_Login branch) → OB11_Notifications → OB12_Arrival
 ```
 
-`WelcomeScreen` calls `onOnboardingComplete` from `OnboardingCallbackContext` to transition to `main`. The legacy onboarding steps were consolidated into `HookScreen` and `WelcomeScreen`.
+- OB08 uses `animation: 'fade'`; OB12 has `gestureEnabled: false`
+- OB07 fires the SSE ancestor-story stream; OB08 displays it with a typewriter effect
+- OB10 has two variants: `SignupScreen` (default, `fromOnboarding: true`) and `OB10_Login`
+- `OB12_Arrival` calls `completeOnboarding()` on the Zustand store and `onOnboardingComplete()` from `OnboardingCallbackContext` to transition to `main`
+
+**Zustand onboarding store** (`src/stores/onboardingStore.ts`): persists user choices to AsyncStorage key `'epocheye-onboarding'`. Tracks `firstName`, `motivation`, `visitFrequency`, `goal`, `regions`, `demoStory`, `demoMonument`, `reactionEmoji`, `onboardingComplete`, `guestMode`. The `completeOnboarding()` action also writes `STORAGE_KEYS.ONBOARDING.COMPLETED = 'true'` to AsyncStorage for the root navigator's `checkAppState()`.
 
 ### Main Navigation (`src/navigation/MainNavigation.tsx`)
 
-A native stack containing `TabNavigation` (5 tabs: Home, Explore, Challenges, Saved, Settings) plus modal/push screens: `SiteDetail`, `ARExperience`, `Permissions`.
+A native stack containing `TabNavigation` (5 tabs) plus full-screen-modal and push screens:
+
+| Screen | Route key | Presentation |
+| --- | --- | --- |
+| `TabNavigation` | `ROUTES.MAIN.TABS` | default |
+| `LensScreen` | `ROUTES.MAIN.LENS` | fullScreenModal, fade |
+| `SiteDetailScreen` | `ROUTES.MAIN.SITE_DETAIL` | slide_from_right |
+| `ARExperienceScreen` | `ROUTES.MAIN.AR_EXPERIENCE` | fullScreenModal, fade |
+| `PermissionsScreen` | `ROUTES.MAIN.PERMISSIONS` | fullScreenModal |
+
+**Tabs** (Home, Explore, Challenges, Saved, Settings). Explore and Challenges are currently disabled with a "Coming Soon" overlay (`ComingSoonTabButton`) — their `tabPress` events are prevented and navigation is blocked.
 
 ---
 
@@ -94,6 +111,31 @@ An extended token set lives in `src/design-system/tokens/` (`typography.ts`, `co
 **Image rule:** All monument/region images via CDN using `CDN_BASE`. No local `require()` for monument images.
 
 **Styling approach:** NativeWind (`className` props, configured via `global.css` + `tailwind.config.js`) is the primary styling method. For dynamic or complex styles, use `StyleSheet` with theme token values.
+
+---
+
+## Lens Screen (`src/screens/Lens/LensScreen.tsx`)
+
+The Lens screen is a live camera view that:
+1. On open, runs GPS monument detection — queries the places API at cascading radii (500 → 1000 → 2000 m) with an 8-second timeout
+2. On match, shows `BottomCard` with two actions: **Story** and **Scan Object**
+3. **Story mode**: takes a photo with `react-native-vision-camera`, sends it + monument name to `POST /api/lens/identify` (SSE stream), renders streamed text in `AncestorStorySheet`
+4. **Object scan mode**: same photo capture path but sends `mode: 'object_scan'` and `motivation`; the `done` event includes an `object` payload (`LensIdentifiedObject`)
+5. Both modes fall back to `getFallbackStory()` on any error
+
+Service: `src/services/lensStoryService.ts` (`streamLensStory`). User context (firstName, regions, motivation) is read from `useOnboardingStore` with a fallback to `useUser().profile`.
+
+---
+
+## SSE Streaming Architecture
+
+Both AI story endpoints (onboarding ancestor story and Lens) use XMLHttpRequest-based SSE (not `fetch`) via `src/services/sseStreamService.ts` (`createSSEStream`). The backend at `BACKEND_URL` (from `src/constants/onboarding.ts`) sends newline-delimited JSON events:
+
+- `{ type: 'chunk', text: string }` → calls `onChunk`
+- `{ type: 'done', monument: string, object?: LensIdentifiedObject }` → calls `onDone`
+- `{ type: 'error' }` → triggers fallback via `getFallbackStory()`
+
+`createSSEStream` returns an abort function. Always call it on component unmount.
 
 ---
 
@@ -142,10 +184,11 @@ Use the typed screen props rather than `any`:
 
 ```ts
 // Onboarding screens
-type Props = OnboardingScreenProps<'AncestryInput'>;
+type Props = OnboardingScreenProps<'OB05_Region'>;
 
-// Main screens
+// Main screens (including Lens)
 type Props = MainScreenProps<'SiteDetail'>;
+type Props = MainScreenProps<'Lens'>;
 
 // Tab screens (composite prop — can also push to main stack)
 type Props = TabScreenProps<'Home'>;
