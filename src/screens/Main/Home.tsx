@@ -52,6 +52,7 @@ import { getTours, getMyTours } from '../../utils/api/tours';
 import type { Tour, MyTour } from '../../utils/api/tours';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { buildSiteDetailData, getPlaceImage } from '../../shared/utils';
+import { usePremiumPass } from '../../shared/hooks';
 
 const FACT_LOADING_LINES = [
   'Tracing your heritage...',
@@ -237,6 +238,7 @@ const Home = ({ navigation }: Props) => {
   >({});
   const [tours, setTours] = useState<Tour[]>([]);
   const [bannerTour, setBannerTour] = useState<MyTour | null>(null);
+  const { hasActivePass: hasPremium, loading: premiumLoading } = usePremiumPass();
 
   const entrance = useSharedValue(24);
   const contentOpacity = useSharedValue(0);
@@ -540,6 +542,43 @@ const Home = ({ navigation }: Props) => {
                 windowSize={5}
                 contentContainerStyle={{ paddingRight: 8, paddingBottom: 8 }}
               />
+            )}
+
+            {/* Premium upgrade banner */}
+            {!premiumLoading && !hasPremium && (
+              <TouchableOpacity
+                onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
+                activeOpacity={0.9}
+                className="mt-6 rounded-[20px] overflow-hidden border border-[rgba(212,134,10,0.35)]"
+                accessibilityRole="button"
+                accessibilityLabel="Upgrade to Epocheye Premium"
+              >
+                <LinearGradient
+                  colors={['#1A120A', '#2A1C0E', '#1A120A']}
+                  locations={[0, 0.5, 1]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ padding: 18 }}
+                >
+                  <View className="flex-row items-center gap-3">
+                    <View className="w-12 h-12 rounded-full bg-[#D4860A]/15 items-center justify-center">
+                      <Sparkles color="#D4860A" size={22} />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[#D4860A] text-[10px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+                        Epocheye Premium
+                      </Text>
+                      <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-Bold'] mt-0.5">
+                        Unlock every premium feature
+                      </Text>
+                      <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Regular'] mt-0.5">
+                        Tap to upgrade
+                      </Text>
+                    </View>
+                    <ArrowRight color="#D4860A" size={20} />
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
             )}
 
             {/* Tours section */}

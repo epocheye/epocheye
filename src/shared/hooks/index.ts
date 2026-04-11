@@ -25,3 +25,9 @@ export type {
 
 export { useTourPurchase } from './useTourPurchase';
 export type { PurchaseResult, UseTourPurchaseReturn } from './useTourPurchase';
+
+export { usePremiumPurchase } from './usePremiumPurchase';
+export type { UsePremiumPurchaseReturn } from './usePremiumPurchase';
+
+export { usePremiumPass } from './usePremiumPass';
+export type { UsePremiumPassReturn } from './usePremiumPass';

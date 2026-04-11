@@ -55,6 +55,7 @@ export type MainStackParamList = {
   Permissions: undefined;
   TourList: { monumentId?: string; monumentName?: string } | undefined;
   TourDetail: { tourId: string; tourTitle: string };
+  Purchase: undefined;
 };
 
 /**

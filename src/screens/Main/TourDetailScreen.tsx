@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   ScrollView,
   StatusBar,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -11,9 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Video from 'react-native-video';
 import type { OnLoadData, OnProgressData } from 'react-native-video';
-import { ArrowLeft, BookOpen, Clock, Pause, Play } from 'lucide-react-native';
-import { getTour } from '../../utils/api/tours';
-import type { Tour } from '../../utils/api/tours';
+import { ArrowLeft, BookOpen, Check, Clock, Pause, Play, Tag, X } from 'lucide-react-native';
+import { getTour, validateCoupon } from '../../utils/api/tours';
+import type { CouponValidation, Tour } from '../../utils/api/tours';
 import { useTourPurchase } from '../../shared/hooks';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 
@@ -139,6 +141,13 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const { purchasing, handleBuyTour } = useTourPurchase();
 
+  // Coupon state
+  const [couponInput, setCouponInput] = useState('');
+  const [couponValidating, setCouponValidating] = useState(false);
+  const [couponResult, setCouponResult] = useState<CouponValidation | null>(null);
+
+  const appliedCoupon = couponResult?.is_valid ? couponResult.code : undefined;
+
   const loadTour = useCallback(async () => {
     setLoading(true);
     const result = await getTour(tourId);
@@ -152,13 +161,32 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     loadTour();
   }, [loadTour]);
 
+  const handleApplyCoupon = useCallback(async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    setCouponValidating(true);
+    setCouponResult(null);
+    const result = await validateCoupon(code);
+    if (result.success) {
+      setCouponResult(result.data);
+    } else {
+      setCouponResult({ is_valid: false, reason: 'not_found' });
+    }
+    setCouponValidating(false);
+  }, [couponInput]);
+
+  const handleClearCoupon = useCallback(() => {
+    setCouponInput('');
+    setCouponResult(null);
+  }, []);
+
   const handlePurchase = useCallback(async () => {
     if (!tour) return;
-    const result = await handleBuyTour(tour.id, tour.price_paise, tour.title);
+    const result = await handleBuyTour(tour.id, tour.price_paise, tour.title, appliedCoupon);
     if (result?.accessGranted) {
       await loadTour(); // reload with content_body
     }
-  }, [handleBuyTour, loadTour, tour]);
+  }, [handleBuyTour, loadTour, tour, appliedCoupon]);
 
   if (loading || purchasing) {
     return (
@@ -281,18 +309,94 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               )}
             </>
           ) : !hasAccess ? (
-            /* Purchase button */
-            <TouchableOpacity
-              onPress={handlePurchase}
-              className="mt-2 py-4 rounded-2xl items-center justify-center flex-row gap-2"
-              style={{ backgroundColor: isFree ? '#D4860A' : '#C9A84C' }}
-              accessibilityRole="button"
-            >
-              <BookOpen color="#0A0A0A" size={18} />
-              <Text className="text-[#0A0A0A] text-base font-['MontserratAlternates-Bold']">
-                {isFree ? 'Start Free Tour' : `Buy Tour ${formatPrice(tour.price_paise)}`}
-              </Text>
-            </TouchableOpacity>
+            /* Purchase section */
+            <View className="mt-2 gap-3">
+              {/* Coupon input — only for paid tours */}
+              {!isFree && (
+                <View className="bg-[#141414] border border-[rgba(255,255,255,0.08)] rounded-2xl p-4">
+                  <View className="flex-row items-center gap-2 mb-2">
+                    <Tag color="#C9A84C" size={13} />
+                    <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Medium']">
+                      Have a promo code?
+                    </Text>
+                  </View>
+
+                  {couponResult?.is_valid ? (
+                    /* Applied state */
+                    <View className="flex-row items-center justify-between bg-[#10B981]/10 border border-[#10B981]/20 rounded-xl px-3 py-2.5">
+                      <View className="flex-row items-center gap-2">
+                        <Check color="#10B981" size={14} />
+                        <Text className="text-[#10B981] text-sm font-['MontserratAlternates-SemiBold']">
+                          {couponResult.code} · {couponResult.discount_percent}% off
+                        </Text>
+                      </View>
+                      <TouchableOpacity onPress={handleClearCoupon} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <X color="#10B981" size={14} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    /* Input state */
+                    <View className="flex-row gap-2">
+                      <TextInput
+                        value={couponInput}
+                        onChangeText={(t) => {
+                          setCouponInput(t.toUpperCase());
+                          if (couponResult) setCouponResult(null);
+                        }}
+                        placeholder="Enter code"
+                        placeholderTextColor="rgba(245,240,232,0.25)"
+                        autoCapitalize="characters"
+                        autoCorrect={false}
+                        returnKeyType="done"
+                        onSubmitEditing={handleApplyCoupon}
+                        className="flex-1 bg-[#1E1E1E] border border-[rgba(255,255,255,0.1)] rounded-xl px-3 py-2.5 text-[#F5F0E8] text-sm font-['MontserratAlternates-Regular']"
+                      />
+                      <TouchableOpacity
+                        onPress={handleApplyCoupon}
+                        disabled={couponValidating || !couponInput.trim()}
+                        className="bg-[#C9A84C]/20 border border-[#C9A84C]/30 rounded-xl px-4 items-center justify-center"
+                      >
+                        {couponValidating ? (
+                          <ActivityIndicator color="#C9A84C" size="small" />
+                        ) : (
+                          <Text className="text-[#C9A84C] text-sm font-['MontserratAlternates-SemiBold']">
+                            Apply
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Invalid coupon feedback */}
+                  {couponResult && !couponResult.is_valid && (
+                    <Text className="text-red-400 text-xs mt-2 font-['MontserratAlternates-Regular']">
+                      {couponResult.reason === 'expired'
+                        ? 'This code has expired.'
+                        : couponResult.reason === 'exhausted'
+                        ? 'This code has reached its usage limit.'
+                        : 'Invalid promo code. Please check and try again.'}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {/* Buy button */}
+              <TouchableOpacity
+                onPress={handlePurchase}
+                className="py-4 rounded-2xl items-center justify-center flex-row gap-2"
+                style={{ backgroundColor: isFree ? '#D4860A' : '#C9A84C' }}
+                accessibilityRole="button"
+              >
+                <BookOpen color="#0A0A0A" size={18} />
+                <Text className="text-[#0A0A0A] text-base font-['MontserratAlternates-Bold']">
+                  {isFree
+                    ? 'Start Free Tour'
+                    : appliedCoupon && couponResult?.discount_percent
+                    ? `Buy Tour ${formatPrice(Math.round(tour.price_paise * (1 - couponResult.discount_percent / 100)))}`
+                    : `Buy Tour ${formatPrice(tour.price_paise)}`}
+                </Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <View className="items-center py-6">
               <Text className="text-[#6B6357] text-sm font-['MontserratAlternates-Regular']">

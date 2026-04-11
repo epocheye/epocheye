@@ -2,8 +2,8 @@
  * Shared hook for the tour purchase flow.
  *
  * Handles:
- *  1. Call initiatePurchase — free tour → done; paid → get Razorpay order
- *  2. Open Razorpay checkout for paid tours
+ *  1. Call initiatePurchase (with optional coupon) — free tour → done; paid → get Razorpay order
+ *  2. Open Razorpay checkout for paid tours (at discounted price if coupon applied)
  *  3. Call confirmPurchase on Razorpay success
  *  4. Return updated access state to the caller
  */
@@ -18,6 +18,7 @@ import {
   initiatePurchase,
 } from '../../utils/api/tours';
 import { useUser } from '../../context';
+import { createAuthenticatedClient } from '../../utils/api/auth';
 
 export interface PurchaseResult {
   accessGranted: boolean;
@@ -30,6 +31,7 @@ export interface UseTourPurchaseReturn {
     tourId: string,
     pricePaise: number,
     tourTitle: string,
+    couponCode?: string,
   ) => Promise<PurchaseResult | null>;
 }
 
@@ -42,11 +44,14 @@ export function useTourPurchase(): UseTourPurchaseReturn {
       tourId: string,
       pricePaise: number,
       tourTitle: string,
+      couponCode?: string,
     ): Promise<PurchaseResult | null> => {
       setPurchasing(true);
       try {
-        // Step 1 — initiate
-        const initResult = await initiatePurchase(tourId);
+        const normalizedCoupon = couponCode?.trim().toUpperCase() || undefined;
+
+        // Step 1 — initiate (backend creates Razorpay order, optionally discounted)
+        const initResult = await initiatePurchase(tourId, normalizedCoupon);
         if (!initResult.success) {
           Alert.alert('Error', initResult.error.message);
           return null;
@@ -79,10 +84,10 @@ export function useTourPurchase(): UseTourPurchaseReturn {
           theme: { color: '#D4860A' },
         };
 
-        // Step 3 — open Razorpay checkout and wait
+        // Step 2 — open Razorpay checkout and wait for user to complete
         const razorpayData = await RazorpayCheckout.open(options);
 
-        // Step 4 — confirm with backend
+        // Step 3 — confirm tour access with backend
         const confirmResult = await confirmPurchase(tourId, {
           razorpay_order_id: razorpayData.razorpay_order_id,
           razorpay_payment_id: razorpayData.razorpay_payment_id,
@@ -95,6 +100,23 @@ export function useTourPurchase(): UseTourPurchaseReturn {
             'Payment received but verification failed. Please contact support.',
           );
           return null;
+        }
+
+        // Step 4 — if a coupon was applied, record the order for creator attribution.
+        // This runs fire-and-forget; a failure here does NOT roll back tour access.
+        if (init.coupon_code) {
+          const originalAmount = init.original_amount_paise ?? pricePaise;
+          const discountedAmount = init.amount_paise;
+          recordCouponOrder({
+            couponCode: init.coupon_code,
+            razorpayOrderId: razorpayData.razorpay_order_id,
+            razorpayPaymentId: razorpayData.razorpay_payment_id,
+            originalAmount,
+            discountedAmount,
+            itemDescription: `Tour: ${tourTitle}`,
+          }).catch(() => {
+            // Silently ignore — creator attribution is a background concern
+          });
         }
 
         return {
@@ -117,4 +139,24 @@ export function useTourPurchase(): UseTourPurchaseReturn {
   );
 
   return { purchasing, handleBuyTour };
+}
+
+/** Fire-and-forget: record coupon attribution in the backend after payment */
+async function recordCouponOrder(params: {
+  couponCode: string;
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  originalAmount: number;
+  discountedAmount: number;
+  itemDescription?: string;
+}): Promise<void> {
+  const client = createAuthenticatedClient();
+  await client.post('/api/v1/orders/record', {
+    coupon_code: params.couponCode,
+    razorpay_order_id: params.razorpayOrderId,
+    razorpay_payment_id: params.razorpayPaymentId,
+    original_amount: params.originalAmount,
+    discounted_amount: params.discountedAmount,
+    item_description: params.itemDescription,
+  });
 }

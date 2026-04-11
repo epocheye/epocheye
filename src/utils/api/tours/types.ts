@@ -33,8 +33,29 @@ export interface InitiateResult {
   expires_at?: string;
   /** Populated for paid tours */
   razorpay_order_id?: string;
-  amount_paise?: number;
+  amount_paise?: number;           // amount the user pays (discounted if coupon applied)
+  original_amount_paise?: number;  // price before discount
   currency?: string;
+  /** Coupon info — populated when a coupon was successfully applied */
+  coupon_code?: string;
+  discount_percent?: number;
+}
+
+export interface CouponValidation {
+  is_valid: boolean;
+  reason?: 'not_found' | 'expired' | 'exhausted';
+  coupon_id?: string;
+  code?: string;
+  discount_percent?: number;
+}
+
+export interface DiscountCalculation {
+  original_amount: number;
+  discount_percent: number;
+  discount_amount: number;
+  final_amount: number;
+  coupon_code: string;
+  coupon_id: string;
 }
 
 export interface ConfirmPayload {

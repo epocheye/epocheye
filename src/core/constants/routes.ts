@@ -39,6 +39,7 @@ export const ROUTES = {
     PERMISSIONS: 'Permissions',
     TOUR_LIST: 'TourList',
     TOUR_DETAIL: 'TourDetail',
+    PURCHASE: 'Purchase',
   },
 
   /**

@@ -9,12 +9,14 @@ import type {
   ApiResult,
   ConfirmPayload,
   ConfirmResult,
+  CouponValidation,
+  DiscountCalculation,
   InitiateResult,
   MyTour,
   Tour,
 } from './types';
 
-export type { Tour, MyTour, InitiateResult, ConfirmResult, UserAccess } from './types';
+export type { Tour, MyTour, InitiateResult, ConfirmResult, UserAccess, CouponValidation, DiscountCalculation } from './types';
 
 /** GET /api/v1/tours — all active tours with user_access */
 export async function getTours(): Promise<ApiResult<Tour[]>> {
@@ -53,14 +55,47 @@ export async function getMyTours(): Promise<ApiResult<MyTour[]>> {
  * POST /api/v1/tours/{id}/purchase/initiate
  * For free tours: returns { access_granted: true, expires_at }.
  * For paid tours: returns { razorpay_order_id, amount_paise, currency }.
+ * If couponCode is provided, the backend applies the discount and returns the discounted amount.
  */
 export async function initiatePurchase(
   tourId: string,
+  couponCode?: string,
 ): Promise<ApiResult<InitiateResult>> {
   try {
     const client = createAuthenticatedClient();
+    const body = couponCode ? { coupon_code: couponCode.toUpperCase().trim() } : undefined;
     const resp = await client.post<InitiateResult>(
       `/api/v1/tours/${tourId}/purchase/initiate`,
+      body,
+    );
+    return { success: true, data: resp.data };
+  } catch (error) {
+    return createErrorResult(error);
+  }
+}
+
+/** GET /api/v1/coupons/validate?code=CODE — validate a coupon code without recording */
+export async function validateCoupon(code: string): Promise<ApiResult<CouponValidation>> {
+  try {
+    const client = createAuthenticatedClient();
+    const resp = await client.get<CouponValidation>(
+      `/api/v1/coupons/validate?code=${encodeURIComponent(code.toUpperCase().trim())}`,
+    );
+    return { success: true, data: resp.data };
+  } catch (error) {
+    return createErrorResult(error);
+  }
+}
+
+/** GET /api/v1/coupons/calculate?code=CODE&amount=PAISE — get discount breakdown */
+export async function calculateDiscount(
+  code: string,
+  amountPaise: number,
+): Promise<ApiResult<DiscountCalculation>> {
+  try {
+    const client = createAuthenticatedClient();
+    const resp = await client.get<DiscountCalculation>(
+      `/api/v1/coupons/calculate?code=${encodeURIComponent(code.toUpperCase().trim())}&amount=${amountPaise}`,
     );
     return { success: true, data: resp.data };
   } catch (error) {
