@@ -3,8 +3,8 @@
  * Centralized exports for all constant modules
  */
 
-export { ROUTES } from './routes';
-export type { OnboardingRoutes, MainRoutes, TabRoutes } from './routes';
+export { ROUTES } from './ROUTES';
+export type { OnboardingRoutes, MainRoutes, TabRoutes } from './ROUTES';
 
 export { STORAGE_KEYS } from './storage-keys';
 export type { StorageKey } from './storage-keys';

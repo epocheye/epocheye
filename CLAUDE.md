@@ -34,17 +34,15 @@ bundle exec pod install
 
 ### Entry Point & Provider Tree
 
-`App.tsx` is the root. It wraps the app in a fixed provider hierarchy:
+`App.tsx` is the root. Provider hierarchy:
 
 ```
 SafeAreaProvider
   └─ NetworkProvider       (offline detection → shows NoInternetScreen)
-       └─ UserProvider     (profile + stats, auto-fetches on auth)
-            └─ PlacesProvider  (geo-tracking, nearby/saved places)
-                 └─ AppContent → AppNavigator
+       └─ AppContent → AppNavigator
 ```
 
-`AppContent` shows `NoInternetScreen` when offline; otherwise renders `AppNavigator`.
+`UserProvider` and `PlacesProvider` exported from `src/context/index.ts` are **no-op wrappers** kept for import compatibility — all real state lives in Zustand stores.
 
 ### Three-State Root Navigator (`src/navigation/index.tsx`)
 
@@ -56,7 +54,22 @@ SafeAreaProvider
 | `login`      | Onboarding done but tokens expired | `LoginScreen` (outside `NavigationContainer`)                   |
 | `main`       | Authenticated                      | `MainNavigation` inside `NavigationContainer`                   |
 
-Auth/onboarding transitions are driven by callbacks (`onLoginSuccess`, `handleOnboardingComplete`, `handleLogout`), not by polling. `PlacesContext.setAuthenticated()` must be called to start/stop geo-tracking.
+> **Note:** Onboarding is temporarily disabled — `hasCompletedOnboarding` is hardcoded to `true` in `checkAppState()`, so the app always routes to `login` or `main`. The screens remain on disk.
+
+Auth transitions are driven by callbacks (`onLoginSuccess`, `handleOnboardingComplete`, `handleLogout`). On login/onboarding-complete, call `useSessionStore.setAuthenticated(true)` and `useUserStore.getState().ensureUserDataLoaded()`.
+
+### Zustand State Layer (`src/stores/`)
+
+All runtime state lives in four Zustand stores (no React context providers needed):
+
+| Store | Hook | Purpose |
+| --- | --- | --- |
+| `sessionStore.ts` | `useSessionStore` | `authenticated`, `bootstrapped`; `bootstrapSession()` on startup |
+| `userStore.ts` | `useUserStore` | Profile + stats; `ensureUserDataLoaded()`, `refreshUserData()` |
+| `placesStore.ts` | `usePlacesStore` | Geo-tracking, nearby/saved places; `ensureLocationTracking()` |
+| `onboardingStore.ts` | `useOnboardingStore` | Persisted onboarding choices (AsyncStorage key `epocheye-onboarding`) |
+
+The `useUser()` and `usePlaces()` hooks in `src/context/index.ts` delegate directly to `useUserStore` / `usePlacesStore` — use these hooks in screens for backward compatibility.
 
 ### Onboarding Flow (`src/navigation/OnboardingNavigator.tsx`)
 
@@ -73,7 +86,7 @@ OB00_Splash → OB01_Welcome → OB02_Motivation → OB03_Frequency → OB04_Goa
 - OB10 has two variants: `SignupScreen` (default, `fromOnboarding: true`) and `OB10_Login`
 - `OB12_Arrival` calls `completeOnboarding()` on the Zustand store and `onOnboardingComplete()` from `OnboardingCallbackContext` to transition to `main`
 
-**Zustand onboarding store** (`src/stores/onboardingStore.ts`): persists user choices to AsyncStorage key `'epocheye-onboarding'`. Tracks `firstName`, `motivation`, `visitFrequency`, `goal`, `regions`, `demoStory`, `demoMonument`, `reactionEmoji`, `onboardingComplete`, `guestMode`. The `completeOnboarding()` action also writes `STORAGE_KEYS.ONBOARDING.COMPLETED = 'true'` to AsyncStorage for the root navigator's `checkAppState()`.
+**Onboarding store** tracks: `firstName`, `motivation`, `visitFrequency`, `goal`, `regions`, `demoStory`, `demoMonument`, `reactionEmoji`, `onboardingComplete`, `guestMode`. `completeOnboarding()` also writes `STORAGE_KEYS.ONBOARDING.COMPLETED = 'true'` to AsyncStorage.
 
 ### Main Navigation (`src/navigation/MainNavigation.tsx`)
 
@@ -139,20 +152,28 @@ Both AI story endpoints (onboarding ancestor story and Lens) use XMLHttpRequest-
 
 ---
 
-## Context Layer (`src/context/`)
+## Payment / Purchase Flow
 
-| Context                     | Hook                      | Purpose                                                                                          |
-| --------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------ |
-| `PlacesContext`             | `usePlaces()`             | Nearby places (cascading radius 1→5→10→20km), saved places, geo-tracking with 1-min API cooldown |
-| `UserContext`               | `useUser()`               | User profile + stats, fetched in parallel on auth                                                |
-| `NetworkContext`            | `useNetwork()`            | `isConnected` / `isInternetReachable` from NetInfo                                               |
-| `OnboardingCallbackContext` | `useOnboardingCallback()` | Bridge from `WelcomeScreen` to root navigator                                                    |
+Tours and Premium subscriptions both use **Razorpay** (`react-native-razorpay`). The `RAZORPAY_KEY_ID` env var is read from `@env` (react-native-dotenv).
+
+**Shared hooks** (`src/shared/hooks/`):
+
+- `useTourPurchase()` — `handleBuyTour(tourId, pricePaise, title, couponCode?)` → initiates order, opens Razorpay checkout, confirms with backend, records coupon attribution fire-and-forget via `POST /api/v1/orders/record`
+- `usePremiumPurchase()` — same flow for `POST /api/v1/premium/initiate` + `/confirm`
+- `usePremiumPass()` — reads current pass from `GET /api/v1/premium/my-pass`
+
+**API modules:**
+
+- `src/utils/api/tours/` — `getTours`, `getTour`, `getMyTours`, `initiatePurchase`, `confirmPurchase`, `validateCoupon`, `calculateDiscount`
+- `src/utils/api/premium/` — `getPremiumConfig`, `getMyPremiumPass`, `initiatePremiumPurchase`, `confirmPremiumPurchase`
+
+For free tours, `initiatePurchase` returns `{ access_granted: true, expires_at }` directly — skip the Razorpay step.
 
 ---
 
 ## API Layer (`src/utils/api/`)
 
-Each subdirectory (auth, places, user, challenges) exports typed functions. All API calls return a discriminated union result: `{ success: true, data: T }` or `{ success: false, error: { message: string } }`.
+Each subdirectory exports typed functions. All API calls return a discriminated union: `{ success: true, data: T }` or `{ success: false, error: { message: string } }`.
 
 **Auth utilities** (`src/utils/api/auth/`):
 
