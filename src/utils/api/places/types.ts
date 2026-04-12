@@ -18,6 +18,14 @@ export interface Place {
   country: string;
   street: string;
   categories: string[];
+  /** Gemini-generated description of the place. */
+  description?: string;
+  /** Gemini-generated significance (UNESCO, historical importance, etc.). */
+  significance?: string;
+  /** Gemini-classified place type, e.g. "temple", "fort", "heritage_site". */
+  place_type?: string;
+  /** Real image URLs from Wikipedia / Gemini enrichment. */
+  image_urls?: string[];
 }
 
 export interface FindPlacesRequest {

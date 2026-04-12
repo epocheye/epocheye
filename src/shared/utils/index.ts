@@ -22,6 +22,8 @@ export {
   truncate,
   formatName,
   formatFileSize,
+  formatCategory,
+  formatPlaceType,
 } from './formatters';
 
 // Validators

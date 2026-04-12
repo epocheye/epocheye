@@ -1,16 +1,16 @@
 /**
- * Lens-specific premium gating hook.
+ * Lens-specific access gating hook.
  *
- * Combines the user's premium pass status (from usePremiumPass) with
- * daily Gemini usage tracking to determine what features are available
- * in the Lens/AR camera experience.
+ * Combines the user's Explorer Pass status with daily Gemini usage
+ * tracking to determine what features are available in the Lens/AR
+ * camera experience.
  *
  * Free tier: 5 Gemini identification calls per day, basic info only.
- * Premium:   Unlimited calls, segmentation masks, detailed facts, offline cache.
+ * Explorer Pass: Unlimited calls, segmentation masks, detailed facts, offline cache.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { usePremiumPass } from './usePremiumPass';
+import { useExplorerPass } from './useExplorerPass';
 import {
   checkAndIncrement as incrementUsage,
   getRemainingCalls as fetchRemainingCalls,
@@ -40,7 +40,7 @@ export interface UseLensPremiumReturn {
 }
 
 export function useLensPremium(): UseLensPremiumReturn {
-  const { hasActivePass, loading } = usePremiumPass();
+  const { hasAnyActivePass: hasActivePass, loading } = useExplorerPass();
   const [remainingCalls, setRemainingCalls] = useState<number>(
     hasActivePass ? Infinity : 5,
   );

@@ -32,10 +32,10 @@ import {
   ChevronUp,
   Lightbulb,
   Users,
-  Star,
   Bookmark,
   BookOpen,
 } from 'lucide-react-native';
+import { formatPlaceType } from '../../shared/utils/formatters';
 import { ROUTES } from '../../core/constants';
 import { usePlaces } from '../../context';
 import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
@@ -75,9 +75,8 @@ interface SiteDetailData extends PlaceNavParam {
   funFacts: FunFact[];
   visitorTips: string[];
   relatedSites: RelatedSite[];
-  rating: number;
-  reviews: number;
   address_line1?: string;
+  place_type?: string;
 }
 
 const DEMO_SITE: SiteDetailData = {
@@ -124,26 +123,8 @@ const DEMO_SITE: SiteDetailData = {
     'Hire a local guide for richer stories and context.',
     'Photography is allowed; check policy for tripods.',
   ],
-  relatedSites: [
-    {
-      id: 'related-1',
-      name: 'Taj Mahal',
-      location: 'Agra, India',
-      image:
-        'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=400&q=80',
-      distance: '210 km',
-    },
-    {
-      id: 'related-2',
-      name: 'Qutub Minar',
-      location: 'Delhi, India',
-      image:
-        'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=400&q=80',
-      distance: '12 km',
-    },
-  ],
-  rating: 4.8,
-  reviews: 2847,
+  relatedSites: [],
+  place_type: 'monument',
 };
 
 function normalizeSite(site?: PlaceNavParam): SiteDetailData {
@@ -164,6 +145,10 @@ function normalizeSite(site?: PlaceNavParam): SiteDetailData {
             (img): img is string => typeof img === 'string',
           )
         : DEMO_SITE.heroImages,
+    place_type:
+      typeof site.place_type === 'string'
+        ? site.place_type
+        : DEMO_SITE.place_type,
   };
 }
 
@@ -350,7 +335,9 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
 
           <View style={styles.heroFooter}>
-            <Text style={styles.heroKicker}>Heritage Landmark</Text>
+            <Text style={styles.heroKicker}>
+              {site.place_type ? formatPlaceType(site.place_type) : 'Heritage Landmark'}
+            </Text>
             <Text style={styles.heroTitle}>{site.name}</Text>
             <View style={styles.heroLocationRow}>
               <MapPin color="#B8AF9E" size={14} />
@@ -385,14 +372,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               <View style={styles.tertiaryTag}>
                 <Text style={styles.tertiaryTagText}>{site.yearBuilt}</Text>
               </View>
-            </View>
-
-            <View style={styles.ratingRow}>
-              <Star color="#C9A84C" fill="#C9A84C" size={16} />
-              <Text style={styles.ratingText}>{site.rating.toFixed(1)}</Text>
-              <Text style={styles.reviewText}>
-                ({site.reviews.toLocaleString()} reviews)
-              </Text>
             </View>
 
             <View style={styles.metaRow}>
@@ -471,24 +450,26 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.sectionWrap}>
-            <View style={styles.sectionHeadingRow}>
-              <Lightbulb color="#C9A84C" size={18} />
-              <Text style={styles.sectionHeading}>Fun Facts</Text>
+          {site.funFacts.length > 0 && (
+            <View style={styles.sectionWrap}>
+              <View style={styles.sectionHeadingRow}>
+                <Lightbulb color="#C9A84C" size={18} />
+                <Text style={styles.sectionHeading}>Fun Facts</Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalContent}
+              >
+                {site.funFacts.map(fact => (
+                  <View key={fact.id} style={styles.factCard}>
+                    <Text style={styles.factTitle}>{fact.title}</Text>
+                    <Text style={styles.factDescription}>{fact.description}</Text>
+                  </View>
+                ))}
+              </ScrollView>
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalContent}
-            >
-              {site.funFacts.map(fact => (
-                <View key={fact.id} style={styles.factCard}>
-                  <Text style={styles.factTitle}>{fact.title}</Text>
-                  <Text style={styles.factDescription}>{fact.description}</Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
+          )}
 
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeadingRow}>
@@ -505,38 +486,40 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             ))}
           </View>
 
-          <View style={styles.sectionWrap}>
-            <Text style={styles.sectionHeading}>Related Sites</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalContent}
-            >
-              {site.relatedSites.map(related => (
-                <TouchableOpacity
-                  key={related.id}
-                  style={styles.relatedCard}
-                  activeOpacity={0.86}
-                >
-                  <ResolvedSubjectImage
-                    subject={related.name}
-                    context={`${related.location} related heritage site`}
-                    fallbackUri={related.image}
-                    style={styles.relatedImage}
-                    imageStyle={styles.relatedImage}
-                    loadingLabel="Loading related site..."
-                  />
-                  <Text style={styles.relatedTitle} numberOfLines={1}>
-                    {related.name}
-                  </Text>
-                  <Text style={styles.relatedLocation} numberOfLines={1}>
-                    {related.location}
-                  </Text>
-                  <Text style={styles.relatedDistance}>{related.distance}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+          {site.relatedSites.length > 0 && (
+            <View style={styles.sectionWrap}>
+              <Text style={styles.sectionHeading}>Related Sites</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalContent}
+              >
+                {site.relatedSites.map(related => (
+                  <TouchableOpacity
+                    key={related.id}
+                    style={styles.relatedCard}
+                    activeOpacity={0.86}
+                  >
+                    <ResolvedSubjectImage
+                      subject={related.name}
+                      context={`${related.location} related heritage site`}
+                      fallbackUri={related.image}
+                      style={styles.relatedImage}
+                      imageStyle={styles.relatedImage}
+                      loadingLabel="Loading related site..."
+                    />
+                    <Text style={styles.relatedTitle} numberOfLines={1}>
+                      {related.name}
+                    </Text>
+                    <Text style={styles.relatedLocation} numberOfLines={1}>
+                      {related.location}
+                    </Text>
+                    <Text style={styles.relatedDistance}>{related.distance}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </View>
       </Animated.ScrollView>
     </SafeAreaView>
@@ -710,24 +693,6 @@ const styles = {
     fontSize: 12,
     lineHeight: 16,
     fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
-  },
-  ratingText: {
-    color: '#F5F0E8',
-    fontSize: 15,
-    lineHeight: 22,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  reviewText: {
-    color: '#B8AF9E',
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: 'MontserratAlternates-Regular',
   },
   metaRow: {
     flexDirection: 'row',

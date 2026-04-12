@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { createNativeStackNavigator, type NativeStackNavigationProp } from '@react-navigation/native-stack';
+import React from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import TabNavigation from './TabNavigation';
 import Permissions from '../screens/Main/PermissionsScreen';
 import SiteDetailScreen from '../screens/Main/SiteDetailScreen';
@@ -10,8 +10,6 @@ import TourDetailScreen from '../screens/Main/TourDetailScreen';
 import PurchaseScreen from '../screens/Main/PurchaseScreen';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
-import { getMyPremiumPass } from '../utils/api/premium';
-
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 interface MainNavigationProps {
@@ -23,25 +21,6 @@ interface MainNavigationProps {
  * Contains the tab navigator and modal screens
  */
 const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
-  const navigationRef = useRef<NativeStackNavigationProp<MainStackParamList> | null>(null);
-  const promptedRef = useRef(false);
-
-  useEffect(() => {
-    if (promptedRef.current) return;
-    promptedRef.current = true;
-    let cancelled = false;
-    (async () => {
-      const result = await getMyPremiumPass();
-      if (cancelled) return;
-      const active = result.success && Boolean(result.data.pass?.is_active);
-      if (!active && navigationRef.current) {
-        navigationRef.current.navigate(ROUTES.MAIN.PURCHASE);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   return (
     <Stack.Navigator
@@ -52,10 +31,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
       }}
     >
       <Stack.Screen name={ROUTES.MAIN.TABS}>
-        {props => {
-          navigationRef.current = props.navigation;
-          return <TabNavigation {...props} onLogout={onLogout} />;
-        }}
+        {props => <TabNavigation {...props} onLogout={onLogout} />}
       </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.PERMISSIONS}

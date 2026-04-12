@@ -52,7 +52,9 @@ import { getTours, getMyTours } from '../../utils/api/tours';
 import type { Tour, MyTour } from '../../utils/api/tours';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { buildSiteDetailData, getPlaceImage } from '../../shared/utils';
-import { usePremiumPass } from '../../shared/hooks';
+import { useExplorerPass } from '../../shared/hooks';
+import ExplorerPassPopup from '../../components/ExplorerPassPopup';
+import OnboardingTooltips from '../../components/OnboardingTooltips';
 
 const FACT_LOADING_LINES = [
   'Tracing your heritage...',
@@ -238,7 +240,7 @@ const Home = ({ navigation }: Props) => {
   >({});
   const [tours, setTours] = useState<Tour[]>([]);
   const [bannerTour, setBannerTour] = useState<MyTour | null>(null);
-  const { hasActivePass: hasPremium, loading: premiumLoading } = usePremiumPass();
+  const { hasAnyActivePass, loading: explorerPassLoading } = useExplorerPass();
 
   const entrance = useSharedValue(24);
   const contentOpacity = useSharedValue(0);
@@ -544,14 +546,14 @@ const Home = ({ navigation }: Props) => {
               />
             )}
 
-            {/* Premium upgrade banner */}
-            {!premiumLoading && !hasPremium && (
+            {/* Explorer Pass banner */}
+            {!explorerPassLoading && !hasAnyActivePass && (
               <TouchableOpacity
                 onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
                 activeOpacity={0.9}
                 className="mt-6 rounded-[20px] overflow-hidden border border-[rgba(212,134,10,0.35)]"
                 accessibilityRole="button"
-                accessibilityLabel="Upgrade to Epocheye Premium"
+                accessibilityLabel="Get Explorer Pass"
               >
                 <LinearGradient
                   colors={['#1A120A', '#2A1C0E', '#1A120A']}
@@ -566,13 +568,13 @@ const Home = ({ navigation }: Props) => {
                     </View>
                     <View className="flex-1">
                       <Text className="text-[#D4860A] text-[10px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
-                        Epocheye Premium
+                        Explorer Pass
                       </Text>
                       <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-Bold'] mt-0.5">
-                        Unlock every premium feature
+                        Unlock heritage sites near you
                       </Text>
                       <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Regular'] mt-0.5">
-                        Tap to upgrade
+                        Tap to choose places
                       </Text>
                     </View>
                     <ArrowRight color="#D4860A" size={20} />
@@ -845,6 +847,15 @@ const Home = ({ navigation }: Props) => {
           </View>
         </Modal>
       )}
+
+      {/* Explorer Pass upsell popup (once per session if no active pass) */}
+      <ExplorerPassPopup
+        hasActivePass={hasAnyActivePass}
+        onGetPass={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
+      />
+
+      {/* First-launch feature walkthrough */}
+      <OnboardingTooltips />
     </SafeAreaView>
   );
 };

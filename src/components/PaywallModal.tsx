@@ -12,8 +12,8 @@ export interface PaywallModalProps {
 
 const PaywallModal: React.FC<PaywallModalProps> = ({
   visible,
-  title = 'Unlock with Premium',
-  message = 'This feature is part of Epocheye Premium. Upgrade to unlock it and every other premium experience.',
+  title = 'Unlock with Explorer Pass',
+  message = 'Get your Explorer Pass to unlock this feature and access heritage sites near you.',
   onClose,
   onUpgrade,
 }) => {
@@ -54,7 +54,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
           >
             <Sparkles color="#0A0A0A" size={18} />
             <Text className="text-[#0A0A0A] text-base font-['MontserratAlternates-Bold']">
-              Upgrade to Premium
+              Get Explorer Pass
             </Text>
           </TouchableOpacity>
 

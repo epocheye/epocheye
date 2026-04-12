@@ -144,6 +144,31 @@ export function formatName(
 }
 
 /**
+ * Format a raw Geoapify category string into a human-readable label.
+ * e.g. "tourism.attraction.place_of_worship" → "Place of Worship"
+ */
+export function formatCategory(raw: string): string {
+  if (!raw) return '';
+  const last = raw.includes('.') ? raw.split('.').pop()! : raw;
+  return last
+    .split('_')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+/**
+ * Format a Gemini place_type into a display label.
+ * e.g. "heritage_site" → "Heritage Site"
+ */
+export function formatPlaceType(raw: string): string {
+  if (!raw) return '';
+  return raw
+    .split('_')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+/**
  * Format file size for display
  * @param bytes - Size in bytes
  * @returns Formatted size string

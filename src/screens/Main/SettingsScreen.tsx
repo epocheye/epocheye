@@ -30,7 +30,7 @@ import { PermissionService } from '../../shared/services/permission.service';
 import { APP_CONFIG } from '../../core/config';
 import type { TabScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
-import { usePremiumPass } from '../../shared/hooks';
+import { useExplorerPass } from '../../shared/hooks';
 
 // React Native's FormData.append accepts a file object with this shape.
 // Casting as RNFile avoids the loose `as any` anti-pattern.
@@ -39,7 +39,7 @@ type RNFile = { uri: string; type: string; name: string };
 type Props = TabScreenProps<'Settings'> & { onLogout?: () => void };
 
 const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
-  const { hasActivePass: hasPremium, loading: premiumLoading } = usePremiumPass();
+  const { hasAnyActivePass, loading: explorerPassLoading } = useExplorerPass();
   const profile = useUser(state => state.profile);
   const isLoading = useUser(state => state.isLoading);
   const updateProfile = useUser(state => state.updateProfile);
@@ -347,24 +347,24 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           </View>
         )}
 
-        {/* Premium upgrade */}
-        {!premiumLoading && !hasPremium && (
+        {/* Explorer Pass */}
+        {!explorerPassLoading && !hasAnyActivePass && (
           <TouchableOpacity
             className="mx-5 mb-6 flex-row items-center rounded-[32px] border border-[rgba(212,134,10,0.35)] bg-[#1A120A] p-5"
             onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
             activeOpacity={0.9}
             accessibilityRole="button"
-            accessibilityLabel="Upgrade to Epocheye Premium"
+            accessibilityLabel="Get Explorer Pass"
           >
             <View className="w-10 h-10 rounded-full bg-[#D4860A]/15 items-center justify-center mr-3">
               <Sparkles size={20} color="#D4860A" />
             </View>
             <View className="flex-1">
               <Text className="text-white text-base font-montserrat-semibold">
-                Upgrade to Premium
+                Get Explorer Pass
               </Text>
               <Text className="text-[#B8AF9E] text-xs font-montserrat-regular mt-0.5">
-                Unlock every premium feature
+                Unlock heritage sites near you
               </Text>
             </View>
             <ChevronRight size={20} color="#D4860A" />
