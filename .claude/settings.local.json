@@ -12,7 +12,12 @@
       "Bash(ls:*)",
       "Bash(grep -E \"export default.*React\\\\.FC|export default.*React\\\\.FC\" src/components/onboarding/*.tsx)",
       "Bash(xargs cat:*)",
-      "Bash(grep -r \"useMemo\\\\|useCallback\" /E/epocheye/src/context/*.tsx)"
+      "Bash(grep -r \"useMemo\\\\|useCallback\" /E/epocheye/src/context/*.tsx)",
+      "Bash(grep -E \"\\\\.ts$|\\\\.tsx$\")",
+      "Bash(:)",
+      "Bash(node:*)",
+      "Bash(npx eslint:*)",
+      "Bash(./gradlew assembleDebug)"
     ]
   }
 }

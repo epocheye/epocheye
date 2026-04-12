@@ -8,7 +8,10 @@ const config = mergeConfig(defaultConfig, {
     babelTransformerPath: require.resolve("react-native-svg-transformer"),
   },
   resolver: {
-    assetExts: defaultConfig.resolver.assetExts.filter(ext => ext !== "svg"),
+    assetExts: [
+      ...defaultConfig.resolver.assetExts.filter(ext => ext !== "svg"),
+      "tflite",
+    ],
     sourceExts: [...defaultConfig.resolver.sourceExts, "svg"],
   },
 });

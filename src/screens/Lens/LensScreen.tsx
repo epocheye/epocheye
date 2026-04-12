@@ -5,12 +5,22 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Dimensions,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {
   Camera as VisionCamera,
   useCameraDevice,
   useCameraPermission,
+  useFrameProcessor,
 } from 'react-native-vision-camera';
+import { useSharedValue } from 'react-native-reanimated';
+import { useResizePlugin } from 'vision-camera-resize-plugin';
 import Geolocation from '@react-native-community/geolocation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +46,8 @@ import MonumentInfoSheet, {
 } from './components/MonumentInfoSheet';
 import PulsingRing from './components/PulsingRing';
 import SearchSheet, { type SearchSheetRef } from './components/SearchSheet';
+import SegmentationOverlay from './components/SegmentationOverlay';
+import * as segmentationService from '../../services/segmentationService';
 
 type Props = MainScreenProps<'Lens'>;
 
@@ -108,6 +120,20 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   );
   const [identifiedObject, setIdentifiedObject] =
     useState<LensIdentifiedObject | null>(null);
+
+  // Live-segmentation state for the Scan Object mode. React state
+  // drives UI conditionals; the shared values are read by the
+  // frame-processor worklet (which cannot see React state directly).
+  const [isScanModeActive, setIsScanModeActive] = useState(false);
+  const [segReady, setSegReady] = useState(false);
+  const isScanModeActiveShared = useSharedValue(false);
+  const isInferenceRunning = useSharedValue(false);
+  const maskShared = useSharedValue<Float32Array | null>(null);
+  const { resize } = useResizePlugin();
+  const { width: screenWidth, height: screenHeight } = useMemo(
+    () => Dimensions.get('window'),
+    [],
+  );
 
   const firstName = useMemo(() => {
     const fromProfile = profile?.name?.trim();
@@ -240,6 +266,85 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     };
   }, []);
 
+  // Load the TFLite segmentation model on mount. Fire-and-forget —
+  // it must never block render. With the zero-byte stub in place,
+  // initialize() silently logs and leaves ready=false; the frame
+  // processor no-ops and the overlay never mounts.
+  useEffect(() => {
+    void segmentationService.initialize();
+    const unsubscribe = segmentationService.subscribeReady(setSegReady);
+    return () => {
+      unsubscribe();
+      segmentationService.dispose();
+      maskShared.value = null;
+    };
+    // maskShared is a stable SharedValue — no dep needed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mirror React state -> shared value so the worklet can gate on it,
+  // and clear the mask whenever scan mode is turned off.
+  useEffect(() => {
+    isScanModeActiveShared.value = isScanModeActive;
+    if (!isScanModeActive) {
+      maskShared.value = null;
+    }
+  }, [isScanModeActive, isScanModeActiveShared, maskShared]);
+
+  // Auto-teardown: when the object_scan SSE finishes streaming (or
+  // errors), turn scan mode off. This piggybacks on the existing
+  // storyStreaming transition so we don't touch the success/error
+  // paths inline in handleScanObject.
+  useEffect(() => {
+    if (!storyStreaming && storyMode === 'object_scan' && isScanModeActive) {
+      setIsScanModeActive(false);
+    }
+  }, [storyStreaming, storyMode, isScanModeActive]);
+
+  // Frame processor: runs on VisionCamera's native worklet thread.
+  // Never touches the JS thread. `model.runSync` blocks this thread
+  // while inference is in progress; the re-entrance lock ensures
+  // subsequent frames are dropped rather than queued, so preview FPS
+  // is never affected regardless of inference latency.
+  const frameProcessor = useFrameProcessor(
+    frame => {
+      'worklet';
+
+      if (!isScanModeActiveShared.value) {
+        return;
+      }
+
+      const m = segmentationService.getModel();
+      if (!m) {
+        return;
+      }
+
+      if (isInferenceRunning.value) {
+        return;
+      }
+      isInferenceRunning.value = true;
+
+      try {
+        const input = resize(frame, {
+          scale: { width: 640, height: 640 },
+          pixelFormat: 'rgb',
+          dataType: 'float32',
+        });
+        const output = m.runSync([input]);
+        // SAM-style heads emit output[0] as a flat Float32Array of
+        // length 640*640. Assumption is asserted by the overlay,
+        // which refuses to render on length mismatch.
+        maskShared.value = output[0] as unknown as Float32Array;
+      } catch {
+        // Per-frame failures are silent — logging here would flood
+        // logcat under any steady-state failure mode.
+      } finally {
+        isInferenceRunning.value = false;
+      }
+    },
+    [isScanModeActiveShared, isInferenceRunning, maskShared, resize],
+  );
+
   const handleOpenStory = useCallback(async () => {
     if (!matchedPlace) {
       return;
@@ -311,6 +416,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     setStoryStreaming(true);
     setStoryMode('object_scan');
     setIdentifiedObject(null);
+    setIsScanModeActive(true);
 
     try {
       const photo = await cameraRef.current?.takePhoto();
@@ -362,6 +468,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       setStoryLoading(false);
       setStoryStreaming(false);
       setIdentifiedObject(null);
+      setIsScanModeActive(false);
       storySheetRef.current?.open();
       track('lens_story_generated', {
         value: fallback.monument,
@@ -460,6 +567,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
             device={device}
             isActive
             photo
+            frameProcessor={isScanModeActive ? frameProcessor : undefined}
           />
         ) : (
           <View style={styles.noDeviceWrap}>
@@ -469,6 +577,14 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
             </Text>
           </View>
         )}
+
+        {isScanModeActive && segReady ? (
+          <SegmentationOverlay
+            maskShared={maskShared}
+            width={screenWidth}
+            height={screenHeight}
+          />
+        ) : null}
 
         <View style={styles.cameraOverlay} />
 

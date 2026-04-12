@@ -105,6 +105,17 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
+
+    // Prevent duplicate native library errors when fast-tflite,
+    // reanimated, and vision-camera all ship the same shared libs.
+    packagingOptions {
+        jniLibs {
+            pickFirsts += [
+                '**/libc++_shared.so',
+                '**/libfbjni.so',
+            ]
+        }
+    }
 }
 
 dependencies {
