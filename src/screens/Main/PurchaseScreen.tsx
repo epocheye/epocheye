@@ -96,15 +96,15 @@ const PurchaseScreen: React.FC<Props> = ({ navigation }) => {
     );
   }
 
-  if (!config || !config.enabled) {
+  if (!config) {
     return (
       <SafeAreaView className="flex-1 bg-[#0A0A0A] items-center justify-center px-8">
         <StatusBar barStyle="light-content" />
         <Text className="text-[#F5F0E8] text-lg text-center font-['MontserratAlternates-SemiBold']">
-          Currently unavailable
+          Something went wrong
         </Text>
         <Text className="text-[#6B6357] text-sm text-center mt-2 font-['MontserratAlternates-Regular']">
-          Premium purchases are disabled right now. Please check back later.
+          Unable to load premium details. Please try again later.
         </Text>
         <TouchableOpacity
           onPress={() => navigation.goBack()}

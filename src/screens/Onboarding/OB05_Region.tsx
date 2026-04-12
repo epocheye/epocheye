@@ -172,7 +172,7 @@ const OB05_Region: React.FC<Props> = ({navigation}) => {
 
         <View style={{paddingBottom: insets.bottom + 24}}>
           <OBPrimaryButton
-            label="This is my heritage  \u2192"
+            label={"This is my heritage  →"}
             disabled={regions.length === 0}
             onPress={() => {
               track('onboarding_region_set', {regions});

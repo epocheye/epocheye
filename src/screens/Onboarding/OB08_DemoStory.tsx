@@ -245,7 +245,7 @@ const OB08_DemoStory: React.FC<Props> = ({navigation}) => {
             {firstName}, this ancestor shares your lineage.
           </Text>
           <OBPrimaryButton
-            label="This is real. Find mine.  \u2192"
+            label={"This is real. Find mine.  →"}
             onPress={() => navigation.navigate('OB09_Reaction')}
           />
           <Text style={styles.disclaimer}>

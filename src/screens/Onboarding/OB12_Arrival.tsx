@@ -159,7 +159,7 @@ const OB12_Arrival: React.FC<Props> = () => {
 
         <Animated.View style={sCta}>
           <OBPrimaryButton
-            label="Explore nearby  \u2192"
+            label={"Explore nearby  →"}
             onPress={() => onOnboardingComplete()}
           />
           <OBSkipLink

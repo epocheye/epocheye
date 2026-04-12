@@ -201,7 +201,7 @@ const OB09_Reaction: React.FC<Props> = ({navigation}) => {
         </Text>
 
         <OBPrimaryButton
-          label="Continue  \u2192"
+          label={"Continue  →"}
           onPress={() =>
             navigation.navigate('OB10_SignUp', {fromOnboarding: true})
           }

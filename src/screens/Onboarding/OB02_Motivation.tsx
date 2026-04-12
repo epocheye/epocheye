@@ -96,7 +96,7 @@ const OB02_Motivation: React.FC<Props> = ({navigation}) => {
         </View>
 
         <OBPrimaryButton
-          label="Continue  \u2192"
+          label={"Continue  →"}
           disabled={!motivation}
           onPress={() => {
             track('onboarding_motivation_set', {motivation});

@@ -104,7 +104,7 @@ const OB03_Frequency: React.FC<Props> = ({navigation}) => {
         </View>
 
         <OBPrimaryButton
-          label="Continue  \u2192"
+          label={"Continue  →"}
           disabled={!visitFrequency}
           onPress={() => navigation.navigate('OB04_Goal')}
         />

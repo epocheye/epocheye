@@ -105,7 +105,7 @@ const OB11_Notifications: React.FC<Props> = ({navigation}) => {
         </View>
 
         <View>
-          <OBPrimaryButton label="Yes, notify me  \u2192" onPress={handleEnable} />
+          <OBPrimaryButton label={"Yes, notify me  →"} onPress={handleEnable} />
           <OBSkipLink
             label="Maybe later"
             onPress={() => navigation.navigate('OB12_Arrival')}

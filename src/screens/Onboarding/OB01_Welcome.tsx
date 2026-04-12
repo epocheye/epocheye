@@ -121,7 +121,7 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
 
         <Animated.View style={[styles.ctaWrap, s5]}>
           <OBPrimaryButton
-            label="Begin  \u2192"
+            label={"Begin  →"}
             onPress={() => navigation.navigate('OB02_Motivation')}
           />
         </Animated.View>

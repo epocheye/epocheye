@@ -92,7 +92,7 @@ const OB04_Goal: React.FC<Props> = ({navigation}) => {
         </View>
 
         <OBPrimaryButton
-          label="Continue  \u2192"
+          label={"Continue  →"}
           onPress={() => navigation.navigate('OB05_Region')}
         />
       </View>

@@ -118,7 +118,7 @@ const OB06_Name: React.FC<Props> = ({navigation}) => {
           </Animated.View>
 
           <OBPrimaryButton
-            label="That's me  \u2192"
+            label={"That's me  →"}
             disabled={firstName.trim().length < 2}
             onPress={() => navigation.navigate('OB07_Promise')}
           />

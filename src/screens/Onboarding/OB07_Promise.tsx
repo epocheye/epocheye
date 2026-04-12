@@ -163,7 +163,7 @@ const OB07_Promise: React.FC<Props> = ({navigation}) => {
         {showCta && (
           <Animated.View style={sCta}>
             <OBPrimaryButton
-              label="Meet them  \u2192"
+              label={"Meet them  →"}
               onPress={() => navigation.navigate('OB08_DemoStory')}
             />
           </Animated.View>
