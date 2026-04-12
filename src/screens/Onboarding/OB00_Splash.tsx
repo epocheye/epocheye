@@ -1,66 +1,55 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, StatusBar } from 'react-native';
+import React, {useEffect} from 'react';
+import {View, StyleSheet, StatusBar} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSpring,
+  withDelay,
   runOnJS,
 } from 'react-native-reanimated';
-import { OB_COLORS } from '../../constants/onboarding';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
-import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
-import type { OnboardingScreenProps } from '../../core/types/navigation.types';
-import { getOnboardingVisualFallback } from '../../components/onboarding/visual-fallbacks';
+import DustMotes from '../../components/onboarding/DustMotes';
+import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB00_Splash'>;
 
-const SPLASH_SUBJECT = 'Ancient monument at sunrise';
-
-const OB00_Splash: React.FC<Props> = ({ navigation }) => {
-  const opacity = useSharedValue(0);
+const OB00_Splash: React.FC<Props> = ({navigation}) => {
+  const logoOpacity = useSharedValue(0);
+  const logoScale = useSharedValue(0.8);
 
   useEffect(() => {
     const goNext = () => {
       navigation.replace('OB01_Welcome');
     };
 
-    opacity.value = withTiming(1, { duration: 600 });
+    // Logo fades in at 400ms with scale spring
+    logoOpacity.value = withDelay(400, withTiming(1, {duration: 600}));
+    logoScale.value = withDelay(400, withSpring(1, {damping: 12, stiffness: 120}));
 
-    // Hold 800ms after fade-in completes, then navigate
+    // Auto-advance at 2000ms
     const timer = setTimeout(() => {
       runOnJS(goNext)();
-    }, 1400);
+    }, 2000);
 
     return () => clearTimeout(timer);
-  }, [navigation, opacity]);
+  }, [navigation, logoOpacity, logoScale]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
+  const logoStyle = useAnimatedStyle(() => ({
+    opacity: logoOpacity.value,
+    transform: [{scale: logoScale.value}],
   }));
 
   return (
     <View style={styles.container}>
-      <ResolvedSubjectImage
-        subject={SPLASH_SUBJECT}
-        context="onboarding splash cinematic opening"
-        fallbackUri={getOnboardingVisualFallback(
-          SPLASH_SUBJECT,
-          'onboarding splash cinematic opening',
-        )}
-        style={styles.backdrop}
-        loadingLabel="Loading opening visual..."
-        showSkeletonWhileLoading
-      />
-      {/* TODO(video): Replace this backdrop with a branded intro clip for a stronger opening moment. */}
-      <View style={styles.backdropTint} />
-
       <StatusBar
         barStyle="light-content"
         translucent
         backgroundColor="transparent"
       />
-      <Animated.View style={animatedStyle}>
-        <AnimatedLogo size={120} motion="drift" variant="white" />
+      <DustMotes />
+      <Animated.View style={logoStyle}>
+        <AnimatedLogo size={100} motion="drift" variant="white" />
       </Animated.View>
     </View>
   );
@@ -69,16 +58,9 @@ const OB00_Splash: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: OB_COLORS.bg,
+    backgroundColor: '#050505',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  backdropTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(13,13,13,0.7)',
   },
 });
 

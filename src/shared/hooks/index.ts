@@ -31,3 +31,6 @@ export type { UsePremiumPurchaseReturn } from './usePremiumPurchase';
 
 export { usePremiumPass } from './usePremiumPass';
 export type { UsePremiumPassReturn } from './usePremiumPass';
+
+export { useLensPremium } from './useLensPremium';
+export type { UseLensPremiumReturn } from './useLensPremium';

@@ -1,15 +1,12 @@
 import React from 'react';
-import {
-  Text,
-  Pressable,
-  StyleSheet,
-  Platform,
-} from 'react-native';
+import {Text, Pressable, StyleSheet, View} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import LinearGradient from 'react-native-linear-gradient';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {FONTS} from '../../core/constants/theme';
 
@@ -23,21 +20,18 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const OBPrimaryButton: React.FC<Props> = ({label, onPress, disabled = false}) => {
   const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{scale: scale.value}],
-    opacity: disabled ? 0.6 : opacity.value,
+    opacity: disabled ? 0.5 : 1,
   }));
 
   const handlePressIn = () => {
-    scale.value = withTiming(0.97, {duration: 100});
-    opacity.value = withTiming(0.9, {duration: 100});
+    scale.value = withTiming(0.96, {duration: 80});
   };
 
   const handlePressOut = () => {
-    scale.value = withTiming(1, {duration: 150});
-    opacity.value = withTiming(1, {duration: 150});
+    scale.value = withSpring(1, {damping: 14, stiffness: 300});
   };
 
   const handlePress = () => {
@@ -55,47 +49,61 @@ const OBPrimaryButton: React.FC<Props> = ({label, onPress, disabled = false}) =>
 
   return (
     <AnimatedPressable
-      style={[
-        styles.button,
-        disabled ? styles.disabled : styles.enabled,
-        animatedStyle,
-      ]}
+      style={[styles.wrapper, animatedStyle]}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={handlePress}
       disabled={disabled}>
-      <Text
-        style={[
-          styles.label,
-          {color: disabled ? '#666' : '#0D0D0D'},
-        ]}>
-        {label}
-      </Text>
+      {disabled ? (
+        <View style={styles.disabledBg}>
+          <Text style={[styles.label, styles.disabledLabel]}>{label}</Text>
+        </View>
+      ) : (
+        <LinearGradient
+          colors={['#EDAF2A', '#D4900C']}
+          start={{x: 0, y: 0}}
+          end={{x: 1, y: 1}}
+          style={styles.gradient}>
+          <Text style={styles.label}>{label}</Text>
+        </LinearGradient>
+      )}
     </AnimatedPressable>
   );
 };
 
 const styles = StyleSheet.create({
-  button: {
-    height: 52,
-    borderRadius: 12,
+  wrapper: {
+    marginHorizontal: 24,
+    borderRadius: 14,
+    overflow: 'hidden',
+    // Subtle glow shadow
+    shadowColor: '#E8A020',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  gradient: {
+    height: 54,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 24,
   },
-  enabled: {
-    backgroundColor: '#E8A020',
-  },
-  disabled: {
-    backgroundColor: '#3A3A3A',
+  disabledBg: {
+    height: 54,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2A2A2A',
   },
   label: {
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: Platform.select({
-      ios: FONTS.bold,
-      android: FONTS.bold,
-    }),
+    color: '#0A0A0A',
+    fontFamily: FONTS.bold,
+  },
+  disabledLabel: {
+    color: '#666',
   },
 });
 

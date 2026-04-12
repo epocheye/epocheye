@@ -24,7 +24,7 @@ import {
 } from '@shopify/react-native-skia';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 
-const MASK_SIZE = 640;
+const MASK_SIZE = 257;
 const MASK_STRIDE = MASK_SIZE * 4; // RGBA bytes per row
 const RGBA_BYTES = MASK_SIZE * MASK_SIZE * 4;
 const THRESHOLD = 0.5;

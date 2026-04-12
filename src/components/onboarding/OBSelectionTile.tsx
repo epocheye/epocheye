@@ -5,11 +5,11 @@ import {
   Pressable,
   StyleSheet,
   Dimensions,
-  Platform,
 } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -46,11 +46,14 @@ const OBSelectionTile: React.FC<Props> = ({
   }));
 
   const handlePressIn = () => {
-    scale.value = withTiming(0.97, {duration: 80});
+    scale.value = withTiming(0.96, {duration: 60});
   };
 
   const handlePressOut = () => {
-    scale.value = withTiming(1, {duration: 120});
+    scale.value = withSpring(selected ? 1.02 : 1, {
+      damping: 14,
+      stiffness: 280,
+    });
   };
 
   const handlePress = () => {
@@ -71,8 +74,12 @@ const OBSelectionTile: React.FC<Props> = ({
         styles.tile,
         isGrid ? styles.gridTile : styles.stackTile,
         {
-          borderColor: selected ? '#E8A020' : '#2A2A2A',
-          backgroundColor: selected ? '#1F1800' : '#1A1A1A',
+          borderColor: selected
+            ? 'rgba(232, 160, 32, 0.7)'
+            : 'rgba(255, 255, 255, 0.08)',
+          backgroundColor: selected
+            ? 'rgba(232, 160, 32, 0.08)'
+            : 'rgba(255, 255, 255, 0.04)',
         },
         animatedStyle,
       ]}
@@ -80,41 +87,39 @@ const OBSelectionTile: React.FC<Props> = ({
       onPressOut={handlePressOut}
       onPress={handlePress}>
       {badge && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge}</Text>
+        <View
+          style={[
+            styles.badge,
+            {
+              backgroundColor: selected ? '#E8A020' : 'rgba(255,255,255,0.1)',
+            },
+          ]}>
+          <Text
+            style={[
+              styles.badgeText,
+              {color: selected ? '#0D0D0D' : '#8C93A0'},
+            ]}>
+            {badge}
+          </Text>
         </View>
       )}
 
+      {/* Amber inner glow for selected state */}
+      {selected && <View style={styles.innerGlow} />}
+
       {isGrid ? (
         <View style={styles.gridContent}>
-          <View style={{marginBottom: 8}}>
-            {icon}
-          </View>
-          <Text
-            style={[
-              styles.label,
-              {color: selected ? '#FFFFFF' : '#FFFFFF'},
-            ]}
-            numberOfLines={2}>
+          <View style={styles.iconWrapGrid}>{icon}</View>
+          <Text style={styles.gridLabel} numberOfLines={2}>
             {label}
           </Text>
         </View>
       ) : (
         <View style={styles.stackContent}>
-          <View style={styles.iconWrapper}>
-            {icon}
-          </View>
+          <View style={styles.iconWrapStack}>{icon}</View>
           <View style={styles.textWrapper}>
-            <Text
-              style={[
-                styles.label,
-                {color: '#FFFFFF'},
-              ]}>
-              {label}
-            </Text>
-            {sublabel && (
-              <Text style={styles.sublabel}>{sublabel}</Text>
-            )}
+            <Text style={styles.stackLabel}>{label}</Text>
+            {sublabel && <Text style={styles.sublabel}>{sublabel}</Text>}
           </View>
         </View>
       )}
@@ -124,74 +129,82 @@ const OBSelectionTile: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   tile: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1.5,
     overflow: 'hidden',
   },
   gridTile: {
     width: GRID_TILE_WIDTH,
-    height: 90,
+    height: 110,
   },
   stackTile: {
-    height: 68,
+    height: 72,
     marginHorizontal: 24,
+  },
+  innerGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 14,
+    backgroundColor: 'rgba(232, 160, 32, 0.04)',
   },
   gridContent: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+  iconWrapGrid: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: FONTS.semiBold,
+    textAlign: 'center',
   },
   stackContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
   },
-  iconWrapper: {
-    width: 40,
+  iconWrapStack: {
+    width: 44,
     alignItems: 'center',
   },
   textWrapper: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 14,
   },
-  label: {
-    fontSize: 14,
+  stackLabel: {
+    fontSize: 15,
     fontWeight: '600',
-    fontFamily: Platform.select({
-      ios: FONTS.semiBold,
-      android: FONTS.semiBold,
-    }),
-    textAlign: 'left',
+    color: '#FFFFFF',
+    fontFamily: FONTS.semiBold,
   },
   sublabel: {
     fontSize: 12,
     color: '#8C93A0',
-    marginTop: 2,
-    fontFamily: Platform.select({
-      ios: FONTS.regular,
-      android: FONTS.regular,
-    }),
+    marginTop: 3,
+    fontFamily: FONTS.regular,
   },
   badge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: '#E8A020',
+    top: 8,
+    right: 8,
     borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     zIndex: 1,
   },
   badgeText: {
-    color: '#0D0D0D',
     fontSize: 10,
     fontWeight: '700',
-    fontFamily: Platform.select({
-      ios: FONTS.bold,
-      android: FONTS.bold,
-    }),
+    fontFamily: FONTS.bold,
   },
 });
 

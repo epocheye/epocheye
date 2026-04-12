@@ -1,41 +1,70 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, StatusBar } from 'react-native';
+import React, {useEffect} from 'react';
+import {View, Text, StyleSheet, StatusBar} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
+  withSequence,
   withTiming,
+  withSpring,
   Easing,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BellRing } from 'lucide-react-native';
-import { requestNotifications } from 'react-native-permissions';
-import { OB_COLORS, OB_TYPOGRAPHY } from '../../constants/onboarding';
-import { FONTS } from '../../core/constants/theme';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {BellRing} from 'lucide-react-native';
+import {requestNotifications} from 'react-native-permissions';
+import {OB_COLORS} from '../../constants/onboarding';
+import {FONTS} from '../../core/constants/theme';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSkipLink from '../../components/onboarding/OBSkipLink';
-import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
-import type { OnboardingScreenProps } from '../../core/types/navigation.types';
+import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB11_Notifications'>;
 
-const OB11_Notifications: React.FC<Props> = ({ navigation }) => {
+const OB11_Notifications: React.FC<Props> = ({navigation}) => {
   const insets = useSafeAreaInsets();
 
-  // Pulsing scale for bell icon
-  const scale = useSharedValue(0.95);
+  // Bell wiggle animation (rotate oscillation)
+  const rotate = useSharedValue(0);
+  const bellScale = useSharedValue(0.9);
+
+  // Entrance animations
+  const headingO = useSharedValue(0);
+  const headingY = useSharedValue(16);
+  const descO = useSharedValue(0);
+
   useEffect(() => {
-    scale.value = withRepeat(
-      withTiming(1.05, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+    // Entrance
+    headingO.value = withTiming(1, {duration: 400});
+    headingY.value = withSpring(0, {damping: 20, stiffness: 140});
+    descO.value = withTiming(1, {duration: 500});
+
+    // Bell spring in
+    bellScale.value = withSpring(1, {damping: 10, stiffness: 100});
+
+    // Bell wiggle — rotateZ oscillation
+    rotate.value = withRepeat(
+      withSequence(
+        withTiming(12, {duration: 150, easing: Easing.inOut(Easing.ease)}),
+        withTiming(-10, {duration: 150, easing: Easing.inOut(Easing.ease)}),
+        withTiming(8, {duration: 120, easing: Easing.inOut(Easing.ease)}),
+        withTiming(-6, {duration: 120, easing: Easing.inOut(Easing.ease)}),
+        withTiming(0, {duration: 100, easing: Easing.inOut(Easing.ease)}),
+        withTiming(0, {duration: 1800}), // pause between wiggles
+      ),
       -1,
-      true,
+      false,
     );
-  }, [scale]);
+  }, [rotate, bellScale, headingO, headingY, descO]);
 
   const bellStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [{rotateZ: `${rotate.value}deg`}, {scale: bellScale.value}],
   }));
+  const sHeading = useAnimatedStyle(() => ({
+    opacity: headingO.value,
+    transform: [{translateY: headingY.value}],
+  }));
+  const sDesc = useAnimatedStyle(() => ({opacity: descO.value}));
 
   const handleEnable = async () => {
     try {
@@ -51,38 +80,32 @@ const OB11_Notifications: React.FC<Props> = ({ navigation }) => {
         translucent
         backgroundColor="transparent"
       />
-      <OBProgressBar current={10} total={10} />
+      <OBProgressBar current={9} total={10} />
 
-      <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
-        <View style={styles.header}>
-          <Text style={OB_TYPOGRAPHY.heading}>
-            Know when history is near you.
+      <View style={[styles.content, {paddingBottom: insets.bottom + 24}]}>
+        <Animated.View style={[styles.header, sHeading]}>
+          <Text style={styles.heading}>
+            Know when history{'\n'}is near you.
           </Text>
-          <Text style={[OB_TYPOGRAPHY.sub, styles.sub]}>
+          <Text style={styles.sub}>
             We'll notify you when you're close to a heritage site.
           </Text>
-        </View>
-
-        <View style={styles.visualWrap}>
-          <OnboardingResolvedVisual
-            subject="Ancestor waiting near a heritage monument"
-            context="onboarding notifications prompt"
-            height={150}
-          />
-        </View>
+        </Animated.View>
 
         <View style={styles.centerArea}>
+          {/* Subtle ambient glow behind bell */}
+          <View style={styles.bellGlow} />
           <Animated.View style={bellStyle}>
-            <BellRing size={64} color="#E8A020" />
+            <BellRing size={72} color="#E8A020" />
           </Animated.View>
 
-          <Text style={styles.description}>
+          <Animated.Text style={[styles.description, sDesc]}>
             Get notified the moment your ancestor is within reach.
-          </Text>
+          </Animated.Text>
         </View>
 
         <View>
-          <OBPrimaryButton label="Yes, notify me →" onPress={handleEnable} />
+          <OBPrimaryButton label="Yes, notify me  \u2192" onPress={handleEnable} />
           <OBSkipLink
             label="Maybe later"
             onPress={() => navigation.navigate('OB12_Arrival')}
@@ -103,25 +126,39 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   header: {
-    paddingHorizontal: 24,
-    marginTop: 40,
+    paddingHorizontal: 28,
+    marginTop: 32,
+  },
+  heading: {
+    fontSize: 28,
+    lineHeight: 36,
+    color: '#FFFFFF',
+    fontFamily: FONTS.extraBold,
   },
   sub: {
-    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#8C93A0',
+    fontFamily: FONTS.regular,
+    marginTop: 10,
   },
   centerArea: {
     alignItems: 'center',
-    gap: 24,
+    gap: 28,
   },
-  visualWrap: {
-    paddingHorizontal: 24,
-    marginTop: 8,
+  bellGlow: {
+    position: 'absolute',
+    top: -20,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(232, 160, 32, 0.06)',
   },
   description: {
     color: '#8C93A0',
     fontSize: 14,
     textAlign: 'center',
-    marginHorizontal: 32,
+    marginHorizontal: 40,
     fontFamily: FONTS.regular,
     lineHeight: 22,
   },

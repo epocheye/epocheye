@@ -62,6 +62,14 @@ export const STORAGE_KEYS = {
   TOURS: {
     FREE_TOUR_BANNER_DISMISSED: `${STORAGE_PREFIX}/free_tour_banner_dismissed`,
   },
+
+  /**
+   * Lens / AR identification keys
+   */
+  LENS: {
+    GEMINI_DAILY_USAGE: `${STORAGE_PREFIX}/gemini_daily_usage`,
+    GEMINI_CACHE: `${STORAGE_PREFIX}/gemini_cache`,
+  },
 } as const;
 
 /**
@@ -73,4 +81,5 @@ export type StorageKey =
   | (typeof STORAGE_KEYS.PREFERENCES)[keyof typeof STORAGE_KEYS.PREFERENCES]
   | (typeof STORAGE_KEYS.ONBOARDING)[keyof typeof STORAGE_KEYS.ONBOARDING]
   | (typeof STORAGE_KEYS.CACHE)[keyof typeof STORAGE_KEYS.CACHE]
-  | (typeof STORAGE_KEYS.TOURS)[keyof typeof STORAGE_KEYS.TOURS];
+  | (typeof STORAGE_KEYS.TOURS)[keyof typeof STORAGE_KEYS.TOURS]
+  | (typeof STORAGE_KEYS.LENS)[keyof typeof STORAGE_KEYS.LENS];

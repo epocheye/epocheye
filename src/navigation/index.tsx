@@ -28,13 +28,12 @@ const AppNavigator: React.FC = () => {
 
   const checkAppState = useCallback(async () => {
     try {
-      const [, authenticated] = await Promise.all([
+      const [completedFlag, authenticated] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING.COMPLETED),
         bootstrapSession(),
       ]);
 
-      // Onboarding temporarily disabled — being redesigned. Screens remain on disk.
-      const hasCompletedOnboarding = true;
+      const hasCompletedOnboarding = completedFlag === 'true';
 
       if (hasCompletedOnboarding && authenticated) {
         setSessionAuthenticated(true);

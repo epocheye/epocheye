@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
   ScrollView,
+  Image,
   Platform,
 } from 'react-native';
 import Animated, {
@@ -13,30 +14,29 @@ import Animated, {
   withTiming,
   withRepeat,
   withSequence,
+  withSpring,
   Easing,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { OB_COLORS, OB_TYPOGRAPHY } from '../../constants/onboarding';
-import { FONTS, CDN_BASE } from '../../core/constants/theme';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {OB_COLORS, OB_TYPOGRAPHY} from '../../constants/onboarding';
+import {FONTS, CDN_BASE} from '../../core/constants/theme';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
-import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
-import { useOnboardingStore } from '../../stores/onboardingStore';
-import { track } from '../../services/analytics';
+import {useOnboardingStore} from '../../stores/onboardingStore';
+import {track} from '../../services/analytics';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
-import type { OnboardingScreenProps } from '../../core/types/navigation.types';
-import { getOnboardingVisualFallback } from '../../components/onboarding/visual-fallbacks';
+import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB08_DemoStory'>;
 
-// Map monument names to CDN images as best-effort
+// Map monument names to CDN images
 const MONUMENT_IMAGES: Record<string, string> = {
   'Konark Sun Temple': `${CDN_BASE}monuments/Konarka_Temple-2.jpg`,
   'Rock-Hewn Churches of Lalibela': `${CDN_BASE}monuments/mesopotamia.jpg`,
   'Longmen Grottoes': `${CDN_BASE}monuments/china.jpg`,
   'Notre-Dame de Paris': `${CDN_BASE}monuments/victoria.jpg`,
-  'Chichén Itzá': `${CDN_BASE}monuments/mesopotamia.jpg`,
+  'Chich\u00e9n Itz\u00e1': `${CDN_BASE}monuments/mesopotamia.jpg`,
   Persepolis: `${CDN_BASE}monuments/persia.jpg`,
   'Angkor Wat': `${CDN_BASE}monuments/tamil.jpg`,
 };
@@ -57,8 +57,8 @@ const STORY_WAIT_STEPS = [
   'Finalizing your timeline',
 ];
 
-const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
-  const { firstName, demoStory, demoMonument, regions } = useOnboardingStore();
+const OB08_DemoStory: React.FC<Props> = ({navigation}) => {
+  const {firstName, demoStory, demoMonument} = useOnboardingStore();
   const insets = useSafeAreaInsets();
   const [isStreaming, setIsStreaming] = useState(true);
   const [showEndCard, setShowEndCard] = useState(false);
@@ -76,22 +76,21 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
     completedRef.current = true;
     setIsStreaming(false);
     if (monument) {
-      track('onboarding_story_generated', { monument });
+      track('onboarding_story_generated', {monument});
     }
     doneTimerRef.current = setTimeout(() => {
       setShowEndCard(true);
     }, 1200);
   };
 
-  // Detect when story is complete — demoMonument is set by onDone (Gemini) or onError (fallback)
+  // Detect when story is complete
   useEffect(() => {
     if (demoMonument && demoStory.length > 0 && !completedRef.current) {
       triggerCompletion(demoMonument);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demoMonument, demoStory.length]);
 
-  // Hard failsafe: if neither story nor monument arrive within 20s, force show CTA
+  // 20s failsafe
   useEffect(() => {
     failsafeTimerRef.current = setTimeout(() => {
       if (!completedRef.current) {
@@ -108,22 +107,21 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
         clearTimeout(doneTimerRef.current);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Blinking cursor — runs on native thread via Reanimated
+  // Blinking cursor
   useEffect(() => {
     if (isStreaming) {
       cursorOpacity.value = withRepeat(
         withSequence(
-          withTiming(0, { duration: 400, easing: Easing.inOut(Easing.quad) }),
-          withTiming(1, { duration: 400, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0, {duration: 400, easing: Easing.inOut(Easing.quad)}),
+          withTiming(1, {duration: 400, easing: Easing.inOut(Easing.quad)}),
         ),
         -1,
         false,
       );
     } else {
-      cursorOpacity.value = withTiming(0, { duration: 200 });
+      cursorOpacity.value = withTiming(0, {duration: 200});
     }
   }, [isStreaming, cursorOpacity]);
 
@@ -131,7 +129,7 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
     opacity: cursorOpacity.value,
   }));
 
-  // Single interval for loading state rotation (messages + steps)
+  // Loading state rotation
   useEffect(() => {
     if (!isStreaming || demoStory.length > 0) {
       return;
@@ -145,22 +143,23 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
     return () => clearInterval(loadingTimer);
   }, [demoStory.length, isStreaming]);
 
-  const cardOpacity = useSharedValue(0);
+  // End card animation
+  const cardY = useSharedValue(100);
+  const cardO = useSharedValue(0);
   useEffect(() => {
     if (showEndCard) {
-      cardOpacity.value = withTiming(1, { duration: 500 });
+      cardO.value = withTiming(1, {duration: 400});
+      cardY.value = withSpring(0, {damping: 16, stiffness: 120});
     }
-  }, [showEndCard, cardOpacity]);
-  const cardStyle = useAnimatedStyle(() => ({ opacity: cardOpacity.value }));
+  }, [showEndCard, cardO, cardY]);
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: cardO.value,
+    transform: [{translateY: cardY.value}],
+  }));
 
-  const fallbackMonumentImage = demoMonument
+  const monumentImage = demoMonument
     ? MONUMENT_IMAGES[demoMonument]
-    : undefined;
-  const imageSubject =
-    demoMonument ||
-    (regions.length > 0
-      ? `${regions[0]} heritage monument`
-      : 'Historic monument and ancestry');
+    : `${CDN_BASE}monuments/Konarka_Temple-2.jpg`;
 
   return (
     <View style={styles.container}>
@@ -173,32 +172,16 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
 
       {/* Monument image header */}
       <View style={styles.imageHeader}>
-        {/* TODO(video): Replace this still header with a subtle monument cinematic loop tied to the generated story. */}
-        <ResolvedSubjectImage
-          subject={imageSubject}
-          context={`onboarding demo story monument ${
-            demoMonument || 'generated'
-          }`}
-          fallbackUri={
-            fallbackMonumentImage ??
-            getOnboardingVisualFallback(
-              imageSubject,
-              `onboarding demo story monument ${demoMonument || 'generated'}`,
-            )
-          }
+        <Image
+          source={{uri: monumentImage}}
           style={StyleSheet.absoluteFill}
-          imageStyle={styles.imageFill}
-          loadingLabel="Resolving monument visual..."
-          showSkeletonWhileLoading
+          resizeMode="cover"
         />
         <LinearGradient
           colors={['transparent', 'rgba(13,13,13,0.9)']}
-          style={styles.imageGradient}
-        >
+          style={styles.imageGradient}>
           {demoMonument ? (
-            <View style={styles.monumentLabel}>
-              <Text style={styles.monumentName}>{demoMonument}</Text>
-            </View>
+            <Text style={styles.monumentName}>{demoMonument}</Text>
           ) : null}
         </LinearGradient>
       </View>
@@ -210,11 +193,15 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
         <ScrollView
           style={styles.storyScroll}
           contentContainerStyle={styles.storyScrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+          showsVerticalScrollIndicator={false}>
           {demoStory.length === 0 ? (
             <View style={styles.loadingArea}>
-              <AnimatedLogo size={72} motion="pulse" variant="white" showRing={false} />
+              <AnimatedLogo
+                size={72}
+                motion="pulse"
+                variant="white"
+                showRing={false}
+              />
               <Text style={styles.loadingHeadline}>
                 {STORY_WAIT_MESSAGES[waitMessageIndex]}
               </Text>
@@ -231,35 +218,34 @@ const OB08_DemoStory: React.FC<Props> = ({ navigation }) => {
 
               <View style={styles.shimmerGroup}>
                 <View style={styles.shimmerLine} />
-                <View style={[styles.shimmerLine, { width: '85%' }]} />
-                <View style={[styles.shimmerLine, { width: '70%' }]} />
+                <View style={[styles.shimmerLine, {width: '85%'}]} />
+                <View style={[styles.shimmerLine, {width: '70%'}]} />
               </View>
             </View>
           ) : (
             <Text style={styles.storyText}>
               {demoStory}
               {isStreaming ? (
-                <Animated.Text style={cursorStyle}>|</Animated.Text>
+                <Animated.Text style={cursorStyle}> |</Animated.Text>
               ) : null}
             </Text>
           )}
         </ScrollView>
       </View>
 
-      {/* End card + CTA */}
+      {/* End card slides up from bottom */}
       {showEndCard && (
         <Animated.View
           style={[
             styles.endCard,
-            { paddingBottom: insets.bottom + 24 },
+            {paddingBottom: insets.bottom + 24},
             cardStyle,
-          ]}
-        >
+          ]}>
           <Text style={styles.endCardText}>
             {firstName}, this ancestor shares your lineage.
           </Text>
           <OBPrimaryButton
-            label="This is real. Find mine. →"
+            label="This is real. Find mine.  \u2192"
             onPress={() => navigation.navigate('OB09_Reaction')}
           />
           <Text style={styles.disclaimer}>
@@ -277,12 +263,8 @@ const styles = StyleSheet.create({
     backgroundColor: OB_COLORS.bg,
   },
   imageHeader: {
-    height: '38%',
+    height: '36%',
     backgroundColor: '#141414',
-  },
-  imageFill: {
-    width: '100%',
-    height: '100%',
   },
   imageGradient: {
     flex: 1,
@@ -290,12 +272,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 16,
   },
-  monumentLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   monumentName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
     fontFamily: FONTS.bold,
@@ -303,19 +281,19 @@ const styles = StyleSheet.create({
   storySection: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 12,
+    paddingTop: 14,
   },
   storyScroll: {
     flex: 1,
     marginTop: 8,
   },
   storyScrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   storyText: {
     fontSize: 15,
-    lineHeight: 26,
-    color: '#FFFFFF',
+    lineHeight: 27,
+    color: '#F0EBD8',
     fontFamily: Platform.select({
       ios: 'Georgia',
       android: 'serif',
@@ -323,8 +301,8 @@ const styles = StyleSheet.create({
     }),
   },
   loadingArea: {
-    marginTop: 8,
-    gap: 12,
+    marginTop: 12,
+    gap: 14,
     alignItems: 'center',
     paddingTop: 8,
   },
@@ -359,13 +337,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(232, 160, 32, 0.4)',
     backgroundColor: 'rgba(232, 160, 32, 0.12)',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 6,
   },
   loadingStepText: {
     color: '#F5E9D8',
     fontSize: 11,
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
     fontFamily: FONTS.medium,
   },
@@ -375,11 +353,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: OB_COLORS.bg,
-    paddingTop: 16,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(232, 160, 32, 0.15)',
   },
   endCardText: {
     fontStyle: 'italic',
-    color: '#8C93A0',
+    color: '#B8AF9E',
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 16,
@@ -388,7 +368,7 @@ const styles = StyleSheet.create({
   },
   disclaimer: {
     fontSize: 11,
-    color: '#8C93A0',
+    color: '#5A5248',
     textAlign: 'center',
     marginTop: 12,
     marginHorizontal: 24,

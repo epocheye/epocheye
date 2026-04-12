@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AR info card layout rendered as a 3D ViewRenderable in AR space.
+  Styled to match the React Native IdentificationCard component:
+  dark background (#0D0D0D), amber accent (#E8A020), Montserrat fonts.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/ar_card_root"
+    android:layout_width="280dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@android:color/transparent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#E60D0D0D"
+        android:padding="16dp">
+
+        <!-- Monument name -->
+        <TextView
+            android:id="@+id/ar_card_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:text="" />
+
+        <!-- Historical period -->
+        <TextView
+            android:id="@+id/ar_card_period"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#99FFFFFF"
+            android:textSize="12sp"
+            android:layout_marginTop="4dp"
+            android:text="" />
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="10dp"
+            android:background="#33E8A020" />
+
+        <!-- Cultural significance -->
+        <TextView
+            android:id="@+id/ar_card_significance"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#CCFFFFFF"
+            android:textSize="13sp"
+            android:lineSpacingExtra="3dp"
+            android:maxLines="3"
+            android:text="" />
+
+        <!-- Surprising fact -->
+        <TextView
+            android:id="@+id/ar_card_fact"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#E8A020"
+            android:textSize="12sp"
+            android:textStyle="italic"
+            android:layout_marginTop="8dp"
+            android:maxLines="2"
+            android:text="" />
+
+    </LinearLayout>
+
+</LinearLayout>

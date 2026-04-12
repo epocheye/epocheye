@@ -17,7 +17,11 @@
       "Bash(:)",
       "Bash(node:*)",
       "Bash(npx eslint:*)",
-      "Bash(./gradlew assembleDebug)"
+      "Bash(./gradlew assembleDebug)",
+      "Bash(wc -l /e/epocheye/src/**/*.ts /e/epocheye/src/**/*.tsx)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(grep -l \"withTiming\\\\|withSpring\\\\|withSequence\\\\|useAnimatedStyle\" /e/epocheye/src/screens/Onboarding/*.tsx)"
     ]
   }
 }

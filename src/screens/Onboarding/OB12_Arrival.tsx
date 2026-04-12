@@ -1,42 +1,46 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, StatusBar, Dimensions } from 'react-native';
+import React, {useEffect, useRef} from 'react';
+import {View, Text, Image, StyleSheet, StatusBar, Dimensions} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withDelay,
   withTiming,
+  withSpring,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import ConfettiCannon from 'react-native-confetti-cannon';
-import { OB_COLORS } from '../../constants/onboarding';
-import { FONTS } from '../../core/constants/theme';
-import { useOnboardingStore } from '../../stores/onboardingStore';
-import { useOnboardingComplete } from '../../context/OnboardingCallbackContext';
-import { track } from '../../services/analytics';
+import {FONTS, CDN_BASE} from '../../core/constants/theme';
+import {OB_COLORS, BACKEND_URL} from '../../constants/onboarding';
+import {useOnboardingStore} from '../../stores/onboardingStore';
+import {useOnboardingComplete} from '../../context/OnboardingCallbackContext';
+import {track} from '../../services/analytics';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSkipLink from '../../components/onboarding/OBSkipLink';
-import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
-import type { OnboardingScreenProps } from '../../core/types/navigation.types';
-import { BACKEND_URL } from '../../constants/onboarding';
-import { getValidAccessToken } from '../../utils/api/auth';
-import { getOnboardingVisualFallback } from '../../components/onboarding/visual-fallbacks';
+import {getValidAccessToken} from '../../utils/api/auth';
+import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB12_Arrival'>;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const OB12_Arrival: React.FC<Props> = () => {
-  const { firstName, demoMonument, regions } = useOnboardingStore();
+  const {firstName, demoMonument, regions} = useOnboardingStore();
   const completeOnboarding = useOnboardingStore(s => s.completeOnboarding);
   const onOnboardingComplete = useOnboardingComplete();
   const insets = useSafeAreaInsets();
   const confettiRef = useRef<ConfettiCannon | null>(null);
   const hasCompleted = useRef(false);
 
-  const h1 = useSharedValue(0);
-  const h2 = useSharedValue(0);
-  const h3 = useSharedValue(0);
-  const h4 = useSharedValue(0);
+  // Staggered text animations
+  const h1O = useSharedValue(0);
+  const h1Y = useSharedValue(20);
+  const h2O = useSharedValue(0);
+  const h2Y = useSharedValue(20);
+  const cardO = useSharedValue(0);
+  const cardScale = useSharedValue(0.95);
+  const ctaO = useSharedValue(0);
+  const ctaY = useSharedValue(20);
 
   useEffect(() => {
     if (hasCompleted.current) {
@@ -78,22 +82,42 @@ const OB12_Arrival: React.FC<Props> = () => {
     // Start confetti immediately
     confettiRef.current?.start();
 
-    // Staggered text reveals
-    h1.value = withDelay(600, withTiming(1, { duration: 500 }));
-    h2.value = withDelay(1200, withTiming(1, { duration: 500 }));
-    h3.value = withDelay(2000, withTiming(1, { duration: 500 }));
-    h4.value = withDelay(2600, withTiming(1, { duration: 500 }));
-  }, [completeOnboarding, h1, h2, h3, h4]);
+    // Staggered reveals with springs
+    h1O.value = withDelay(500, withTiming(1, {duration: 500}));
+    h1Y.value = withDelay(500, withSpring(0, {damping: 18, stiffness: 120}));
 
-  const s1 = useAnimatedStyle(() => ({ opacity: h1.value }));
-  const s2 = useAnimatedStyle(() => ({ opacity: h2.value }));
-  const s3 = useAnimatedStyle(() => ({ opacity: h3.value }));
-  const s4 = useAnimatedStyle(() => ({ opacity: h4.value }));
-  const visualSubject =
-    demoMonument ||
-    (regions.length > 0
-      ? `${regions[0]} heritage monument`
-      : 'Heritage monument near your location');
+    h2O.value = withDelay(1000, withTiming(1, {duration: 500}));
+    h2Y.value = withDelay(1000, withSpring(0, {damping: 18, stiffness: 120}));
+
+    cardO.value = withDelay(1600, withTiming(1, {duration: 500}));
+    cardScale.value = withDelay(1600, withSpring(1, {damping: 14, stiffness: 100}));
+
+    ctaO.value = withDelay(2200, withTiming(1, {duration: 500}));
+    ctaY.value = withDelay(2200, withSpring(0, {damping: 16, stiffness: 120}));
+  }, [completeOnboarding, h1O, h1Y, h2O, h2Y, cardO, cardScale, ctaO, ctaY]);
+
+  const s1 = useAnimatedStyle(() => ({
+    opacity: h1O.value,
+    transform: [{translateY: h1Y.value}],
+  }));
+  const s2 = useAnimatedStyle(() => ({
+    opacity: h2O.value,
+    transform: [{translateY: h2Y.value}],
+  }));
+  const sCard = useAnimatedStyle(() => ({
+    opacity: cardO.value,
+    transform: [{scale: cardScale.value}],
+  }));
+  const sCta = useAnimatedStyle(() => ({
+    opacity: ctaO.value,
+    transform: [{translateY: ctaY.value}],
+  }));
+
+  const monumentImage = demoMonument
+    ? `${CDN_BASE}monuments/Konarka_Temple-2.jpg`
+    : regions.length > 0
+    ? `${CDN_BASE}monuments/Konarka_Temple-2.jpg`
+    : `${CDN_BASE}monuments/Konarka_Temple-2.jpg`;
 
   return (
     <View style={styles.container}>
@@ -103,40 +127,39 @@ const OB12_Arrival: React.FC<Props> = () => {
         backgroundColor="transparent"
       />
 
-      <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
+      <View style={[styles.content, {paddingBottom: insets.bottom + 24}]}>
         <View style={styles.centerArea}>
           <Animated.Text style={[styles.heroText, s1]}>
-            {firstName}, your lineage is ready.
+            {firstName || 'Explorer'},{'\n'}your lineage is ready.
           </Animated.Text>
 
           <Animated.Text style={[styles.subText, s2]}>
             Head to any heritage site and your ancestor will be waiting.
           </Animated.Text>
 
-          {/* TODO(video): Replace this static destination preview with a short guided arrival clip. */}
-          {/* Map placeholder */}
-          <Animated.View style={[styles.mapPlaceholder, s3]}>
-            <ResolvedSubjectImage
-              subject={visualSubject}
-              context="onboarding final arrival destination"
-              fallbackUri={getOnboardingVisualFallback(
-                visualSubject,
-                'onboarding final arrival destination',
-              )}
-              style={styles.mapImage}
-              imageStyle={styles.mapImage}
-              loadingLabel="Loading your destination visual..."
-              showSkeletonWhileLoading
+          {/* Monument destination card */}
+          <Animated.View style={[styles.destinationCard, sCard]}>
+            <Image
+              source={{uri: monumentImage}}
+              style={styles.cardImage}
+              resizeMode="cover"
             />
-            <View style={styles.mapOverlay}>
-              <Text style={styles.mapText}>Explore nearby monuments</Text>
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.7)']}
+              style={styles.cardGradient}
+            />
+            <View style={styles.cardContent}>
+              <Text style={styles.cardLabel}>YOUR FIRST DESTINATION</Text>
+              <Text style={styles.cardTitle}>
+                {demoMonument || 'Explore nearby monuments'}
+              </Text>
             </View>
           </Animated.View>
         </View>
 
-        <Animated.View style={s4}>
+        <Animated.View style={sCta}>
           <OBPrimaryButton
-            label="Explore nearby →"
+            label="Explore nearby  \u2192"
             onPress={() => onOnboardingComplete()}
           />
           <OBSkipLink
@@ -149,8 +172,8 @@ const OB12_Arrival: React.FC<Props> = () => {
       <ConfettiCannon
         ref={confettiRef}
         count={60}
-        origin={{ x: SCREEN_WIDTH / 2, y: -10 }}
-        colors={['#E8A020', '#FFD700', '#FFFFFF', '#FFA500']}
+        origin={{x: SCREEN_WIDTH / 2, y: -10}}
+        colors={['#E8A020', '#FFD700', '#FFFFFF', '#FFA500', '#D4860A']}
         autoStart={false}
         fadeOut
       />
@@ -171,10 +194,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 28,
   },
   heroText: {
-    fontSize: 28,
+    fontSize: 30,
+    lineHeight: 38,
     fontWeight: '800',
     color: '#FFFFFF',
     fontFamily: FONTS.extraBold,
@@ -185,32 +209,45 @@ const styles = StyleSheet.create({
     color: '#8C93A0',
     fontSize: 15,
     textAlign: 'center',
-    marginHorizontal: 32,
+    marginHorizontal: 20,
     fontFamily: FONTS.regular,
-    lineHeight: 22,
+    lineHeight: 23,
   },
-  mapPlaceholder: {
-    width: SCREEN_WIDTH - 48,
+  destinationCard: {
+    width: SCREEN_WIDTH - 56,
     height: 180,
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
     marginTop: 32,
     backgroundColor: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: 'rgba(232, 160, 32, 0.2)',
   },
-  mapImage: {
+  cardImage: {
+    ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
   },
-  mapOverlay: {
+  cardGradient: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  mapText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  cardContent: {
+    position: 'absolute',
+    bottom: 16,
+    left: 18,
+    right: 18,
+  },
+  cardLabel: {
+    fontSize: 10,
+    letterSpacing: 1,
+    color: '#E8A020',
     fontFamily: FONTS.semiBold,
+    marginBottom: 4,
+  },
+  cardTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontFamily: FONTS.bold,
   },
 });
 

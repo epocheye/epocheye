@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ScanSearch } from 'lucide-react-native';
+import { Layers, ScanSearch, Sparkles } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
 import type { Place } from '../../../utils/api/places';
@@ -25,6 +25,16 @@ interface BottomCardProps {
   onScanObject: () => void;
   onBrowseMonuments: () => void;
   onSearchManually: () => void;
+  /** Triggers Gemini heritage identification */
+  onIdentify?: () => void;
+  /** Whether an identification request is in-flight */
+  identifyLoading?: boolean;
+  /** Remaining free Gemini calls today (Infinity for premium) */
+  remainingCalls?: number;
+  /** Triggers HD Scan via SAM Lambda (premium only) */
+  onHDScan?: () => void;
+  /** Whether an HD scan request is in-flight */
+  hdScanLoading?: boolean;
 }
 
 function formatPlaceSubline(place: Place): string {
@@ -50,6 +60,11 @@ const BottomCard: React.FC<BottomCardProps> = ({
   onScanObject,
   onBrowseMonuments,
   onSearchManually,
+  onIdentify,
+  identifyLoading,
+  remainingCalls,
+  onHDScan,
+  hdScanLoading,
 }) => {
   const insets = useSafeAreaInsets();
 
@@ -100,6 +115,52 @@ const BottomCard: React.FC<BottomCardProps> = ({
             <ScanSearch size={18} color="#E8A020" />
             <Text style={styles.scanObjectText}>Scan an object inside →</Text>
           </TouchableOpacity>
+
+          {onIdentify && (
+            <TouchableOpacity
+              style={styles.identifyButton}
+              onPress={onIdentify}
+              disabled={identifyLoading}
+            >
+              {identifyLoading ? (
+                <ActivityIndicator color="#0D0D0D" size="small" />
+              ) : (
+                <>
+                  <Sparkles size={18} color="#0D0D0D" />
+                  <Text style={styles.identifyButtonText}>
+                    Identify Heritage
+                  </Text>
+                </>
+              )}
+              {remainingCalls !== undefined &&
+                remainingCalls !== Infinity &&
+                !identifyLoading && (
+                  <Text style={styles.remainingText}>
+                    {remainingCalls} left
+                  </Text>
+                )}
+            </TouchableOpacity>
+          )}
+
+          {onHDScan && (
+            <TouchableOpacity
+              style={styles.hdScanButton}
+              onPress={onHDScan}
+              disabled={hdScanLoading}
+            >
+              {hdScanLoading ? (
+                <ActivityIndicator color="#E8A020" size="small" />
+              ) : (
+                <>
+                  <Layers size={16} color="#E8A020" />
+                  <Text style={styles.hdScanButtonText}>HD Scan</Text>
+                  <View style={styles.hdBadge}>
+                    <Text style={styles.hdBadgeText}>PRO</Text>
+                  </View>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       ) : null}
 
@@ -229,6 +290,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     fontFamily: FONTS.semiBold,
+  },
+  identifyButton: {
+    marginTop: 10,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#E8A020',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: 8,
+  },
+  identifyButtonText: {
+    color: '#0D0D0D',
+    fontSize: 15,
+    fontFamily: FONTS.bold,
+  },
+  remainingText: {
+    color: 'rgba(13,13,13,0.6)',
+    fontSize: 11,
+    fontFamily: FONTS.medium,
+    marginLeft: 4,
+  },
+  hdScanButton: {
+    marginTop: 8,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(232,160,32,0.5)',
+    backgroundColor: 'rgba(232,160,32,0.1)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: 8,
+  },
+  hdScanButtonText: {
+    color: '#E8A020',
+    fontSize: 13,
+    fontFamily: FONTS.semiBold,
+  },
+  hdBadge: {
+    backgroundColor: '#E8A020',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  hdBadgeText: {
+    color: '#0D0D0D',
+    fontSize: 9,
+    fontFamily: FONTS.bold,
   },
   notFoundTitle: {
     color: '#FFFFFF',

@@ -19,12 +19,13 @@ import {
   useCameraPermission,
   useFrameProcessor,
 } from 'react-native-vision-camera';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSharedValue } from 'react-native-reanimated';
 import { useResizePlugin } from 'vision-camera-resize-plugin';
 import Geolocation from '@react-native-community/geolocation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ScanEye, X } from 'lucide-react-native';
+import { MapPin, ScanEye, X } from 'lucide-react-native';
 import { track } from '../../services/analytics';
 import { findPlaces, type Place } from '../../utils/api/places';
 import { getFallbackStory } from '../../services/fallbackStories';
@@ -32,20 +33,44 @@ import {
   streamLensStory,
   type LensIdentifiedObject,
 } from '../../services/lensStoryService';
-import { usePlaces, useUser } from '../../context';
+import { usePlaces, useUser, useNetwork } from '../../context';
 import { useOnboardingStore } from '../../stores/onboardingStore';
+import { useLensPremium } from '../../shared/hooks/useLensPremium';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 import { FONTS } from '../../core/constants/theme';
+import { ROUTES } from '../../core/constants/ROUTES';
+import {
+  identifyHeritage,
+  fileToBase64,
+  type GeminiIdentification,
+} from '../../services/geminiVisionService';
+import { getActiveZone } from '../../services/geofenceService';
+import type { HeritageZone } from '../../core/config/geofence.config';
+import {
+  cacheResult,
+  findCachedResult,
+} from '../../services/geminiCacheService';
+import { fetchZones } from '../../services/zoneService';
+import { trackUsageEvent } from '../../services/usageTelemetryService';
+import {
+  performHDScan,
+  type HDScanMask,
+} from '../../services/hdScanService';
+import { getValidAccessToken } from '../../utils/api/auth';
+import { useARCore } from '../../shared/hooks/useARCore';
+import EpocheyeARView from '../../native/EpocheyeARView';
 import AncestorStorySheet, {
   type AncestorStorySheetRef,
 } from './components/AncestorStorySheet';
 import BottomCard, { type LensDetectionState } from './components/BottomCard';
 import EpochChips from './components/EpochChips';
+import IdentificationCard from './components/IdentificationCard';
 import MonumentInfoSheet, {
   type MonumentInfoSheetRef,
 } from './components/MonumentInfoSheet';
 import PulsingRing from './components/PulsingRing';
 import SearchSheet, { type SearchSheetRef } from './components/SearchSheet';
+import HDScanOverlay from './components/HDScanOverlay';
 import SegmentationOverlay from './components/SegmentationOverlay';
 import * as segmentationService from '../../services/segmentationService';
 
@@ -121,6 +146,30 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   const [identifiedObject, setIdentifiedObject] =
     useState<LensIdentifiedObject | null>(null);
 
+  // ── Gemini identification state ──
+  const [geminiResult, setGeminiResult] =
+    useState<GeminiIdentification | null>(null);
+  const [geminiLoading, setGeminiLoading] = useState(false);
+  const [geminiError, setGeminiError] = useState<string | null>(null);
+  const [activeZone, setActiveZone] = useState<HeritageZone | null>(null);
+  const [isOfflineResult, setIsOfflineResult] = useState(false);
+
+  // Premium + network state
+  const {
+    canIdentify,
+    canShowMask,
+    canShowDetails,
+    canUseOffline,
+    remainingCalls,
+    checkAndIncrement,
+  } = useLensPremium();
+  const { isConnected } = useNetwork();
+  const { arAvailable } = useARCore();
+
+  // HD Scan state (SAM Lambda)
+  const [hdMasks, setHdMasks] = useState<HDScanMask[]>([]);
+  const [hdScanLoading, setHdScanLoading] = useState(false);
+
   // Live-segmentation state for the Scan Object mode. React state
   // drives UI conditionals; the shared values are read by the
   // frame-processor worklet (which cannot see React state directly).
@@ -129,6 +178,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   const isScanModeActiveShared = useSharedValue(false);
   const isInferenceRunning = useSharedValue(false);
   const maskShared = useSharedValue<Float32Array | null>(null);
+  const frameCount = useSharedValue(0);
   const { resize } = useResizePlugin();
   const { width: screenWidth, height: screenHeight } = useMemo(
     () => Dimensions.get('window'),
@@ -175,10 +225,13 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       Geolocation.getCurrentPosition(
         async position => {
           try {
-            const place = await findNearestPlace(
-              position.coords.latitude,
-              position.coords.longitude,
-            );
+            const { latitude, longitude } = position.coords;
+
+            // Check geofence zones
+            const zone = getActiveZone(latitude, longitude);
+            setActiveZone(zone);
+
+            const place = await findNearestPlace(latitude, longitude);
 
             if (place) {
               resolve({ kind: 'matched', place });
@@ -243,6 +296,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
 
   useEffect(() => {
     void ensureLocationTracking();
+    void fetchZones(); // Fetch dynamic zones from backend (fire-and-forget)
   }, [ensureLocationTracking]);
 
   useEffect(() => {
@@ -314,6 +368,12 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
 
+      // Skip 2 out of every 3 frames to reduce CPU/GPU load
+      frameCount.value += 1;
+      if (frameCount.value % 3 !== 0) {
+        return;
+      }
+
       const m = segmentationService.getModel();
       if (!m) {
         return;
@@ -326,15 +386,45 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
 
       try {
         const input = resize(frame, {
-          scale: { width: 640, height: 640 },
+          scale: { width: 257, height: 257 },
           pixelFormat: 'rgb',
           dataType: 'float32',
         });
         const output = m.runSync([input]);
-        // SAM-style heads emit output[0] as a flat Float32Array of
-        // length 640*640. Assumption is asserted by the overlay,
-        // which refuses to render on length mismatch.
-        maskShared.value = output[0] as unknown as Float32Array;
+        const raw = output[0] as unknown as Float32Array;
+
+        // DeepLab v3 output is either:
+        //   - [257*257]        argmax class indices (int cast to float)
+        //   - [257*257 * 21]   raw logits per class
+        // In both cases we produce a binary Float32Array:
+        //   0.0 = background (class 0), 1.0 = any foreground class
+        const PIXELS = 257 * 257; // 66049
+        const numClasses = Math.round(raw.length / PIXELS);
+        const binaryMask = new Float32Array(PIXELS);
+
+        if (numClasses <= 1) {
+          // Argmax map — non-zero means foreground
+          for (let i = 0; i < PIXELS; i++) {
+            binaryMask[i] = raw[i] !== 0 ? 1.0 : 0.0;
+          }
+        } else {
+          // Logits — find argmax per pixel; class 0 = background
+          for (let i = 0; i < PIXELS; i++) {
+            const base = i * numClasses;
+            let maxVal = raw[base];
+            let maxClass = 0;
+            for (let c = 1; c < numClasses; c++) {
+              const v = raw[base + c];
+              if (v > maxVal) {
+                maxVal = v;
+                maxClass = c;
+              }
+            }
+            binaryMask[i] = maxClass !== 0 ? 1.0 : 0.0;
+          }
+        }
+
+        maskShared.value = binaryMask;
       } catch {
         // Per-frame failures are silent — logging here would flood
         // logcat under any steady-state failure mode.
@@ -478,6 +568,164 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [firstName, matchedPlace, motivation, regions]);
 
+  const handleIdentify = useCallback(async () => {
+    if (geminiLoading) {
+      return;
+    }
+
+    // Check usage / premium
+    const allowed = await checkAndIncrement();
+    if (!allowed) {
+      navigation.navigate(ROUTES.MAIN.PURCHASE);
+      return;
+    }
+
+    setGeminiLoading(true);
+    setGeminiError(null);
+    setGeminiResult(null);
+    setIsOfflineResult(false);
+
+    // Offline path: check cache first
+    if (!isConnected) {
+      try {
+        const pos = await new Promise<{ lat: number; lon: number }>(
+          (resolve, reject) => {
+            Geolocation.getCurrentPosition(
+              p => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }),
+              reject,
+              { timeout: 5000, maximumAge: 30000 },
+            );
+          },
+        );
+        const cached = await findCachedResult(pos.lat, pos.lon);
+        if (cached) {
+          setGeminiResult(cached.identification);
+          setIsOfflineResult(true);
+          setGeminiLoading(false);
+          track('lens_identify_offline_hit', {
+            name: cached.identification.name,
+          });
+          return;
+        }
+      } catch {
+        // GPS failed while offline — fall through to error
+      }
+      setGeminiError('Connect to internet for live identification');
+      setGeminiLoading(false);
+      return;
+    }
+
+    try {
+      const photo = await cameraRef.current?.takePhoto();
+      if (!photo) {
+        throw new Error('Photo capture failed');
+      }
+
+      const imageBase64 = await fileToBase64(photo.path);
+      const siteHint = activeZone?.name ?? matchedPlace?.name;
+      const result = await identifyHeritage(imageBase64, siteHint);
+
+      if (result.success) {
+        setGeminiResult(result.data);
+        track('lens_identify_success', { name: result.data.name });
+        trackUsageEvent('gemini_identify', activeZone?.id);
+
+        // Cache for offline use (premium only)
+        if (canUseOffline) {
+          Geolocation.getCurrentPosition(
+            pos => {
+              void cacheResult(
+                result.data,
+                pos.coords.latitude,
+                pos.coords.longitude,
+                matchedPlace?.name,
+              );
+            },
+            () => {}, // Silent — caching is best-effort
+            { timeout: 5000, maximumAge: 30000 },
+          );
+        }
+      } else {
+        setGeminiError(result.error);
+        track('lens_identify_error', { error: result.error });
+      }
+    } catch {
+      setGeminiError('Could not identify — try holding steady');
+    } finally {
+      setGeminiLoading(false);
+    }
+  }, [
+    geminiLoading,
+    checkAndIncrement,
+    isConnected,
+    activeZone,
+    matchedPlace,
+    canUseOffline,
+    navigation,
+  ]);
+
+  const handleDismissIdentification = useCallback(() => {
+    setGeminiResult(null);
+    setGeminiError(null);
+    setIsOfflineResult(false);
+  }, []);
+
+  const handleExpandIdentification = useCallback(() => {
+    if (matchedPlace) {
+      navigation.navigate(ROUTES.MAIN.SITE_DETAIL, {
+        site: {
+          id: matchedPlace.id,
+          name: matchedPlace.name,
+          lat: matchedPlace.lat,
+          lon: matchedPlace.lon,
+          city: matchedPlace.city,
+          country: matchedPlace.country,
+          formatted: matchedPlace.formatted,
+        },
+      });
+    }
+  }, [matchedPlace, navigation]);
+
+  const handleUpgradePremium = useCallback(() => {
+    navigation.navigate(ROUTES.MAIN.PURCHASE);
+  }, [navigation]);
+
+  const handleHDScan = useCallback(async () => {
+    if (hdScanLoading) return;
+
+    if (!canShowMask) {
+      navigation.navigate(ROUTES.MAIN.PURCHASE);
+      return;
+    }
+
+    setHdScanLoading(true);
+    setHdMasks([]);
+
+    try {
+      const photo = await cameraRef.current?.takePhoto();
+      if (!photo) throw new Error('Photo capture failed');
+
+      const token = await getValidAccessToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const result = await performHDScan(photo.path, token);
+      if (result.success && result.masks.length > 0) {
+        setHdMasks(result.masks);
+        trackUsageEvent('hd_scan', activeZone?.id);
+        track('lens_hd_scan_success', {
+          masks: result.masks.length.toString(),
+          time_ms: result.inferenceTimeMs.toString(),
+        });
+      } else if (!result.success) {
+        track('lens_hd_scan_error', { error: result.error });
+      }
+    } catch {
+      // Silent — HD scan failures don't show errors
+    } finally {
+      setHdScanLoading(false);
+    }
+  }, [hdScanLoading, canShowMask, activeZone?.id, navigation]);
+
   const handleOpenInfo = useCallback(() => {
     if (!matchedPlace) {
       return;
@@ -578,7 +826,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         )}
 
-        {isScanModeActive && segReady ? (
+        {isScanModeActive && segReady && canShowMask ? (
           <SegmentationOverlay
             maskShared={maskShared}
             width={screenWidth}
@@ -586,7 +834,51 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           />
         ) : null}
 
+        {hdMasks.length > 0 && (
+          <HDScanOverlay
+            masks={hdMasks}
+            width={screenWidth}
+            height={screenHeight}
+          />
+        )}
+
         <View style={styles.cameraOverlay} />
+
+        {/* Geofence banner */}
+        {activeZone && (
+          <Animated.View
+            entering={FadeIn.duration(300)}
+            exiting={FadeOut.duration(200)}
+            style={[styles.geofenceBanner, { top: insets.top + 52 }]}
+          >
+            <MapPin size={14} color="#E8A020" />
+            <Text style={styles.geofenceBannerText}>
+              You are near {activeZone.name}
+            </Text>
+          </Animated.View>
+        )}
+
+        {/* Gemini identification — 3D AR on ARCore, 2D card fallback */}
+        {arAvailable && geminiResult && !geminiLoading ? (
+          <EpocheyeARView
+            style={StyleSheet.absoluteFill}
+            identification={geminiResult}
+            arEnabled
+            onCardTapped={handleExpandIdentification}
+            onARError={() => {}}
+          />
+        ) : (
+          <IdentificationCard
+            identification={geminiResult}
+            isLoading={geminiLoading}
+            error={geminiError}
+            isPremium={canShowDetails}
+            isOffline={isOfflineResult}
+            onDismiss={handleDismissIdentification}
+            onExpand={handleExpandIdentification}
+            onUpgrade={handleUpgradePremium}
+          />
+        )}
 
         <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
           <Text style={styles.topBarTitle}>LENS</Text>
@@ -620,6 +912,11 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           onScanObject={handleScanObject}
           onBrowseMonuments={handleBrowseMonuments}
           onSearchManually={handleSearchManually}
+          onIdentify={canIdentify ? handleIdentify : undefined}
+          identifyLoading={geminiLoading}
+          remainingCalls={remainingCalls}
+          onHDScan={canShowMask ? handleHDScan : undefined}
+          hdScanLoading={hdScanLoading}
         />
 
         <AncestorStorySheet
@@ -685,6 +982,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  geofenceBanner: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 6,
+    backgroundColor: 'rgba(13,13,13,0.82)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(232,160,32,0.4)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    zIndex: 5,
+  },
+  geofenceBannerText: {
+    color: '#E8A020',
+    fontSize: 12,
+    fontFamily: FONTS.semiBold,
   },
   noDeviceWrap: {
     ...StyleSheet.absoluteFillObject,
