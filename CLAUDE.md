@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+**Requires Node.js 20+.**
+
 ```bash
 # Start Metro bundler
 npm start
@@ -17,6 +19,9 @@ npm run ios
 # Lint
 npm run lint
 
+# Type check
+npx tsc --noEmit
+
 # Run all tests
 npm test
 
@@ -26,6 +31,9 @@ npx jest path/to/__tests__/MyComponent.test.tsx
 # iOS native dependencies (first clone or after native dep changes)
 bundle install
 bundle exec pod install
+
+# If install fails on @gorhom/bottom-sheet peer constraints
+npm install --legacy-peer-deps
 ```
 
 ---
@@ -54,7 +62,7 @@ SafeAreaProvider
 | `login`      | Onboarding done but tokens expired | `LoginScreen` (outside `NavigationContainer`)                   |
 | `main`       | Authenticated                      | `MainNavigation` inside `NavigationContainer`                   |
 
-> **Note:** Onboarding is temporarily disabled — `hasCompletedOnboarding` is hardcoded to `true` in `checkAppState()`, so the app always routes to `login` or `main`. The screens remain on disk.
+> **Note:** Onboarding was previously disabled (hardcoded `true`). It is now re-enabled — the actual AsyncStorage check (`completedFlag === 'true'`) controls routing. To test onboarding, clear AsyncStorage key `@epocheye/onboarding_complete`.
 
 Auth transitions are driven by callbacks (`onLoginSuccess`, `handleOnboardingComplete`, `handleLogout`). On login/onboarding-complete, call `useSessionStore.setAuthenticated(true)` and `useUserStore.getState().ensureUserDataLoaded()`.
 
@@ -214,6 +222,30 @@ type Props = MainScreenProps<'Lens'>;
 // Tab screens (composite prop — can also push to main stack)
 type Props = TabScreenProps<'Home'>;
 ```
+
+---
+
+---
+
+## Known Pitfalls
+
+- **Jest + CSS**: `App.tsx` imports `global.css` — Jest needs CSS mocking/transform support or tests on `App.tsx` will fail.
+- **Android NDK**: Build expects a pinned NDK version in `android/build.gradle`. Missing NDK causes native build failures.
+- **Disabled tabs**: Explore and Challenges tabs are intentionally blocked with `ComingSoonTabButton` — don't remove the guards.
+- **SSE cleanup**: Lens and onboarding story streams use XHR-based SSE. Always call the abort function on component unmount.
+- **Peer deps**: If `npm install` fails on `@gorhom/bottom-sheet` constraints, use `--legacy-peer-deps`.
+
+---
+
+## Brand Voice & Design Language
+
+- Heritage-dark aesthetic: deep black (`#0A0A0A`) backgrounds, amber/gold (`#C9A84C`, `#E8A020`) accents, warm white (`#F5F0E8`) text.
+- CTAs use heritage-inspired language: "Begin Your Journey", "Explore the Era", "Uncover History".
+- Error messages should be calm and human, never technical jargon.
+- Empty states should be evocative, not generic.
+- Loading states use skeleton screens, never spinners (except in modals).
+- Animations always use `react-native-reanimated` — never the built-in `Animated` API for new code.
+- Use gold glow effects instead of drop shadows on dark backgrounds.
 
 ---
 

@@ -192,7 +192,7 @@ const AncestorStorySheet = forwardRef<
           {isLoading && storyText.length === 0 ? (
             <View style={styles.loadingArea}>
               <ActivityIndicator color="#E8A020" size="small" />
-              <Text style={styles.loadingText}>Gathering your story...</Text>
+              <Text style={styles.loadingText}>Crafting your ancestor's story...</Text>
               <View style={styles.shimmerLine} />
               <View style={[styles.shimmerLine, styles.shimmerLineNarrow]} />
               <View style={styles.shimmerLine} />

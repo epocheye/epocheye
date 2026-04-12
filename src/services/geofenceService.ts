@@ -6,7 +6,7 @@
  * called on each GPS position update from the Lens screen.
  */
 
-import type { HeritageZone } from '../core/config/geofence.config';
+import type { HeritageZone } from '../core/config/geofence.types';
 import { getCachedZones } from './zoneService';
 
 /**

@@ -3,14 +3,11 @@
  *
  * On success, caches the server response in memory so `getCachedZones()`
  * returns the latest data without another network call. On failure,
- * falls back silently to the hardcoded zones in geofence.config.ts.
+ * falls back to an empty list if the API is unreachable.
  */
 
 import { createAuthenticatedClient } from '../utils/api/auth';
-import {
-  HERITAGE_ZONES,
-  type HeritageZone,
-} from '../core/config/geofence.config';
+import type { HeritageZone } from '../core/config/geofence.types';
 
 let cachedZones: HeritageZone[] | null = null;
 
@@ -43,7 +40,7 @@ export async function fetchZones(
     // Silent — fall back to hardcoded config
   }
 
-  return HERITAGE_ZONES;
+  return [];
 }
 
 /**
@@ -51,5 +48,5 @@ export async function fetchZones(
  * fetchZones() hasn't succeeded yet.
  */
 export function getCachedZones(): HeritageZone[] {
-  return cachedZones ?? HERITAGE_ZONES;
+  return cachedZones ?? [];
 }

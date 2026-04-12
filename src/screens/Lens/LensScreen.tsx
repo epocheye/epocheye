@@ -45,7 +45,7 @@ import {
   type GeminiIdentification,
 } from '../../services/geminiVisionService';
 import { getActiveZone } from '../../services/geofenceService';
-import type { HeritageZone } from '../../core/config/geofence.config';
+import type { HeritageZone } from '../../core/config/geofence.types';
 import {
   cacheResult,
   findCachedResult,
@@ -610,7 +610,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       } catch {
         // GPS failed while offline — fall through to error
       }
-      setGeminiError('Connect to internet for live identification');
+      setGeminiError('You\'re offline — connect to the internet to identify this site');
       setGeminiLoading(false);
       return;
     }
@@ -650,7 +650,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         track('lens_identify_error', { error: result.error });
       }
     } catch {
-      setGeminiError('Could not identify — try holding steady');
+      setGeminiError('Couldn\'t identify this site — try holding your phone steady and try again');
     } finally {
       setGeminiLoading(false);
     }
@@ -763,11 +763,11 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       <GestureHandlerRootView style={styles.root}>
         <View style={styles.permissionScreen}>
           <Text style={styles.permissionTitle}>
-            Camera access is required for Lens.
+            Camera access needed
           </Text>
           <Text style={styles.permissionBody}>
-            Grant camera permission to identify nearby monuments and generate
-            your ancestor story.
+            Allow camera access to explore heritage sites and uncover your
+            ancestor's story.
           </Text>
 
           <Pressable
@@ -821,7 +821,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.noDeviceWrap}>
             <ScanEye size={38} color="#E8A020" />
             <Text style={styles.noDeviceText}>
-              Camera device not available.
+              Camera not available on this device
             </Text>
           </View>
         )}

@@ -21,7 +21,11 @@
       "Bash(wc -l /e/epocheye/src/**/*.ts /e/epocheye/src/**/*.tsx)",
       "Bash(git status:*)",
       "Bash(git log:*)",
-      "Bash(grep -l \"withTiming\\\\|withSpring\\\\|withSequence\\\\|useAnimatedStyle\" /e/epocheye/src/screens/Onboarding/*.tsx)"
+      "Bash(grep -l \"withTiming\\\\|withSpring\\\\|withSequence\\\\|useAnimatedStyle\" /e/epocheye/src/screens/Onboarding/*.tsx)",
+      "Bash(npm start:*)",
+      "Bash(npm run:*)",
+      "Bash(npx react-native:*)",
+      "Bash(./gradlew.bat app:installDebug -PreactNativeDevServerPort=8081)"
     ]
   }
 }

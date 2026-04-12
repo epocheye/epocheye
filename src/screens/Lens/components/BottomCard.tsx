@@ -73,7 +73,7 @@ const BottomCard: React.FC<BottomCardProps> = ({
       {state === 'searching' ? (
         <View style={styles.searchingRow}>
           <ActivityIndicator color="#E8A020" size="small" />
-          <Text style={styles.searchingText}>Searching nearby...</Text>
+          <Text style={styles.searchingText}>Looking for heritage sites near you...</Text>
         </View>
       ) : null}
 
@@ -168,11 +168,11 @@ const BottomCard: React.FC<BottomCardProps> = ({
         <View>
           <Text style={styles.notFoundTitle}>
             {locationDenied
-              ? 'Enable location to identify monuments near you.'
-              : 'No heritage site detected nearby.'}
+              ? 'Turn on location to discover heritage sites near you'
+              : 'No heritage sites found nearby'}
           </Text>
           <Text style={styles.notFoundBody}>
-            Try moving closer, or search manually.
+            Try visiting a heritage site, or search for one below
           </Text>
 
           <View style={styles.buttonRow}>

@@ -78,7 +78,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
       {isOffline && (
         <View style={styles.offlineBadge}>
           <WifiOff size={10} color="#0D0D0D" />
-          <Text style={styles.offlineBadgeText}>Offline</Text>
+          <Text style={styles.offlineBadgeText}>Saved offline</Text>
         </View>
       )}
 
@@ -86,7 +86,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
       {isLoading && (
         <View style={styles.loadingRow}>
           <ActivityIndicator color="#E8A020" size="small" />
-          <Text style={styles.loadingText}>Identifying heritage...</Text>
+          <Text style={styles.loadingText}>Identifying this heritage site...</Text>
         </View>
       )}
 
@@ -114,7 +114,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
             <Pressable style={styles.lockedRow} onPress={onUpgrade}>
               <Lock size={12} color="#E8A020" />
               <Text style={styles.lockedText}>
-                Upgrade to Premium for details
+                Unlock full details with Premium
               </Text>
             </Pressable>
           ) : null}
