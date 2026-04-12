@@ -11,9 +11,13 @@ export const API_TIMEOUT_MS = API_CONFIG.TIMEOUT_MS;
 /**
  * Extracts error message from axios error
  */
-export function getErrorMessage(error: AxiosError<{ message?: string }>): string {
-  if (error.response?.data?.message) {
-    return error.response.data.message;
+export function getErrorMessage(error: AxiosError<{ message?: string; error?: string }>): string {
+  const data = error.response?.data;
+  if (data?.message) {
+    return data.message;
+  }
+  if (data?.error && typeof data.error === 'string') {
+    return data.error;
   }
 
   if (error.code === 'ECONNABORTED') {
