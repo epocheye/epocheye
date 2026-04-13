@@ -36,9 +36,9 @@ export const ROUTES = {
     LENS: 'Lens',
     SITE_DETAIL: 'SiteDetail',
     AR_EXPERIENCE: 'ARExperience',
-    PERMISSIONS: 'Permissions',
     TOUR_LIST: 'TourList',
     TOUR_DETAIL: 'TourDetail',
+    MY_TOURS: 'MyTours',
     PURCHASE: 'Purchase',
   },
 

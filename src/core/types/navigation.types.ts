@@ -52,9 +52,9 @@ export type MainStackParamList = {
   Lens: undefined;
   SiteDetail: { site: PlaceNavParam };
   ARExperience: { site: PlaceNavParam };
-  Permissions: undefined;
   TourList: { monumentId?: string; monumentName?: string } | undefined;
   TourDetail: { tourId: string; tourTitle: string };
+  MyTours: undefined;
   Purchase: { preSelectedPlaceId?: string } | undefined;
 };
 

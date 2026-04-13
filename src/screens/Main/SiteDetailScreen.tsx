@@ -11,10 +11,13 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
+import ThinkingDots from '../../components/ui/ThinkingDots';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   Extrapolation,
+  FadeIn,
+  FadeInDown,
   interpolate,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -30,216 +33,210 @@ import {
   Camera,
   ChevronDown,
   ChevronUp,
-  Lightbulb,
-  Users,
+  Sparkles,
   Bookmark,
   BookOpen,
+  Shield,
 } from 'lucide-react-native';
 import { formatPlaceType } from '../../shared/utils/formatters';
 import { ROUTES } from '../../core/constants';
-import { usePlaces } from '../../context';
-import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
-import { useResolvedSubjectImage } from '../../shared/hooks';
-import type {
-  MainScreenProps,
-  PlaceNavParam,
-} from '../../core/types/navigation.types';
+import { usePlaces, useUser } from '../../context';
+import { useResolvedSubjectImage, useExplorerPass } from '../../shared/hooks';
+import {
+  getPersonalizedFacts,
+  elaboratePersonalizedFact,
+} from '../../utils/api/user';
+import type { PersonalizedFact } from '../../utils/api/user';
+import type { MainScreenProps } from '../../core/types/navigation.types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const HERO_HEIGHT = 320;
+const HERO_HEIGHT = 340;
 
-interface FunFact {
-  id: string;
-  title: string;
-  description: string;
-}
-
-interface RelatedSite {
-  id: string;
-  name: string;
-  location: string;
-  image: string;
-  distance: string;
-}
-
-interface SiteDetailData extends PlaceNavParam {
-  location: string;
-  era: string;
-  style: string;
-  yearBuilt: string;
-  distance: string;
-  estimatedTime: string;
-  heroImages: string[];
-  shortDescription: string;
-  fullDescription: string;
-  funFacts: FunFact[];
-  visitorTips: string[];
-  relatedSites: RelatedSite[];
-  address_line1?: string;
-  place_type?: string;
-}
-
-const DEMO_SITE: SiteDetailData = {
-  id: 'humayuns-tomb',
-  name: "Humayun's Tomb",
-  location: 'Nizamuddin East, Delhi, India',
-  era: 'Mughal Era',
-  style: 'Persian-Mughal Architecture',
-  yearBuilt: '1570 CE',
-  distance: '2.4 km',
-  estimatedTime: '45 min',
-  heroImages: [
-    'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1564507592333-c60657eea523?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1585135497273-1a86b09fe70e?auto=format&fit=crop&w=1200&q=80',
-  ],
-  shortDescription:
-    "Humayun's Tomb is a UNESCO World Heritage Site and the tomb of the Mughal Emperor Humayun.",
-  fullDescription:
-    "Humayun's Tomb is a UNESCO World Heritage Site and the tomb of the Mughal Emperor Humayun. It was commissioned by Empress Bega Begum and designed by Persian architects Mirak Mirza Ghiyas and Sayyid Muhammad.\n\nIt was the first garden-tomb on the Indian subcontinent and became an architectural inspiration for later wonders, including the Taj Mahal.",
-  funFacts: [
-    {
-      id: 'fact-1',
-      title: 'Inspiration for Taj Mahal',
-      description:
-        'Its form and garden layout inspired the Taj Mahal decades later.',
-    },
-    {
-      id: 'fact-2',
-      title: 'Perfect Symmetry',
-      description:
-        'The tomb achieves exceptional symmetry in all four elevations.',
-    },
-    {
-      id: 'fact-3',
-      title: 'Char Bagh Garden',
-      description:
-        'The surrounding Persian garden is divided by water channels.',
-    },
-  ],
-  visitorTips: [
-    'Best visited in early morning or late afternoon for softer light.',
-    'Carry water and comfortable footwear for long walking paths.',
-    'Hire a local guide for richer stories and context.',
-    'Photography is allowed; check policy for tripods.',
-  ],
-  relatedSites: [],
-  place_type: 'monument',
-};
-
-function normalizeSite(site?: PlaceNavParam): SiteDetailData {
-  if (!site) {
-    return DEMO_SITE;
-  }
-
-  return {
-    ...DEMO_SITE,
-    ...site,
-    location:
-      typeof site.formatted === 'string' && site.formatted.length > 0
-        ? site.formatted
-        : DEMO_SITE.location,
-    heroImages:
-      Array.isArray(site.heroImages) && site.heroImages.length > 0
-        ? site.heroImages.filter(
-            (img): img is string => typeof img === 'string',
-          )
-        : DEMO_SITE.heroImages,
-    place_type:
-      typeof site.place_type === 'string'
-        ? site.place_type
-        : DEMO_SITE.place_type,
-  };
-}
+const FACT_LOADING_LINES = [
+  'Reading the stones...',
+  'Uncovering connections...',
+  'Weaving the narrative...',
+];
 
 type Props = MainScreenProps<'SiteDetail'>;
 
 const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
+  const site = route.params.site;
+  const profile = useUser(state => state.profile);
   const toggleSavePlace = usePlaces(state => state.toggleSavePlace);
   const isPlaceSaved = usePlaces(state => state.isPlaceSaved);
-  const site = useMemo(
-    () => normalizeSite(route.params?.site),
-    [route.params?.site],
-  );
+  const { checkAccess } = useExplorerPass();
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
+
+  // Personalized facts state
+  const [facts, setFacts] = useState<PersonalizedFact[]>([]);
+  const [factsLoading, setFactsLoading] = useState(true);
+  const [expandedFactId, setExpandedFactId] = useState<string | null>(null);
+  const [elaboratingFactId, setElaboratingFactId] = useState<string | null>(
+    null,
+  );
+
   const { url: resolvedHeroImage } = useResolvedSubjectImage({
     subject: site.name,
-    context: `${site.location} ${site.era} ${site.style}`,
+    context: `${(site as any).formatted ?? site.city ?? ''} heritage monument`,
     enabled: !!site.name,
     remote: true,
   });
-  const heroImages = useMemo(() => {
-    const existing = site.heroImages;
-    if (!resolvedHeroImage) {
-      return existing;
-    }
 
+  const heroImages = useMemo(() => {
+    const existing =
+      Array.isArray(site.heroImages) && site.heroImages.length > 0
+        ? (site.heroImages.filter(
+            (img): img is string => typeof img === 'string',
+          ) as string[])
+        : [];
+    if (!resolvedHeroImage) {
+      return existing.length > 0
+        ? existing
+        : [
+            'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
+          ];
+    }
     if (existing.includes(resolvedHeroImage)) {
       return existing;
     }
-
     return [resolvedHeroImage, ...existing];
   }, [resolvedHeroImage, site.heroImages]);
 
   const scrollY = useSharedValue(0);
   const isSaved = isPlaceSaved(site.id);
 
+  const placeType = useMemo(() => {
+    const pt = (site as any).place_type;
+    return typeof pt === 'string' ? formatPlaceType(pt) : 'Heritage Landmark';
+  }, [site]);
+
+  const location = useMemo(() => {
+    const formatted = (site as any).formatted;
+    if (typeof formatted === 'string' && formatted.length > 0) {
+      return formatted;
+    }
+    return [site.city, site.country].filter(Boolean).join(', ') || 'India';
+  }, [site]);
+
+  const categories = useMemo(() => {
+    const cats = (site as any).categories;
+    return Array.isArray(cats) ? cats.slice(0, 3) : [];
+  }, [site]);
+
+  const description = useMemo(() => {
+    const desc = (site as any).description;
+    const sig = (site as any).significance;
+    return (
+      desc ||
+      sig ||
+      `Explore ${site.name}, a historic heritage site located at ${location}.`
+    );
+  }, [site, location]);
+
+  const distance = useMemo(() => {
+    const meters = (site as any).distance_meters;
+    if (typeof meters === 'number' && meters > 0) {
+      return `${(meters / 1000).toFixed(1)} km`;
+    }
+    return null;
+  }, [site]);
+
+  // Prefetch hero image
   useEffect(() => {
     if (resolvedHeroImage) {
       void Image.prefetch(resolvedHeroImage);
     }
   }, [resolvedHeroImage]);
 
+  // Check explorer pass access
+  useEffect(() => {
+    checkAccess(site.id).then(result => {
+      if (result?.has_access) {
+        setHasAccess(true);
+      }
+    });
+  }, [checkAccess, site.id]);
+
+  // Fetch personalized facts
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFacts() {
+      setFactsLoading(true);
+      const result = await getPersonalizedFacts({
+        userName: profile?.name ?? 'Explorer',
+        nearbyPlaces: [site.name],
+        limit: 4,
+      });
+      if (!cancelled) {
+        if (result.success) {
+          setFacts(result.data.facts);
+        }
+        setFactsLoading(false);
+      }
+    }
+
+    loadFacts();
+    return () => {
+      cancelled = true;
+    };
+  }, [site.name, profile?.name]);
+
   const onScroll = useAnimatedScrollHandler(event => {
     scrollY.value = event.contentOffset.y;
   });
 
-  const stickyHeaderStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
+  const stickyHeaderStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
       scrollY.value,
       [100, 180],
       [0, 1],
       Extrapolation.CLAMP,
-    );
-    return {
-      opacity,
-    };
-  });
+    ),
+  }));
 
   const handleToggleSave = useCallback(async () => {
     if (isSaving) {
       return;
     }
-
     setIsSaving(true);
     try {
       await toggleSavePlace(site.id, {
         id: site.id,
         name: site.name,
-        lat: site.lat,
-        lon: site.lon,
-        city: site.city,
-        country: site.country,
-        formatted: site.location,
-        address_line1: site.address_line1 || site.location,
+        lat: site.lat ?? 0,
+        lon: site.lon ?? 0,
+        city: site.city ?? '',
+        country: site.country ?? '',
+        formatted: (site as any).formatted ?? location,
+        address_line1: (site as any).address_line1 ?? location,
         address_line2: '',
         state: '',
         postcode: '',
         street: '',
         distance_meters: 0,
-        categories: [site.era, site.style].filter(Boolean),
+        categories: categories,
       });
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, site, toggleSavePlace]);
+  }, [isSaving, site, toggleSavePlace, location, categories]);
 
   const handleStartARExperience = useCallback(() => {
     navigation.navigate('ARExperience', { site });
+  }, [navigation, site]);
+
+  const handleViewTours = useCallback(() => {
+    navigation.navigate(ROUTES.MAIN.TOUR_LIST, {
+      monumentId: site.id,
+      monumentName: site.name,
+    });
   }, [navigation, site]);
 
   const handleImageScroll = useCallback(
@@ -250,12 +247,56 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     [],
   );
 
+  const handleElaborateFact = useCallback(
+    async (fact: PersonalizedFact) => {
+      if (expandedFactId === fact.id && fact.detail) {
+        setExpandedFactId(null);
+        return;
+      }
+
+      setExpandedFactId(fact.id);
+
+      if (fact.detail) {
+        return;
+      }
+
+      setElaboratingFactId(fact.id);
+      const result = await elaboratePersonalizedFact({
+        factId: fact.id,
+        headline: fact.headline,
+        summary: fact.summary,
+        userName: profile?.name,
+        nearbyPlaceName: site.name,
+      });
+
+      if (result.success) {
+        setFacts(prev =>
+          prev.map(f =>
+            f.id === fact.id ? { ...f, detail: result.data.detail } : f,
+          ),
+        );
+      }
+      setElaboratingFactId(null);
+    },
+    [expandedFactId, profile?.name, site.name],
+  );
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView className="flex-1 bg-[#0A0A0A]" edges={['top']}>
       <StatusBar barStyle="light-content" />
 
-      <Animated.View style={[styles.stickyHeader, stickyHeaderStyle]}>
-        <Text numberOfLines={1} style={styles.stickyTitle}>
+      {/* Sticky header */}
+      <Animated.View
+        className="absolute top-0 left-0 right-0 z-20 h-14 justify-center items-center px-14"
+        style={[
+          { backgroundColor: 'rgba(10,10,10,0.94)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+          stickyHeaderStyle,
+        ]}
+      >
+        <Text
+          numberOfLines={1}
+          className="text-[#F5F0E8] text-[15px] font-['MontserratAlternates-SemiBold']"
+        >
           {site.name}
         </Text>
       </Animated.View>
@@ -265,9 +306,10 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         bounces={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{ paddingBottom: 40 }}
       >
-        <View style={styles.heroWrap}>
+        {/* Hero */}
+        <View style={{ height: HERO_HEIGHT }}>
           <ScrollView
             horizontal
             pagingEnabled
@@ -278,29 +320,30 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               <Image
                 key={`${image}-${index}`}
                 source={{ uri: image }}
-                style={styles.heroImage}
+                style={{ width: SCREEN_WIDTH, height: HERO_HEIGHT }}
                 resizeMode="cover"
               />
             ))}
           </ScrollView>
 
           <LinearGradient
-            colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.65)']}
-            style={styles.heroOverlay}
+            colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.7)']}
+            style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
           />
 
-          <View style={styles.heroHeaderControls}>
+          {/* Hero controls */}
+          <View className="absolute top-4 left-5 right-5 flex-row justify-between items-center">
             <TouchableOpacity
               onPress={() => navigation.goBack()}
-              style={styles.heroIconButton}
+              className="w-10 h-10 rounded-full bg-black/45 border border-white/20 items-center justify-center"
             >
               <ArrowLeft color="#F5F0E8" size={20} />
             </TouchableOpacity>
 
-            <View style={styles.heroRightActions}>
+            <View className="flex-row gap-2">
               <TouchableOpacity
                 onPress={() => setIsLiked(prev => !prev)}
-                style={styles.heroIconButton}
+                className="w-10 h-10 rounded-full bg-black/45 border border-white/20 items-center justify-center"
               >
                 <Heart
                   color={isLiked ? '#E05C5C' : '#F5F0E8'}
@@ -311,7 +354,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               <TouchableOpacity
                 onPress={handleToggleSave}
                 disabled={isSaving}
-                style={styles.heroIconButton}
+                className="w-10 h-10 rounded-full bg-black/45 border border-white/20 items-center justify-center"
               >
                 {isSaving ? (
                   <AnimatedLogo
@@ -328,576 +371,254 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   />
                 )}
               </TouchableOpacity>
-              <TouchableOpacity style={styles.heroIconButton}>
+              <TouchableOpacity className="w-10 h-10 rounded-full bg-black/45 border border-white/20 items-center justify-center">
                 <Share2 color="#F5F0E8" size={20} />
               </TouchableOpacity>
             </View>
           </View>
 
-          <View style={styles.heroFooter}>
-            <Text style={styles.heroKicker}>
-              {site.place_type ? formatPlaceType(site.place_type) : 'Heritage Landmark'}
+          {/* Hero footer */}
+          <View className="absolute left-5 right-5 bottom-[18px]">
+            <Text className="text-[#C9A84C] text-[11px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+              {placeType}
             </Text>
-            <Text style={styles.heroTitle}>{site.name}</Text>
-            <View style={styles.heroLocationRow}>
+            <Text className="text-[#F5F0E8] text-[28px] leading-9 font-['MontserratAlternates-Bold'] mt-1">
+              {site.name}
+            </Text>
+            <View className="flex-row items-center gap-1 mt-1.5">
               <MapPin color="#B8AF9E" size={14} />
-              <Text numberOfLines={1} style={styles.heroLocationText}>
-                {site.location}
+              <Text
+                numberOfLines={1}
+                className="flex-1 text-[#B8AF9E] text-[13px] font-['MontserratAlternates-Medium']"
+              >
+                {location}
               </Text>
             </View>
 
-            <View style={styles.heroDots}>
-              {heroImages.map((_, index) => (
-                <View
-                  key={`dot-${index}`}
-                  style={[
-                    styles.heroDot,
-                    currentImageIndex === index ? styles.heroDotActive : null,
-                  ]}
-                />
-              ))}
-            </View>
+            {heroImages.length > 1 && (
+              <View className="flex-row gap-1.5 mt-2.5">
+                {heroImages.map((_, index) => (
+                  <View
+                    key={`dot-${index}`}
+                    className={`h-2 rounded-full ${
+                      currentImageIndex === index
+                        ? 'w-[22px] bg-[#C9A84C]'
+                        : 'w-2 bg-white/55'
+                    }`}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         </View>
 
-        <View style={styles.contentWrap}>
-          <View style={styles.infoCard}>
-            <View style={styles.tagRow}>
-              <View style={styles.primaryTag}>
-                <Text style={styles.primaryTagText}>{site.era}</Text>
+        {/* Content */}
+        <View className="-mt-6 px-5 gap-4">
+          {/* Info card */}
+          <Animated.View
+            entering={FadeInDown.delay(100).duration(400)}
+            className="rounded-[20px] bg-[#141414] border border-white/[0.08] p-4"
+          >
+            {/* Category tags */}
+            {categories.length > 0 && (
+              <View className="flex-row flex-wrap gap-2 mb-3">
+                {categories.map((cat: string, i: number) => (
+                  <View
+                    key={cat}
+                    className={`rounded-full px-2.5 py-1 ${
+                      i === 0
+                        ? 'bg-[rgba(201,168,76,0.18)]'
+                        : 'bg-white/[0.08]'
+                    }`}
+                  >
+                    <Text
+                      className={`text-xs font-['MontserratAlternates-SemiBold'] ${
+                        i === 0 ? 'text-[#E8C870]' : 'text-[#F5F0E8]'
+                      }`}
+                    >
+                      {typeof cat === 'string'
+                        ? cat.charAt(0).toUpperCase() + cat.slice(1)
+                        : ''}
+                    </Text>
+                  </View>
+                ))}
               </View>
-              <View style={styles.secondaryTag}>
-                <Text style={styles.secondaryTagText}>{site.style}</Text>
-              </View>
-              <View style={styles.tertiaryTag}>
-                <Text style={styles.tertiaryTagText}>{site.yearBuilt}</Text>
-              </View>
-            </View>
+            )}
 
-            <View style={styles.metaRow}>
-              <View style={styles.metaItem}>
-                <View style={styles.metaIconWrap}>
-                  <Navigation color="#C9A84C" size={16} />
+            {/* Meta row */}
+            <View className="flex-row gap-3">
+              {distance && (
+                <View className="flex-1 flex-row items-center gap-2.5 rounded-xl bg-[#1C1C1C] p-3">
+                  <View className="w-7 h-7 rounded-full bg-[rgba(201,168,76,0.15)] items-center justify-center">
+                    <Navigation color="#C9A84C" size={16} />
+                  </View>
+                  <View>
+                    <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-SemiBold']">
+                      {distance}
+                    </Text>
+                    <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
+                      Distance
+                    </Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={styles.metaValue}>{site.distance}</Text>
-                  <Text style={styles.metaLabel}>Distance</Text>
-                </View>
-              </View>
-              <View style={styles.metaItem}>
-                <View style={styles.metaIconWrap}>
+              )}
+              <View className="flex-1 flex-row items-center gap-2.5 rounded-xl bg-[#1C1C1C] p-3">
+                <View className="w-7 h-7 rounded-full bg-[rgba(201,168,76,0.15)] items-center justify-center">
                   <Clock3 color="#C9A84C" size={16} />
                 </View>
                 <View>
-                  <Text style={styles.metaValue}>{site.estimatedTime}</Text>
-                  <Text style={styles.metaLabel}>Tour Time</Text>
+                  <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-SemiBold']">
+                    45 min
+                  </Text>
+                  <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
+                    Est. Tour
+                  </Text>
                 </View>
               </View>
             </View>
-          </View>
+          </Animated.View>
 
-          <TouchableOpacity
-            onPress={handleStartARExperience}
-            style={styles.ctaButton}
-            activeOpacity={0.88}
-          >
-            <Camera color="#0A0A0A" size={18} />
-            <Text style={styles.ctaText}>Begin Your Journey</Text>
-          </TouchableOpacity>
+          {/* Explorer Pass badge */}
+          {hasAccess && (
+            <Animated.View
+              entering={FadeIn.delay(200)}
+              className="flex-row items-center gap-2 bg-[#10B981]/10 border border-[#10B981]/20 rounded-xl px-4 py-3"
+            >
+              <Shield color="#10B981" size={16} />
+              <Text className="text-[#10B981] text-sm font-['MontserratAlternates-SemiBold']">
+                Explorer Pass Active
+              </Text>
+            </Animated.View>
+          )}
 
+          {/* CTA: Begin Your Journey */}
+          <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+            <TouchableOpacity
+              onPress={handleStartARExperience}
+              className="rounded-xl bg-[#C9A84C] py-3.5 items-center justify-center flex-row gap-2"
+              activeOpacity={0.88}
+            >
+              <Camera color="#0A0A0A" size={18} />
+              <Text className="text-[#0A0A0A] text-[15px] uppercase tracking-[0.8px] font-['MontserratAlternates-Bold']">
+                Begin Your Journey
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* CTA: View Tours */}
           <TouchableOpacity
-            onPress={() =>
-              navigation.navigate(ROUTES.MAIN.TOUR_LIST, {
-                monumentId: site.id,
-                monumentName: site.name,
-              })
-            }
-            style={styles.toursButton}
+            onPress={handleViewTours}
+            className="rounded-xl border border-[rgba(212,134,10,0.45)] py-3 items-center justify-center flex-row gap-2"
             activeOpacity={0.88}
           >
             <BookOpen color="#D4860A" size={18} />
-            <Text style={styles.toursButtonText}>View Tours</Text>
+            <Text className="text-[#D4860A] text-sm font-['MontserratAlternates-SemiBold']">
+              View Tours
+            </Text>
           </TouchableOpacity>
 
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Historical Overview</Text>
+          {/* Historical Overview */}
+          <Animated.View
+            entering={FadeInDown.delay(300).duration(400)}
+            className="rounded-2xl bg-[#141414] border border-white/[0.08] p-4"
+          >
+            <Text className="text-[#F5F0E8] text-lg font-['MontserratAlternates-SemiBold'] mb-2">
+              Historical Overview
+            </Text>
             <Text
-              style={styles.sectionBody}
+              className="text-[#B8AF9E] text-sm leading-[22px] font-['MontserratAlternates-Regular']"
               numberOfLines={isDescriptionExpanded ? undefined : 3}
             >
-              {isDescriptionExpanded
-                ? site.fullDescription
-                : site.shortDescription}
+              {description}
             </Text>
-            <TouchableOpacity
-              onPress={() => setIsDescriptionExpanded(prev => !prev)}
-              style={styles.expandButton}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isDescriptionExpanded
-                  ? 'Collapse description'
-                  : 'Expand description'
-              }
-            >
-              <Text style={styles.expandButtonText}>
-                {isDescriptionExpanded ? 'Show Less' : 'Read More'}
+            {description.length > 120 && (
+              <TouchableOpacity
+                onPress={() => setIsDescriptionExpanded(prev => !prev)}
+                className="mt-2.5 flex-row items-center gap-1 self-start"
+                accessibilityRole="button"
+              >
+                <Text className="text-[#C9A84C] text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+                  {isDescriptionExpanded ? 'Show Less' : 'Read More'}
+                </Text>
+                {isDescriptionExpanded ? (
+                  <ChevronUp color="#C9A84C" size={16} />
+                ) : (
+                  <ChevronDown color="#C9A84C" size={16} />
+                )}
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+
+          {/* Personalized Insights */}
+          <Animated.View entering={FadeInDown.delay(400).duration(400)}>
+            <View className="flex-row items-center gap-1.5 mb-3">
+              <Sparkles color="#C9A84C" size={18} />
+              <Text className="text-[#F5F0E8] text-lg font-['MontserratAlternates-SemiBold']">
+                Insights
               </Text>
-              {isDescriptionExpanded ? (
-                <ChevronUp color="#C9A84C" size={16} />
-              ) : (
-                <ChevronDown color="#C9A84C" size={16} />
-              )}
-            </TouchableOpacity>
-          </View>
+            </View>
 
-          {site.funFacts.length > 0 && (
-            <View style={styles.sectionWrap}>
-              <View style={styles.sectionHeadingRow}>
-                <Lightbulb color="#C9A84C" size={18} />
-                <Text style={styles.sectionHeading}>Fun Facts</Text>
+            {factsLoading ? (
+              <View className="rounded-2xl bg-[#141414] border border-white/[0.08] p-5 items-center">
+                <ThinkingDots messages={FACT_LOADING_LINES} color="#C9A84C" />
               </View>
+            ) : facts.length > 0 ? (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalContent}
+                contentContainerStyle={{ paddingRight: 20, gap: 12 }}
               >
-                {site.funFacts.map(fact => (
-                  <View key={fact.id} style={styles.factCard}>
-                    <Text style={styles.factTitle}>{fact.title}</Text>
-                    <Text style={styles.factDescription}>{fact.description}</Text>
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionHeadingRow}>
-              <Users color="#C9A84C" size={18} />
-              <Text style={styles.sectionHeading}>Visitor Tips</Text>
-            </View>
-            {site.visitorTips.map((tip, index) => (
-              <View key={`${tip}-${index}`} style={styles.tipRow}>
-                <View style={styles.tipIndexPill}>
-                  <Text style={styles.tipIndexText}>{index + 1}</Text>
-                </View>
-                <Text style={styles.tipText}>{tip}</Text>
-              </View>
-            ))}
-          </View>
-
-          {site.relatedSites.length > 0 && (
-            <View style={styles.sectionWrap}>
-              <Text style={styles.sectionHeading}>Related Sites</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalContent}
-              >
-                {site.relatedSites.map(related => (
+                {facts.map(fact => (
                   <TouchableOpacity
-                    key={related.id}
-                    style={styles.relatedCard}
+                    key={fact.id}
+                    onPress={() => handleElaborateFact(fact)}
                     activeOpacity={0.86}
+                    className="w-[240px] rounded-2xl bg-[#141414] border border-[rgba(201,168,76,0.28)] p-3.5"
                   >
-                    <ResolvedSubjectImage
-                      subject={related.name}
-                      context={`${related.location} related heritage site`}
-                      fallbackUri={related.image}
-                      style={styles.relatedImage}
-                      imageStyle={styles.relatedImage}
-                      loadingLabel="Loading related site..."
-                    />
-                    <Text style={styles.relatedTitle} numberOfLines={1}>
-                      {related.name}
+                    <Text className="text-[#F5F0E8] text-[15px] leading-[22px] font-['MontserratAlternates-SemiBold'] mb-1.5">
+                      {fact.headline}
                     </Text>
-                    <Text style={styles.relatedLocation} numberOfLines={1}>
-                      {related.location}
+                    <Text className="text-[#B8AF9E] text-[13px] leading-[18px] font-['MontserratAlternates-Regular']">
+                      {fact.summary}
                     </Text>
-                    <Text style={styles.relatedDistance}>{related.distance}</Text>
+
+                    {expandedFactId === fact.id && (
+                      <View className="mt-3 pt-3 border-t border-white/[0.08]">
+                        {elaboratingFactId === fact.id ? (
+                          <View className="items-center py-2">
+                            <AnimatedLogo
+                              size={16}
+                              variant="white"
+                              motion="pulse"
+                              showRing={false}
+                            />
+                          </View>
+                        ) : fact.detail ? (
+                          <Text className="text-[#D4C5A0] text-[13px] leading-[20px] font-['MontserratAlternates-Regular']">
+                            {fact.detail}
+                          </Text>
+                        ) : null}
+                      </View>
+                    )}
+
+                    <Text className="text-[#C9A84C] text-[11px] mt-2 font-['MontserratAlternates-SemiBold']">
+                      {expandedFactId === fact.id ? 'Collapse' : 'Learn more'}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            </View>
-          )}
+            ) : (
+              <View className="rounded-2xl bg-[#141414] border border-white/[0.08] p-4">
+                <Text className="text-[#6B6357] text-sm text-center font-['MontserratAlternates-Regular']">
+                  Insights will appear as you explore nearby monuments
+                </Text>
+              </View>
+            )}
+          </Animated.View>
         </View>
       </Animated.ScrollView>
     </SafeAreaView>
   );
-};
-
-const styles = {
-  safe: {
-    flex: 1,
-    backgroundColor: '#0A0A0A',
-  },
-  stickyHeader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-    height: 56,
-    backgroundColor: 'rgba(10,10,10,0.94)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 56,
-  },
-  stickyTitle: {
-    color: '#F5F0E8',
-    fontSize: 15,
-    lineHeight: 22,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  heroWrap: {
-    height: HERO_HEIGHT,
-  },
-  heroImage: {
-    width: SCREEN_WIDTH,
-    height: HERO_HEIGHT,
-  },
-  heroOverlay: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-  },
-  heroHeaderControls: {
-    position: 'absolute',
-    top: 16,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  heroRightActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  heroIconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 999,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroFooter: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    bottom: 18,
-  },
-  heroKicker: {
-    color: '#C9A84C',
-    fontSize: 11,
-    lineHeight: 16,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  heroTitle: {
-    color: '#F5F0E8',
-    fontSize: 28,
-    lineHeight: 36,
-    fontFamily: 'MontserratAlternates-Bold',
-    marginTop: 4,
-  },
-  heroLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-  },
-  heroLocationText: {
-    color: '#B8AF9E',
-    fontSize: 13,
-    lineHeight: 18,
-    flex: 1,
-    fontFamily: 'MontserratAlternates-Medium',
-  },
-  heroDots: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 10,
-  },
-  heroDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-  },
-  heroDotActive: {
-    width: 22,
-    backgroundColor: '#C9A84C',
-  },
-  contentWrap: {
-    marginTop: -24,
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  infoCard: {
-    borderRadius: 20,
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    padding: 16,
-  },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
-  primaryTag: {
-    borderRadius: 999,
-    backgroundColor: 'rgba(201,168,76,0.18)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  primaryTagText: {
-    color: '#E8C870',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  secondaryTag: {
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  secondaryTagText: {
-    color: '#F5F0E8',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  tertiaryTag: {
-    borderRadius: 999,
-    backgroundColor: 'rgba(92,155,224,0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  tertiaryTagText: {
-    color: '#9DC6F1',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  metaItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderRadius: 12,
-    backgroundColor: '#1C1C1C',
-    padding: 12,
-  },
-  metaIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 999,
-    backgroundColor: 'rgba(201,168,76,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  metaValue: {
-    color: '#F5F0E8',
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  metaLabel: {
-    color: '#6B6357',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'MontserratAlternates-Regular',
-  },
-  ctaButton: {
-    borderRadius: 12,
-    backgroundColor: '#C9A84C',
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  ctaText: {
-    color: '#0A0A0A',
-    fontSize: 15,
-    lineHeight: 22,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    fontFamily: 'MontserratAlternates-Bold',
-  },
-  toursButton: {
-    borderRadius: 12,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(212,134,10,0.45)',
-    paddingVertical: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 10,
-  },
-  toursButtonText: {
-    color: '#D4860A',
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  sectionWrap: {
-    gap: 12,
-  },
-  sectionCard: {
-    borderRadius: 16,
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    padding: 16,
-  },
-  sectionTitle: {
-    color: '#F5F0E8',
-    fontSize: 18,
-    lineHeight: 24,
-    fontFamily: 'MontserratAlternates-SemiBold',
-    marginBottom: 8,
-  },
-  sectionBody: {
-    color: '#B8AF9E',
-    fontSize: 14,
-    lineHeight: 22,
-    fontFamily: 'MontserratAlternates-Regular',
-  },
-  expandButton: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-  },
-  expandButtonText: {
-    color: '#C9A84C',
-    fontSize: 12,
-    lineHeight: 16,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  sectionHeadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  sectionHeading: {
-    color: '#F5F0E8',
-    fontSize: 18,
-    lineHeight: 24,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  horizontalContent: {
-    paddingRight: 20,
-    gap: 12,
-  },
-  factCard: {
-    width: 240,
-    borderRadius: 16,
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.28)',
-    padding: 14,
-  },
-  factTitle: {
-    color: '#F5F0E8',
-    fontSize: 15,
-    lineHeight: 22,
-    fontFamily: 'MontserratAlternates-SemiBold',
-    marginBottom: 6,
-  },
-  factDescription: {
-    color: '#B8AF9E',
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: 'MontserratAlternates-Regular',
-  },
-  tipRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginTop: 12,
-  },
-  tipIndexPill: {
-    width: 24,
-    height: 24,
-    borderRadius: 999,
-    backgroundColor: 'rgba(201,168,76,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  tipIndexText: {
-    color: '#E8C870',
-    fontSize: 11,
-    lineHeight: 16,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  tipText: {
-    flex: 1,
-    color: '#B8AF9E',
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: 'MontserratAlternates-Regular',
-  },
-  relatedCard: {
-    width: 166,
-    borderRadius: 12,
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    padding: 8,
-  },
-  relatedImage: {
-    width: '100%',
-    height: 92,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  relatedTitle: {
-    color: '#F5F0E8',
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  relatedLocation: {
-    color: '#B8AF9E',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'MontserratAlternates-Regular',
-    marginTop: 2,
-  },
-  relatedDistance: {
-    color: '#C9A84C',
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'MontserratAlternates-SemiBold',
-    marginTop: 6,
-  },
 };
 
 export default SiteDetailScreen;
