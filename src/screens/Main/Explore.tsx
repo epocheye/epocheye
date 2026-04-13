@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   Easing,
+  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -19,7 +20,19 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { ArrowRight, Compass, MapPin, Search, X } from 'lucide-react-native';
+import {
+  ArrowRight,
+  ArrowUpDown,
+  Compass,
+  List,
+  Map as MapIcon,
+  MapPin,
+  Search,
+  X,
+} from 'lucide-react-native';
+import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import { GOOGLE_MAPS_API_KEY } from '@env';
+import mapStyle from '../../content/mapstyle.json';
 import { usePlaces } from '../../context';
 import { useDebounce } from '../../shared/hooks';
 import type { TabScreenProps } from '../../core/types/navigation.types';
@@ -27,18 +40,16 @@ import { ROUTES } from '../../core/constants';
 import type { Place } from '../../utils/api/places/types';
 import { buildSiteDetailData, getPlaceImage } from '../../shared/utils';
 
-// ─── constants ────────────────────────────────────────────────────────────────
-
-
 // ─── ExploreCard ──────────────────────────────────────────────────────────────
 
 interface ExploreCardProps {
   place: Place;
+  index: number;
   onPress: (place: Place) => void;
 }
 
 const ExploreCard: React.FC<ExploreCardProps> = React.memo(
-  ({ place, onPress }) => {
+  ({ place, index, onPress }) => {
     const scale = useSharedValue(1);
     const fallbackUri = getPlaceImage(place.categories);
     const distanceKm = (place.distance_meters / 1000).toFixed(1);
@@ -48,7 +59,10 @@ const ExploreCard: React.FC<ExploreCardProps> = React.memo(
     }));
 
     return (
-      <Animated.View style={[exploreCardStyles.container, animatedStyle]}>
+      <Animated.View
+        entering={FadeInDown.delay(index * 60).duration(350)}
+        style={[{ flex: 1 }, animatedStyle]}
+      >
         <TouchableOpacity
           onPress={() => onPress(place)}
           onPressIn={() => {
@@ -63,12 +77,19 @@ const ExploreCard: React.FC<ExploreCardProps> = React.memo(
         >
           <ImageBackground
             source={{ uri: fallbackUri }}
-            style={exploreCardStyles.image}
-            imageStyle={exploreCardStyles.imageMask}
+            style={{ height: 220 }}
+            imageStyle={{ borderRadius: 16 }}
           >
             <LinearGradient
               colors={['rgba(8,8,8,0.05)', 'rgba(8,8,8,0.9)']}
-              style={exploreCardStyles.gradient}
+              style={{
+                flex: 1,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)',
+                padding: 12,
+                justifyContent: 'space-between',
+              }}
             >
               <View className="self-start flex-row items-center gap-1 rounded-full bg-[rgba(10,10,10,0.8)] border border-[rgba(201,168,76,0.35)] px-2 py-1">
                 <Compass color="#C9A84C" size={11} />
@@ -128,16 +149,19 @@ const SkeletonCard: React.FC = () => {
   const animatedStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
 
   return (
-    <Animated.View style={[skeletonStyles.card, animatedStyle]}>
-      <View style={skeletonStyles.pill} />
-      <View style={skeletonStyles.title} />
-      <View style={skeletonStyles.line} />
-      <View style={skeletonStyles.cta} />
+    <Animated.View
+      style={animatedStyle}
+      className="flex-1 h-[220px] rounded-2xl bg-[#141414] border border-white/[0.08] p-3 justify-end"
+    >
+      <View className="w-16 h-5 rounded-full bg-white/10 mb-2.5" />
+      <View className="w-3/4 h-[22px] rounded-md bg-white/[0.14] mb-2" />
+      <View className="w-[55%] h-3 rounded-md bg-white/10 mb-2.5" />
+      <View className="w-[72px] h-[26px] rounded-full bg-[rgba(201,168,76,0.22)]" />
     </Animated.View>
   );
 };
 
-// ─── Category / Region chips ──────────────────────────────────────────────────
+// ─── Filter Chip ──────────────────────────────────────────────────────────────
 
 interface FilterChipProps {
   label: string;
@@ -166,6 +190,78 @@ const FilterChip: React.FC<FilterChipProps> = ({ label, active, onPress }) => (
   </TouchableOpacity>
 );
 
+// ─── Sort options ─────────────────────────────────────────────────────────────
+
+type SortMode = 'distance' | 'name';
+
+// ─── Map View ─────────────────────────────────────────────────────────────────
+
+interface PlaceMapViewProps {
+  places: Place[];
+  onPlacePress: (place: Place) => void;
+}
+
+const PlaceMapView: React.FC<PlaceMapViewProps> = React.memo(
+  ({ places, onPlacePress }) => {
+    const mapRef = useRef<MapView>(null);
+
+    const initialRegion: Region = useMemo(() => {
+      if (places.length > 0) {
+        const lats = places.map(p => p.lat);
+        const lons = places.map(p => p.lon);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLon = Math.min(...lons);
+        const maxLon = Math.max(...lons);
+        return {
+          latitude: (minLat + maxLat) / 2,
+          longitude: (minLon + maxLon) / 2,
+          latitudeDelta: Math.max(maxLat - minLat, 0.02) * 1.5,
+          longitudeDelta: Math.max(maxLon - minLon, 0.02) * 1.5,
+        };
+      }
+      return {
+        latitude: 28.6139,
+        longitude: 77.209,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
+    }, [places]);
+
+    return (
+      <Animated.View
+        entering={FadeInDown.duration(350)}
+        className="flex-1 mx-5 rounded-2xl overflow-hidden border border-white/10"
+      >
+        <MapView
+          ref={mapRef}
+          provider={PROVIDER_GOOGLE}
+          style={{ flex: 1 }}
+          initialRegion={initialRegion}
+          customMapStyle={mapStyle}
+          showsUserLocation
+          showsMyLocationButton
+          loadingEnabled
+          // @ts-expect-error Prop exists on native MapView but missing from type defs
+          googleMapsApiKey={GOOGLE_MAPS_API_KEY?.trim()}
+        >
+          {places.map(place => (
+            <Marker
+              key={place.id}
+              coordinate={{ latitude: place.lat, longitude: place.lon }}
+              title={place.name}
+              description={`${place.city} · ${(place.distance_meters / 1000).toFixed(1)} km`}
+              pinColor="#D4860A"
+              onCalloutPress={() => onPlacePress(place)}
+            />
+          ))}
+        </MapView>
+      </Animated.View>
+    );
+  },
+);
+PlaceMapView.displayName = 'PlaceMapView';
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 type Props = TabScreenProps<'Explore'>;
@@ -177,6 +273,8 @@ const Explore: React.FC<Props> = ({ navigation }) => {
   const [searchText, setSearchText] = useState('');
   const [activeRegion, setActiveRegion] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+  const [sortMode, setSortMode] = useState<SortMode>('distance');
   const debouncedSearch = useDebounce(searchText, 300);
   const searchRef = useRef<TextInput>(null);
 
@@ -190,7 +288,7 @@ const Explore: React.FC<Props> = ({ navigation }) => {
     void ensureLocationTracking();
   }, [ensureLocationTracking]);
 
-  // Derive unique regions and categories from nearby places.
+  // Derive unique regions from nearby places
   const regions = useMemo(() => {
     const seen = new Set<string>();
     return (nearbyPlaces || [])
@@ -203,6 +301,7 @@ const Explore: React.FC<Props> = ({ navigation }) => {
       .slice(0, 6);
   }, [nearbyPlaces]);
 
+  // Derive unique categories from nearby places
   const categories = useMemo(() => {
     const seen = new Set<string>();
     return (nearbyPlaces || [])
@@ -216,9 +315,9 @@ const Explore: React.FC<Props> = ({ navigation }) => {
       .slice(0, 6);
   }, [nearbyPlaces]);
 
-  // Filter places by search + region + category.
+  // Filter and sort places
   const filteredPlaces = useMemo(() => {
-    return (nearbyPlaces || []).filter(place => {
+    const filtered = (nearbyPlaces || []).filter(place => {
       const matchesSearch = debouncedSearch
         ? place.name.toLowerCase().includes(debouncedSearch.toLowerCase())
         : true;
@@ -232,7 +331,13 @@ const Explore: React.FC<Props> = ({ navigation }) => {
         : true;
       return matchesSearch && matchesRegion && matchesCategory;
     });
-  }, [nearbyPlaces, debouncedSearch, activeRegion, activeCategory]);
+
+    if (sortMode === 'name') {
+      return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    // 'distance' — already sorted by distance from API
+    return filtered;
+  }, [nearbyPlaces, debouncedSearch, activeRegion, activeCategory, sortMode]);
 
   const handleCardPress = useCallback(
     (place: Place) => {
@@ -244,8 +349,8 @@ const Explore: React.FC<Props> = ({ navigation }) => {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: Place }) => (
-      <ExploreCard place={item} onPress={handleCardPress} />
+    ({ item, index }: { item: Place; index: number }) => (
+      <ExploreCard place={item} index={index} onPress={handleCardPress} />
     ),
     [handleCardPress],
   );
@@ -253,6 +358,10 @@ const Explore: React.FC<Props> = ({ navigation }) => {
   const keyExtractor = useCallback((item: Place) => item.id, []);
 
   const hasActiveFilter = !!(searchText || activeRegion || activeCategory);
+
+  const toggleSort = useCallback(() => {
+    setSortMode(prev => (prev === 'distance' ? 'name' : 'distance'));
+  }, []);
 
   return (
     <SafeAreaView className="flex-1 bg-[#0A0A0A]">
@@ -264,13 +373,39 @@ const Explore: React.FC<Props> = ({ navigation }) => {
       >
         <Animated.View className="flex-1" style={containerStyle}>
           {/* Header */}
-          <View className="px-5 pt-5 pb-3">
-            <Text className="font-['MontserratAlternates-SemiBold'] text-xs uppercase tracking-[1px] text-[#C9A84C]">
-              DISCOVER
-            </Text>
-            <Text className="mt-1 font-['MontserratAlternates-Bold'] text-[26px] leading-9 text-[#F5F0E8]">
-              Explore Places
-            </Text>
+          <View className="px-5 pt-5 pb-3 flex-row items-end justify-between">
+            <View>
+              <Text className="font-['MontserratAlternates-SemiBold'] text-xs uppercase tracking-[1px] text-[#C9A84C]">
+                DISCOVER
+              </Text>
+              <Text className="mt-1 font-['MontserratAlternates-Bold'] text-[26px] leading-9 text-[#F5F0E8]">
+                Explore Places
+              </Text>
+            </View>
+
+            {/* View toggle */}
+            <View className="flex-row items-center gap-2">
+              <TouchableOpacity
+                onPress={toggleSort}
+                className="w-9 h-9 rounded-full bg-[#141414] border border-white/10 items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={`Sort by ${sortMode === 'distance' ? 'name' : 'distance'}`}
+              >
+                <ArrowUpDown color={sortMode === 'name' ? '#C9A84C' : '#6B6357'} size={16} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setViewMode(prev => (prev === 'grid' ? 'map' : 'grid'))}
+                className="w-9 h-9 rounded-full bg-[#141414] border border-white/10 items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={viewMode === 'grid' ? 'Switch to map view' : 'Switch to grid view'}
+              >
+                {viewMode === 'grid' ? (
+                  <MapIcon color="#6B6357" size={16} />
+                ) : (
+                  <List color="#C9A84C" size={16} />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Search bar */}
@@ -338,32 +473,30 @@ const Explore: React.FC<Props> = ({ navigation }) => {
             </View>
           )}
 
-          {/* Clear filters hint */}
-          {hasActiveFilter && (
-            <TouchableOpacity
-              className="mx-5 mb-3 self-start"
-              onPress={() => {
-                setSearchText('');
-                setActiveRegion(null);
-                setActiveCategory(null);
-              }}
-            >
-              <Text className="text-[#C9A84C] text-xs font-['MontserratAlternates-Medium']">
-                Clear filters
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Results count */}
+          {/* Clear filters + results count */}
           <View className="mx-5 mb-3 flex-row items-center justify-between">
             <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
               {isLoadingNearby
                 ? 'Loading...'
                 : `${filteredPlaces.length} site${filteredPlaces.length !== 1 ? 's' : ''} found`}
+              {sortMode === 'name' ? ' · A–Z' : ' · nearest'}
             </Text>
+            {hasActiveFilter && (
+              <TouchableOpacity
+                onPress={() => {
+                  setSearchText('');
+                  setActiveRegion(null);
+                  setActiveCategory(null);
+                }}
+              >
+                <Text className="text-[#C9A84C] text-xs font-['MontserratAlternates-Medium']">
+                  Clear filters
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Place grid */}
+          {/* Content area */}
           {isLoadingNearby ? (
             <View className="flex-row flex-wrap px-5 gap-3">
               <SkeletonCard />
@@ -383,6 +516,11 @@ const Explore: React.FC<Props> = ({ navigation }) => {
                   : 'Move closer to a heritage site or enable location access.'}
               </Text>
             </View>
+          ) : viewMode === 'map' ? (
+            <PlaceMapView
+              places={filteredPlaces}
+              onPlacePress={handleCardPress}
+            />
           ) : (
             <FlatList
               data={filteredPlaces}
@@ -406,65 +544,3 @@ const Explore: React.FC<Props> = ({ navigation }) => {
 };
 
 export default Explore;
-
-// ─── styles ───────────────────────────────────────────────────────────────────
-
-const exploreCardStyles = {
-  container: {
-    flex: 1,
-  },
-  image: {
-    height: 220,
-  },
-  imageMask: {
-    borderRadius: 16,
-  },
-  gradient: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    padding: 12,
-    justifyContent: 'space-between' as const,
-  },
-};
-
-const skeletonStyles = {
-  card: {
-    flex: 1,
-    height: 220,
-    borderRadius: 16,
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    padding: 12,
-    justifyContent: 'flex-end' as const,
-  },
-  pill: {
-    width: 64,
-    height: 20,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginBottom: 10,
-  },
-  title: {
-    width: '75%' as const,
-    height: 22,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    marginBottom: 8,
-  },
-  line: {
-    width: '55%' as const,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginBottom: 10,
-  },
-  cta: {
-    width: 72,
-    height: 26,
-    borderRadius: 999,
-    backgroundColor: 'rgba(201,168,76,0.22)',
-  },
-};
