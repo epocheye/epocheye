@@ -38,7 +38,7 @@ import { useOnboardingStore } from '../../stores/onboardingStore';
 import { useLensPremium } from '../../shared/hooks/useLensPremium';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 import { FONTS } from '../../core/constants/theme';
-import { ROUTES } from '../../core/constants/ROUTES';
+import { ROUTES } from '../../core/constants';
 import {
   identifyHeritage,
   fileToBase64,
@@ -52,10 +52,7 @@ import {
 } from '../../services/geminiCacheService';
 import { fetchZones } from '../../services/zoneService';
 import { trackUsageEvent } from '../../services/usageTelemetryService';
-import {
-  performHDScan,
-  type HDScanMask,
-} from '../../services/hdScanService';
+import { performHDScan, type HDScanMask } from '../../services/hdScanService';
 import { getValidAccessToken } from '../../utils/api/auth';
 import { useARCore } from '../../shared/hooks/useARCore';
 import EpocheyeARView from '../../native/EpocheyeARView';
@@ -115,7 +112,9 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const profile = useUser(state => state.profile);
   const nearbyPlaces = usePlaces(state => state.nearbyPlaces);
-  const ensureLocationTracking = usePlaces(state => state.ensureLocationTracking);
+  const ensureLocationTracking = usePlaces(
+    state => state.ensureLocationTracking,
+  );
   const storeFirstName = useOnboardingStore(state => state.firstName);
   const storeMotivation = useOnboardingStore(state => state.motivation);
   const storeRegions = useOnboardingStore(state => state.regions);
@@ -147,8 +146,9 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     useState<LensIdentifiedObject | null>(null);
 
   // ── Gemini identification state ──
-  const [geminiResult, setGeminiResult] =
-    useState<GeminiIdentification | null>(null);
+  const [geminiResult, setGeminiResult] = useState<GeminiIdentification | null>(
+    null,
+  );
   const [geminiLoading, setGeminiLoading] = useState(false);
   const [geminiError, setGeminiError] = useState<string | null>(null);
   const [activeZone, setActiveZone] = useState<HeritageZone | null>(null);
@@ -610,7 +610,9 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       } catch {
         // GPS failed while offline — fall through to error
       }
-      setGeminiError('You\'re offline — connect to the internet to identify this site');
+      setGeminiError(
+        "You're offline — connect to the internet to identify this site",
+      );
       setGeminiLoading(false);
       return;
     }
@@ -650,7 +652,9 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         track('lens_identify_error', { error: result.error });
       }
     } catch {
-      setGeminiError('Couldn\'t identify this site — try holding your phone steady and try again');
+      setGeminiError(
+        "Couldn't identify this site — try holding your phone steady and try again",
+      );
     } finally {
       setGeminiLoading(false);
     }
@@ -762,9 +766,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <GestureHandlerRootView style={styles.root}>
         <View style={styles.permissionScreen}>
-          <Text style={styles.permissionTitle}>
-            Camera access needed
-          </Text>
+          <Text style={styles.permissionTitle}>Camera access needed</Text>
           <Text style={styles.permissionBody}>
             Allow camera access to explore heritage sites and uncover your
             ancestor's story.
