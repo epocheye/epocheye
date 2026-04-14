@@ -282,7 +282,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
   // Loading state
   if (loadingConfig) {
     return (
-      <SafeAreaView className="flex-1 bg-[#0A0A0A] items-center justify-center">
+      <SafeAreaView className="flex-1 bg-[#000000] items-center justify-center">
         <StatusBar barStyle="light-content" />
         <ActivityIndicator color="#D4860A" size="large" />
         <Text className="text-[#B8AF9E] text-sm font-['MontserratAlternates-Regular'] mt-3">
@@ -295,7 +295,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
   // Error state
   if (!config || sortedTiers.length === 0) {
     return (
-      <SafeAreaView className="flex-1 bg-[#0A0A0A] items-center justify-center px-8">
+      <SafeAreaView className="flex-1 bg-[#000000] items-center justify-center px-8">
         <StatusBar barStyle="light-content" />
         <Text className="text-[#F5F0E8] text-lg text-center font-['MontserratAlternates-SemiBold']">
           Something went wrong
@@ -316,10 +316,10 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0A0A0A]">
+    <SafeAreaView className="flex-1 bg-[#000000]">
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#0A0A0A', '#14110B', '#0A0A0A']}
+        colors={['#000000', '#0C0A07', '#000000']}
         locations={[0, 0.5, 1]}
         className="flex-1"
       >

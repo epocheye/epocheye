@@ -25,7 +25,7 @@ const AppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <SafeAreaProvider style={{ backgroundColor: '#111111' }}>
+    <SafeAreaProvider style={{ backgroundColor: '#000000' }}>
       <NetworkProvider>
         <AppContent />
       </NetworkProvider>

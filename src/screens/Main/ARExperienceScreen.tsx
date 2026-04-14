@@ -225,7 +225,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
   if (!hasPermission) {
     return (
       <GestureHandlerRootView className="flex-1">
-        <SafeAreaView className="flex-1 bg-[#0A0A0A] items-center justify-center px-8">
+        <SafeAreaView className="flex-1 bg-[#000000] items-center justify-center px-8">
           <Camera color="#D4860A" size={56} />
           <Text className="text-[#F5F0E8] text-xl text-center font-['MontserratAlternates-Bold'] mt-6 mb-2">
             Camera access needed
@@ -263,7 +263,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
   // ── Main AR view ─────────────────────────────────────────────────
   return (
     <GestureHandlerRootView className="flex-1">
-      <View className="flex-1 bg-[#0A0A0A]">
+      <View className="flex-1 bg-[#000000]">
         {/* Camera layer */}
         {device && (
           <VisionCamera

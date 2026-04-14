@@ -112,7 +112,7 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   // Loading / purchasing state
   if (loading || purchasing) {
     return (
-      <SafeAreaView className="flex-1 bg-[#0A0A0A] items-center justify-center">
+      <SafeAreaView className="flex-1 bg-[#000000] items-center justify-center">
         <StatusBar barStyle="light-content" />
         <Text className="text-[#B8AF9E] text-sm font-['MontserratAlternates-Regular']">
           {purchasing ? 'Processing payment...' : 'Loading tour...'}
@@ -124,7 +124,7 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   // Not found
   if (!tour) {
     return (
-      <SafeAreaView className="flex-1 bg-[#0A0A0A] items-center justify-center px-8">
+      <SafeAreaView className="flex-1 bg-[#000000] items-center justify-center px-8">
         <StatusBar barStyle="light-content" />
         <Text className="text-[#F5F0E8] text-lg text-center font-['MontserratAlternates-SemiBold']">
           Tour not found
@@ -149,10 +149,10 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     tour.content_type === 'text' || tour.content_type === 'mixed';
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0A0A0A]">
+    <SafeAreaView className="flex-1 bg-[#000000]">
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#0A0A0A', '#14110B', '#0A0A0A']}
+        colors={['#000000', '#0C0A07', '#000000']}
         locations={[0, 0.5, 1]}
         className="flex-1"
       >

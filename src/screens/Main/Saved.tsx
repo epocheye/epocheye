@@ -350,10 +350,10 @@ const Saved: React.FC<Props> = ({ navigation }) => {
   const keyExtractor = useCallback((item: SavedPlace) => item.id, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0A0A0A]">
+    <SafeAreaView className="flex-1 bg-[#000000]">
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#0A0A0A', '#14110B', '#0A0A0A']}
+        colors={['#000000', '#0C0A07', '#000000']}
         locations={[0, 0.5, 1]}
         className="flex-1"
       >

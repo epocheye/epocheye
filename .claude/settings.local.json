@@ -25,7 +25,9 @@
       "Bash(npm start:*)",
       "Bash(npm run:*)",
       "Bash(npx react-native:*)",
-      "Bash(./gradlew.bat app:installDebug -PreactNativeDevServerPort=8081)"
+      "Bash(./gradlew.bat app:installDebug -PreactNativeDevServerPort=8081)",
+      "mcp__magic__21st_magic_component_inspiration",
+      "Bash(echo \"EXIT_CODE=$?\")"
     ]
   }
 }

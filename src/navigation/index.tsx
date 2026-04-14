@@ -83,7 +83,7 @@ const AppNavigator: React.FC = () => {
 
   if (appState === 'loading') {
     return (
-      <View className="flex-1 items-center justify-center bg-[#0A0A0A]">
+      <View className="flex-1 items-center justify-center bg-[#000000]">
         <AnimatedLogo size={92} motion="pulse" variant="white" showRing={false} />
         <Text className="mt-5 font-['MontserratAlternates-Regular'] text-sm text-[#B8AF9E]">
           Preparing your journey...

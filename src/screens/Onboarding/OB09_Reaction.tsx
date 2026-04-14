@@ -142,7 +142,7 @@ const OB09_Reaction: React.FC<Props> = ({navigation}) => {
 
   return (
     <LinearGradient
-      colors={['#0D0B08', '#0F0D0A', '#0A0A0A']}
+      colors={['#050403', '#070605', '#000000']}
       style={styles.container}>
       <StatusBar
         barStyle="light-content"

@@ -17,8 +17,8 @@ export const FONTS = {
 
 export const COLORS = {
   /** Core backgrounds */
-  bg: '#111111',
-  bgWarm: '#1A1612',
+  bg: '#000000',
+  bgWarm: '#080604',
   bgCard: 'rgba(255,255,255,0.06)',
 
   /** Brand amber */

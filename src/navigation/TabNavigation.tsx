@@ -30,7 +30,7 @@ const TAB_ICON_SIZE = 22;
  */
 const TAB_COLORS = {
   /** Elevated dark background for the tab bar strip */
-  barBackground: '#141414',
+  barBackground: '#0A0A0A',
   /** Gold-tinted separator above the tab bar */
   barBorder: 'rgba(201, 168, 76, 0.28)',
   /** Icon/label color for the active (selected) tab */

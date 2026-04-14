@@ -282,7 +282,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0A0A0A]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-[#000000]" edges={['top']}>
       <StatusBar barStyle="light-content" />
 
       {/* Sticky header */}

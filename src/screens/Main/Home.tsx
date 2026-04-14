@@ -21,6 +21,8 @@ import Animated, {
   withSequence,
   Easing,
   withSpring,
+  FadeInDown,
+  interpolate,
 } from 'react-native-reanimated';
 import {
   Bell,
@@ -64,6 +66,16 @@ const FACT_LOADING_LINES = [
   'Reading the monuments...',
 ];
 
+const NOIR = {
+  bg: '#000000',
+  cardBg: '#0A0A0A',
+  cardBorder: 'rgba(212, 134, 10, 0.12)',
+  glowAmber: 'rgba(212, 134, 10, 0.08)',
+  amber: '#D4860A',
+  gold: '#C9A84C',
+  warmWhite: '#F5F0E8',
+} as const;
+
 function buildFallbackFacts(
   userName: string,
   places: Place[],
@@ -104,10 +116,11 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface PlaceCardProps {
   place: Place;
+  index: number;
   onPress: (place: Place) => void;
 }
 
-const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, onPress }) => {
+const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress }) => {
   const scale = useSharedValue(1);
   const fallbackImageUri = getPlaceImage(place.categories);
   const distanceKm = (place.distance_meters / 1000).toFixed(1);
@@ -126,25 +139,27 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, onPress }) => {
   };
 
   return (
-    <AnimatedTouchable
-      style={[cardStyles.container, animatedCardStyle]}
-      onPress={() => onPress(place)}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={0.9}
-      accessibilityRole="button"
-      accessibilityLabel={`Visit ${place.name}, ${distanceKm} km away`}
-      accessibilityHint="Opens the site details screen"
-    >
-      <ImageBackground
-        source={{ uri: fallbackImageUri }}
-        style={cardStyles.image}
-        imageStyle={cardStyles.imageMask}
+    <Animated.View entering={FadeInDown.delay(index * 80).duration(500)}>
+      <AnimatedTouchable
+        style={[cardStyles.container, animatedCardStyle]}
+        onPress={() => onPress(place)}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.9}
+        accessibilityRole="button"
+        accessibilityLabel={`Visit ${place.name}, ${distanceKm} km away`}
+        accessibilityHint="Opens the site details screen"
       >
-        <LinearGradient
-          colors={['rgba(8,8,8,0.12)', 'rgba(8,8,8,0.88)']}
-          style={cardStyles.gradient}
+        <ImageBackground
+          source={{ uri: fallbackImageUri }}
+          style={cardStyles.image}
+          imageStyle={cardStyles.imageMask}
         >
+          <LinearGradient
+            colors={['rgba(8,8,8,0.12)', 'rgba(212,134,10,0.06)', 'rgba(8,8,8,0.88)']}
+            locations={[0, 0.6, 1]}
+            style={cardStyles.gradient}
+          >
           <View className="self-start flex-row items-center gap-1 rounded-full bg-[rgba(10,10,10,0.7)] border border-[rgba(201,168,76,0.35)] px-3 py-1.5">
             <Compass color="#C9A84C" size={14} />
             <Text className="text-[#F5F0E8] text-xs leading-4 font-['MontserratAlternates-SemiBold']">
@@ -183,9 +198,10 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, onPress }) => {
               <ArrowRight color="#0A0A0A" size={14} />
             </View>
           </View>
-        </LinearGradient>
-      </ImageBackground>
-    </AnimatedTouchable>
+          </LinearGradient>
+        </ImageBackground>
+      </AnimatedTouchable>
+    </Animated.View>
   );
 });
 
@@ -245,11 +261,30 @@ const Home = ({ navigation }: Props) => {
   const entrance = useSharedValue(24);
   const contentOpacity = useSharedValue(0);
   const lensFabScale = useSharedValue(1);
+  const passBorderPulse = useSharedValue(0);
+  const fabRingScale = useSharedValue(1);
+  const fabRingOpacity = useSharedValue(0.3);
+  const refreshRotation = useSharedValue(0);
 
   useEffect(() => {
     entrance.value = withSpring(0, { damping: 20, stiffness: 200 });
     contentOpacity.value = withTiming(1, { duration: 400 });
-  }, [contentOpacity, entrance]);
+    passBorderPulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 2000 }),
+        withTiming(0, { duration: 2000 }),
+      ),
+      -1,
+    );
+    fabRingScale.value = withRepeat(
+      withTiming(1.3, { duration: 1500, easing: Easing.out(Easing.quad) }),
+      -1,
+    );
+    fabRingOpacity.value = withRepeat(
+      withTiming(0, { duration: 1500, easing: Easing.out(Easing.quad) }),
+      -1,
+    );
+  }, [contentOpacity, entrance, passBorderPulse, fabRingScale, fabRingOpacity]);
 
   useEffect(() => {
     void ensureLocationTracking();
@@ -262,6 +297,19 @@ const Home = ({ navigation }: Props) => {
 
   const lensFabStyle = useAnimatedStyle(() => ({
     transform: [{ scale: lensFabScale.value }],
+  }));
+
+  const passBorderStyle = useAnimatedStyle(() => ({
+    borderColor: `rgba(212, 134, 10, ${interpolate(passBorderPulse.value, [0, 1], [0.15, 0.5])})`,
+  }));
+
+  const fabRingStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: fabRingScale.value }],
+    opacity: fabRingOpacity.value,
+  }));
+
+  const refreshIconStyle = useAnimatedStyle(() => ({
+    transform: [{ rotateZ: `${refreshRotation.value}deg` }],
   }));
 
   const handleLensPressIn = () => {
@@ -296,12 +344,6 @@ const Home = ({ navigation }: Props) => {
     () => (nearbyPlaces || []).slice(0, 20),
     [nearbyPlaces],
   );
-  const insightSubject =
-    facts[0]?.monument || topNearbyPlaces[0]?.name || 'Heritage monument';
-  const insightFallbackImage = topNearbyPlaces[0]
-    ? getPlaceImage(topNearbyPlaces[0].categories)
-    : undefined;
-
   const handleVisitPlace = useCallback(
     (place: Place) => {
       navigation.navigate('SiteDetail', {
@@ -448,17 +490,17 @@ const Home = ({ navigation }: Props) => {
   );
 
   const renderPlaceItem = useCallback(
-    ({ item }: { item: Place }) => (
-      <PlaceCard place={item} onPress={handleVisitPlace} />
+    ({ item, index }: { item: Place; index: number }) => (
+      <PlaceCard place={item} index={index} onPress={handleVisitPlace} />
     ),
     [handleVisitPlace],
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0A0A0A]">
+    <SafeAreaView className="flex-1 bg-[#000000]">
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#0A0A0A', '#12100D', '#0A0A0A']}
+        colors={['#000000', '#0A0806', '#000000']}
         locations={[0, 0.5, 1]}
         style={{ flex: 1 }}
       >
@@ -476,7 +518,18 @@ const Home = ({ navigation }: Props) => {
               className="flex-row items-center justify-between mb-6"
               accessibilityRole="header"
             >
-              <View className="flex-1 pr-4">
+              <View className="flex-1 pr-4" style={{ position: 'relative' }}>
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -20,
+                    left: -30,
+                    width: 160,
+                    height: 100,
+                    borderRadius: 80,
+                    backgroundColor: NOIR.glowAmber,
+                  }}
+                />
                 <Text className="text-[#B8AF9E] text-xs uppercase tracking-[1px] font-['MontserratAlternates-SemiBold']">
                   {greeting}
                 </Text>
@@ -488,7 +541,12 @@ const Home = ({ navigation }: Props) => {
                 </Text>
               </View>
               <TouchableOpacity
-                className="w-11 h-11 rounded-full bg-[#1C1C1C] border border-[rgba(201,168,76,0.3)] items-center justify-center"
+                className="w-11 h-11 rounded-xl items-center justify-center"
+                style={{
+                  borderWidth: 1,
+                  borderColor: NOIR.cardBorder,
+                  backgroundColor: NOIR.cardBg,
+                }}
                 accessibilityRole="button"
                 accessibilityLabel="Notifications"
                 accessibilityHint="Opens your notification centre"
@@ -498,6 +556,7 @@ const Home = ({ navigation }: Props) => {
             </View>
 
             {/* Nearby Highlights */}
+            <View style={{ height: 1, backgroundColor: 'rgba(201,168,76,0.15)', marginBottom: 20 }} />
             <View className="mb-4">
               <View className="flex-row items-center gap-2">
                 <Sparkles color="#C9A84C" size={18} />
@@ -548,39 +607,50 @@ const Home = ({ navigation }: Props) => {
 
             {/* Explorer Pass banner */}
             {!explorerPassLoading && !hasAnyActivePass && (
-              <TouchableOpacity
-                onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
-                activeOpacity={0.9}
-                className="mt-6 rounded-[20px] overflow-hidden border border-[rgba(212,134,10,0.35)]"
-                accessibilityRole="button"
-                accessibilityLabel="Get Explorer Pass"
+              <Animated.View
+                entering={FadeInDown.delay(200).duration(500)}
+                style={[{ marginTop: 24, borderRadius: 20, overflow: 'hidden', borderWidth: 1 }, passBorderStyle]}
               >
-                <LinearGradient
-                  colors={['#1A120A', '#2A1C0E', '#1A120A']}
-                  locations={[0, 0.5, 1]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={{ padding: 18 }}
+                <TouchableOpacity
+                  onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
+                  activeOpacity={0.9}
+                  accessibilityRole="button"
+                  accessibilityLabel="Get Explorer Pass"
                 >
-                  <View className="flex-row items-center gap-3">
-                    <View className="w-12 h-12 rounded-full bg-[#D4860A]/15 items-center justify-center">
-                      <Sparkles color="#D4860A" size={22} />
+                  <LinearGradient
+                    colors={['#0A0A0A', '#1A1206', '#0A0A0A']}
+                    locations={[0, 0.5, 1]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{ padding: 18 }}
+                  >
+                    <View className="flex-row items-center gap-3">
+                      <View className="w-12 h-12 rounded-full bg-[#D4860A]/15 items-center justify-center">
+                        <Sparkles color="#D4860A" size={22} />
+                      </View>
+                      <View className="flex-1">
+                        <View className="flex-row items-center gap-2 mb-0.5">
+                          <Text className="text-[#D4860A] text-[10px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+                            Explorer Pass
+                          </Text>
+                          <View style={{ backgroundColor: '#D4860A', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 }}>
+                            <Text className="text-[#000000] text-[8px] uppercase tracking-[0.5px] font-['MontserratAlternates-Bold']">
+                              PREMIUM
+                            </Text>
+                          </View>
+                        </View>
+                        <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-Bold'] mt-0.5">
+                          Unlock heritage sites near you
+                        </Text>
+                        <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Regular'] mt-0.5">
+                          Tap to choose places
+                        </Text>
+                      </View>
+                      <ArrowRight color="#D4860A" size={20} />
                     </View>
-                    <View className="flex-1">
-                      <Text className="text-[#D4860A] text-[10px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
-                        Explorer Pass
-                      </Text>
-                      <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-Bold'] mt-0.5">
-                        Unlock heritage sites near you
-                      </Text>
-                      <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Regular'] mt-0.5">
-                        Tap to choose places
-                      </Text>
-                    </View>
-                    <ArrowRight color="#D4860A" size={20} />
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </Animated.View>
             )}
 
             {/* Tours section */}
@@ -607,18 +677,26 @@ const Home = ({ navigation }: Props) => {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ gap: 12, paddingRight: 8, paddingBottom: 4 }}
                 >
-                  {tours.map(tour => (
-                    <TouchableOpacity
+                  {tours.map((tour, tourIndex) => (
+                    <Animated.View
                       key={tour.id}
-                      onPress={() =>
-                        navigation.navigate(ROUTES.MAIN.TOUR_LIST, {
-                          monumentId: tour.monument_id,
-                          monumentName: tour.monument_name,
-                        })
-                      }
-                      className="w-44 bg-[#141414] rounded-[16px] p-3 border border-[rgba(255,255,255,0.08)]"
-                      activeOpacity={0.85}
+                      entering={FadeInDown.delay(tourIndex * 60).duration(400)}
                     >
+                      <TouchableOpacity
+                        onPress={() =>
+                          navigation.navigate(ROUTES.MAIN.TOUR_LIST, {
+                            monumentId: tour.monument_id,
+                            monumentName: tour.monument_name,
+                          })
+                        }
+                        className="w-44 rounded-[16px] p-3"
+                        style={{
+                          backgroundColor: NOIR.cardBg,
+                          borderWidth: 1,
+                          borderColor: NOIR.cardBorder,
+                        }}
+                        activeOpacity={0.85}
+                      >
                       <Text className="text-[#D4860A] text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold'] mb-1" numberOfLines={1}>
                         {tour.monument_name}
                       </Text>
@@ -642,16 +720,17 @@ const Home = ({ navigation }: Props) => {
                           )}
                         </View>
                       </View>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                    </Animated.View>
                   ))}
                 </ScrollView>
               </View>
             )}
 
-            {/* Insights card */}
+            {/* Insights */}
             {factsVisible && (
-              <View className="mt-6 mb-3 rounded-[20px] bg-[#141414] border border-[rgba(201,168,76,0.3)] p-5">
-                <View className="flex-row items-center justify-between mb-2.5">
+              <View className="mt-6 mb-3">
+                <View className="flex-row items-center justify-between mb-4">
                   <Text className="text-[#F5F0E8] text-lg leading-6 font-['MontserratAlternates-SemiBold']">
                     Insights For You
                   </Text>
@@ -664,17 +743,11 @@ const Home = ({ navigation }: Props) => {
                   </TouchableOpacity>
                 </View>
 
-                <ResolvedSubjectImage
-                  subject={insightSubject}
-                  context="home personalized insights"
-                  fallbackUri={insightFallbackImage}
-                  style={homeStyles.insightVisual}
-                  imageStyle={homeStyles.insightVisualImage}
-                  loadingLabel="Loading insight visual..."
-                />
-
                 {isLoadingFacts ? (
-                  <View className="items-center py-4 gap-4">
+                  <View
+                    className="items-center py-6 gap-4 rounded-[20px]"
+                    style={{ backgroundColor: NOIR.cardBg, borderWidth: 1, borderColor: NOIR.cardBorder }}
+                  >
                     <AnimatedLogo size={58} motion="orbit" variant="white" />
                     <ThinkingDots messages={FACT_LOADING_LINES} />
                     <Text className="text-[#B8AF9E] text-xs leading-[18px] text-center font-['MontserratAlternates-Regular']">
@@ -682,78 +755,120 @@ const Home = ({ navigation }: Props) => {
                     </Text>
                   </View>
                 ) : (
-                  <View className="gap-2.5 mt-1">
+                  <View className="gap-3">
                     {factsError ? (
                       <Text className="text-[#8F8576] text-[11px] leading-4 mb-0.5 font-['MontserratAlternates-Regular']">
                         {factsError}
                       </Text>
                     ) : null}
 
-                    {facts.map((fact, index) => {
+                    {facts.map((fact, factIndex) => {
                       const isExpanded = activeFactId === fact.id;
                       const isElaborating = elaboratingFactId === fact.id;
                       const detailText =
                         factDetailsById[fact.id] ?? fact.detail;
+                      const factMonument = fact.monument || topNearbyPlaces[factIndex]?.name;
 
                       return (
-                        <TouchableOpacity
+                        <Animated.View
                           key={fact.id}
-                          className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-3"
-                          onPress={() => {
-                            handleFactPress(fact).catch(() => {
-                              setFactDetailsById(prev => ({
-                                ...prev,
-                                [fact.id]: `${fact.summary} This connects to ${
-                                  topNearbyPlaces[0]?.name ??
-                                  'nearby heritage sites'
-                                } through shared routes, ritual patterns, and artisan exchange across generations.`,
-                              }));
-                            });
-                          }}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Open insight ${index + 1}`}
-                          accessibilityHint="Shows a detailed explanation"
+                          entering={FadeInDown.delay(factIndex * 100).duration(400)}
                         >
-                          <View className="flex-row items-start gap-2.5">
-                            <View className="w-[22px] h-[22px] rounded-full bg-[rgba(201,168,76,0.2)] border border-[rgba(201,168,76,0.45)] items-center justify-center mt-0.5">
-                              <Text className="text-[#E8A33A] text-[11px] font-['MontserratAlternates-SemiBold']">
-                                {index + 1}
-                              </Text>
-                            </View>
-                            <View className="flex-1">
-                              <Text className="text-[#F5F0E8] text-sm leading-5 font-['MontserratAlternates-SemiBold']">
-                                {fact.headline}
-                              </Text>
-                              <Text className="text-[#B8AF9E] text-[13px] leading-[19px] mt-1 font-['MontserratAlternates-Regular']">
-                                {fact.summary}
-                              </Text>
-                            </View>
-                          </View>
-
-                          {isExpanded ? (
-                            <View className="mt-2.5 pt-2.5 border-t border-[rgba(255,255,255,0.08)]">
-                              {isElaborating ? (
-                                <ThinkingDots
-                                  messages={['Expanding this insight...']}
-                                  color="#B8AF9E"
+                          <TouchableOpacity
+                            className="rounded-2xl p-3.5"
+                            style={[
+                              {
+                                backgroundColor: NOIR.cardBg,
+                                borderWidth: 1,
+                                borderColor: isExpanded ? 'rgba(212, 134, 10, 0.3)' : NOIR.cardBorder,
+                              },
+                              isExpanded && {
+                                shadowColor: '#D4860A',
+                                shadowOpacity: 0.12,
+                                shadowRadius: 16,
+                                shadowOffset: { width: 0, height: 4 },
+                                elevation: 8,
+                              },
+                            ]}
+                            onPress={() => {
+                              handleFactPress(fact).catch(() => {
+                                setFactDetailsById(prev => ({
+                                  ...prev,
+                                  [fact.id]: `${fact.summary} This connects to ${
+                                    topNearbyPlaces[0]?.name ??
+                                    'nearby heritage sites'
+                                  } through shared routes, ritual patterns, and artisan exchange across generations.`,
+                                }));
+                              });
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Open insight ${factIndex + 1}`}
+                            accessibilityHint="Shows a detailed explanation"
+                          >
+                            <View className="flex-row items-start gap-3">
+                              {factMonument ? (
+                                <ResolvedSubjectImage
+                                  subject={factMonument}
+                                  context="insight card"
+                                  style={{ width: 72, height: 72, borderRadius: 14 }}
+                                  imageStyle={{ borderRadius: 14 }}
                                 />
-                              ) : detailText ? (
-                                <Text className="text-[#E6DFC7] text-[13px] leading-5 font-['MontserratAlternates-Regular']">
-                                  {detailText}
+                              ) : (
+                                <View
+                                  style={{
+                                    width: 72,
+                                    height: 72,
+                                    borderRadius: 14,
+                                    backgroundColor: 'rgba(212,134,10,0.1)',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  <Sparkles color="#D4860A" size={24} />
+                                </View>
+                              )}
+                              <View className="flex-1">
+                                <Text className="text-[#F5F0E8] text-sm leading-5 font-['MontserratAlternates-SemiBold']">
+                                  {fact.headline}
                                 </Text>
-                              ) : null}
+                                <Text
+                                  className="text-[#B8AF9E] text-[13px] leading-[19px] mt-1 font-['MontserratAlternates-Regular']"
+                                  numberOfLines={isExpanded ? undefined : 2}
+                                >
+                                  {fact.summary}
+                                </Text>
+                              </View>
                             </View>
-                          ) : null}
 
-                          <Text className="mt-2 text-[#8C7F6B] text-[10px] leading-[14px] uppercase tracking-[0.7px] font-['MontserratAlternates-SemiBold']">
-                            {isExpanded ? 'Tap to collapse' : 'Tap to expand'}
-                          </Text>
-                        </TouchableOpacity>
+                            {isExpanded ? (
+                              <View className="mt-3 pt-3 border-t border-[rgba(255,255,255,0.06)]">
+                                {isElaborating ? (
+                                  <ThinkingDots
+                                    messages={['Expanding this insight...']}
+                                    color="#B8AF9E"
+                                  />
+                                ) : detailText ? (
+                                  <Text className="text-[#E6DFC7] text-[13px] leading-5 font-['MontserratAlternates-Regular']">
+                                    {detailText}
+                                  </Text>
+                                ) : null}
+                              </View>
+                            ) : null}
+
+                            <Text className="mt-2 text-[#8C7F6B] text-[10px] leading-[14px] uppercase tracking-[0.7px] font-['MontserratAlternates-SemiBold']">
+                              {isExpanded ? 'Tap to collapse' : 'Tap to expand'}
+                            </Text>
+                          </TouchableOpacity>
+                        </Animated.View>
                       );
                     })}
 
                     <TouchableOpacity
                       onPress={() => {
+                        refreshRotation.value = withSequence(
+                          withTiming(360, { duration: 600 }),
+                          withTiming(0, { duration: 0 }),
+                        );
                         loadPersonalizedFacts().catch(() => {
                           setFacts(
                             buildFallbackFacts(userName, topNearbyPlaces),
@@ -771,7 +886,9 @@ const Home = ({ navigation }: Props) => {
                       <Text className="text-[#C9A84C] text-xs leading-4 uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
                         Refresh Insights
                       </Text>
-                      <RefreshCw color="#C9A84C" size={16} />
+                      <Animated.View style={refreshIconStyle}>
+                        <RefreshCw color="#C9A84C" size={16} />
+                      </Animated.View>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -780,25 +897,30 @@ const Home = ({ navigation }: Props) => {
           </ScrollView>
         </Animated.View>
 
-        <AnimatedTouchable
-          style={[fabStyle.fab, lensFabStyle]}
-          onPress={handleOpenLens}
-          onPressIn={handleLensPressIn}
-          onPressOut={handleLensPressOut}
-          activeOpacity={0.9}
-          accessibilityRole="button"
-          accessibilityLabel="Open Lens"
-          accessibilityHint="Opens the Lens camera to detect nearby monuments"
-        >
-          <ScanEye color="#0A0A0A" size={24} />
-        </AnimatedTouchable>
+        <View style={fabStyle.fabContainer}>
+          <Animated.View
+            style={[fabStyle.fabRing, fabRingStyle]}
+          />
+          <AnimatedTouchable
+            style={[fabStyle.fab, lensFabStyle]}
+            onPress={handleOpenLens}
+            onPressIn={handleLensPressIn}
+            onPressOut={handleLensPressOut}
+            activeOpacity={0.9}
+            accessibilityRole="button"
+            accessibilityLabel="Open Lens"
+            accessibilityHint="Opens the Lens camera to detect nearby monuments"
+          >
+            <ScanEye color="#0A0A0A" size={24} />
+          </AnimatedTouchable>
+        </View>
       </LinearGradient>
 
       {/* Free Tour Banner */}
       {bannerTour && (
         <Modal visible transparent animationType="slide">
           <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }}>
-            <View className="bg-[#141414] rounded-t-3xl p-6 border-t border-[rgba(201,168,76,0.3)]">
+            <View className="rounded-t-3xl p-6" style={{ backgroundColor: NOIR.cardBg, borderTopWidth: 1, borderTopColor: 'rgba(201,168,76,0.3)' }}>
               <Text className="text-[#D4860A] text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold'] mb-1">
                 Free Tour Waiting
               </Text>
@@ -836,7 +958,8 @@ const Home = ({ navigation }: Props) => {
                   );
                   setBannerTour(null);
                 }}
-                className="bg-[#1F1F2A] rounded-2xl py-3 items-center border border-[#272730]"
+                className="rounded-2xl py-3 items-center"
+                style={{ backgroundColor: '#141414', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}
                 accessibilityRole="button"
               >
                 <Text className="text-[#8D8D92] text-sm font-['MontserratAlternates-SemiBold']">
@@ -877,9 +1000,14 @@ const cardStyles = {
     flex: 1,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: NOIR.cardBorder,
     padding: 16,
     justifyContent: 'space-between' as const,
+    shadowColor: '#D4860A',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
 };
 
@@ -888,9 +1016,9 @@ const skeletonStyles = {
     width: 210,
     height: 248,
     borderRadius: 16,
-    backgroundColor: '#141414',
+    backgroundColor: NOIR.cardBg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: NOIR.cardBorder,
     padding: 16,
     justifyContent: 'flex-end' as const,
   },
@@ -927,22 +1055,25 @@ const skeletonStyles = {
   },
 };
 
-const homeStyles = {
-  insightVisual: {
-    height: 132,
-    borderRadius: 16,
-    marginBottom: 14,
-  },
-  insightVisualImage: {
-    borderRadius: 16,
-  },
-};
-
 const fabStyle = {
-  fab: {
+  fabContainer: {
     position: 'absolute' as const,
     right: 20,
     bottom: 88,
+    width: 56,
+    height: 56,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  fabRing: {
+    position: 'absolute' as const,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: '#E8A020',
+  },
+  fab: {
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -950,7 +1081,7 @@ const fabStyle = {
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     borderWidth: 1,
-    borderColor: 'rgba(10,10,10,0.2)',
+    borderColor: 'rgba(212,134,10,0.15)',
   },
 };
 

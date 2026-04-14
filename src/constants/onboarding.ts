@@ -7,7 +7,7 @@ import { FONTS } from '../core/constants/theme';
 import { API_CONFIG } from '../core/config';
 
 export const OB_COLORS = {
-  bg: '#0D0D0D',
+  bg: '#000000',
   accent: '#E8A020',
   accentBg: '#1F1800',
   white: '#FFFFFF',
