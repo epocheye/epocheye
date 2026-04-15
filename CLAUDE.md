@@ -124,7 +124,7 @@ A native stack containing `TabNavigation` (5 tabs) plus full-screen-modal and pu
 | `ARExperienceScreen` | `ROUTES.MAIN.AR_EXPERIENCE` | fullScreenModal, fade |
 | `PermissionsScreen` | `ROUTES.MAIN.PERMISSIONS` | fullScreenModal |
 
-**Tabs** (Home, Explore, Challenges, Saved, Settings). Explore and Challenges are currently disabled with a "Coming Soon" overlay (`ComingSoonTabButton`) — their `tabPress` events are prevented and navigation is blocked.
+**Tabs** (Home, Explore, Challenges, Saved, Settings). **Explore is live.** Only Challenges is disabled with a "Coming Soon" overlay (`ComingSoonTabButton`) — its `tabPress` event is prevented and navigation is blocked.
 
 ---
 
@@ -262,7 +262,7 @@ type Props = TabScreenProps<'Home'>;
 
 - **Jest + CSS**: `App.tsx` imports `global.css` — Jest needs CSS mocking/transform support or tests on `App.tsx` will fail.
 - **Android NDK**: Build expects a pinned NDK version in `android/build.gradle`. Missing NDK causes native build failures.
-- **Disabled tabs**: Explore and Challenges tabs are intentionally blocked with `ComingSoonTabButton` — don't remove the guards.
+- **Disabled tabs**: Only the Challenges tab is blocked with `ComingSoonTabButton` — don't remove that guard. Explore is live.
 - **SSE cleanup**: Lens and onboarding story streams use XHR-based SSE. Always call the abort function on component unmount.
 - **Peer deps**: If `npm install` fails on `@gorhom/bottom-sheet` constraints, use `--legacy-peer-deps`.
 

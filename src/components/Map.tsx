@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import { GOOGLE_MAPS_API_KEY } from '@env';
 import mapStyle from '../content/mapstyle.json';
 
 const DEFAULT_REGION: Region = {
@@ -22,6 +23,8 @@ const Map = () => {
     >
       <MapView
         provider={PROVIDER_GOOGLE}
+        // @ts-expect-error Prop exists on native MapView but missing from type defs
+        googleMapsApiKey={GOOGLE_MAPS_API_KEY?.trim()}
         className="absolute inset-0"
         initialRegion={DEFAULT_REGION}
         customMapStyle={mapStyle}
