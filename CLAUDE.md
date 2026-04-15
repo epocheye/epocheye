@@ -38,6 +38,22 @@ npm install --legacy-peer-deps
 
 ---
 
+## Source Directory Boundaries
+
+| Directory | Responsibility |
+| --- | --- |
+| `src/screens` | UI composition — screens only, no business logic |
+| `src/components` | Reusable UI components |
+| `src/navigation` | Route definitions and flow orchestration |
+| `src/stores` | Zustand app state |
+| `src/shared` | Reusable hooks, API clients, services, and utilities |
+| `src/core` | Config, constants, and shared types |
+| `src/utils/api` | Domain-specific API call functions |
+| `src/services` | SSE streaming and other stateful services |
+| `src/context` | Compatibility no-op wrappers (don't add new context here) |
+
+---
+
 ## Architecture Overview
 
 ### Entry Point & Provider Tree
@@ -192,6 +208,23 @@ Each subdirectory exports typed functions. All API calls return a discriminated 
 
 ---
 
+## Image Resolution Pipeline
+
+`useResolvedSubjectImage(subject, context?)` (`src/shared/hooks/useResolvedSubjectImage.ts`) is the shared entry point for all contextual monument imagery across Home, SiteDetailScreen, ARExperienceScreen, OB08_DemoStory, and ResolvedSubjectImage components.
+
+**Resolution flow:**
+1. Check in-memory session cache in `src/shared/services/image-resolve.service.ts`
+2. On miss, call `GET /api/v1/images/resolve?subject=&context=` via `src/utils/api/images/Images.ts` (authenticated)
+3. Backend responds either:
+   - `200` with a resolved URL — done immediately
+   - `202 Accepted` with `{ job_id }` — backend is resolving asynchronously
+4. On `202`, the service polls `GET /api/v1/images/resolve/status?job_id=` until `completed`, `failed`, or a client-side timeout
+5. Resolved URL is stored in the in-memory session cache and returned
+
+**Important:** `ARExperienceScreen` uses this hook for its backdrop imagery — it does **not** call `/api/lens/identify` or any live AI scan. The scan UI on that screen simulates progress locally.
+
+---
+
 ## Shared Services (`src/shared/services/`)
 
 - `StorageService` — typed AsyncStorage wrapper (`get<T>`, `set<T>`, `getString`, `multiSet`, etc.)
@@ -222,8 +255,6 @@ type Props = MainScreenProps<'Lens'>;
 // Tab screens (composite prop — can also push to main stack)
 type Props = TabScreenProps<'Home'>;
 ```
-
----
 
 ---
 

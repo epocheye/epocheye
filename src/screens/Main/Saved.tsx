@@ -69,7 +69,7 @@ const SkeletonCard: React.FC = () => {
   return (
     <Animated.View
       style={style}
-      className="flex-1 h-[200px] rounded-2xl bg-[#141414] border border-white/[0.08] p-3 justify-end"
+      className="flex-1 h-[200px] rounded-2xl bg-surface-1 border border-white/[0.08] p-3 justify-end"
     >
       <View className="w-16 h-5 rounded-full bg-white/10 mb-2" />
       <View className="w-3/4 h-5 rounded-md bg-white/[0.14] mb-2" />
@@ -91,7 +91,7 @@ const FilterChip: React.FC<FilterChipProps> = ({ label, active, onPress }) => (
     onPress={onPress}
     className={`mr-2 px-3 py-1.5 rounded-full border ${
       active
-        ? 'bg-[#C9A84C] border-[#C9A84C]'
+        ? 'bg-brand-gold border-brand-gold'
         : 'bg-transparent border-[rgba(201,168,76,0.3)]'
     }`}
     accessibilityRole="button"
@@ -99,7 +99,7 @@ const FilterChip: React.FC<FilterChipProps> = ({ label, active, onPress }) => (
   >
     <Text
       className={`text-xs font-['MontserratAlternates-SemiBold'] ${
-        active ? 'text-[#0A0A0A]' : 'text-[#B8AF9E]'
+        active ? 'text-ink' : 'text-parchment-muted'
       }`}
     >
       {label}
@@ -170,7 +170,7 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(
               <View className="flex-row items-start justify-between">
                 <View className="rounded-full bg-[rgba(10,10,10,0.8)] border border-[rgba(201,168,76,0.35)] px-2 py-1">
                   <Text
-                    className="text-[#F5F0E8] text-[10px] font-['MontserratAlternates-SemiBold']"
+                    className="text-parchment text-[10px] font-['MontserratAlternates-SemiBold']"
                     numberOfLines={1}
                   >
                     {place.categories[0] || 'Historic'}
@@ -200,7 +200,7 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(
               {/* Bottom: name + location */}
               <View>
                 <Text
-                  className="text-[#F5F0E8] text-[15px] font-['MontserratAlternates-Bold'] leading-5"
+                  className="text-parchment text-[15px] font-['MontserratAlternates-Bold'] leading-5"
                   numberOfLines={2}
                 >
                   {place.name}
@@ -208,7 +208,7 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(
                 <View className="flex-row items-center gap-1 mt-1">
                   <MapPin color="#B8AF9E" size={11} />
                   <Text
-                    className="text-[#B8AF9E] text-[11px] font-['MontserratAlternates-Medium'] flex-shrink"
+                    className="text-parchment-muted text-[11px] font-['MontserratAlternates-Medium'] flex-shrink"
                     numberOfLines={1}
                   >
                     {place.city}{distanceKm ? ` · ${distanceKm}` : ''}
@@ -350,7 +350,7 @@ const Saved: React.FC<Props> = ({ navigation }) => {
   const keyExtractor = useCallback((item: SavedPlace) => item.id, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#000000]">
+    <SafeAreaView className="flex-1 bg-ink-deep">
       <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={['#000000', '#0C0A07', '#000000']}
@@ -360,13 +360,13 @@ const Saved: React.FC<Props> = ({ navigation }) => {
         {/* Header */}
         <View className="px-5 pt-5 pb-3 flex-row items-end justify-between">
           <View>
-            <Text className="font-['MontserratAlternates-SemiBold'] text-xs uppercase tracking-[1px] text-[#C9A84C]">
+            <Text className="font-['MontserratAlternates-SemiBold'] text-xs uppercase tracking-[1px] text-brand-gold">
               COLLECTION
             </Text>
-            <Text className="mt-1 font-['MontserratAlternates-Bold'] text-[26px] leading-9 text-[#F5F0E8]">
+            <Text className="mt-1 font-['MontserratAlternates-Bold'] text-[26px] leading-9 text-parchment">
               Saved Places
             </Text>
-            <Text className="mt-0.5 text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
+            <Text className="mt-0.5 text-parchment-dim text-xs font-['MontserratAlternates-Regular']">
               {safeSavedPlaces.length}{' '}
               {safeSavedPlaces.length === 1 ? 'place' : 'places'} saved
             </Text>
@@ -375,7 +375,7 @@ const Saved: React.FC<Props> = ({ navigation }) => {
           {/* Sort toggle */}
           <TouchableOpacity
             onPress={cycleSort}
-            className="flex-row items-center gap-1.5 bg-[#141414] border border-white/10 rounded-full px-3 py-2"
+            className="flex-row items-center gap-1.5 bg-surface-1 border border-white/10 rounded-full px-3 py-2"
             accessibilityRole="button"
             accessibilityLabel={`Sort by ${SORT_LABELS[sortMode]}`}
           >
@@ -383,7 +383,7 @@ const Saved: React.FC<Props> = ({ navigation }) => {
               color={sortMode !== 'date' ? '#C9A84C' : '#6B6357'}
               size={13}
             />
-            <Text className="text-[#B8AF9E] text-[11px] font-['MontserratAlternates-Medium']">
+            <Text className="text-parchment-muted text-[11px] font-['MontserratAlternates-Medium']">
               {SORT_LABELS[sortMode]}
             </Text>
           </TouchableOpacity>
@@ -428,15 +428,15 @@ const Saved: React.FC<Props> = ({ navigation }) => {
           </View>
         ) : filteredPlaces.length === 0 ? (
           <View className="flex-1 items-center justify-center px-8 pb-16">
-            <View className="w-20 h-20 rounded-full bg-[#141414] border border-[rgba(201,168,76,0.2)] items-center justify-center mb-5">
+            <View className="w-20 h-20 rounded-full bg-surface-1 border border-[rgba(201,168,76,0.2)] items-center justify-center mb-5">
               <Bookmark color="#D4860A" size={32} />
             </View>
-            <Text className="text-[#F5F0E8] text-lg text-center font-['MontserratAlternates-SemiBold']">
+            <Text className="text-parchment text-lg text-center font-['MontserratAlternates-SemiBold']">
               {activeFilter !== 'All'
                 ? 'No places in this category'
                 : 'No saved places yet'}
             </Text>
-            <Text className="mt-2 text-[#B8AF9E] text-sm text-center font-['MontserratAlternates-Regular'] leading-5">
+            <Text className="mt-2 text-parchment-muted text-sm text-center font-['MontserratAlternates-Regular'] leading-5">
               {activeFilter !== 'All'
                 ? 'Try a different filter or save more places.'
                 : 'Discover monuments and tap the bookmark icon to build your personal heritage collection.'}
@@ -444,11 +444,11 @@ const Saved: React.FC<Props> = ({ navigation }) => {
             {activeFilter === 'All' && (
               <TouchableOpacity
                 onPress={() => navigation.navigate('Home')}
-                className="mt-6 bg-[#C9A84C] rounded-xl px-6 py-3 flex-row items-center gap-2"
+                className="mt-6 bg-brand-gold rounded-xl px-6 py-3 flex-row items-center gap-2"
                 accessibilityRole="button"
               >
                 <Compass color="#0A0A0A" size={16} />
-                <Text className="text-[#0A0A0A] text-sm font-['MontserratAlternates-Bold']">
+                <Text className="text-ink text-sm font-['MontserratAlternates-Bold']">
                   Start Exploring
                 </Text>
               </TouchableOpacity>

@@ -321,7 +321,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   // Load the TFLite segmentation model on mount. Fire-and-forget —
-  // it must never block render. With the zero-byte stub in place,
+  // it must never block render. If the asset is missing or corrupt,
   // initialize() silently logs and leaves ready=false; the frame
   // processor no-ops and the overlay never mounts.
   useEffect(() => {

@@ -16,11 +16,13 @@ import {
   Check,
   Compass,
   MapPin,
+  RefreshCw,
   Shield,
   Sparkles,
   Tag,
   X,
 } from 'lucide-react-native';
+import { Linking } from 'react-native';
 import { validateCoupon } from '../../utils/api/tours';
 import type { CouponValidation } from '../../utils/api/tours';
 import {
@@ -73,19 +75,19 @@ const TierCard: React.FC<TierCardProps> = React.memo(({ tier, isActive, index })
     className={`rounded-xl px-4 py-3 mb-2 border ${
       isActive
         ? 'border-[rgba(201,168,76,0.5)] bg-[rgba(201,168,76,0.08)]'
-        : 'border-white/[0.06] bg-[#1C1C1C]'
+        : 'border-white/[0.06] bg-surface-2'
     }`}
   >
     <View className="flex-row items-center justify-between">
       <View className="flex-1 gap-0.5">
         <Text
           className={`text-sm font-['MontserratAlternates-SemiBold'] ${
-            isActive ? 'text-[#E8C870]' : 'text-[#F5F0E8]'
+            isActive ? 'text-brand-gold' : 'text-parchment'
           }`}
         >
           {tier.label}
         </Text>
-        <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
+        <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular']">
           {tier.max_places
             ? `${tier.min_places}–${tier.max_places} places`
             : `${tier.min_places}+ places`}
@@ -93,7 +95,7 @@ const TierCard: React.FC<TierCardProps> = React.memo(({ tier, isActive, index })
       </View>
       <Text
         className={`text-sm font-['MontserratAlternates-SemiBold'] ${
-          isActive ? 'text-[#C9A84C]' : 'text-[#B8AF9E]'
+          isActive ? 'text-brand-gold' : 'text-parchment-muted'
         }`}
       >
         {formatInr(tier.price_per_place_paise)}/place
@@ -125,7 +127,7 @@ const PlaceSelectCard: React.FC<PlaceSelectCardProps> = React.memo(
           className={`flex-row items-center rounded-2xl p-3 mb-2 border ${
             isSelected
               ? 'border-[rgba(201,168,76,0.45)] bg-[rgba(201,168,76,0.06)]'
-              : 'border-white/[0.08] bg-[#141414]'
+              : 'border-white/[0.08] bg-surface-1'
           }`}
         >
           {/* Thumbnail */}
@@ -141,13 +143,13 @@ const PlaceSelectCard: React.FC<PlaceSelectCardProps> = React.memo(
           {/* Info */}
           <View className="flex-1 ml-3">
             <Text
-              className="text-[#F5F0E8] text-sm font-['MontserratAlternates-SemiBold']"
+              className="text-parchment text-sm font-['MontserratAlternates-SemiBold']"
               numberOfLines={1}
             >
               {place.name}
             </Text>
             <Text
-              className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular'] mt-0.5"
+              className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] mt-0.5"
               numberOfLines={1}
             >
               {place.place_type
@@ -159,7 +161,7 @@ const PlaceSelectCard: React.FC<PlaceSelectCardProps> = React.memo(
           {/* Distance */}
           <View className="flex-row items-center gap-1 mr-3">
             <Compass color="#6B6357" size={11} />
-            <Text className="text-[#6B6357] text-[11px] font-['MontserratAlternates-Medium']">
+            <Text className="text-parchment-dim text-[11px] font-['MontserratAlternates-Medium']">
               {distanceKm} km
             </Text>
           </View>
@@ -168,7 +170,7 @@ const PlaceSelectCard: React.FC<PlaceSelectCardProps> = React.memo(
           <View
             className={`w-6 h-6 rounded-md border items-center justify-center ${
               isSelected
-                ? 'bg-[#C9A84C] border-[#C9A84C]'
+                ? 'bg-brand-gold border-brand-gold'
                 : 'border-white/20 bg-transparent'
             }`}
           >
@@ -189,6 +191,10 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
   // Config
   const [config, setConfig] = useState<ExplorerPassConfig | null>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
+  const [configError, setConfigError] = useState<{
+    message: string;
+    statusCode: number;
+  } | null>(null);
 
   // Place selection
   const nearbyPlaces = usePlacesStore(s => s.nearbyPlaces);
@@ -205,19 +211,38 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
 
   // Purchase
   const { purchasing, purchase } = useExplorerPassPurchase();
-  const { refresh: refreshPasses } = useExplorerPass();
+  const { refresh: refreshPasses, passes, hasAnyActivePass } = useExplorerPass();
 
-  // Load config
+  // Load config (extracted so the error screen can retry)
+  const loadConfig = useCallback(async () => {
+    setLoadingConfig(true);
+    setConfigError(null);
+    const result = await getExplorerPassConfig();
+    if (result.success) {
+      setConfig(result.data);
+    } else {
+      setConfig(null);
+      setConfigError(result.error);
+      if (__DEV__) {
+        console.warn(
+          '[PurchaseScreen] explorer-pass/config failed',
+          result.error,
+        );
+      }
+    }
+    setLoadingConfig(false);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoadingConfig(true);
-      const result = await getExplorerPassConfig();
-      if (!cancelled && result.success) setConfig(result.data);
-      if (!cancelled) setLoadingConfig(false);
+      if (cancelled) return;
+      await loadConfig();
     })();
-    return () => { cancelled = true; };
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [loadConfig]);
 
   // Tier matching
   const selectedCount = selectedPlaceIds.size;
@@ -282,41 +307,108 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
   // Loading state
   if (loadingConfig) {
     return (
-      <SafeAreaView className="flex-1 bg-[#000000] items-center justify-center">
+      <SafeAreaView className="flex-1 bg-ink-deep items-center justify-center">
         <StatusBar barStyle="light-content" />
         <ActivityIndicator color="#D4860A" size="large" />
-        <Text className="text-[#B8AF9E] text-sm font-['MontserratAlternates-Regular'] mt-3">
+        <Text className="text-parchment-muted text-sm font-['MontserratAlternates-Regular'] mt-3">
           Loading Explorer Pass...
         </Text>
       </SafeAreaView>
     );
   }
 
-  // Error state
+  // Error state — resilient: retry, active-pass handoff, support link
   if (!config || sortedTiers.length === 0) {
+    const activePass = passes.find(p => p.is_active);
+    const isServerError = configError && configError.statusCode >= 500;
+    const title = hasAnyActivePass
+      ? 'Your Explorer Pass is active'
+      : isServerError
+        ? 'Our servers are taking a breather'
+        : 'Unable to load Explorer Pass';
+
+    const body = hasAnyActivePass
+      ? `You already have an active pass${
+          activePass ? ` for ${activePass.place_count} place${activePass.place_count > 1 ? 's' : ''}` : ''
+        }. Pricing options aren't available right now, but your access is unaffected.`
+      : configError
+        ? 'We couldn’t reach pricing right now. Please retry in a moment.'
+        : 'No pricing tiers are configured. Please try again later.';
+
     return (
-      <SafeAreaView className="flex-1 bg-[#000000] items-center justify-center px-8">
+      <SafeAreaView className="flex-1 bg-ink-deep items-center justify-center px-8">
         <StatusBar barStyle="light-content" />
-        <Text className="text-[#F5F0E8] text-lg text-center font-['MontserratAlternates-SemiBold']">
-          Something went wrong
-        </Text>
-        <Text className="text-[#6B6357] text-sm text-center mt-2 font-['MontserratAlternates-Regular']">
-          Unable to load Explorer Pass details. Please try again later.
-        </Text>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          className="mt-6 px-5 py-3 rounded-xl bg-[#141414] border border-white/10"
+        <View
+          className={`w-14 h-14 rounded-full items-center justify-center mb-5 ${
+            hasAnyActivePass
+              ? 'bg-[rgba(16,185,129,0.12)] border border-[rgba(16,185,129,0.35)]'
+              : 'bg-[rgba(201,168,76,0.12)] border border-[rgba(201,168,76,0.3)]'
+          }`}
         >
-          <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-Medium']">
-            Go back
+          {hasAnyActivePass ? (
+            <Shield color="#10B981" size={22} />
+          ) : (
+            <Sparkles color="#C9A84C" size={22} />
+          )}
+        </View>
+
+        <Text className="text-parchment text-lg text-center font-['MontserratAlternates-SemiBold']">
+          {title}
+        </Text>
+        <Text className="text-parchment-dim text-sm text-center mt-2 font-['MontserratAlternates-Regular'] max-w-[320px]">
+          {body}
+        </Text>
+
+        {__DEV__ && configError && (
+          <Text className="text-parchment-dim/70 text-[11px] text-center mt-3 font-['MontserratAlternates-Regular']">
+            {`dev: ${configError.statusCode} \u2014 ${configError.message}`}
           </Text>
-        </TouchableOpacity>
+        )}
+
+        <View className="flex-row items-center gap-3 mt-6">
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="px-5 py-3 rounded-xl bg-surface-1 border border-white/10"
+          >
+            <Text className="text-parchment text-sm font-['MontserratAlternates-Medium']">
+              Go back
+            </Text>
+          </TouchableOpacity>
+
+          {!hasAnyActivePass && (
+            <TouchableOpacity
+              onPress={loadConfig}
+              disabled={loadingConfig}
+              className="px-5 py-3 rounded-xl bg-brand-gold flex-row items-center gap-2"
+            >
+              <RefreshCw color="#0A0A0A" size={14} />
+              <Text className="text-ink text-sm font-['MontserratAlternates-SemiBold']">
+                {loadingConfig ? 'Retrying…' : 'Retry'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {!hasAnyActivePass && (
+          <TouchableOpacity
+            onPress={() =>
+              Linking.openURL(
+                'mailto:support@epocheye.com?subject=Explorer%20Pass%20unavailable',
+              )
+            }
+            className="mt-4"
+          >
+            <Text className="text-brand-gold text-xs font-['MontserratAlternates-Medium'] underline">
+              Contact support
+            </Text>
+          </TouchableOpacity>
+        )}
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#000000]">
+    <SafeAreaView className="flex-1 bg-ink-deep">
       <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={['#000000', '#0C0A07', '#000000']}
@@ -327,13 +419,13 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
         <View className="flex-row items-center gap-3 px-5 pt-5 pb-4">
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            className="w-10 h-10 rounded-full bg-[#141414] border border-white/10 items-center justify-center"
+            className="w-10 h-10 rounded-full bg-surface-1 border border-white/10 items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
             <ArrowLeft color="#F5F0E8" size={20} />
           </TouchableOpacity>
-          <Text className="text-[#F5F0E8] text-xl font-['MontserratAlternates-Bold']">
+          <Text className="text-parchment text-xl font-['MontserratAlternates-Bold']">
             Explorer Pass
           </Text>
         </View>
@@ -346,18 +438,18 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Hero card */}
           <Animated.View
             entering={FadeIn.duration(400)}
-            className="bg-[#141414] rounded-2xl border border-[rgba(212,134,10,0.25)] p-5 mb-5"
+            className="bg-surface-1 rounded-2xl border border-[rgba(212,134,10,0.25)] p-5 mb-5"
           >
             <View className="flex-row items-center gap-2 mb-3">
               <Sparkles color="#D4860A" size={16} />
-              <Text className="text-[#D4860A] text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+              <Text className="text-brand-amber text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
                 Explorer Pass
               </Text>
             </View>
-            <Text className="text-[#F5F0E8] text-[22px] leading-7 font-['MontserratAlternates-Bold']">
+            <Text className="text-parchment text-[22px] leading-7 font-['MontserratAlternates-Bold']">
               Unlock Heritage Sites Near You
             </Text>
-            <Text className="text-[#B8AF9E] text-sm leading-5 mt-2 font-['MontserratAlternates-Regular']">
+            <Text className="text-parchment-muted text-sm leading-5 mt-2 font-['MontserratAlternates-Regular']">
               Select the places you want to explore. The more you pick, the less you pay per place.
             </Text>
 
@@ -376,14 +468,14 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Place selection */}
           <Animated.View entering={FadeInDown.delay(100).duration(350)}>
-            <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-SemiBold'] mb-3">
+            <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold'] mb-3">
               Select Places
             </Text>
 
             {nearbyPlaces.length === 0 ? (
               <View className="items-center py-8 gap-2">
                 <MapPin color="#6B6357" size={24} />
-                <Text className="text-[#6B6357] text-sm text-center font-['MontserratAlternates-Regular']">
+                <Text className="text-parchment-dim text-sm text-center font-['MontserratAlternates-Regular']">
                   No nearby places found. Move closer to a heritage area.
                 </Text>
               </View>
@@ -404,56 +496,56 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
           {selectedCount > 0 && matchedTier && (
             <Animated.View
               entering={FadeInDown.duration(300)}
-              className="bg-[#141414] rounded-2xl border border-white/[0.08] p-4 mt-3 mb-4"
+              className="bg-surface-1 rounded-2xl border border-white/[0.08] p-4 mt-3 mb-4"
             >
-              <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-SemiBold'] mb-3">
+              <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold'] mb-3">
                 Price Summary
               </Text>
 
               <View className="flex-row justify-between mb-2">
-                <Text className="text-[#B8AF9E] text-sm font-['MontserratAlternates-Regular']">
+                <Text className="text-parchment-muted text-sm font-['MontserratAlternates-Regular']">
                   {selectedCount} place{selectedCount > 1 ? 's' : ''} x{' '}
                   {formatInr(pricePerPlacePaise)}
                 </Text>
-                <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-SemiBold']">
+                <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
                   {formatInr(subtotalPaise)}
                 </Text>
               </View>
 
               <View className="flex-row justify-between mb-2">
-                <Text className="text-[#B8AF9E] text-sm font-['MontserratAlternates-Regular']">
+                <Text className="text-parchment-muted text-sm font-['MontserratAlternates-Regular']">
                   Tier
                 </Text>
-                <Text className="text-[#C9A84C] text-sm font-['MontserratAlternates-SemiBold']">
+                <Text className="text-brand-gold text-sm font-['MontserratAlternates-SemiBold']">
                   {matchedTier.label}
                 </Text>
               </View>
 
               <View className="flex-row justify-between mb-2">
-                <Text className="text-[#B8AF9E] text-sm font-['MontserratAlternates-Regular']">
+                <Text className="text-parchment-muted text-sm font-['MontserratAlternates-Regular']">
                   Access Duration
                 </Text>
-                <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-SemiBold']">
+                <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
                   {formatAccessDuration(accessHours)}
                 </Text>
               </View>
 
               {discountPaise > 0 && (
                 <View className="flex-row justify-between mb-2">
-                  <Text className="text-[#10B981] text-sm font-['MontserratAlternates-Regular']">
+                  <Text className="text-status-success text-sm font-['MontserratAlternates-Regular']">
                     Coupon ({discountPercent}% off)
                   </Text>
-                  <Text className="text-[#10B981] text-sm font-['MontserratAlternates-SemiBold']">
+                  <Text className="text-status-success text-sm font-['MontserratAlternates-SemiBold']">
                     -{formatInr(discountPaise)}
                   </Text>
                 </View>
               )}
 
               <View className="flex-row justify-between mt-1 pt-3 border-t border-white/[0.08]">
-                <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-Bold']">
+                <Text className="text-parchment text-base font-['MontserratAlternates-Bold']">
                   Total
                 </Text>
-                <Text className="text-[#F5F0E8] text-xl font-['MontserratAlternates-Bold']">
+                <Text className="text-parchment text-xl font-['MontserratAlternates-Bold']">
                   {formatInr(totalPaise)}
                 </Text>
               </View>
@@ -463,20 +555,20 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Coupon section */}
           <Animated.View
             entering={FadeInDown.delay(200).duration(350)}
-            className="bg-[#141414] border border-white/[0.08] rounded-2xl p-4 mb-4"
+            className="bg-surface-1 border border-white/[0.08] rounded-2xl p-4 mb-4"
           >
             <View className="flex-row items-center gap-2 mb-2">
               <Tag color="#C9A84C" size={13} />
-              <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Medium']">
+              <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Medium']">
                 Have a promo code?
               </Text>
             </View>
 
             {couponResult?.is_valid ? (
-              <View className="flex-row items-center justify-between bg-[#10B981]/10 border border-[#10B981]/20 rounded-xl px-3 py-2.5">
+              <View className="flex-row items-center justify-between bg-status-success/10 border border-status-success/20 rounded-xl px-3 py-2.5">
                 <View className="flex-row items-center gap-2">
                   <Check color="#10B981" size={14} />
-                  <Text className="text-[#10B981] text-sm font-['MontserratAlternates-SemiBold']">
+                  <Text className="text-status-success text-sm font-['MontserratAlternates-SemiBold']">
                     {couponResult.code} · {couponResult.discount_percent}% off
                   </Text>
                 </View>
@@ -501,17 +593,17 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                   autoCorrect={false}
                   returnKeyType="done"
                   onSubmitEditing={handleApplyCoupon}
-                  className="flex-1 bg-[#1E1E1E] border border-white/10 rounded-xl px-3 py-2.5 text-[#F5F0E8] text-sm font-['MontserratAlternates-Regular']"
+                  className="flex-1 bg-surface-2 border border-white/10 rounded-xl px-3 py-2.5 text-parchment text-sm font-['MontserratAlternates-Regular']"
                 />
                 <TouchableOpacity
                   onPress={handleApplyCoupon}
                   disabled={couponValidating || !couponInput.trim()}
-                  className="bg-[#C9A84C]/20 border border-[#C9A84C]/30 rounded-xl px-4 items-center justify-center"
+                  className="bg-brand-gold/20 border border-brand-gold/30 rounded-xl px-4 items-center justify-center"
                 >
                   {couponValidating ? (
                     <ActivityIndicator color="#C9A84C" size="small" />
                   ) : (
-                    <Text className="text-[#C9A84C] text-sm font-['MontserratAlternates-SemiBold']">
+                    <Text className="text-brand-gold text-sm font-['MontserratAlternates-SemiBold']">
                       Apply
                     </Text>
                   )}
@@ -546,7 +638,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
               ) : (
                 <>
                   <Sparkles color="#0A0A0A" size={18} />
-                  <Text className="text-[#0A0A0A] text-base font-['MontserratAlternates-Bold']">
+                  <Text className="text-ink text-base font-['MontserratAlternates-Bold']">
                     {selectedCount === 0
                       ? 'Select Places to Continue'
                       : `Get Explorer Pass · ${formatInr(totalPaise)}`}
@@ -557,7 +649,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
 
             <View className="flex-row items-center justify-center gap-1.5 mt-3 mb-2">
               <Shield color="#6B6357" size={12} />
-              <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
+              <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular']">
                 Secure checkout via Razorpay · One-time payment
               </Text>
             </View>

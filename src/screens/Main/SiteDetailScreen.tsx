@@ -81,12 +81,13 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     null,
   );
 
-  const { url: resolvedHeroImage } = useResolvedSubjectImage({
-    subject: site.name,
-    context: `${(site as any).formatted ?? site.city ?? ''} heritage monument`,
-    enabled: !!site.name,
-    remote: true,
-  });
+  const { url: resolvedHeroImage, loading: resolvingHeroImage } =
+    useResolvedSubjectImage({
+      subject: site.name,
+      context: `${(site as any).formatted ?? site.city ?? ''} heritage monument`,
+      enabled: !!site.name,
+      remote: true,
+    });
 
   const heroImages = useMemo(() => {
     const existing =
@@ -96,17 +97,15 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           ) as string[])
         : [];
     if (!resolvedHeroImage) {
-      return existing.length > 0
-        ? existing
-        : [
-            'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
-          ];
+      return existing;
     }
     if (existing.includes(resolvedHeroImage)) {
       return existing;
     }
     return [resolvedHeroImage, ...existing];
   }, [resolvedHeroImage, site.heroImages]);
+
+  const showHeroSkeleton = heroImages.length === 0 && resolvingHeroImage;
 
   const scrollY = useSharedValue(0);
   const isSaved = isPlaceSaved(site.id);
@@ -282,7 +281,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-[#000000]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-ink-deep" edges={['top']}>
       <StatusBar barStyle="light-content" />
 
       {/* Sticky header */}
@@ -295,7 +294,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       >
         <Text
           numberOfLines={1}
-          className="text-[#F5F0E8] text-[15px] font-['MontserratAlternates-SemiBold']"
+          className="text-parchment text-[15px] font-['MontserratAlternates-SemiBold']"
         >
           {site.name}
         </Text>
@@ -310,21 +309,50 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       >
         {/* Hero */}
         <View style={{ height: HERO_HEIGHT }}>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleImageScroll}
-          >
-            {heroImages.map((image, index) => (
-              <Image
-                key={`${image}-${index}`}
-                source={{ uri: image }}
-                style={{ width: SCREEN_WIDTH, height: HERO_HEIGHT }}
-                resizeMode="cover"
+          {showHeroSkeleton ? (
+            <View
+              style={{
+                width: SCREEN_WIDTH,
+                height: HERO_HEIGHT,
+                backgroundColor: '#141414',
+              }}
+              className="items-center justify-center"
+            >
+              <AnimatedLogo
+                size={44}
+                variant="white"
+                motion="pulse"
+                showRing
               />
-            ))}
-          </ScrollView>
+              <Text className="text-parchment-muted text-[12px] mt-3 tracking-[0.8px] uppercase font-['MontserratAlternates-SemiBold']">
+                Rendering the scene
+              </Text>
+            </View>
+          ) : heroImages.length === 0 ? (
+            <View
+              style={{
+                width: SCREEN_WIDTH,
+                height: HERO_HEIGHT,
+                backgroundColor: '#0F0F0F',
+              }}
+            />
+          ) : (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={handleImageScroll}
+            >
+              {heroImages.map((image, index) => (
+                <Image
+                  key={`${image}-${index}`}
+                  source={{ uri: image }}
+                  style={{ width: SCREEN_WIDTH, height: HERO_HEIGHT }}
+                  resizeMode="cover"
+                />
+              ))}
+            </ScrollView>
+          )}
 
           <LinearGradient
             colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.7)']}
@@ -379,17 +407,17 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Hero footer */}
           <View className="absolute left-5 right-5 bottom-[18px]">
-            <Text className="text-[#C9A84C] text-[11px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+            <Text className="text-brand-gold text-[11px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
               {placeType}
             </Text>
-            <Text className="text-[#F5F0E8] text-[28px] leading-9 font-['MontserratAlternates-Bold'] mt-1">
+            <Text className="text-parchment text-[28px] leading-9 font-['MontserratAlternates-Bold'] mt-1">
               {site.name}
             </Text>
             <View className="flex-row items-center gap-1 mt-1.5">
               <MapPin color="#B8AF9E" size={14} />
               <Text
                 numberOfLines={1}
-                className="flex-1 text-[#B8AF9E] text-[13px] font-['MontserratAlternates-Medium']"
+                className="flex-1 text-parchment-muted text-[13px] font-['MontserratAlternates-Medium']"
               >
                 {location}
               </Text>
@@ -402,7 +430,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     key={`dot-${index}`}
                     className={`h-2 rounded-full ${
                       currentImageIndex === index
-                        ? 'w-[22px] bg-[#C9A84C]'
+                        ? 'w-[22px] bg-brand-gold'
                         : 'w-2 bg-white/55'
                     }`}
                   />
@@ -417,7 +445,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Info card */}
           <Animated.View
             entering={FadeInDown.delay(100).duration(400)}
-            className="rounded-[20px] bg-[#141414] border border-white/[0.08] p-4"
+            className="rounded-[20px] bg-surface-1 border border-white/[0.08] p-4"
           >
             {/* Category tags */}
             {categories.length > 0 && (
@@ -433,7 +461,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   >
                     <Text
                       className={`text-xs font-['MontserratAlternates-SemiBold'] ${
-                        i === 0 ? 'text-[#E8C870]' : 'text-[#F5F0E8]'
+                        i === 0 ? 'text-brand-gold' : 'text-parchment'
                       }`}
                     >
                       {typeof cat === 'string'
@@ -448,29 +476,29 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             {/* Meta row */}
             <View className="flex-row gap-3">
               {distance && (
-                <View className="flex-1 flex-row items-center gap-2.5 rounded-xl bg-[#1C1C1C] p-3">
+                <View className="flex-1 flex-row items-center gap-2.5 rounded-xl bg-surface-2 p-3">
                   <View className="w-7 h-7 rounded-full bg-[rgba(201,168,76,0.15)] items-center justify-center">
                     <Navigation color="#C9A84C" size={16} />
                   </View>
                   <View>
-                    <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-SemiBold']">
+                    <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
                       {distance}
                     </Text>
-                    <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
+                    <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular']">
                       Distance
                     </Text>
                   </View>
                 </View>
               )}
-              <View className="flex-1 flex-row items-center gap-2.5 rounded-xl bg-[#1C1C1C] p-3">
+              <View className="flex-1 flex-row items-center gap-2.5 rounded-xl bg-surface-2 p-3">
                 <View className="w-7 h-7 rounded-full bg-[rgba(201,168,76,0.15)] items-center justify-center">
                   <Clock3 color="#C9A84C" size={16} />
                 </View>
                 <View>
-                  <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-SemiBold']">
+                  <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
                     45 min
                   </Text>
-                  <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
+                  <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular']">
                     Est. Tour
                   </Text>
                 </View>
@@ -482,10 +510,10 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           {hasAccess && (
             <Animated.View
               entering={FadeIn.delay(200)}
-              className="flex-row items-center gap-2 bg-[#10B981]/10 border border-[#10B981]/20 rounded-xl px-4 py-3"
+              className="flex-row items-center gap-2 bg-status-success/10 border border-status-success/20 rounded-xl px-4 py-3"
             >
               <Shield color="#10B981" size={16} />
-              <Text className="text-[#10B981] text-sm font-['MontserratAlternates-SemiBold']">
+              <Text className="text-status-success text-sm font-['MontserratAlternates-SemiBold']">
                 Explorer Pass Active
               </Text>
             </Animated.View>
@@ -495,11 +523,11 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           <Animated.View entering={FadeInDown.delay(200).duration(400)}>
             <TouchableOpacity
               onPress={handleStartARExperience}
-              className="rounded-xl bg-[#C9A84C] py-3.5 items-center justify-center flex-row gap-2"
+              className="rounded-xl bg-brand-gold py-3.5 items-center justify-center flex-row gap-2"
               activeOpacity={0.88}
             >
               <Camera color="#0A0A0A" size={18} />
-              <Text className="text-[#0A0A0A] text-[15px] uppercase tracking-[0.8px] font-['MontserratAlternates-Bold']">
+              <Text className="text-ink text-[15px] uppercase tracking-[0.8px] font-['MontserratAlternates-Bold']">
                 Begin Your Journey
               </Text>
             </TouchableOpacity>
@@ -512,7 +540,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             activeOpacity={0.88}
           >
             <BookOpen color="#D4860A" size={18} />
-            <Text className="text-[#D4860A] text-sm font-['MontserratAlternates-SemiBold']">
+            <Text className="text-brand-amber text-sm font-['MontserratAlternates-SemiBold']">
               View Tours
             </Text>
           </TouchableOpacity>
@@ -520,13 +548,13 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Historical Overview */}
           <Animated.View
             entering={FadeInDown.delay(300).duration(400)}
-            className="rounded-2xl bg-[#141414] border border-white/[0.08] p-4"
+            className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4"
           >
-            <Text className="text-[#F5F0E8] text-lg font-['MontserratAlternates-SemiBold'] mb-2">
+            <Text className="text-parchment text-lg font-['MontserratAlternates-SemiBold'] mb-2">
               Historical Overview
             </Text>
             <Text
-              className="text-[#B8AF9E] text-sm leading-[22px] font-['MontserratAlternates-Regular']"
+              className="text-parchment-muted text-sm leading-[22px] font-['MontserratAlternates-Regular']"
               numberOfLines={isDescriptionExpanded ? undefined : 3}
             >
               {description}
@@ -537,7 +565,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 className="mt-2.5 flex-row items-center gap-1 self-start"
                 accessibilityRole="button"
               >
-                <Text className="text-[#C9A84C] text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+                <Text className="text-brand-gold text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
                   {isDescriptionExpanded ? 'Show Less' : 'Read More'}
                 </Text>
                 {isDescriptionExpanded ? (
@@ -553,13 +581,13 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           <Animated.View entering={FadeInDown.delay(400).duration(400)}>
             <View className="flex-row items-center gap-1.5 mb-3">
               <Sparkles color="#C9A84C" size={18} />
-              <Text className="text-[#F5F0E8] text-lg font-['MontserratAlternates-SemiBold']">
+              <Text className="text-parchment text-lg font-['MontserratAlternates-SemiBold']">
                 Insights
               </Text>
             </View>
 
             {factsLoading ? (
-              <View className="rounded-2xl bg-[#141414] border border-white/[0.08] p-5 items-center">
+              <View className="rounded-2xl bg-surface-1 border border-white/[0.08] p-5 items-center">
                 <ThinkingDots messages={FACT_LOADING_LINES} color="#C9A84C" />
               </View>
             ) : facts.length > 0 ? (
@@ -573,12 +601,12 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     key={fact.id}
                     onPress={() => handleElaborateFact(fact)}
                     activeOpacity={0.86}
-                    className="w-[240px] rounded-2xl bg-[#141414] border border-[rgba(201,168,76,0.28)] p-3.5"
+                    className="w-[240px] rounded-2xl bg-surface-1 border border-[rgba(201,168,76,0.28)] p-3.5"
                   >
-                    <Text className="text-[#F5F0E8] text-[15px] leading-[22px] font-['MontserratAlternates-SemiBold'] mb-1.5">
+                    <Text className="text-parchment text-[15px] leading-[22px] font-['MontserratAlternates-SemiBold'] mb-1.5">
                       {fact.headline}
                     </Text>
-                    <Text className="text-[#B8AF9E] text-[13px] leading-[18px] font-['MontserratAlternates-Regular']">
+                    <Text className="text-parchment-muted text-[13px] leading-[18px] font-['MontserratAlternates-Regular']">
                       {fact.summary}
                     </Text>
 
@@ -594,22 +622,22 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                             />
                           </View>
                         ) : fact.detail ? (
-                          <Text className="text-[#D4C5A0] text-[13px] leading-[20px] font-['MontserratAlternates-Regular']">
+                          <Text className="text-brand-goldSoft text-[13px] leading-[20px] font-['MontserratAlternates-Regular']">
                             {fact.detail}
                           </Text>
                         ) : null}
                       </View>
                     )}
 
-                    <Text className="text-[#C9A84C] text-[11px] mt-2 font-['MontserratAlternates-SemiBold']">
+                    <Text className="text-brand-gold text-[11px] mt-2 font-['MontserratAlternates-SemiBold']">
                       {expandedFactId === fact.id ? 'Collapse' : 'Learn more'}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             ) : (
-              <View className="rounded-2xl bg-[#141414] border border-white/[0.08] p-4">
-                <Text className="text-[#6B6357] text-sm text-center font-['MontserratAlternates-Regular']">
+              <View className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4">
+                <Text className="text-parchment-dim text-sm text-center font-['MontserratAlternates-Regular']">
                   Insights will appear as you explore nearby monuments
                 </Text>
               </View>

@@ -193,7 +193,7 @@ const NoInternetScreen: React.FC = () => {
               <Wifi color="#FFFFFF" size={32} strokeWidth={2} />
               {/* X overlay */}
               <View
-                className="absolute h-[3px] w-11 rounded-[2px] bg-[#EF4444]"
+                className="absolute h-[3px] w-11 rounded-[2px] bg-status-danger"
                 style={{ transform: [{ rotate: '45deg' }] }}
               />
             </View>

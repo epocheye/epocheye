@@ -87,7 +87,7 @@ const SkeletonTourCard: React.FC = () => {
   return (
     <Animated.View
       style={style}
-      className="bg-[#141414] rounded-[20px] p-4 mb-3 border border-white/[0.08]"
+      className="bg-surface-1 rounded-[20px] p-4 mb-3 border border-white/[0.08]"
     >
       <View className="w-1/2 h-3.5 rounded-md bg-white/10 mb-2" />
       <View className="w-3/4 h-5 rounded-md bg-white/[0.14] mb-3" />
@@ -112,14 +112,14 @@ const TourCard: React.FC<TourCardProps> = React.memo(
 
     return (
       <Animated.View entering={FadeInDown.delay(index * 80).duration(350)}>
-        <View className="bg-[#141414] rounded-[20px] p-4 mb-3 border border-white/[0.08]">
+        <View className="bg-surface-1 rounded-[20px] p-4 mb-3 border border-white/[0.08]">
           {/* Monument name */}
-          <Text className="text-[#D4860A] text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold'] mb-1">
+          <Text className="text-brand-amber text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold'] mb-1">
             {tour.monument_name}
           </Text>
 
           {/* Tour title */}
-          <Text className="text-[#F5F0E8] text-lg font-['MontserratAlternates-Bold'] leading-6 mb-1">
+          <Text className="text-parchment text-lg font-['MontserratAlternates-Bold'] leading-6 mb-1">
             {tour.title}
           </Text>
 
@@ -127,19 +127,19 @@ const TourCard: React.FC<TourCardProps> = React.memo(
           <View className="flex-row items-center gap-3 mb-3">
             <View className="flex-row items-center gap-1">
               <Clock color="#6B6357" size={13} />
-              <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
+              <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular']">
                 {tour.duration_minutes} min
               </Text>
             </View>
             <View className="flex-row items-center gap-1">
               <ContentTypeIcon type={tour.content_type} />
-              <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular'] capitalize">
+              <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] capitalize">
                 {tour.content_type}
               </Text>
             </View>
             {isFree && (
-              <View className="bg-[#10B981]/15 border border-[#10B981]/30 rounded-full px-2 py-0.5">
-                <Text className="text-[#10B981] text-[10px] font-['MontserratAlternates-SemiBold']">
+              <View className="bg-status-success/15 border border-status-success/30 rounded-full px-2 py-0.5">
+                <Text className="text-status-success text-[10px] font-['MontserratAlternates-SemiBold']">
                   Free
                 </Text>
               </View>
@@ -149,8 +149,8 @@ const TourCard: React.FC<TourCardProps> = React.memo(
           {/* Active badge */}
           {hasAccess && tour.user_access.expires_at && (
             <View className="flex-row items-center gap-1.5 mb-3">
-              <View className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-              <Text className="text-[#10B981] text-xs font-['MontserratAlternates-Medium']">
+              <View className="w-1.5 h-1.5 rounded-full bg-status-success" />
+              <Text className="text-status-success text-xs font-['MontserratAlternates-Medium']">
                 Active · expires in {formatExpiry(tour.user_access.expires_at)}
               </Text>
             </View>
@@ -161,15 +161,15 @@ const TourCard: React.FC<TourCardProps> = React.memo(
             onPress={() => onPressCTA(tour)}
             className={`self-start px-4 py-2.5 rounded-xl flex-row items-center gap-1.5 ${
               hasAccess
-                ? 'bg-[#10B981]'
+                ? 'bg-status-success'
                 : isFree
-                ? 'bg-[#D4860A]'
-                : 'bg-[#C9A84C]'
+                ? 'bg-brand-amber'
+                : 'bg-brand-gold'
             }`}
             accessibilityRole="button"
           >
             <BookOpen color="#0A0A0A" size={15} />
-            <Text className="text-[#0A0A0A] text-sm font-['MontserratAlternates-SemiBold']">
+            <Text className="text-ink text-sm font-['MontserratAlternates-SemiBold']">
               {hasAccess
                 ? 'Start Tour'
                 : isFree
@@ -269,7 +269,7 @@ const TourListScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-[#000000]">
+    <SafeAreaView className="flex-1 bg-ink-deep">
       <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={['#000000', '#0C0A07', '#000000']}
@@ -280,16 +280,16 @@ const TourListScreen: React.FC<Props> = ({ navigation, route }) => {
         <View className="flex-row items-center gap-3 px-5 pt-5 pb-4">
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            className="w-10 h-10 rounded-full bg-[#141414] border border-white/10 items-center justify-center"
+            className="w-10 h-10 rounded-full bg-surface-1 border border-white/10 items-center justify-center"
           >
             <ArrowLeft color="#F5F0E8" size={20} />
           </TouchableOpacity>
           <View className="flex-1">
-            <Text className="text-[#F5F0E8] text-xl font-['MontserratAlternates-Bold']">
+            <Text className="text-parchment text-xl font-['MontserratAlternates-Bold']">
               {monumentName ? 'Tours' : 'All Tours'}
             </Text>
             {monumentName && (
-              <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular'] mt-0.5">
+              <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] mt-0.5">
                 {monumentName}
               </Text>
             )}
@@ -297,9 +297,9 @@ const TourListScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* My Tours link */}
           <TouchableOpacity
             onPress={() => navigation.navigate(ROUTES.MAIN.MY_TOURS)}
-            className="bg-[#141414] border border-white/10 rounded-full px-3 py-1.5"
+            className="bg-surface-1 border border-white/10 rounded-full px-3 py-1.5"
           >
-            <Text className="text-[#D4860A] text-xs font-['MontserratAlternates-SemiBold']">
+            <Text className="text-brand-amber text-xs font-['MontserratAlternates-SemiBold']">
               My Tours
             </Text>
           </TouchableOpacity>
@@ -315,12 +315,12 @@ const TourListScreen: React.FC<Props> = ({ navigation, route }) => {
         ) : tours.length === 0 && activePurchased.length === 0 ? (
           <View className="flex-1 items-center justify-center px-8 pb-16">
             <BookOpen color="#D4860A" size={40} />
-            <Text className="mt-4 text-[#F5F0E8] text-lg text-center font-['MontserratAlternates-SemiBold']">
+            <Text className="mt-4 text-parchment text-lg text-center font-['MontserratAlternates-SemiBold']">
               {monumentName
                 ? `No tours for ${monumentName} yet`
                 : 'No tours available'}
             </Text>
-            <Text className="mt-2 text-[#B8AF9E] text-sm text-center font-['MontserratAlternates-Regular']">
+            <Text className="mt-2 text-parchment-muted text-sm text-center font-['MontserratAlternates-Regular']">
               Check back soon — guided tours are coming to more monuments.
             </Text>
           </View>
@@ -336,7 +336,7 @@ const TourListScreen: React.FC<Props> = ({ navigation, route }) => {
                 <View className="mb-4">
                   <View className="flex-row items-center gap-1.5 mb-3">
                     <Sparkles color="#10B981" size={14} />
-                    <Text className="text-[#10B981] text-sm font-['MontserratAlternates-SemiBold']">
+                    <Text className="text-status-success text-sm font-['MontserratAlternates-SemiBold']">
                       Your Active Tours
                     </Text>
                   </View>
@@ -349,15 +349,15 @@ const TourListScreen: React.FC<Props> = ({ navigation, route }) => {
                           tourTitle: mt.title,
                         })
                       }
-                      className="bg-[#10B981]/10 border border-[#10B981]/20 rounded-2xl p-3 mb-2 flex-row items-center gap-3"
+                      className="bg-status-success/10 border border-status-success/20 rounded-2xl p-3 mb-2 flex-row items-center gap-3"
                     >
                       <BookOpen color="#10B981" size={18} />
                       <View className="flex-1">
-                        <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-SemiBold']">
+                        <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
                           {mt.title}
                         </Text>
                         {mt.user_access.expires_at && (
-                          <Text className="text-[#10B981] text-xs font-['MontserratAlternates-Regular'] mt-0.5">
+                          <Text className="text-status-success text-xs font-['MontserratAlternates-Regular'] mt-0.5">
                             Expires in{' '}
                             {formatExpiry(mt.user_access.expires_at)}
                           </Text>

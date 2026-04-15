@@ -112,9 +112,9 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   // Loading / purchasing state
   if (loading || purchasing) {
     return (
-      <SafeAreaView className="flex-1 bg-[#000000] items-center justify-center">
+      <SafeAreaView className="flex-1 bg-ink-deep items-center justify-center">
         <StatusBar barStyle="light-content" />
-        <Text className="text-[#B8AF9E] text-sm font-['MontserratAlternates-Regular']">
+        <Text className="text-parchment-muted text-sm font-['MontserratAlternates-Regular']">
           {purchasing ? 'Processing payment...' : 'Loading tour...'}
         </Text>
       </SafeAreaView>
@@ -124,16 +124,16 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   // Not found
   if (!tour) {
     return (
-      <SafeAreaView className="flex-1 bg-[#000000] items-center justify-center px-8">
+      <SafeAreaView className="flex-1 bg-ink-deep items-center justify-center px-8">
         <StatusBar barStyle="light-content" />
-        <Text className="text-[#F5F0E8] text-lg text-center font-['MontserratAlternates-SemiBold']">
+        <Text className="text-parchment text-lg text-center font-['MontserratAlternates-SemiBold']">
           Tour not found
         </Text>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          className="mt-4 px-4 py-2.5 rounded-xl bg-[#141414] border border-white/10"
+          className="mt-4 px-4 py-2.5 rounded-xl bg-surface-1 border border-white/10"
         >
-          <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-Medium']">
+          <Text className="text-parchment text-sm font-['MontserratAlternates-Medium']">
             Go back
           </Text>
         </TouchableOpacity>
@@ -149,7 +149,7 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     tour.content_type === 'text' || tour.content_type === 'mixed';
 
   return (
-    <SafeAreaView className="flex-1 bg-[#000000]">
+    <SafeAreaView className="flex-1 bg-ink-deep">
       <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={['#000000', '#0C0A07', '#000000']}
@@ -160,21 +160,21 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         <View className="flex-row items-center gap-3 px-5 pt-5 pb-4">
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            className="w-10 h-10 rounded-full bg-[#141414] border border-white/10 items-center justify-center"
+            className="w-10 h-10 rounded-full bg-surface-1 border border-white/10 items-center justify-center"
           >
             <ArrowLeft color="#F5F0E8" size={20} />
           </TouchableOpacity>
           <View className="flex-1">
             <Text
-              className="text-[#F5F0E8] text-xl font-['MontserratAlternates-Bold']"
+              className="text-parchment text-xl font-['MontserratAlternates-Bold']"
               numberOfLines={1}
             >
               {tourTitle}
             </Text>
             {hasAccess && tour.user_access.expires_at && (
               <View className="flex-row items-center gap-1 mt-0.5">
-                <View className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-                <Text className="text-[#10B981] text-xs font-['MontserratAlternates-Medium']">
+                <View className="w-1.5 h-1.5 rounded-full bg-status-success" />
+                <Text className="text-status-success text-xs font-['MontserratAlternates-Medium']">
                   Active · expires in{' '}
                   {formatExpiry(tour.user_access.expires_at)}
                 </Text>
@@ -189,7 +189,7 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           showsVerticalScrollIndicator={false}
         >
           {/* Monument name */}
-          <Text className="text-[#D4860A] text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold'] mb-2">
+          <Text className="text-brand-amber text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold'] mb-2">
             {tour.monument_name}
           </Text>
 
@@ -211,9 +211,9 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Description card */}
           <Animated.View
             entering={FadeInDown.delay(100).duration(350)}
-            className="bg-[#141414] rounded-2xl p-4 mb-4 border border-white/[0.08]"
+            className="bg-surface-1 rounded-2xl p-4 mb-4 border border-white/[0.08]"
           >
-            <Text className="text-[#B8AF9E] text-sm font-['MontserratAlternates-Regular'] leading-5">
+            <Text className="text-parchment-muted text-sm font-['MontserratAlternates-Regular'] leading-5">
               {tour.description}
             </Text>
           </Animated.View>
@@ -223,21 +223,21 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             entering={FadeInDown.delay(150).duration(350)}
             className="flex-row gap-3 mb-4"
           >
-            <View className="flex-row items-center gap-1.5 bg-[#141414] rounded-xl px-3 py-2 border border-white/[0.08]">
+            <View className="flex-row items-center gap-1.5 bg-surface-1 rounded-xl px-3 py-2 border border-white/[0.08]">
               <Clock color="#6B6357" size={14} />
-              <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Medium']">
+              <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Medium']">
                 {tour.duration_minutes} min
               </Text>
             </View>
-            <View className="flex-row items-center gap-1.5 bg-[#141414] rounded-xl px-3 py-2 border border-white/[0.08]">
+            <View className="flex-row items-center gap-1.5 bg-surface-1 rounded-xl px-3 py-2 border border-white/[0.08]">
               <BookOpen color="#6B6357" size={14} />
-              <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Medium'] capitalize">
+              <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Medium'] capitalize">
                 {tour.content_type}
               </Text>
             </View>
             {!hasAccess && (
-              <View className="flex-row items-center gap-1.5 bg-[#141414] rounded-xl px-3 py-2 border border-white/[0.08]">
-                <Text className="text-[#C9A84C] text-xs font-['MontserratAlternates-SemiBold']">
+              <View className="flex-row items-center gap-1.5 bg-surface-1 rounded-xl px-3 py-2 border border-white/[0.08]">
+                <Text className="text-brand-gold text-xs font-['MontserratAlternates-SemiBold']">
                   {isFree ? 'Free' : formatPrice(tour.price_paise)}
                 </Text>
               </View>
@@ -259,8 +259,8 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
               {/* Text content */}
               {isText && (
-                <View className="bg-[#141414] rounded-2xl p-5 border border-white/[0.08]">
-                  <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-Regular'] leading-7">
+                <View className="bg-surface-1 rounded-2xl p-5 border border-white/[0.08]">
+                  <Text className="text-parchment text-sm font-['MontserratAlternates-Regular'] leading-7">
                     {tour.content_body}
                   </Text>
                 </View>
@@ -274,19 +274,19 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             >
               {/* Coupon input — only for paid tours */}
               {!isFree && (
-                <View className="bg-[#141414] border border-white/[0.08] rounded-2xl p-4">
+                <View className="bg-surface-1 border border-white/[0.08] rounded-2xl p-4">
                   <View className="flex-row items-center gap-2 mb-2">
                     <Tag color="#C9A84C" size={13} />
-                    <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Medium']">
+                    <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Medium']">
                       Have a promo code?
                     </Text>
                   </View>
 
                   {couponResult?.is_valid ? (
-                    <View className="flex-row items-center justify-between bg-[#10B981]/10 border border-[#10B981]/20 rounded-xl px-3 py-2.5">
+                    <View className="flex-row items-center justify-between bg-status-success/10 border border-status-success/20 rounded-xl px-3 py-2.5">
                       <View className="flex-row items-center gap-2">
                         <Check color="#10B981" size={14} />
-                        <Text className="text-[#10B981] text-sm font-['MontserratAlternates-SemiBold']">
+                        <Text className="text-status-success text-sm font-['MontserratAlternates-SemiBold']">
                           {couponResult.code} ·{' '}
                           {couponResult.discount_percent}% off
                         </Text>
@@ -314,17 +314,17 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                         autoCorrect={false}
                         returnKeyType="done"
                         onSubmitEditing={handleApplyCoupon}
-                        className="flex-1 bg-[#1E1E1E] border border-white/10 rounded-xl px-3 py-2.5 text-[#F5F0E8] text-sm font-['MontserratAlternates-Regular']"
+                        className="flex-1 bg-surface-2 border border-white/10 rounded-xl px-3 py-2.5 text-parchment text-sm font-['MontserratAlternates-Regular']"
                       />
                       <TouchableOpacity
                         onPress={handleApplyCoupon}
                         disabled={couponValidating || !couponInput.trim()}
-                        className="bg-[#C9A84C]/20 border border-[#C9A84C]/30 rounded-xl px-4 items-center justify-center"
+                        className="bg-brand-gold/20 border border-brand-gold/30 rounded-xl px-4 items-center justify-center"
                       >
                         {couponValidating ? (
                           <ActivityIndicator color="#C9A84C" size="small" />
                         ) : (
-                          <Text className="text-[#C9A84C] text-sm font-['MontserratAlternates-SemiBold']">
+                          <Text className="text-brand-gold text-sm font-['MontserratAlternates-SemiBold']">
                             Apply
                           </Text>
                         )}
@@ -354,7 +354,7 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 accessibilityRole="button"
               >
                 <BookOpen color="#0A0A0A" size={18} />
-                <Text className="text-[#0A0A0A] text-base font-['MontserratAlternates-Bold']">
+                <Text className="text-ink text-base font-['MontserratAlternates-Bold']">
                   {isFree
                     ? 'Start Free Tour'
                     : appliedCoupon && couponResult?.discount_percent
@@ -370,7 +370,7 @@ const TourDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             </Animated.View>
           ) : (
             <View className="items-center py-6">
-              <Text className="text-[#6B6357] text-sm font-['MontserratAlternates-Regular']">
+              <Text className="text-parchment-dim text-sm font-['MontserratAlternates-Regular']">
                 Tour content is not available yet.
               </Text>
             </View>

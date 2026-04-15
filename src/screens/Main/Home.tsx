@@ -162,14 +162,14 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress 
           >
           <View className="self-start flex-row items-center gap-1 rounded-full bg-[rgba(10,10,10,0.7)] border border-[rgba(201,168,76,0.35)] px-3 py-1.5">
             <Compass color="#C9A84C" size={14} />
-            <Text className="text-[#F5F0E8] text-xs leading-4 font-['MontserratAlternates-SemiBold']">
+            <Text className="text-parchment text-xs leading-4 font-['MontserratAlternates-SemiBold']">
               {distanceKm} km away
             </Text>
           </View>
 
           <View>
             <Text
-              className="text-[#F5F0E8] text-2xl leading-8 font-['MontserratAlternates-Bold']"
+              className="text-parchment text-2xl leading-8 font-['MontserratAlternates-Bold']"
               numberOfLines={2}
             >
               {place.name}
@@ -177,7 +177,7 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress 
             <View className="flex-row items-center gap-1 mt-2">
               <MapPin color="#B8AF9E" size={15} />
               <Text
-                className="text-[#B8AF9E] text-[13px] leading-[18px] font-['MontserratAlternates-Medium'] flex-shrink"
+                className="text-parchment-muted text-[13px] leading-[18px] font-['MontserratAlternates-Medium'] flex-shrink"
                 numberOfLines={1}
               >
                 {place.city}, {place.country}
@@ -185,14 +185,14 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress 
             </View>
 
             <Text
-              className="text-[#B8AF9E] text-sm leading-5 mt-3 font-['MontserratAlternates-Regular']"
+              className="text-parchment-muted text-sm leading-5 mt-3 font-['MontserratAlternates-Regular']"
               numberOfLines={2}
             >
               {shortDescription}
             </Text>
 
-            <View className="mt-4 self-start flex-row items-center gap-1 rounded-full bg-[#C9A84C] px-3 py-2">
-              <Text className="text-[#0A0A0A] text-xs leading-4 uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+            <View className="mt-4 self-start flex-row items-center gap-1 rounded-full bg-brand-gold px-3 py-2">
+              <Text className="text-ink text-xs leading-4 uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
                 Explore the Era
               </Text>
               <ArrowRight color="#0A0A0A" size={14} />
@@ -497,7 +497,7 @@ const Home = ({ navigation }: Props) => {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-[#000000]">
+    <SafeAreaView className="flex-1 bg-ink-deep">
       <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={['#000000', '#0A0806', '#000000']}
@@ -530,13 +530,13 @@ const Home = ({ navigation }: Props) => {
                     backgroundColor: NOIR.glowAmber,
                   }}
                 />
-                <Text className="text-[#B8AF9E] text-xs uppercase tracking-[1px] font-['MontserratAlternates-SemiBold']">
+                <Text className="text-parchment-muted text-xs uppercase tracking-[1px] font-['MontserratAlternates-SemiBold']">
                   {greeting}
                 </Text>
-                <Text className="text-[#F5F0E8] text-[32px] leading-10 font-['MontserratAlternates-Bold'] mt-1">
+                <Text className="text-parchment text-[32px] leading-10 font-['MontserratAlternates-Bold'] mt-1">
                   {userName}
                 </Text>
-                <Text className="text-[#B8AF9E] text-[15px] leading-[22px] font-['MontserratAlternates-Medium'] mt-1">
+                <Text className="text-parchment-muted text-[15px] leading-[22px] font-['MontserratAlternates-Medium'] mt-1">
                   Ready to uncover history today?
                 </Text>
               </View>
@@ -560,15 +560,15 @@ const Home = ({ navigation }: Props) => {
             <View className="mb-4">
               <View className="flex-row items-center gap-2">
                 <Sparkles color="#C9A84C" size={18} />
-                <Text className="text-[#F5F0E8] text-[22px] leading-[30px] font-['MontserratAlternates-SemiBold']">
+                <Text className="text-parchment text-[22px] leading-[30px] font-['MontserratAlternates-SemiBold']">
                   Nearby Highlights
                 </Text>
               </View>
-              <Text className="text-[#6B6357] text-[13px] leading-[18px] font-['MontserratAlternates-Regular'] mt-1">
+              <Text className="text-parchment-dim text-[13px] leading-[18px] font-['MontserratAlternates-Regular'] mt-1">
                 Curated sites around your location
               </Text>
               {nearbyError ? (
-                <Text className="text-[#E05C5C] text-[13px] leading-[18px] font-['MontserratAlternates-Medium'] mt-2">
+                <Text className="text-status-warning text-[13px] leading-[18px] font-['MontserratAlternates-Medium'] mt-2">
                   {nearbyError}
                 </Text>
               ) : null}
@@ -580,12 +580,12 @@ const Home = ({ navigation }: Props) => {
                 <SkeletonCard />
               </View>
             ) : topNearbyPlaces.length === 0 ? (
-              <View className="mb-4 rounded-[20px] bg-[#141414] border border-[rgba(255,255,255,0.08)] py-7 px-5 items-center justify-center gap-2">
+              <View className="mb-4 rounded-[20px] bg-surface-1 border border-[rgba(255,255,255,0.08)] py-7 px-5 items-center justify-center gap-2">
                 <MapPin color="#C9A84C" size={36} />
-                <Text className="text-[#F5F0E8] text-lg leading-6 text-center font-['MontserratAlternates-SemiBold']">
+                <Text className="text-parchment text-lg leading-6 text-center font-['MontserratAlternates-SemiBold']">
                   No monuments discovered nearby yet
                 </Text>
-                <Text className="text-[#B8AF9E] text-sm leading-5 text-center font-['MontserratAlternates-Regular']">
+                <Text className="text-parchment-muted text-sm leading-5 text-center font-['MontserratAlternates-Regular']">
                   Try moving to a nearby heritage district or check location
                   permissions.
                 </Text>
@@ -625,24 +625,24 @@ const Home = ({ navigation }: Props) => {
                     style={{ padding: 18 }}
                   >
                     <View className="flex-row items-center gap-3">
-                      <View className="w-12 h-12 rounded-full bg-[#D4860A]/15 items-center justify-center">
+                      <View className="w-12 h-12 rounded-full bg-brand-amber/15 items-center justify-center">
                         <Sparkles color="#D4860A" size={22} />
                       </View>
                       <View className="flex-1">
                         <View className="flex-row items-center gap-2 mb-0.5">
-                          <Text className="text-[#D4860A] text-[10px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+                          <Text className="text-brand-amber text-[10px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
                             Explorer Pass
                           </Text>
                           <View style={{ backgroundColor: '#D4860A', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 }}>
-                            <Text className="text-[#000000] text-[8px] uppercase tracking-[0.5px] font-['MontserratAlternates-Bold']">
+                            <Text className="text-ink-deep text-[8px] uppercase tracking-[0.5px] font-['MontserratAlternates-Bold']">
                               PREMIUM
                             </Text>
                           </View>
                         </View>
-                        <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-Bold'] mt-0.5">
+                        <Text className="text-parchment text-base font-['MontserratAlternates-Bold'] mt-0.5">
                           Unlock heritage sites near you
                         </Text>
-                        <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Regular'] mt-0.5">
+                        <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Regular'] mt-0.5">
                           Tap to choose places
                         </Text>
                       </View>
@@ -659,7 +659,7 @@ const Home = ({ navigation }: Props) => {
                 <View className="flex-row items-center justify-between mb-3">
                   <View className="flex-row items-center gap-2">
                     <BookOpen color="#D4860A" size={18} />
-                    <Text className="text-[#F5F0E8] text-[22px] leading-[30px] font-['MontserratAlternates-SemiBold']">
+                    <Text className="text-parchment text-[22px] leading-[30px] font-['MontserratAlternates-SemiBold']">
                       Tours
                     </Text>
                   </View>
@@ -667,7 +667,7 @@ const Home = ({ navigation }: Props) => {
                     onPress={() => navigation.navigate(ROUTES.MAIN.TOUR_LIST)}
                     accessibilityRole="button"
                   >
-                    <Text className="text-[#D4860A] text-xs font-['MontserratAlternates-SemiBold']">
+                    <Text className="text-brand-amber text-xs font-['MontserratAlternates-SemiBold']">
                       See all
                     </Text>
                   </TouchableOpacity>
@@ -697,24 +697,24 @@ const Home = ({ navigation }: Props) => {
                         }}
                         activeOpacity={0.85}
                       >
-                      <Text className="text-[#D4860A] text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold'] mb-1" numberOfLines={1}>
+                      <Text className="text-brand-amber text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold'] mb-1" numberOfLines={1}>
                         {tour.monument_name}
                       </Text>
-                      <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-Bold'] leading-5 mb-2" numberOfLines={2}>
+                      <Text className="text-parchment text-sm font-['MontserratAlternates-Bold'] leading-5 mb-2" numberOfLines={2}>
                         {tour.title}
                       </Text>
                       <View className="flex-row items-center gap-1.5">
                         <Clock color="#6B6357" size={12} />
-                        <Text className="text-[#6B6357] text-[11px] font-['MontserratAlternates-Regular']">
+                        <Text className="text-parchment-dim text-[11px] font-['MontserratAlternates-Regular']">
                           {tour.duration_minutes} min
                         </Text>
                         <View className="ml-auto">
                           {tour.price_paise === 0 ? (
-                            <Text className="text-[#10B981] text-[11px] font-['MontserratAlternates-SemiBold']">
+                            <Text className="text-status-success text-[11px] font-['MontserratAlternates-SemiBold']">
                               Free
                             </Text>
                           ) : (
-                            <Text className="text-[#C9A84C] text-[11px] font-['MontserratAlternates-SemiBold']">
+                            <Text className="text-brand-gold text-[11px] font-['MontserratAlternates-SemiBold']">
                               ₹{(tour.price_paise / 100).toFixed(0)}
                             </Text>
                           )}
@@ -731,7 +731,7 @@ const Home = ({ navigation }: Props) => {
             {factsVisible && (
               <View className="mt-6 mb-3">
                 <View className="flex-row items-center justify-between mb-4">
-                  <Text className="text-[#F5F0E8] text-lg leading-6 font-['MontserratAlternates-SemiBold']">
+                  <Text className="text-parchment text-lg leading-6 font-['MontserratAlternates-SemiBold']">
                     Insights For You
                   </Text>
                   <TouchableOpacity
@@ -750,14 +750,14 @@ const Home = ({ navigation }: Props) => {
                   >
                     <AnimatedLogo size={58} motion="orbit" variant="white" />
                     <ThinkingDots messages={FACT_LOADING_LINES} />
-                    <Text className="text-[#B8AF9E] text-xs leading-[18px] text-center font-['MontserratAlternates-Regular']">
+                    <Text className="text-parchment-muted text-xs leading-[18px] text-center font-['MontserratAlternates-Regular']">
                       Preparing expandable details you can tap into.
                     </Text>
                   </View>
                 ) : (
                   <View className="gap-3">
                     {factsError ? (
-                      <Text className="text-[#8F8576] text-[11px] leading-4 mb-0.5 font-['MontserratAlternates-Regular']">
+                      <Text className="text-parchment-faint text-[11px] leading-4 mb-0.5 font-['MontserratAlternates-Regular']">
                         {factsError}
                       </Text>
                     ) : null}
@@ -828,11 +828,11 @@ const Home = ({ navigation }: Props) => {
                                 </View>
                               )}
                               <View className="flex-1">
-                                <Text className="text-[#F5F0E8] text-sm leading-5 font-['MontserratAlternates-SemiBold']">
+                                <Text className="text-parchment text-sm leading-5 font-['MontserratAlternates-SemiBold']">
                                   {fact.headline}
                                 </Text>
                                 <Text
-                                  className="text-[#B8AF9E] text-[13px] leading-[19px] mt-1 font-['MontserratAlternates-Regular']"
+                                  className="text-parchment-muted text-[13px] leading-[19px] mt-1 font-['MontserratAlternates-Regular']"
                                   numberOfLines={isExpanded ? undefined : 2}
                                 >
                                   {fact.summary}
@@ -848,14 +848,14 @@ const Home = ({ navigation }: Props) => {
                                     color="#B8AF9E"
                                   />
                                 ) : detailText ? (
-                                  <Text className="text-[#E6DFC7] text-[13px] leading-5 font-['MontserratAlternates-Regular']">
+                                  <Text className="text-brand-goldSoft text-[13px] leading-5 font-['MontserratAlternates-Regular']">
                                     {detailText}
                                   </Text>
                                 ) : null}
                               </View>
                             ) : null}
 
-                            <Text className="mt-2 text-[#8C7F6B] text-[10px] leading-[14px] uppercase tracking-[0.7px] font-['MontserratAlternates-SemiBold']">
+                            <Text className="mt-2 text-parchment-faint text-[10px] leading-[14px] uppercase tracking-[0.7px] font-['MontserratAlternates-SemiBold']">
                               {isExpanded ? 'Tap to collapse' : 'Tap to expand'}
                             </Text>
                           </TouchableOpacity>
@@ -883,7 +883,7 @@ const Home = ({ navigation }: Props) => {
                       accessibilityRole="button"
                       accessibilityLabel="Refresh insights"
                     >
-                      <Text className="text-[#C9A84C] text-xs leading-4 uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+                      <Text className="text-brand-gold text-xs leading-4 uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
                         Refresh Insights
                       </Text>
                       <Animated.View style={refreshIconStyle}>
@@ -921,13 +921,13 @@ const Home = ({ navigation }: Props) => {
         <Modal visible transparent animationType="slide">
           <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }}>
             <View className="rounded-t-3xl p-6" style={{ backgroundColor: NOIR.cardBg, borderTopWidth: 1, borderTopColor: 'rgba(201,168,76,0.3)' }}>
-              <Text className="text-[#D4860A] text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold'] mb-1">
+              <Text className="text-brand-amber text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold'] mb-1">
                 Free Tour Waiting
               </Text>
-              <Text className="text-[#F5F0E8] text-xl font-['MontserratAlternates-Bold'] mb-1">
+              <Text className="text-parchment text-xl font-['MontserratAlternates-Bold'] mb-1">
                 {bannerTour.title}
               </Text>
-              <Text className="text-[#B8AF9E] text-sm font-['MontserratAlternates-Regular'] mb-5">
+              <Text className="text-parchment-muted text-sm font-['MontserratAlternates-Regular'] mb-5">
                 {bannerTour.monument_name} · {bannerTour.duration_minutes} min
               </Text>
               <TouchableOpacity
@@ -942,11 +942,11 @@ const Home = ({ navigation }: Props) => {
                     tourTitle: bannerTour.title,
                   });
                 }}
-                className="bg-[#D4860A] rounded-2xl py-4 items-center mb-3 flex-row justify-center gap-2"
+                className="bg-brand-amber rounded-2xl py-4 items-center mb-3 flex-row justify-center gap-2"
                 accessibilityRole="button"
               >
                 <BookOpen color="#0A0A0A" size={18} />
-                <Text className="text-[#0A0A0A] text-base font-['MontserratAlternates-Bold']">
+                <Text className="text-ink text-base font-['MontserratAlternates-Bold']">
                   Start Tour
                 </Text>
               </TouchableOpacity>
@@ -962,7 +962,7 @@ const Home = ({ navigation }: Props) => {
                 style={{ backgroundColor: '#141414', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}
                 accessibilityRole="button"
               >
-                <Text className="text-[#8D8D92] text-sm font-['MontserratAlternates-SemiBold']">
+                <Text className="text-parchment-faint text-sm font-['MontserratAlternates-SemiBold']">
                   Later
                 </Text>
               </TouchableOpacity>

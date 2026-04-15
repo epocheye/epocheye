@@ -225,33 +225,33 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
   if (!hasPermission) {
     return (
       <GestureHandlerRootView className="flex-1">
-        <SafeAreaView className="flex-1 bg-[#000000] items-center justify-center px-8">
+        <SafeAreaView className="flex-1 bg-ink-deep items-center justify-center px-8">
           <Camera color="#D4860A" size={56} />
-          <Text className="text-[#F5F0E8] text-xl text-center font-['MontserratAlternates-Bold'] mt-6 mb-2">
+          <Text className="text-parchment text-xl text-center font-['MontserratAlternates-Bold'] mt-6 mb-2">
             Camera access needed
           </Text>
-          <Text className="text-[#B8AF9E] text-sm text-center font-['MontserratAlternates-Regular'] mb-8 leading-5">
+          <Text className="text-parchment-muted text-sm text-center font-['MontserratAlternates-Regular'] mb-8 leading-5">
             Allow camera access to explore {site.name} through augmented
             reality.
           </Text>
           <Pressable
             onPress={() => requestPermission().catch(() => {})}
-            className="w-full bg-[#C9A84C] rounded-xl py-3.5 items-center mb-3"
+            className="w-full bg-brand-gold rounded-xl py-3.5 items-center mb-3"
           >
-            <Text className="text-[#0A0A0A] text-base font-['MontserratAlternates-Bold']">
+            <Text className="text-ink text-base font-['MontserratAlternates-Bold']">
               Grant Camera Access
             </Text>
           </Pressable>
           <Pressable
             onPress={() => Linking.openSettings().catch(() => {})}
-            className="w-full bg-[#141414] border border-white/10 rounded-xl py-3.5 items-center mb-3"
+            className="w-full bg-surface-1 border border-white/10 rounded-xl py-3.5 items-center mb-3"
           >
-            <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-Medium']">
+            <Text className="text-parchment text-sm font-['MontserratAlternates-Medium']">
               Open Settings
             </Text>
           </Pressable>
           <Pressable onPress={() => navigation.goBack()} className="mt-2">
-            <Text className="text-[#6B6357] text-sm font-['MontserratAlternates-Medium']">
+            <Text className="text-parchment-dim text-sm font-['MontserratAlternates-Medium']">
               Back
             </Text>
           </Pressable>
@@ -263,7 +263,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
   // ── Main AR view ─────────────────────────────────────────────────
   return (
     <GestureHandlerRootView className="flex-1">
-      <View className="flex-1 bg-[#000000]">
+      <View className="flex-1 bg-ink-deep">
         {/* Camera layer */}
         {device && (
           <VisionCamera
@@ -337,15 +337,15 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
             <View className="flex-row items-center gap-1.5 bg-black/50 rounded-full px-3 py-1.5 border border-[rgba(212,134,10,0.3)]">
               {arAvailable ? (
                 <>
-                  <View className="w-2 h-2 rounded-full bg-[#10B981]" />
-                  <Text className="text-[#10B981] text-[11px] font-['MontserratAlternates-SemiBold']">
+                  <View className="w-2 h-2 rounded-full bg-status-success" />
+                  <Text className="text-status-success text-[11px] font-['MontserratAlternates-SemiBold']">
                     AR Active
                   </Text>
                 </>
               ) : (
                 <>
                   <Sparkles color="#D4860A" size={11} />
-                  <Text className="text-[#D4860A] text-[11px] font-['MontserratAlternates-Medium']">
+                  <Text className="text-brand-amber text-[11px] font-['MontserratAlternates-Medium']">
                     Live AR launching soon
                   </Text>
                 </>
@@ -376,10 +376,10 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Monument name overlay */}
         <View className="absolute left-5 right-5" style={{ top: insets.top + 80 }}>
           <View className="bg-black/60 rounded-2xl p-4">
-            <Text className="text-[#F5F0E8] text-xl font-['MontserratAlternates-Bold']">
+            <Text className="text-parchment text-xl font-['MontserratAlternates-Bold']">
               {site.name}
             </Text>
-            <Text className="text-[#D4860A] text-sm font-['MontserratAlternates-SemiBold'] mt-1">
+            <Text className="text-brand-amber text-sm font-['MontserratAlternates-SemiBold'] mt-1">
               Heritage Monument
             </Text>
           </View>
@@ -408,11 +408,11 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
             activeOpacity={0.88}
             className="bg-[#12121A]/90 rounded-2xl p-4 border border-[#272730] flex-row items-center gap-3"
           >
-            <View className="w-10 h-10 rounded-full bg-[#D4860A]/15 items-center justify-center">
+            <View className="w-10 h-10 rounded-full bg-brand-amber/15 items-center justify-center">
               <ScanEye color="#D4860A" size={20} />
             </View>
             <View className="flex-1">
-              <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-SemiBold']">
+              <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
                 Identify Object
               </Text>
               <Text
@@ -427,9 +427,9 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
             {canShowMask && (
               <TouchableOpacity
                 onPress={handleHDScan}
-                className="bg-[#C9A84C]/15 border border-[#C9A84C]/30 rounded-full px-2.5 py-1"
+                className="bg-brand-gold/15 border border-brand-gold/30 rounded-full px-2.5 py-1"
               >
-                <Text className="text-[#C9A84C] text-[10px] font-['MontserratAlternates-SemiBold']">
+                <Text className="text-brand-gold text-[10px] font-['MontserratAlternates-SemiBold']">
                   {hdScanLoading ? '...' : 'HD Scan'}
                 </Text>
               </TouchableOpacity>
@@ -468,7 +468,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
             <View className="flex-row items-center justify-between w-full px-5">
               <View className="flex-row items-center gap-2">
                 <Clock color="#D4860A" size={16} />
-                <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-SemiBold']">
+                <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
                   Historical Insights
                 </Text>
               </View>
@@ -489,7 +489,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
             >
               {timelineLoading ? (
                 <View className="py-4 items-center">
-                  <Text className="text-[#6B6357] text-sm font-['MontserratAlternates-Regular']">
+                  <Text className="text-parchment-dim text-sm font-['MontserratAlternates-Regular']">
                     Loading insights...
                   </Text>
                 </View>
@@ -502,8 +502,8 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
                   >
                     {/* Vertical connector */}
                     <View className="items-center mr-3" style={{ width: 20 }}>
-                      <View className="w-4 h-4 rounded-full bg-[#D4860A] items-center justify-center">
-                        <View className="w-2 h-2 rounded-full bg-[#0A0A0A]" />
+                      <View className="w-4 h-4 rounded-full bg-brand-amber items-center justify-center">
+                        <View className="w-2 h-2 rounded-full bg-ink" />
                       </View>
                       {index < timelineFacts.length - 1 && (
                         <View
@@ -513,7 +513,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
                       )}
                     </View>
                     <View className="flex-1 pb-2">
-                      <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-SemiBold']">
+                      <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
                         {fact.headline}
                       </Text>
                       <Text className="text-[#8D8D92] text-xs font-['MontserratAlternates-Regular'] mt-1 leading-4">
@@ -524,7 +524,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
                 ))
               ) : (
                 <View className="py-4 items-center">
-                  <Text className="text-[#6B6357] text-sm font-['MontserratAlternates-Regular']">
+                  <Text className="text-parchment-dim text-sm font-['MontserratAlternates-Regular']">
                     No insights available for this monument yet
                   </Text>
                 </View>

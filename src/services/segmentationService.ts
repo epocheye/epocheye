@@ -10,11 +10,10 @@
  * runInference API would force a JS-thread round-trip per frame via
  * runOnJS, defeating the point of worklet-native execution.
  *
- * While the `sam_segment.tflite` asset is a zero-byte stub,
- * `initialize()` will silently fail (the flatbuffer is invalid),
- * leave `ready=false`, and the rest of the Lens screen keeps working
- * as if the overlay did not exist. Dropping in a real TFLite file and
- * rebuilding is a pure drop-in — no code changes required here.
+ * The bundled `sam_segment.tflite` is DeepLab v3 (257x257, PASCAL VOC
+ * 21 classes). If the asset is missing or corrupt, `initialize()`
+ * silently fails, leaves `ready=false`, and the Lens screen keeps
+ * working without the overlay.
  */
 
 import {

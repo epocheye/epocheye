@@ -113,7 +113,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
               source={require('../../assets/images/logo-white.png')}
               className="size-20 my-5"
             />
-            <Text className="font-['MontserratAlternates-Regular'] text-[18px] text-[#B8AF9E]">
+            <Text className="font-['MontserratAlternates-Regular'] text-[18px] text-parchment-muted">
               {headingText}
             </Text>
             {subheadingText ? (
@@ -170,7 +170,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                     motion="pulse"
                     showRing={false}
                   />
-                  <Text className="font-['MontserratAlternates-Regular'] text-sm text-[#B8AF9E]">
+                  <Text className="font-['MontserratAlternates-Regular'] text-sm text-parchment-muted">
                     Signing in...
                   </Text>
                 </View>
@@ -182,7 +182,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                 onPress={() => setShowEmailForm(false)}
                 className="mt-2 items-center"
               >
-                <Text className="font-['MontserratAlternates-Medium'] text-sm text-[#8F8576]">
+                <Text className="font-['MontserratAlternates-Medium'] text-sm text-parchment-faint">
                   Back to options
                 </Text>
               </TouchableOpacity>
@@ -194,13 +194,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
               onPress={onSecondaryActionPress}
               className="mt-8 items-center"
             >
-              <Text className="font-['MontserratAlternates-Regular'] text-sm text-[#8F8576]">
+              <Text className="font-['MontserratAlternates-Regular'] text-sm text-parchment-faint">
                 {secondaryActionLabel}
               </Text>
             </TouchableOpacity>
           ) : null}
 
-          <Text className="mb-8 mt-10 text-center font-['MontserratAlternates-Regular'] text-xs text-[#6B6357]">
+          <Text className="mb-8 mt-10 text-center font-['MontserratAlternates-Regular'] text-xs text-parchment-dim">
             By continuing, you agree to our Terms & Privacy Policy
           </Text>
         </ScrollView>

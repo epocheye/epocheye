@@ -54,6 +54,7 @@ export const STORAGE_KEYS = {
     NEARBY_PLACES: `${STORAGE_PREFIX}/nearby_places_cache`,
     SAVED_PLACES: `${STORAGE_PREFIX}/saved_places_cache`,
     USER_PROFILE: `${STORAGE_PREFIX}/user_profile_cache`,
+    GEMINI_IMAGE: `${STORAGE_PREFIX}/gemini_image_cache`,
   },
 
   /**

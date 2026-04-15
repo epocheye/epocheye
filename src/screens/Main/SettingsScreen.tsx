@@ -196,7 +196,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   ];
 
   return (
-    <SafeAreaView className="flex-1 bg-[#000000]">
+    <SafeAreaView className="flex-1 bg-ink-deep">
       <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={['#000000', '#0C0A07', '#000000']}
@@ -213,21 +213,21 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             className="px-5 pt-5 pb-4 flex-row items-end justify-between"
           >
             <View>
-              <Text className="text-xs uppercase tracking-[1px] text-[#C9A84C] font-['MontserratAlternates-SemiBold']">
+              <Text className="text-xs uppercase tracking-[1px] text-brand-gold font-['MontserratAlternates-SemiBold']">
                 ACCOUNT
               </Text>
-              <Text className="mt-1 text-[#F5F0E8] text-[26px] leading-9 font-['MontserratAlternates-Bold']">
+              <Text className="mt-1 text-parchment text-[26px] leading-9 font-['MontserratAlternates-Bold']">
                 Settings
               </Text>
             </View>
             <TouchableOpacity
-              className="flex-row items-center rounded-full border border-white/10 bg-[#141414] px-3.5 py-2"
+              className="flex-row items-center rounded-full border border-white/10 bg-surface-1 px-3.5 py-2"
               onPress={() => Linking.openURL('mailto:support@epocheye.app')}
               accessibilityRole="button"
               accessibilityLabel="Contact support"
             >
               <MessageCircle size={14} color="#B8AF9E" />
-              <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Medium'] ml-1.5">
+              <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Medium'] ml-1.5">
                 Support
               </Text>
             </TouchableOpacity>
@@ -236,21 +236,21 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           {/* Profile card */}
           {isLoading ? (
             <View
-              className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-[#141414] p-5 items-center justify-center"
+              className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-5 items-center justify-center"
               style={{ height: 260 }}
             >
               <AnimatedLogo size={48} variant="white" motion="orbit" />
-              <Text className="text-[#6B6357] text-sm font-['MontserratAlternates-Regular'] mt-3">
+              <Text className="text-parchment-dim text-sm font-['MontserratAlternates-Regular'] mt-3">
                 Loading profile...
               </Text>
             </View>
           ) : (
             <Animated.View
               entering={FadeInDown.delay(80).duration(350)}
-              className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-[#141414] p-5"
+              className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-5"
             >
               <View className="flex-row items-center mb-5">
-                <View className="w-16 h-16 rounded-full bg-[#1E1E1E] items-center justify-center mr-4 relative">
+                <View className="w-16 h-16 rounded-full bg-surface-2 items-center justify-center mr-4 relative">
                   {profile?.avatar_url ? (
                     <Image
                       source={{ uri: profile.avatar_url }}
@@ -265,7 +265,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     />
                   )}
                   <TouchableOpacity
-                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#D4860A] items-center justify-center"
+                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand-amber items-center justify-center"
                     onPress={handleAvatarUpload}
                     accessibilityRole="button"
                     accessibilityLabel="Change profile picture"
@@ -274,10 +274,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   </TouchableOpacity>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-[#F5F0E8] text-xl font-['MontserratAlternates-Bold']">
+                  <Text className="text-parchment text-xl font-['MontserratAlternates-Bold']">
                     {fullName || 'User'}
                   </Text>
-                  <Text className="text-[#6B6357] text-sm font-['MontserratAlternates-Regular'] mt-0.5">
+                  <Text className="text-parchment-dim text-sm font-['MontserratAlternates-Regular'] mt-0.5">
                     {email || 'No email'}
                   </Text>
                 </View>
@@ -285,7 +285,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
 
               {/* Form fields */}
               <View className="mb-3">
-                <Text className="text-xs uppercase tracking-[1px] text-[#6B6357] font-['MontserratAlternates-SemiBold'] mb-2">
+                <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['MontserratAlternates-SemiBold'] mb-2">
                   Full name
                 </Text>
                 <TextInput
@@ -293,13 +293,13 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   onChangeText={setFullName}
                   placeholder="Full name"
                   placeholderTextColor="rgba(245,240,232,0.25)"
-                  className="bg-[#1E1E1E] border border-white/10 rounded-xl text-[#F5F0E8] font-['MontserratAlternates-Medium'] px-4 py-3 text-sm"
+                  className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['MontserratAlternates-Medium'] px-4 py-3 text-sm"
                   accessibilityLabel="Full name"
                 />
               </View>
               <View className="flex-row gap-3">
                 <View className="flex-1">
-                  <Text className="text-xs uppercase tracking-[1px] text-[#6B6357] font-['MontserratAlternates-SemiBold'] mb-2">
+                  <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['MontserratAlternates-SemiBold'] mb-2">
                     Email
                   </Text>
                   <TextInput
@@ -308,12 +308,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     keyboardType="email-address"
                     placeholder="Email"
                     placeholderTextColor="rgba(245,240,232,0.25)"
-                    className="bg-[#1E1E1E] border border-white/10 rounded-xl text-[#F5F0E8] font-['MontserratAlternates-Medium'] px-4 py-3 text-sm"
+                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['MontserratAlternates-Medium'] px-4 py-3 text-sm"
                     accessibilityLabel="Email address"
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-xs uppercase tracking-[1px] text-[#6B6357] font-['MontserratAlternates-SemiBold'] mb-2">
+                  <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['MontserratAlternates-SemiBold'] mb-2">
                     Phone
                   </Text>
                   <TextInput
@@ -322,7 +322,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     keyboardType="phone-pad"
                     placeholder="Phone"
                     placeholderTextColor="rgba(245,240,232,0.25)"
-                    className="bg-[#1E1E1E] border border-white/10 rounded-xl text-[#F5F0E8] font-['MontserratAlternates-Medium'] px-4 py-3 text-sm"
+                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['MontserratAlternates-Medium'] px-4 py-3 text-sm"
                     accessibilityLabel="Phone number"
                   />
                 </View>
@@ -330,7 +330,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
 
               {hasChanges && (
                 <TouchableOpacity
-                  className="mt-4 flex-row items-center justify-center rounded-xl bg-[#C9A84C] py-3"
+                  className="mt-4 flex-row items-center justify-center rounded-xl bg-brand-gold py-3"
                   onPress={handleSaveChanges}
                   disabled={isSaving}
                   accessibilityRole="button"
@@ -346,7 +346,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   ) : (
                     <>
                       <Save size={16} color="#0A0A0A" />
-                      <Text className="text-[#0A0A0A] text-sm font-['MontserratAlternates-Bold'] ml-2">
+                      <Text className="text-ink text-sm font-['MontserratAlternates-Bold'] ml-2">
                         Save Changes
                       </Text>
                     </>
@@ -366,14 +366,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 accessibilityRole="button"
                 accessibilityLabel="Get Explorer Pass"
               >
-                <View className="w-10 h-10 rounded-full bg-[#D4860A]/15 items-center justify-center mr-3">
+                <View className="w-10 h-10 rounded-full bg-brand-amber/15 items-center justify-center mr-3">
                   <Sparkles size={18} color="#D4860A" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-SemiBold']">
+                  <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
                     Get Explorer Pass
                   </Text>
-                  <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular'] mt-0.5">
+                  <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] mt-0.5">
                     Unlock heritage sites near you
                   </Text>
                 </View>
@@ -385,20 +385,20 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           {/* My Tours link */}
           <Animated.View entering={FadeInDown.delay(200).duration(350)}>
             <TouchableOpacity
-              className="mx-5 mb-5 flex-row items-center rounded-2xl border border-white/[0.08] bg-[#141414] p-4"
+              className="mx-5 mb-5 flex-row items-center rounded-2xl border border-white/[0.08] bg-surface-1 p-4"
               onPress={() => navigation.navigate(ROUTES.MAIN.MY_TOURS)}
               activeOpacity={0.85}
               accessibilityRole="button"
               accessibilityLabel="My Tours"
             >
-              <View className="w-10 h-10 rounded-full bg-[#C9A84C]/10 items-center justify-center mr-3">
+              <View className="w-10 h-10 rounded-full bg-brand-gold/10 items-center justify-center mr-3">
                 <BookOpen size={18} color="#C9A84C" />
               </View>
               <View className="flex-1">
-                <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-SemiBold']">
+                <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
                   My Tours
                 </Text>
-                <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular'] mt-0.5">
+                <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] mt-0.5">
                   Purchased and active tours
                 </Text>
               </View>
@@ -409,13 +409,13 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           {/* Permissions section */}
           <Animated.View
             entering={FadeInDown.delay(260).duration(350)}
-            className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-[#141414] p-4"
+            className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-4"
           >
             <View className="flex-row items-center gap-2.5 mb-4">
-              <View className="w-9 h-9 rounded-full bg-[#1E1E1E] items-center justify-center">
+              <View className="w-9 h-9 rounded-full bg-surface-2 items-center justify-center">
                 <Shield size={16} color="#C9A84C" />
               </View>
-              <Text className="text-[#F5F0E8] text-base font-['MontserratAlternates-SemiBold']">
+              <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
                 Permissions
               </Text>
             </View>
@@ -431,25 +431,25 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   ) : (
                     <MapPin size={16} color="#6B6357" />
                   )}
-                  <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-Medium']">
+                  <Text className="text-parchment text-sm font-['MontserratAlternates-Medium']">
                     {item.label}
                   </Text>
                 </View>
 
                 {item.granted ? (
-                  <View className="bg-[#10B981]/15 border border-[#10B981]/30 rounded-full px-2.5 py-1">
-                    <Text className="text-[#10B981] text-[10px] font-['MontserratAlternates-SemiBold']">
+                  <View className="bg-status-success/15 border border-status-success/30 rounded-full px-2.5 py-1">
+                    <Text className="text-status-success text-[10px] font-['MontserratAlternates-SemiBold']">
                       Granted
                     </Text>
                   </View>
                 ) : (
                   <TouchableOpacity
                     onPress={() => handleRequestPermission(item.key)}
-                    className="bg-[#D4860A]/15 border border-[#D4860A]/30 rounded-full px-2.5 py-1"
+                    className="bg-brand-amber/15 border border-brand-amber/30 rounded-full px-2.5 py-1"
                     accessibilityRole="button"
                     accessibilityLabel={`Grant ${item.label} permission`}
                   >
-                    <Text className="text-[#D4860A] text-[10px] font-['MontserratAlternates-SemiBold']">
+                    <Text className="text-brand-amber text-[10px] font-['MontserratAlternates-SemiBold']">
                       Grant
                     </Text>
                   </TouchableOpacity>
@@ -458,13 +458,13 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             ))}
 
             <TouchableOpacity
-              className="mt-3 flex-row items-center justify-center rounded-xl border border-white/[0.08] bg-[#1E1E1E] py-2.5"
+              className="mt-3 flex-row items-center justify-center rounded-xl border border-white/[0.08] bg-surface-2 py-2.5"
               onPress={() => PermissionService.openAppSettings()}
               accessibilityRole="button"
               accessibilityLabel="Open device settings"
             >
               <Shield size={14} color="#6B6357" />
-              <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-Medium'] ml-1.5">
+              <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Medium'] ml-1.5">
                 Open Device Settings
               </Text>
             </TouchableOpacity>
@@ -475,10 +475,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             entering={FadeInDown.delay(320).duration(350)}
             className="items-center py-6"
           >
-            <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Medium']">
+            <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Medium']">
               Version {APP_CONFIG.APP.VERSION}
             </Text>
-            <Text className="text-[#6B6357]/60 text-[10px] font-['MontserratAlternates-Regular'] mt-1">
+            <Text className="text-parchment-dim/60 text-[10px] font-['MontserratAlternates-Regular'] mt-1">
               Made with care for India's heritage
             </Text>
           </Animated.View>
@@ -489,18 +489,18 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             className="flex-row px-5 gap-3 mb-12"
           >
             <TouchableOpacity
-              className="flex-1 flex-row items-center justify-center rounded-xl bg-[#141414] border border-white/[0.08] py-3.5"
+              className="flex-1 flex-row items-center justify-center rounded-xl bg-surface-1 border border-white/[0.08] py-3.5"
               onPress={handleLogout}
               accessibilityRole="button"
               accessibilityLabel="Log out"
             >
               <LogOut size={16} color="#B8AF9E" />
-              <Text className="text-[#B8AF9E] text-sm font-['MontserratAlternates-SemiBold'] ml-2">
+              <Text className="text-parchment-muted text-sm font-['MontserratAlternates-SemiBold'] ml-2">
                 Log Out
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              className="flex-1 flex-row items-center justify-center rounded-xl border border-[#EF4444]/30 bg-[#EF4444]/5 py-3.5"
+              className="flex-1 flex-row items-center justify-center rounded-xl border border-status-danger/30 bg-status-danger/5 py-3.5"
               onPress={() =>
                 Alert.alert(
                   'Coming Soon',
@@ -511,7 +511,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessibilityLabel="Delete account"
             >
               <Trash2 size={16} color="#EF4444" />
-              <Text className="text-[#EF4444] text-sm font-['MontserratAlternates-SemiBold'] ml-2">
+              <Text className="text-status-danger text-sm font-['MontserratAlternates-SemiBold'] ml-2">
                 Delete Account
               </Text>
             </TouchableOpacity>

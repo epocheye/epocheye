@@ -170,7 +170,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
             motion="pulse"
             showRing={false}
           />
-          <Text className="font-['MontserratAlternates-Regular'] text-sm text-[#B8AF9E]">
+          <Text className="font-['MontserratAlternates-Regular'] text-sm text-parchment-muted">
             Creating account...
           </Text>
         </View>
@@ -182,7 +182,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         onPress={() => setShowEmailForm(false)}
         className="mt-2 items-center"
       >
-        <Text className="font-['MontserratAlternates-Medium'] text-sm text-[#8F8576]">
+        <Text className="font-['MontserratAlternates-Medium'] text-sm text-parchment-faint">
           Back to options
         </Text>
       </TouchableOpacity>
@@ -220,7 +220,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
               source={require('../../assets/images/logo-white.png')}
               className="size-20 my-5"
             />
-            <Text className="font-['MontserratAlternates-Regular'] text-[18px] text-[#B8AF9E]">
+            <Text className="font-['MontserratAlternates-Regular'] text-[18px] text-parchment-muted">
               {headingText}
             </Text>
             {fromOnboarding && (
@@ -237,9 +237,9 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
               onPress={() => navigation.navigate('OB10_Login')}
               className="mt-8 items-center"
             >
-              <Text className="font-['MontserratAlternates-Regular'] text-sm text-[#8F8576]">
+              <Text className="font-['MontserratAlternates-Regular'] text-sm text-parchment-faint">
                 Already have an account?{' '}
-                <Text className="font-['MontserratAlternates-SemiBold'] text-[#D4860A]">
+                <Text className="font-['MontserratAlternates-SemiBold'] text-brand-amber">
                   Log in
                 </Text>
               </Text>
@@ -252,7 +252,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
             </Text>
           )}
 
-          <Text className="mb-8 mt-10 text-center font-['MontserratAlternates-Regular'] text-xs text-[#6B6357]">
+          <Text className="mb-8 mt-10 text-center font-['MontserratAlternates-Regular'] text-xs text-parchment-dim">
             By continuing, you agree to our Terms & Privacy Policy
           </Text>
         </ScrollView>

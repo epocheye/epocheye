@@ -1,5 +1,15 @@
 /**
  * Shared hook for subject-image resolution.
+ *
+ * Resolution order:
+ *   1. In-memory Gemini cache hit → instant
+ *   2. AsyncStorage-persisted Gemini hit → instant
+ *   3. Fresh Gemini image generation call
+ *   4. Backend /api/v1/images/resolve fallback (legacy path)
+ *
+ * The Gemini path is primary because the backend resolver has been
+ * unreliable. Backend call remains as a last-resort fallback so we
+ * degrade gracefully when Gemini quota is exhausted.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -8,6 +18,10 @@ import {
   resolveSubjectImage,
   type ResolveSubjectImageParams,
 } from '../services/image-resolve.service';
+import {
+  generateMonumentImage,
+  peekMonumentImageFromMemory,
+} from '../../services/geminiImageService';
 
 export interface UseResolvedSubjectImageOptions {
   subject?: string | null;
@@ -69,14 +83,31 @@ export function useResolvedSubjectImage(
       return;
     }
 
-    const cached = getResolvedSubjectImageFromCache(params);
-    if (cached) {
+    // 1. Gemini in-memory cache (synchronous)
+    const geminiMemory = peekMonumentImageFromMemory({
+      subject: normalizedSubject,
+      context: normalizedContext,
+    });
+    if (geminiMemory) {
       setState({
-        url: cached.url,
+        url: geminiMemory.url,
         loading: false,
-        error: cached.error,
-        source: cached.source,
-        fromMemoryCache: cached.fromMemoryCache,
+        error: null,
+        source: 'gemini:memory',
+        fromMemoryCache: true,
+      });
+      return;
+    }
+
+    // 2. Legacy backend cache (kept for back-compat during transition)
+    const legacyCached = getResolvedSubjectImageFromCache(params);
+    if (legacyCached && legacyCached.url) {
+      setState({
+        url: legacyCached.url,
+        loading: false,
+        error: legacyCached.error,
+        source: legacyCached.source,
+        fromMemoryCache: legacyCached.fromMemoryCache,
       });
       return;
     }
@@ -87,11 +118,29 @@ export function useResolvedSubjectImage(
       error: null,
     }));
 
-    const resolved = await resolveSubjectImage(params);
+    // 3. Try Gemini (will hit AsyncStorage or call API)
+    const generated = await generateMonumentImage({
+      subject: normalizedSubject,
+      context: normalizedContext,
+    });
 
-    if (requestIdRef.current !== requestId) {
+    if (requestIdRef.current !== requestId) return;
+
+    if (generated) {
+      setState({
+        url: generated.url,
+        loading: false,
+        error: null,
+        source: generated.fromCache ? 'gemini:persisted' : 'gemini:generated',
+        fromMemoryCache: generated.fromCache,
+      });
       return;
     }
+
+    // 4. Last-resort: backend resolver
+    const resolved = await resolveSubjectImage(params);
+
+    if (requestIdRef.current !== requestId) return;
 
     setState({
       url: resolved.url,
@@ -100,7 +149,7 @@ export function useResolvedSubjectImage(
       source: resolved.source,
       fromMemoryCache: resolved.fromMemoryCache,
     });
-  }, [enabled, normalizedSubject, params, remote]);
+  }, [enabled, normalizedContext, normalizedSubject, params, remote]);
 
   useEffect(() => {
     runResolution().catch(() => {

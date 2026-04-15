@@ -93,14 +93,14 @@ const ExploreCard: React.FC<ExploreCardProps> = React.memo(
             >
               <View className="self-start flex-row items-center gap-1 rounded-full bg-[rgba(10,10,10,0.8)] border border-[rgba(201,168,76,0.35)] px-2 py-1">
                 <Compass color="#C9A84C" size={11} />
-                <Text className="text-[#F5F0E8] text-[10px] font-['MontserratAlternates-SemiBold']">
+                <Text className="text-parchment text-[10px] font-['MontserratAlternates-SemiBold']">
                   {distanceKm} km
                 </Text>
               </View>
 
               <View>
                 <Text
-                  className="text-[#F5F0E8] text-base font-['MontserratAlternates-Bold'] leading-5"
+                  className="text-parchment text-base font-['MontserratAlternates-Bold'] leading-5"
                   numberOfLines={2}
                 >
                   {place.name}
@@ -108,14 +108,14 @@ const ExploreCard: React.FC<ExploreCardProps> = React.memo(
                 <View className="flex-row items-center gap-1 mt-1">
                   <MapPin color="#B8AF9E" size={11} />
                   <Text
-                    className="text-[#B8AF9E] text-[11px] font-['MontserratAlternates-Medium'] flex-shrink"
+                    className="text-parchment-muted text-[11px] font-['MontserratAlternates-Medium'] flex-shrink"
                     numberOfLines={1}
                   >
                     {place.city}
                   </Text>
                 </View>
-                <View className="mt-3 self-start flex-row items-center gap-1 rounded-full bg-[#C9A84C] px-2.5 py-1.5">
-                  <Text className="text-[#0A0A0A] text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold']">
+                <View className="mt-3 self-start flex-row items-center gap-1 rounded-full bg-brand-gold px-2.5 py-1.5">
+                  <Text className="text-ink text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold']">
                     Explore
                   </Text>
                   <ArrowRight color="#0A0A0A" size={11} />
@@ -151,7 +151,7 @@ const SkeletonCard: React.FC = () => {
   return (
     <Animated.View
       style={animatedStyle}
-      className="flex-1 h-[220px] rounded-2xl bg-[#141414] border border-white/[0.08] p-3 justify-end"
+      className="flex-1 h-[220px] rounded-2xl bg-surface-1 border border-white/[0.08] p-3 justify-end"
     >
       <View className="w-16 h-5 rounded-full bg-white/10 mb-2.5" />
       <View className="w-3/4 h-[22px] rounded-md bg-white/[0.14] mb-2" />
@@ -174,7 +174,7 @@ const FilterChip: React.FC<FilterChipProps> = ({ label, active, onPress }) => (
     onPress={onPress}
     className={`mr-2 px-3 py-1.5 rounded-full border ${
       active
-        ? 'bg-[#C9A84C] border-[#C9A84C]'
+        ? 'bg-brand-gold border-brand-gold'
         : 'bg-transparent border-[rgba(201,168,76,0.3)]'
     }`}
     accessibilityRole="button"
@@ -182,7 +182,7 @@ const FilterChip: React.FC<FilterChipProps> = ({ label, active, onPress }) => (
   >
     <Text
       className={`text-xs font-['MontserratAlternates-SemiBold'] ${
-        active ? 'text-[#0A0A0A]' : 'text-[#B8AF9E]'
+        active ? 'text-ink' : 'text-parchment-muted'
       }`}
     >
       {label}
@@ -364,7 +364,7 @@ const Explore: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#000000]">
+    <SafeAreaView className="flex-1 bg-ink-deep">
       <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={['#000000', '#0C0A07', '#000000']}
@@ -375,10 +375,10 @@ const Explore: React.FC<Props> = ({ navigation }) => {
           {/* Header */}
           <View className="px-5 pt-5 pb-3 flex-row items-end justify-between">
             <View>
-              <Text className="font-['MontserratAlternates-SemiBold'] text-xs uppercase tracking-[1px] text-[#C9A84C]">
+              <Text className="font-['MontserratAlternates-SemiBold'] text-xs uppercase tracking-[1px] text-brand-gold">
                 DISCOVER
               </Text>
-              <Text className="mt-1 font-['MontserratAlternates-Bold'] text-[26px] leading-9 text-[#F5F0E8]">
+              <Text className="mt-1 font-['MontserratAlternates-Bold'] text-[26px] leading-9 text-parchment">
                 Explore Places
               </Text>
             </View>
@@ -387,7 +387,7 @@ const Explore: React.FC<Props> = ({ navigation }) => {
             <View className="flex-row items-center gap-2">
               <TouchableOpacity
                 onPress={toggleSort}
-                className="w-9 h-9 rounded-full bg-[#141414] border border-white/10 items-center justify-center"
+                className="w-9 h-9 rounded-full bg-surface-1 border border-white/10 items-center justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={`Sort by ${sortMode === 'distance' ? 'name' : 'distance'}`}
               >
@@ -395,7 +395,7 @@ const Explore: React.FC<Props> = ({ navigation }) => {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setViewMode(prev => (prev === 'grid' ? 'map' : 'grid'))}
-                className="w-9 h-9 rounded-full bg-[#141414] border border-white/10 items-center justify-center"
+                className="w-9 h-9 rounded-full bg-surface-1 border border-white/10 items-center justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={viewMode === 'grid' ? 'Switch to map view' : 'Switch to grid view'}
               >
@@ -409,7 +409,7 @@ const Explore: React.FC<Props> = ({ navigation }) => {
           </View>
 
           {/* Search bar */}
-          <View className="mx-5 mb-3 flex-row items-center bg-[#141414] border border-[rgba(255,255,255,0.1)] rounded-2xl px-3 py-2.5">
+          <View className="mx-5 mb-3 flex-row items-center bg-surface-1 border border-[rgba(255,255,255,0.1)] rounded-2xl px-3 py-2.5">
             <Search color="#6B6357" size={18} />
             <TextInput
               ref={searchRef}
@@ -417,7 +417,7 @@ const Explore: React.FC<Props> = ({ navigation }) => {
               onChangeText={setSearchText}
               placeholder="Search heritage sites..."
               placeholderTextColor="#6B6357"
-              className="flex-1 ml-2.5 text-[#F5F0E8] text-sm font-['MontserratAlternates-Regular']"
+              className="flex-1 ml-2.5 text-parchment text-sm font-['MontserratAlternates-Regular']"
               returnKeyType="search"
               autoCorrect={false}
               autoCapitalize="none"
@@ -475,7 +475,7 @@ const Explore: React.FC<Props> = ({ navigation }) => {
 
           {/* Clear filters + results count */}
           <View className="mx-5 mb-3 flex-row items-center justify-between">
-            <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
+            <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular']">
               {isLoadingNearby
                 ? 'Loading...'
                 : `${filteredPlaces.length} site${filteredPlaces.length !== 1 ? 's' : ''} found`}
@@ -489,7 +489,7 @@ const Explore: React.FC<Props> = ({ navigation }) => {
                   setActiveCategory(null);
                 }}
               >
-                <Text className="text-[#C9A84C] text-xs font-['MontserratAlternates-Medium']">
+                <Text className="text-brand-gold text-xs font-['MontserratAlternates-Medium']">
                   Clear filters
                 </Text>
               </TouchableOpacity>
@@ -507,10 +507,10 @@ const Explore: React.FC<Props> = ({ navigation }) => {
           ) : filteredPlaces.length === 0 ? (
             <View className="flex-1 items-center justify-center px-8 pb-16">
               <MapPin color="#C9A84C" size={40} />
-              <Text className="mt-4 text-[#F5F0E8] text-lg text-center font-['MontserratAlternates-SemiBold']">
+              <Text className="mt-4 text-parchment text-lg text-center font-['MontserratAlternates-SemiBold']">
                 No places found
               </Text>
-              <Text className="mt-2 text-[#B8AF9E] text-sm text-center font-['MontserratAlternates-Regular']">
+              <Text className="mt-2 text-parchment-muted text-sm text-center font-['MontserratAlternates-Regular']">
                 {hasActiveFilter
                   ? 'Try adjusting your filters or search term.'
                   : 'Move closer to a heritage site or enable location access.'}
