@@ -52,10 +52,19 @@ export type MainStackParamList = {
   Lens: undefined;
   SiteDetail: { site: PlaceNavParam };
   ARExperience: { site: PlaceNavParam };
+  ARComposer: {
+    monumentId: string;
+    objectLabel: string;
+    glbUrl: string;
+    thumbnailUrl?: string;
+    cached: boolean;
+    provider: string;
+  };
   TourList: { monumentId?: string; monumentName?: string } | undefined;
   TourDetail: { tourId: string; tourTitle: string };
   MyTours: undefined;
   Purchase: { preSelectedPlaceId?: string } | undefined;
+  Notifications: undefined;
 };
 
 /**
@@ -64,6 +73,7 @@ export type MainStackParamList = {
 export type TabParamList = {
   Home: undefined;
   Explore: undefined;
+  Plan: undefined;
   Challenges: undefined;
   Saved: undefined;
   Settings: undefined;

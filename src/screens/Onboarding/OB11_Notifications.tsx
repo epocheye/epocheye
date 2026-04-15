@@ -11,7 +11,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {BellRing} from 'lucide-react-native';
-import {requestNotifications} from 'react-native-permissions';
+import {requestNotifications, RESULTS} from 'react-native-permissions';
+import {fcmRegisterAfterPermission} from '../../services/fcmService';
 import {OB_COLORS} from '../../constants/onboarding';
 import {FONTS} from '../../core/constants/theme';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
@@ -68,7 +69,12 @@ const OB11_Notifications: React.FC<Props> = ({navigation}) => {
 
   const handleEnable = async () => {
     try {
-      await requestNotifications(['alert', 'badge', 'sound']);
+      const {status} = await requestNotifications(['alert', 'badge', 'sound']);
+      if (status === RESULTS.GRANTED || status === RESULTS.LIMITED) {
+        // Push the FCM token to the backend now that we're allowed to receive
+        // notifications. Fire-and-forget — next-launch fcmInit() is the safety net.
+        void fcmRegisterAfterPermission();
+      }
     } catch {}
     navigation.navigate('OB12_Arrival');
   };

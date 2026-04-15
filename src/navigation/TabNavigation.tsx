@@ -8,10 +8,12 @@ import Explore from '../screens/Main/Explore';
 import Challenges from '../screens/Main/Challenges.tsx';
 import Saved from '../screens/Main/Saved';
 import SettingsScreen from '../screens/Main/SettingsScreen';
+import PlanScreen from '../screens/Plan/PlanScreen';
 import {
   HomeIcon,
   Bookmark,
   Map,
+  Route,
   Trophy,
   Settings,
   Sparkles,
@@ -76,6 +78,8 @@ const getTabIcon = (
       return <HomeIcon color={color} size={iconSize} />;
     case ROUTES.TABS.EXPLORE:
       return <Map color={color} size={iconSize} />;
+    case ROUTES.TABS.PLAN:
+      return <Route color={color} size={iconSize} />;
     case ROUTES.TABS.CHALLENGES:
       return <Trophy color={color} size={iconSize} />;
     case ROUTES.TABS.SAVED:
@@ -167,6 +171,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
     >
       <Tab.Screen name={ROUTES.TABS.HOME} component={Home} />
       <Tab.Screen name={ROUTES.TABS.EXPLORE} component={Explore} />
+      <Tab.Screen name={ROUTES.TABS.PLAN} component={PlanScreen} />
       <Tab.Screen
         name={ROUTES.TABS.CHALLENGES}
         component={Challenges}

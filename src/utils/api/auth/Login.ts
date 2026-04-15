@@ -177,6 +177,11 @@ export async function getValidAccessToken(): Promise<string | null> {
  */
 export async function logout(): Promise<void> {
   await clearTokens();
+  // Drop cached FCM token so the next user's device registers a fresh row.
+  try {
+    const { fcmClearCachedToken } = await import('../../../services/fcmService');
+    await fcmClearCachedToken();
+  } catch {}
 }
 
 /**

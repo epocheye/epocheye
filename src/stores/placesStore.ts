@@ -11,6 +11,7 @@ import {
   type SavedPlace,
 } from '../utils/api/places';
 import { useSessionStore } from './sessionStore';
+import { PermissionService } from '../shared/services/permission.service';
 
 interface LocationData {
   latitude: number;
@@ -199,6 +200,20 @@ export const usePlacesStore = create<PlacesStoreState>((set, get) => ({
   isTrackingLocation: false,
   ensureLocationTracking: async () => {
     if (!useSessionStore.getState().authenticated || get().isTrackingLocation) {
+      return;
+    }
+
+    // Request runtime permission before touching Geolocation. On Android 6+
+    // Geolocation.getCurrentPosition silently fails without this; on iOS the
+    // system prompt fires here rather than inside the native module.
+    const hasPermission =
+      (await PermissionService.check('location')) ||
+      (await PermissionService.request('location'));
+    if (!hasPermission) {
+      set({
+        isTrackingLocation: false,
+        nearbyError: 'Location permission denied',
+      });
       return;
     }
 

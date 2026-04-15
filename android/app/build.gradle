@@ -131,4 +131,5 @@ dependencies {
     // ARCore + SceneView for 3D-anchored heritage info cards
     implementation 'com.google.ar:core:1.44.0'
     implementation 'io.github.sceneview:arsceneview:2.2.1'
+    implementation 'androidx.lifecycle:lifecycle-process:2.7.0'
 }

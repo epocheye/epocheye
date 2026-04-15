@@ -1,10 +1,12 @@
 import './global.css';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation';
 import { NetworkProvider, useNetwork } from './src/context';
 import NoInternetScreen from './src/screens/NoInternetScreen';
+import { fcmInit } from './src/services/fcmService';
+import { useArQuotaStore } from './src/stores/arQuotaStore';
 
 /**
  * Main app content that handles network state
@@ -24,6 +26,15 @@ const AppContent: React.FC = () => {
 };
 
 export default function App() {
+  useEffect(() => {
+    // Best-effort — FCM registration is skipped silently until the user is
+    // authenticated and has granted notification permission.
+    void fcmInit();
+    // Pull AR quota + config so the quota pill + maintenance banner render
+    // correctly from first paint. Unauth requests are silently dropped.
+    void useArQuotaStore.getState().refresh();
+  }, []);
+
   return (
     <SafeAreaProvider style={{ backgroundColor: '#000000' }}>
       <NetworkProvider>

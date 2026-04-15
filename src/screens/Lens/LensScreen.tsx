@@ -54,8 +54,12 @@ import { fetchZones } from '../../services/zoneService';
 import { trackUsageEvent } from '../../services/usageTelemetryService';
 import { performHDScan, type HDScanMask } from '../../services/hdScanService';
 import { getValidAccessToken } from '../../utils/api/auth';
+import { logVisit } from '../../utils/api/userActions';
 import { useARCore } from '../../shared/hooks/useARCore';
 import EpocheyeARView from '../../native/EpocheyeARView';
+import { reconstructForLens } from '../../services/arReconstructionService';
+import { useArQuotaStore } from '../../stores/arQuotaStore';
+import ARQuotaPill from '../../components/ARQuotaPill';
 import AncestorStorySheet, {
   type AncestorStorySheetRef,
 } from './components/AncestorStorySheet';
@@ -144,6 +148,21 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   );
   const [identifiedObject, setIdentifiedObject] =
     useState<LensIdentifiedObject | null>(null);
+
+  // Reconstruction state for the "View in 3D" CTA shown after object_scan.
+  const [reconstructionReady, setReconstructionReady] = useState<null | {
+    glbUrl: string;
+    thumbnailUrl?: string;
+    provider: string;
+    cached: boolean;
+    objectLabel: string;
+  }>(null);
+  const [reconstructionLoading, setReconstructionLoading] = useState(false);
+  const [reconstructionQuotaExceeded, setReconstructionQuotaExceeded] =
+    useState(false);
+  const lastCapturedImageRef = useRef<string | null>(null);
+
+  const arEnabled = useArQuotaStore(state => state.enabled && !state.maintenanceMode);
 
   // ── Gemini identification state ──
   const [geminiResult, setGeminiResult] = useState<GeminiIdentification | null>(
@@ -491,6 +510,66 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [firstName, matchedPlace, regions]);
 
+  const triggerReconstruction = useCallback(
+    async (monumentName: string, objectLabel: string) => {
+      if (!arEnabled || !objectLabel) {
+        return;
+      }
+      setReconstructionLoading(true);
+      setReconstructionQuotaExceeded(false);
+      try {
+        const result = await reconstructForLens({
+          monumentId: monumentName,
+          objectLabel,
+          imageBase64: lastCapturedImageRef.current ?? undefined,
+        });
+        if (result.kind === 'success') {
+          setReconstructionReady({
+            glbUrl: result.glbUrl,
+            thumbnailUrl: result.thumbnailUrl,
+            provider: result.provider,
+            cached: result.cached,
+            objectLabel,
+          });
+          track('lens_reconstruction_ready', {
+            monument: monumentName,
+            object: objectLabel,
+            cached: result.cached ? 'true' : 'false',
+            provider: result.provider,
+          });
+        } else if (result.kind === 'quota_exceeded') {
+          setReconstructionQuotaExceeded(true);
+          track('lens_reconstruction_quota_hit', {
+            plan: result.info.current_plan,
+          });
+        } else {
+          track('lens_reconstruction_error', { message: result.message });
+        }
+      } finally {
+        setReconstructionLoading(false);
+      }
+    },
+    [arEnabled],
+  );
+
+  const openReconstruction = useCallback(() => {
+    if (!reconstructionReady || !matchedPlace) {
+      return;
+    }
+    navigation.navigate(ROUTES.MAIN.AR_COMPOSER, {
+      monumentId: matchedPlace.name,
+      objectLabel: reconstructionReady.objectLabel,
+      glbUrl: reconstructionReady.glbUrl,
+      thumbnailUrl: reconstructionReady.thumbnailUrl,
+      cached: reconstructionReady.cached,
+      provider: reconstructionReady.provider,
+    });
+    track('lens_reconstruction_opened', {
+      monument: matchedPlace.name,
+      object: reconstructionReady.objectLabel,
+    });
+  }, [navigation, reconstructionReady, matchedPlace]);
+
   const handleScanObject = useCallback(async () => {
     if (!matchedPlace) {
       return;
@@ -507,6 +586,9 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     setStoryMode('object_scan');
     setIdentifiedObject(null);
     setIsScanModeActive(true);
+    setReconstructionReady(null);
+    setReconstructionQuotaExceeded(false);
+    lastCapturedImageRef.current = null;
 
     try {
       const photo = await cameraRef.current?.takePhoto();
@@ -516,6 +598,15 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       }
 
       const imageUri = normalizePhotoUri(photo.path);
+      // Keep the base64 around so we can hand it to the reconstruction
+      // endpoint once the object is identified in the SSE stream.
+      fileToBase64(photo.path)
+        .then(b64 => {
+          lastCapturedImageRef.current = b64;
+        })
+        .catch(() => {
+          lastCapturedImageRef.current = null;
+        });
       storySheetRef.current?.open();
 
       storyAbortRef.current = streamLensStory({
@@ -540,6 +631,10 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
               objectName: object?.name ?? 'unknown',
               confidence: 'from_done_event_if_available',
             });
+
+            // Fire reconstruction in parallel; the story UI continues to
+            // show immediately and the CTA appears once the GLB is ready.
+            void triggerReconstruction(matchedPlace.name, object.name ?? '');
           }
 
           track('lens_story_generated', {
@@ -566,7 +661,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         mode: 'object_scan',
       });
     }
-  }, [firstName, matchedPlace, motivation, regions]);
+  }, [firstName, matchedPlace, motivation, regions, triggerReconstruction]);
 
   const handleIdentify = useCallback(async () => {
     if (geminiLoading) {
@@ -631,6 +726,12 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         setGeminiResult(result.data);
         track('lens_identify_success', { name: result.data.name });
         trackUsageEvent('gemini_identify', activeZone?.id);
+
+        // Log the visit so it counts toward history + personalization signals.
+        // Best-effort — never block the identify flow on the visit-log call.
+        if (matchedPlace?.id) {
+          void logVisit(matchedPlace.id);
+        }
 
         // Cache for offline use (premium only)
         if (canUseOffline) {
@@ -905,6 +1006,31 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
 
         <EpochChips visible={state === 'matched'} onPress={handleOpenStory} />
 
+        {/* AR reconstruction CTA — shown after the object_scan SSE identifies an
+            object and the reconstruct API returns a GLB. Tapping navigates to
+            the dedicated composer screen. */}
+        {(reconstructionReady || reconstructionLoading || reconstructionQuotaExceeded) && (
+          <View style={[styles.reconstructionBar, { bottom: insets.bottom + 180 }]}>
+            <ARQuotaPill compact />
+            {reconstructionLoading && (
+              <Text style={styles.reconstructionText}>Building 3D model…</Text>
+            )}
+            {reconstructionReady && !reconstructionLoading && (
+              <Pressable style={styles.reconstructionCta} onPress={openReconstruction}>
+                <Text style={styles.reconstructionCtaText}>View in 3D</Text>
+              </Pressable>
+            )}
+            {reconstructionQuotaExceeded && (
+              <Pressable
+                style={styles.reconstructionCta}
+                onPress={handleUpgradePremium}
+              >
+                <Text style={styles.reconstructionCtaText}>Upgrade for more</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
         <BottomCard
           state={state}
           place={matchedPlace}
@@ -1074,6 +1200,37 @@ const styles = StyleSheet.create({
     color: '#8C93A0',
     fontSize: 13,
     fontFamily: FONTS.regular,
+  },
+  reconstructionBar: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 10,
+    backgroundColor: 'rgba(13,13,13,0.88)',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(232,160,32,0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    zIndex: 6,
+  },
+  reconstructionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: FONTS.medium,
+    paddingHorizontal: 4,
+  },
+  reconstructionCta: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#E8A020',
+    borderRadius: 999,
+  },
+  reconstructionCtaText: {
+    color: '#0D0D0D',
+    fontSize: 12,
+    fontFamily: FONTS.bold,
   },
 });
 

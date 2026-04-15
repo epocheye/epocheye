@@ -53,14 +53,14 @@ class EpocheyeARView(context: Context) : FrameLayout(context) {
 
     private fun setupAR() {
         try {
-            val sceneView = ARSceneView(context).apply {
+            val sceneView = ARSceneView(
+                context = context,
+                sharedLifecycle = ProcessLifecycleOwner.get().lifecycle,
+            ).apply {
                 layoutParams = LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 )
-                // Tie ARSceneView lifecycle to the app's process lifecycle
-                // so pause/resume propagate automatically.
-                sharedLifecycle = ProcessLifecycleOwner.get().lifecycle
 
                 configureSession { _, config ->
                     config.depthMode = Config.DepthMode.DISABLED

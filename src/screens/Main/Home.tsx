@@ -52,6 +52,8 @@ import {
 import type { PersonalizedFact } from '../../utils/api/user';
 import { getTours, getMyTours } from '../../utils/api/tours';
 import type { Tour, MyTour } from '../../utils/api/tours';
+import { getRecommendations } from '../../utils/api/recommendations';
+import type { Recommendation } from '../../utils/api/recommendations';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { buildSiteDetailData, getPlaceImage } from '../../shared/utils';
 import { useExplorerPass } from '../../shared/hooks';
@@ -241,6 +243,7 @@ const Home = ({ navigation }: Props) => {
   const isLoadingNearby = usePlaces(state => state.isLoadingNearby);
   const nearbyError = usePlaces(state => state.nearbyError);
   const ensureLocationTracking = usePlaces(state => state.ensureLocationTracking);
+  const currentLocation = usePlaces(state => state.currentLocation);
   const profile = useUser(state => state.profile);
 
   const [factsVisible, setFactsVisible] = useState(true);
@@ -256,6 +259,8 @@ const Home = ({ navigation }: Props) => {
   >({});
   const [tours, setTours] = useState<Tour[]>([]);
   const [bannerTour, setBannerTour] = useState<MyTour | null>(null);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(true);
   const { hasAnyActivePass, loading: explorerPassLoading } = useExplorerPass();
 
   const entrance = useSharedValue(24);
@@ -364,7 +369,7 @@ const Home = ({ navigation }: Props) => {
       regionHint: topNearbyPlaces[0]?.country,
     });
 
-    if (result.success && result.data.facts.length > 0) {
+    if (result.success && result.data.facts?.length > 0) {
       setFacts(result.data.facts.slice(0, 3));
       setFactDetailsById({});
       setActiveFactId(null);
@@ -407,6 +412,26 @@ const Home = ({ navigation }: Props) => {
       task.cancel();
     };
   }, []);
+
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setIsLoadingRecommendations(true);
+      getRecommendations({
+        limit: 8,
+        lat: currentLocation?.latitude,
+        lon: currentLocation?.longitude,
+      }).then(result => {
+        if (result.success) {
+          setRecommendations(result.data.items ?? []);
+        }
+        setIsLoadingRecommendations(false);
+      });
+    });
+
+    return () => {
+      task.cancel();
+    };
+  }, [currentLocation?.latitude, currentLocation?.longitude]);
 
   // Check if user has a free tour they haven't seen yet
   useEffect(() => {
@@ -724,6 +749,81 @@ const Home = ({ navigation }: Props) => {
                     </Animated.View>
                   ))}
                 </ScrollView>
+              </View>
+            )}
+
+            {/* Recommended for you */}
+            {(isLoadingRecommendations || recommendations.length > 0) && (
+              <View className="mt-6 mb-2">
+                <View className="flex-row items-center gap-2 mb-3">
+                  <Compass color="#C9A84C" size={18} />
+                  <Text className="text-parchment text-[22px] leading-[30px] font-['MontserratAlternates-SemiBold']">
+                    Recommended for you
+                  </Text>
+                </View>
+                {isLoadingRecommendations ? (
+                  <View className="flex-row gap-3">
+                    <SkeletonCard />
+                    <SkeletonCard />
+                  </View>
+                ) : (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 12, paddingRight: 8, paddingBottom: 4 }}
+                  >
+                    {recommendations.map((rec, recIndex) => (
+                      <Animated.View
+                        key={rec.monument_id}
+                        entering={FadeInDown.delay(recIndex * 60).duration(400)}
+                      >
+                        <TouchableOpacity
+                          onPress={() =>
+                            navigation.navigate('SiteDetail', {
+                              site: {
+                                id: rec.monument_id,
+                                name: rec.name,
+                                city: rec.city,
+                                country: rec.country,
+                                lat: rec.latitude,
+                                lon: rec.longitude,
+                                formatted: [rec.city, rec.state, rec.country]
+                                  .filter(Boolean)
+                                  .join(', '),
+                              },
+                            })
+                          }
+                          className="w-48 rounded-[16px] p-3"
+                          style={{
+                            backgroundColor: NOIR.cardBg,
+                            borderWidth: 1,
+                            borderColor: NOIR.cardBorder,
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <Text
+                            className="text-brand-amber text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold'] mb-1"
+                            numberOfLines={1}
+                          >
+                            {rec.state || rec.country || 'Heritage'}
+                          </Text>
+                          <Text
+                            className="text-parchment text-sm font-['MontserratAlternates-Bold'] leading-5 mb-2"
+                            numberOfLines={2}
+                          >
+                            {rec.name}
+                          </Text>
+                          <Text
+                            className="text-parchment-dim text-[11px] font-['MontserratAlternates-Regular']"
+                            numberOfLines={1}
+                          >
+                            {rec.reason}
+                          </Text>
+                        </TouchableOpacity>
+                      </Animated.View>
+                    ))}
+                  </ScrollView>
+                )}
               </View>
             )}
 

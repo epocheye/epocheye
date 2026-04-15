@@ -70,8 +70,18 @@ export function useTourPurchase(): UseTourPurchaseReturn {
           return null;
         }
 
+        // Surface a clear message instead of letting Razorpay throw a cryptic
+        // error when the public key isn't configured in .env.
+        if (!RAZORPAY_KEY_ID?.trim()) {
+          Alert.alert(
+            'Payment unavailable',
+            'Checkout is not configured on this build. Please update the app.',
+          );
+          return null;
+        }
+
         const options = {
-          key: RAZORPAY_KEY_ID || '',
+          key: RAZORPAY_KEY_ID,
           amount: String(init.amount_paise),
           currency: init.currency || 'INR',
           name: 'EpochEye',
