@@ -5,6 +5,8 @@ import type {
   QuotaExceededResponse,
   ReconstructRequest,
   ReconstructResponse,
+  ScanContributeRequest,
+  ScanContributeResponse,
   UserArConfig,
 } from './types';
 
@@ -39,6 +41,21 @@ export async function reconstructObject(
         data: error.response.data as QuotaExceededResponse,
       };
     }
+    return createErrorResult(error);
+  }
+}
+
+export async function contributeScan(
+  req: ScanContributeRequest,
+): Promise<ArResult<ScanContributeResponse>> {
+  try {
+    const client = createAuthenticatedClient();
+    const resp = await client.post<ScanContributeResponse>(
+      '/api/lens/scan-contribute',
+      req,
+    );
+    return { success: true, data: resp.data };
+  } catch (error) {
     return createErrorResult(error);
   }
 }

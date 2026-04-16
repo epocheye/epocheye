@@ -156,6 +156,8 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     provider: string;
     cached: boolean;
     objectLabel: string;
+    quality?: string;
+    scanCount?: number;
   }>(null);
   const [reconstructionLoading, setReconstructionLoading] = useState(false);
   const [reconstructionQuotaExceeded, setReconstructionQuotaExceeded] =
@@ -530,6 +532,8 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
             provider: result.provider,
             cached: result.cached,
             objectLabel,
+            quality: result.quality,
+            scanCount: result.scanCount,
           });
           track('lens_reconstruction_ready', {
             monument: monumentName,
@@ -563,6 +567,8 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       thumbnailUrl: reconstructionReady.thumbnailUrl,
       cached: reconstructionReady.cached,
       provider: reconstructionReady.provider,
+      quality: reconstructionReady.quality,
+      scanCount: reconstructionReady.scanCount,
     });
     track('lens_reconstruction_opened', {
       monument: matchedPlace.name,

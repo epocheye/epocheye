@@ -15,10 +15,19 @@ interface ArQuotaState {
   lastSyncedAt: number | null;
   syncing: boolean;
   error: string | null;
+  scanCount: number;
+  quality: string;
+  isImproving: boolean;
 
   refresh: () => Promise<void>;
   applyServerSnapshot: (cfg: UserArConfig) => void;
-  applyReconstructionResult: (quotaRemaining: number, quotaLimit: number) => void;
+  applyReconstructionResult: (
+    quotaRemaining: number,
+    quotaLimit: number,
+    scanCount?: number,
+    quality?: string,
+    isImproving?: boolean,
+  ) => void;
   reset: () => void;
 }
 
@@ -35,6 +44,9 @@ const initialState = {
   lastSyncedAt: null as number | null,
   syncing: false,
   error: null as string | null,
+  scanCount: 0,
+  quality: 'none',
+  isImproving: false,
 };
 
 export const useArQuotaStore = create<ArQuotaState>((set, get) => ({
@@ -70,10 +82,13 @@ export const useArQuotaStore = create<ArQuotaState>((set, get) => ({
 
   // After a successful reconstruction, backend returns the new remaining count;
   // apply it optimistically so the quota pill updates before the next 60s refresh.
-  applyReconstructionResult: (quotaRemaining, quotaLimit) => {
+  applyReconstructionResult: (quotaRemaining, quotaLimit, scanCount?, quality?, isImproving?) => {
     set({
       todayRemaining: quotaRemaining,
       todayUsed: Math.max(0, quotaLimit - quotaRemaining),
+      ...(scanCount != null && { scanCount }),
+      ...(quality != null && { quality }),
+      ...(isImproving != null && { isImproving }),
     });
   },
 

@@ -59,6 +59,8 @@ export type MainStackParamList = {
     thumbnailUrl?: string;
     cached: boolean;
     provider: string;
+    quality?: 'none' | 'single_view' | 'multi_view' | string;
+    scanCount?: number;
   };
   TourList: { monumentId?: string; monumentName?: string } | undefined;
   TourDetail: { tourId: string; tourTitle: string };

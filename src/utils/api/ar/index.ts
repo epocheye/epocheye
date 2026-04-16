@@ -5,4 +5,6 @@ export type {
   QuotaExceededResponse,
   UserArConfig,
   ArResult,
+  ScanContributeRequest,
+  ScanContributeResponse,
 } from './types';

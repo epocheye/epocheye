@@ -19,7 +19,7 @@ jest.mock('../../src/utils/api/helpers', () => {
   };
 });
 
-import { getArConfig, reconstructObject } from '../../src/utils/api/ar/Ar';
+import { getArConfig, reconstructObject, contributeScan } from '../../src/utils/api/ar/Ar';
 
 describe('getArConfig', () => {
   beforeEach(() => {
@@ -53,12 +53,12 @@ describe('reconstructObject', () => {
     await reconstructObject({
       monument_id: 'konark',
       object_label: 'charioteer',
-      image_b64: 'abc',
+      image_base64: 'abc',
     });
 
     expect(mockPost).toHaveBeenCalledWith(
       '/api/lens/reconstruct',
-      { monument_id: 'konark', object_label: 'charioteer', image_b64: 'abc' },
+      { monument_id: 'konark', object_label: 'charioteer', image_base64: 'abc' },
     );
   });
 
@@ -77,7 +77,7 @@ describe('reconstructObject', () => {
     const res = await reconstructObject({
       monument_id: 'konark',
       object_label: 'charioteer',
-      image_b64: 'abc',
+      image_base64: 'abc',
     });
 
     expect(res.success).toBe(false);
@@ -92,11 +92,50 @@ describe('reconstructObject', () => {
     const res = await reconstructObject({
       monument_id: 'x',
       object_label: 'y',
-      image_b64: '',
+      image_base64: '',
     });
     expect(res.success).toBe(false);
     if (!res.success) {
       expect(res.quotaExceeded).toBeFalsy();
     }
+  });
+});
+
+describe('contributeScan', () => {
+  beforeEach(() => {
+    mockPost.mockReset();
+  });
+
+  it('posts to /api/lens/scan-contribute', async () => {
+    mockPost.mockResolvedValueOnce({
+      data: { scan_stored: true, scan_count: 5, rebuild_triggered: false, message: 'ok' },
+    });
+
+    const res = await contributeScan({
+      monument_id: 'konark',
+      object_label: 'charioteer',
+      image_base64: 'abc123',
+    });
+
+    expect(mockPost).toHaveBeenCalledWith('/api/lens/scan-contribute', {
+      monument_id: 'konark',
+      object_label: 'charioteer',
+      image_base64: 'abc123',
+    });
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.scan_stored).toBe(true);
+      expect(res.data.scan_count).toBe(5);
+    }
+  });
+
+  it('returns failure on network error', async () => {
+    mockPost.mockRejectedValueOnce(new Error('offline'));
+    const res = await contributeScan({
+      monument_id: 'x',
+      object_label: 'y',
+      image_base64: '',
+    });
+    expect(res.success).toBe(false);
   });
 });

@@ -17,6 +17,9 @@ export interface ReconstructResponse {
   quota_remaining: number;
   quota_limit: number;
   user_tier: 'free' | 'premium' | string;
+  scan_count: number;
+  reconstruction_quality: 'none' | 'single_view' | 'multi_view' | string;
+  is_improving: boolean;
 }
 
 export interface QuotaExceededResponse {
@@ -38,6 +41,19 @@ export interface UserArConfig {
   today_used: number;
   today_remaining: number;
   next_reset: string;
+}
+
+export interface ScanContributeRequest {
+  monument_id: string;
+  object_label: string;
+  image_base64: string;
+}
+
+export interface ScanContributeResponse {
+  scan_stored: boolean;
+  scan_count: number;
+  rebuild_triggered: boolean;
+  message: string;
 }
 
 export type ArResult<T> =

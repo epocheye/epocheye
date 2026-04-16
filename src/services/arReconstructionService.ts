@@ -1,4 +1,4 @@
-import { reconstructObject } from '../utils/api/ar';
+import { reconstructObject, contributeScan } from '../utils/api/ar';
 import type {
   QuotaExceededResponse,
   ReconstructResponse,
@@ -12,6 +12,9 @@ export type ArReconstructionResult =
       thumbnailUrl?: string;
       provider: string;
       cached: boolean;
+      scanCount: number;
+      quality: string;
+      isImproving: boolean;
     }
   | {
       kind: 'quota_exceeded';
@@ -52,14 +55,34 @@ export async function reconstructForLens(
     if (!payload.cached) {
       useArQuotaStore
         .getState()
-        .applyReconstructionResult(payload.quota_remaining, payload.quota_limit);
+        .applyReconstructionResult(
+          payload.quota_remaining,
+          payload.quota_limit,
+          payload.scan_count,
+          payload.reconstruction_quality,
+          payload.is_improving,
+        );
     }
+
+    // Cached results skip StoreScan on the backend. Contribute the scan
+    // in the background so the monument still accumulates angles.
+    if (payload.cached && input.imageBase64) {
+      contributeScan({
+        monument_id: input.monumentId,
+        object_label: input.objectLabel,
+        image_base64: input.imageBase64,
+      }).catch(() => {}); // fire-and-forget
+    }
+
     return {
       kind: 'success',
       glbUrl: payload.glb_url,
       thumbnailUrl: payload.thumbnail_url,
       provider: payload.provider,
       cached: payload.cached,
+      scanCount: payload.scan_count ?? 0,
+      quality: payload.reconstruction_quality ?? 'none',
+      isImproving: payload.is_improving ?? false,
     };
   }
 

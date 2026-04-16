@@ -22,8 +22,16 @@ type Props = MainScreenProps<'ARComposer'>;
 // bundle, replace the thumbnail View below with a GLView + GLTFLoader; the
 // route, params, and quota flow stay identical.
 const ARComposer: React.FC<Props> = ({ navigation, route }) => {
-  const { monumentId, objectLabel, glbUrl, thumbnailUrl, cached, provider } =
-    route.params;
+  const {
+    monumentId,
+    objectLabel,
+    glbUrl,
+    thumbnailUrl,
+    cached,
+    provider,
+    quality = 'none',
+    scanCount = 0,
+  } = route.params;
   const insets = useSafeAreaInsets();
 
   const openExternally = useCallback(() => {
@@ -73,6 +81,25 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
               {cached ? 'Cached' : 'Generated'} · {provider}
             </Text>
           </View>
+          {quality === 'multi_view' && (
+            <View style={[styles.badge, styles.badgeGreen]}>
+              <Text style={[styles.badgeText, styles.badgeGreenText]}>
+                Community 3D
+              </Text>
+            </View>
+          )}
+          {quality === 'single_view' && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Basic 3D</Text>
+            </View>
+          )}
+          {scanCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {scanCount} {scanCount === 1 ? 'scan' : 'scans'}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -155,6 +182,13 @@ const styles = StyleSheet.create({
     color: '#E8A020',
     fontFamily: FONTS.semiBold,
     fontSize: 11,
+  },
+  badgeGreen: {
+    backgroundColor: 'rgba(76,175,80,0.14)',
+    borderColor: 'rgba(76,175,80,0.35)',
+  },
+  badgeGreenText: {
+    color: '#4CAF50',
   },
   footer: {
     paddingHorizontal: 24,
