@@ -40,17 +40,17 @@ npm install --legacy-peer-deps
 
 ## Source Directory Boundaries
 
-| Directory | Responsibility |
-| --- | --- |
-| `src/screens` | UI composition — screens only, no business logic |
-| `src/components` | Reusable UI components |
-| `src/navigation` | Route definitions and flow orchestration |
-| `src/stores` | Zustand app state |
-| `src/shared` | Reusable hooks, API clients, services, and utilities |
-| `src/core` | Config, constants, and shared types |
-| `src/utils/api` | Domain-specific API call functions |
-| `src/services` | SSE streaming and other stateful services |
-| `src/context` | Compatibility no-op wrappers (don't add new context here) |
+| Directory        | Responsibility                                            |
+| ---------------- | --------------------------------------------------------- |
+| `src/screens`    | UI composition — screens only, no business logic          |
+| `src/components` | Reusable UI components                                    |
+| `src/navigation` | Route definitions and flow orchestration                  |
+| `src/stores`     | Zustand app state                                         |
+| `src/shared`     | Reusable hooks, API clients, services, and utilities      |
+| `src/core`       | Config, constants, and shared types                       |
+| `src/utils/api`  | Domain-specific API call functions                        |
+| `src/services`   | SSE streaming and other stateful services                 |
+| `src/context`    | Compatibility no-op wrappers (don't add new context here) |
 
 ---
 
@@ -86,11 +86,11 @@ Auth transitions are driven by callbacks (`onLoginSuccess`, `handleOnboardingCom
 
 All runtime state lives in four Zustand stores (no React context providers needed):
 
-| Store | Hook | Purpose |
-| --- | --- | --- |
-| `sessionStore.ts` | `useSessionStore` | `authenticated`, `bootstrapped`; `bootstrapSession()` on startup |
-| `userStore.ts` | `useUserStore` | Profile + stats; `ensureUserDataLoaded()`, `refreshUserData()` |
-| `placesStore.ts` | `usePlacesStore` | Geo-tracking, nearby/saved places; `ensureLocationTracking()` |
+| Store                | Hook                 | Purpose                                                               |
+| -------------------- | -------------------- | --------------------------------------------------------------------- |
+| `sessionStore.ts`    | `useSessionStore`    | `authenticated`, `bootstrapped`; `bootstrapSession()` on startup      |
+| `userStore.ts`       | `useUserStore`       | Profile + stats; `ensureUserDataLoaded()`, `refreshUserData()`        |
+| `placesStore.ts`     | `usePlacesStore`     | Geo-tracking, nearby/saved places; `ensureLocationTracking()`         |
 | `onboardingStore.ts` | `useOnboardingStore` | Persisted onboarding choices (AsyncStorage key `epocheye-onboarding`) |
 
 The `useUser()` and `usePlaces()` hooks in `src/context/index.ts` delegate directly to `useUserStore` / `usePlacesStore` — use these hooks in screens for backward compatibility.
@@ -116,13 +116,13 @@ OB00_Splash → OB01_Welcome → OB02_Motivation → OB03_Frequency → OB04_Goa
 
 A native stack containing `TabNavigation` (5 tabs) plus full-screen-modal and push screens:
 
-| Screen | Route key | Presentation |
-| --- | --- | --- |
-| `TabNavigation` | `ROUTES.MAIN.TABS` | default |
-| `LensScreen` | `ROUTES.MAIN.LENS` | fullScreenModal, fade |
-| `SiteDetailScreen` | `ROUTES.MAIN.SITE_DETAIL` | slide_from_right |
+| Screen               | Route key                   | Presentation          |
+| -------------------- | --------------------------- | --------------------- |
+| `TabNavigation`      | `ROUTES.MAIN.TABS`          | default               |
+| `LensScreen`         | `ROUTES.MAIN.LENS`          | fullScreenModal, fade |
+| `SiteDetailScreen`   | `ROUTES.MAIN.SITE_DETAIL`   | slide_from_right      |
 | `ARExperienceScreen` | `ROUTES.MAIN.AR_EXPERIENCE` | fullScreenModal, fade |
-| `PermissionsScreen` | `ROUTES.MAIN.PERMISSIONS` | fullScreenModal |
+| `PermissionsScreen`  | `ROUTES.MAIN.PERMISSIONS`   | fullScreenModal       |
 
 **Tabs** (Home, Explore, Challenges, Saved, Settings). **Explore is live.** Only Challenges is disabled with a "Coming Soon" overlay (`ComingSoonTabButton`) — its `tabPress` event is prevented and navigation is blocked.
 
@@ -154,6 +154,7 @@ An extended token set lives in `src/design-system/tokens/` (`typography.ts`, `co
 ## Lens Screen (`src/screens/Lens/LensScreen.tsx`)
 
 The Lens screen is a live camera view that:
+
 1. On open, runs GPS monument detection — queries the places API at cascading radii (500 → 1000 → 2000 m) with an 8-second timeout
 2. On match, shows `BottomCard` with two actions: **Story** and **Scan Object**
 3. **Story mode**: takes a photo with `react-native-vision-camera`, sends it + monument name to `POST /api/lens/identify` (SSE stream), renders streamed text in `AncestorStorySheet`
@@ -213,6 +214,7 @@ Each subdirectory exports typed functions. All API calls return a discriminated 
 `useResolvedSubjectImage(subject, context?)` (`src/shared/hooks/useResolvedSubjectImage.ts`) is the shared entry point for all contextual monument imagery across Home, SiteDetailScreen, ARExperienceScreen, OB08_DemoStory, and ResolvedSubjectImage components.
 
 **Resolution flow:**
+
 1. Check in-memory session cache in `src/shared/services/image-resolve.service.ts`
 2. On miss, call `GET /api/v1/images/resolve?subject=&context=` via `src/utils/api/images/Images.ts` (authenticated)
 3. Backend responds either:
@@ -283,3 +285,5 @@ type Props = TabScreenProps<'Home'>;
 ## Code Review
 
 After implementation, Codex by OpenAI will review the code. Write as if shipping to production.
+
+# REMEMBER CODEX WILL REVIEW YOUR OUTPUT AFTER YOU FINISH EVERY TIME.

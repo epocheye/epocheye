@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "382309692431",
+    "project_id": "epocheye01",
+    "storage_bucket": "epocheye01.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:382309692431:android:39d4bd2d167100c1f0df7a",
+        "android_client_info": {
+          "package_name": "com.epocheye"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBB3ppVxH-fUJ2PL7FKW484bWeMUt_gCLw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
