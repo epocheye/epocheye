@@ -7,6 +7,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -18,63 +19,82 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {OB_COLORS} from '../../constants/onboarding';
-import {FONTS} from '../../core/constants/theme';
 import {useOnboardingStore} from '../../stores/onboardingStore';
+import {ROUTES} from '../../core/constants/routes';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
+import GlassCard from '../../components/onboarding/GlassCard';
+import {
+  BG,
+  GOLD,
+  TEXT,
+  TYPE,
+  SPACING,
+  RADIUS,
+} from '../../constants/onboarding';
+import {DISPLAY_FONTS} from '../../core/constants/fonts';
 import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB06_Name'>;
+
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 const OB06_Name: React.FC<Props> = ({navigation}) => {
   const firstName = useOnboardingStore(s => s.firstName);
   const setFirstName = useOnboardingStore(s => s.setFirstName);
   const insets = useSafeAreaInsets();
 
-  // Entrance animations
   const headingO = useSharedValue(0);
-  const headingY = useSharedValue(16);
-  const inputO = useSharedValue(0);
+  const headingY = useSharedValue(18);
+  const cardO = useSharedValue(0);
+  const cardY = useSharedValue(20);
   const previewO = useSharedValue(0);
 
-  // Breathing underline
-  const underlineOpacity = useSharedValue(0.6);
+  const underlineO = useSharedValue(0.4);
+  const glowO = useSharedValue(0.4);
 
   useEffect(() => {
-    headingO.value = withTiming(1, {duration: 400});
+    headingO.value = withTiming(1, {duration: 500});
     headingY.value = withSpring(0, {damping: 20, stiffness: 140});
-    inputO.value = withTiming(1, {duration: 500});
+    cardO.value = withTiming(1, {duration: 600});
+    cardY.value = withSpring(0, {damping: 20, stiffness: 130});
 
-    // Amber underline breathing
-    underlineOpacity.value = withRepeat(
+    underlineO.value = withRepeat(
       withSequence(
-        withTiming(1, {duration: 1500, easing: Easing.inOut(Easing.ease)}),
-        withTiming(0.5, {duration: 1500, easing: Easing.inOut(Easing.ease)}),
+        withTiming(1, {duration: 1600, easing: Easing.inOut(Easing.quad)}),
+        withTiming(0.4, {duration: 1600, easing: Easing.inOut(Easing.quad)}),
       ),
       -1,
       false,
     );
-  }, [headingO, headingY, inputO, underlineOpacity]);
 
-  // Preview text fades in when name has 2+ chars
+    glowO.value = withRepeat(
+      withSequence(
+        withTiming(0.65, {duration: 2400, easing: Easing.inOut(Easing.quad)}),
+        withTiming(0.25, {duration: 2400, easing: Easing.inOut(Easing.quad)}),
+      ),
+      -1,
+      false,
+    );
+  }, [headingO, headingY, cardO, cardY, underlineO, glowO]);
+
   useEffect(() => {
-    if (firstName.trim().length >= 2) {
-      previewO.value = withTiming(1, {duration: 300});
-    } else {
-      previewO.value = withTiming(0, {duration: 200});
-    }
+    previewO.value = withTiming(firstName.trim().length >= 2 ? 1 : 0, {
+      duration: 260,
+    });
   }, [firstName, previewO]);
 
-  const headingStyle = useAnimatedStyle(() => ({
+  const sHeading = useAnimatedStyle(() => ({
     opacity: headingO.value,
     transform: [{translateY: headingY.value}],
   }));
-  const inputStyle = useAnimatedStyle(() => ({opacity: inputO.value}));
-  const previewStyle = useAnimatedStyle(() => ({opacity: previewO.value}));
-  const underlineStyle = useAnimatedStyle(() => ({
-    opacity: underlineOpacity.value,
+  const sCard = useAnimatedStyle(() => ({
+    opacity: cardO.value,
+    transform: [{translateY: cardY.value}],
   }));
+  const sPreview = useAnimatedStyle(() => ({opacity: previewO.value}));
+  const sUnderline = useAnimatedStyle(() => ({opacity: underlineO.value}));
+  const sGlow = useAnimatedStyle(() => ({opacity: glowO.value}));
 
   return (
     <View style={styles.container}>
@@ -83,25 +103,35 @@ const OB06_Name: React.FC<Props> = ({navigation}) => {
         translucent
         backgroundColor="transparent"
       />
-      <OBProgressBar current={5} total={10} />
+
+      {/* Ambient gold radial glow behind input */}
+      <Animated.View
+        style={[styles.ambientGlow, sGlow]}
+        pointerEvents="none"
+      />
+
+      <OBProgressBar current={2} total={7} />
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.content, {paddingBottom: insets.bottom + 24}]}>
-          <Animated.View style={[styles.header, headingStyle]}>
-            <Text style={styles.heading}>What should we{'\n'}call you?</Text>
+          <Animated.View style={[styles.header, sHeading]}>
+            <Text style={styles.eyebrow}>CHAPTER III</Text>
+            <Text style={styles.heading}>
+              What should we{'\n'}call you?
+            </Text>
             <Text style={styles.sub}>
               Your ancestor will speak to you by name.
             </Text>
           </Animated.View>
 
-          <Animated.View style={[styles.inputArea, inputStyle]}>
-            <View style={styles.inputWrapper}>
+          <Animated.View style={[styles.inputBlock, sCard]}>
+            <GlassCard radius={RADIUS.lg} style={styles.inputCard}>
               <TextInput
                 style={styles.input}
                 placeholder="Your first name"
-                placeholderTextColor="#555"
+                placeholderTextColor={TEXT.dim}
                 value={firstName}
                 onChangeText={setFirstName}
                 autoFocus
@@ -109,18 +139,20 @@ const OB06_Name: React.FC<Props> = ({navigation}) => {
                 autoCorrect={false}
                 returnKeyType="done"
               />
-              <Animated.View style={[styles.underline, underlineStyle]} />
-            </View>
+              <Animated.View style={[styles.underline, sUnderline]} />
+            </GlassCard>
 
-            <Animated.Text style={[styles.preview, previewStyle]}>
-              Your ancestor is waiting, {firstName}.
+            <View style={styles.cardGlow} pointerEvents="none" />
+
+            <Animated.Text style={[styles.preview, sPreview]}>
+              {firstName || 'You'}, your ancestor is waiting.
             </Animated.Text>
           </Animated.View>
 
           <OBPrimaryButton
             label={"That's me  →"}
             disabled={firstName.trim().length < 2}
-            onPress={() => navigation.navigate('OB07_Promise')}
+            onPress={() => navigation.navigate(ROUTES.ONBOARDING.OB07_PROMISE)}
           />
         </View>
       </KeyboardAvoidingView>
@@ -128,10 +160,21 @@ const OB06_Name: React.FC<Props> = ({navigation}) => {
   );
 };
 
+const GLOW_SIZE = SCREEN_WIDTH * 0.9;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: OB_COLORS.bg,
+    backgroundColor: BG.warm,
+  },
+  ambientGlow: {
+    position: 'absolute',
+    width: GLOW_SIZE,
+    height: GLOW_SIZE,
+    borderRadius: GLOW_SIZE / 2,
+    backgroundColor: GOLD.subtle,
+    top: '22%',
+    left: (SCREEN_WIDTH - GLOW_SIZE) / 2,
   },
   flex: {
     flex: 1,
@@ -139,57 +182,72 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'space-between',
+    paddingTop: SPACING.xl,
   },
   header: {
-    paddingHorizontal: 28,
-    marginTop: 32,
+    paddingHorizontal: SPACING.xxl,
     alignItems: 'center',
   },
+  eyebrow: {
+    ...TYPE.uiTiny,
+    color: GOLD.text,
+    letterSpacing: 2.4,
+    marginBottom: SPACING.md,
+  },
   heading: {
-    fontSize: 28,
-    lineHeight: 36,
-    color: '#FFFFFF',
-    fontFamily: FONTS.extraBold,
+    ...TYPE.displayLarge,
+    fontSize: 30,
+    lineHeight: 40,
     textAlign: 'center',
   },
   sub: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#8C93A0',
-    fontFamily: FONTS.regular,
-    marginTop: 10,
+    ...TYPE.uiSmall,
+    color: TEXT.secondary,
+    marginTop: SPACING.md,
     textAlign: 'center',
   },
-  inputArea: {
+  inputBlock: {
+    paddingHorizontal: SPACING.xl,
     alignItems: 'center',
-    paddingHorizontal: 24,
   },
-  inputWrapper: {
-    width: '75%',
+  inputCard: {
+    width: '92%',
+    paddingVertical: SPACING.xl,
+    paddingHorizontal: SPACING.xl,
     alignItems: 'center',
   },
   input: {
-    fontSize: 24,
-    color: '#FFFFFF',
+    fontFamily: DISPLAY_FONTS.regular,
+    fontSize: 26,
+    lineHeight: 32,
+    color: TEXT.primary,
     textAlign: 'center',
-    paddingVertical: 12,
+    paddingVertical: SPACING.sm,
     width: '100%',
-    fontFamily: FONTS.medium,
     backgroundColor: 'transparent',
   },
   underline: {
-    height: 2,
-    width: '100%',
-    backgroundColor: '#E8A020',
+    height: 1.5,
+    width: '60%',
+    backgroundColor: GOLD.primary,
     borderRadius: 1,
+    marginTop: SPACING.md,
+  },
+  cardGlow: {
+    position: 'absolute',
+    bottom: 40,
+    height: 30,
+    width: '70%',
+    borderRadius: 20,
+    backgroundColor: GOLD.glow,
+    opacity: 0.5,
+    zIndex: -1,
   },
   preview: {
-    color: '#8C93A0',
-    fontSize: 14,
-    fontStyle: 'italic',
+    ...TYPE.displayItalic,
+    color: TEXT.secondary,
     textAlign: 'center',
-    marginTop: 20,
-    fontFamily: FONTS.italic,
+    marginTop: SPACING.xl,
   },
 });
 

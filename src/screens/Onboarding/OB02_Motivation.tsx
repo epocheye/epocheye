@@ -1,5 +1,5 @@
 import React, {useEffect} from 'react';
-import {View, Text, StyleSheet, StatusBar} from 'react-native';
+import {View, Text, StyleSheet, StatusBar, Pressable} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -7,59 +7,117 @@ import Animated, {
   withTiming,
   withSpring,
 } from 'react-native-reanimated';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Landmark, Globe, TreePine, BookOpen} from 'lucide-react-native';
-import {OB_COLORS} from '../../constants/onboarding';
-import {FONTS} from '../../core/constants/theme';
-import {useOnboardingStore} from '../../stores/onboardingStore';
+import {
+  useOnboardingStore,
+  VisitFrequencyType,
+} from '../../stores/onboardingStore';
+import {ROUTES} from '../../core/constants/routes';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSelectionTile from '../../components/onboarding/OBSelectionTile';
+import {
+  BG,
+  GOLD,
+  TEXT,
+  TYPE,
+  SPACING,
+  BORDER,
+  RADIUS,
+} from '../../constants/onboarding';
 import {track} from '../../services/analytics';
 import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB02_Motivation'>;
 
-const OPTIONS = [
+const MOTIVATIONS = [
   {id: 'heritage_visitor', label: 'I visit heritage sites', Icon: Landmark},
   {id: 'traveller', label: 'I love to travel', Icon: Globe},
   {id: 'roots', label: 'I want to know my roots', Icon: TreePine},
   {id: 'history_lover', label: 'I love history', Icon: BookOpen},
 ] as const;
 
+const FREQUENCIES: ReadonlyArray<{label: string; value: VisitFrequencyType}> = [
+  {label: 'Rarely', value: 'rarely'},
+  {label: 'Monthly', value: 'occasional'},
+  {label: 'Often', value: 'frequent'},
+];
+
+const Chip: React.FC<{
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}> = ({label, selected, onPress}) => {
+  const scale = useSharedValue(1);
+  const aStyle = useAnimatedStyle(() => ({
+    transform: [{scale: scale.value}],
+  }));
+  return (
+    <Animated.View style={[{flex: 1}, aStyle]}>
+      <Pressable
+        onPress={() => {
+          try {
+            ReactNativeHapticFeedback.trigger('impactLight', {
+              enableVibrateFallback: true,
+              ignoreAndroidSystemSettings: false,
+            });
+          } catch {}
+          onPress();
+        }}
+        onPressIn={() => {
+          scale.value = withTiming(0.96, {duration: 60});
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, {damping: 14, stiffness: 280});
+        }}
+        style={[
+          styles.chip,
+          {
+            borderColor: selected ? GOLD.borderStrong : BORDER.subtle,
+            backgroundColor: selected ? GOLD.subtle : BG.glass,
+          },
+        ]}>
+        <Text
+          style={[
+            styles.chipText,
+            {color: selected ? GOLD.text : TEXT.secondary},
+          ]}>
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+};
+
 const OB02_Motivation: React.FC<Props> = ({navigation}) => {
   const motivation = useOnboardingStore(s => s.motivation);
+  const visitFrequency = useOnboardingStore(s => s.visitFrequency);
   const setMotivation = useOnboardingStore(s => s.setMotivation);
+  const setVisitFrequency = useOnboardingStore(s => s.setVisitFrequency);
   const insets = useSafeAreaInsets();
 
-  // Staggered entrance animations
   const headingO = useSharedValue(0);
-  const headingY = useSharedValue(16);
-  const tile0O = useSharedValue(0);
-  const tile1O = useSharedValue(0);
-  const tile2O = useSharedValue(0);
-  const tile3O = useSharedValue(0);
+  const headingY = useSharedValue(18);
+  const tilesO = useSharedValue(0);
+  const freqO = useSharedValue(0);
 
   useEffect(() => {
-    headingO.value = withTiming(1, {duration: 400});
-    headingY.value = withSpring(0, {damping: 20, stiffness: 140});
-    tile0O.value = withDelay(150, withTiming(1, {duration: 350}));
-    tile1O.value = withDelay(250, withTiming(1, {duration: 350}));
-    tile2O.value = withDelay(350, withTiming(1, {duration: 350}));
-    tile3O.value = withDelay(450, withTiming(1, {duration: 350}));
-  }, [headingO, headingY, tile0O, tile1O, tile2O, tile3O]);
+    headingO.value = withTiming(1, {duration: 500});
+    headingY.value = withSpring(0, {damping: 22, stiffness: 140});
+    tilesO.value = withDelay(200, withTiming(1, {duration: 500}));
+    freqO.value = withDelay(500, withTiming(1, {duration: 500}));
+  }, [headingO, headingY, tilesO, freqO]);
 
-  const headingStyle = useAnimatedStyle(() => ({
+  const sHeading = useAnimatedStyle(() => ({
     opacity: headingO.value,
     transform: [{translateY: headingY.value}],
   }));
+  const sTiles = useAnimatedStyle(() => ({opacity: tilesO.value}));
+  const sFreq = useAnimatedStyle(() => ({opacity: freqO.value}));
 
-  const tileStyles = [
-    useAnimatedStyle(() => ({opacity: tile0O.value})),
-    useAnimatedStyle(() => ({opacity: tile1O.value})),
-    useAnimatedStyle(() => ({opacity: tile2O.value})),
-    useAnimatedStyle(() => ({opacity: tile3O.value})),
-  ];
+  const canContinue = !!motivation && !!visitFrequency;
 
   return (
     <View style={styles.container}>
@@ -68,39 +126,65 @@ const OB02_Motivation: React.FC<Props> = ({navigation}) => {
         translucent
         backgroundColor="transparent"
       />
-      <OBProgressBar current={1} total={10} />
+      <OBProgressBar current={0} total={7} />
 
       <View style={[styles.content, {paddingBottom: insets.bottom + 24}]}>
-        <Animated.View style={[styles.header, headingStyle]}>
-          <Text style={styles.heading}>What brings{'\n'}you here?</Text>
-          <Text style={styles.sub}>We'll personalise your experience.</Text>
+        <Animated.View style={[styles.header, sHeading]}>
+          <Text style={styles.eyebrow}>STEP 1 OF 7</Text>
+          <Text style={styles.heading}>Tell us about yourself.</Text>
+          <Text style={styles.sub}>
+            Two quick questions so we know where to start.
+          </Text>
         </Animated.View>
 
-        <View style={styles.grid}>
-          {OPTIONS.map((opt, idx) => (
-            <Animated.View key={opt.id} style={tileStyles[idx]}>
+        <Animated.View style={[styles.section, sTiles]}>
+          <Text style={styles.sectionEyebrow}>WHAT DRAWS YOU IN</Text>
+          <View style={styles.grid}>
+            {MOTIVATIONS.map(opt => (
               <OBSelectionTile
+                key={opt.id}
+                layout="grid"
                 icon={
                   <opt.Icon
-                    size={28}
-                    color={motivation === opt.id ? '#E8A020' : '#8C93A0'}
+                    size={30}
+                    color={motivation === opt.id ? GOLD.primary : TEXT.muted}
                   />
                 }
                 label={opt.label}
                 selected={motivation === opt.id}
                 onPress={() => setMotivation(opt.id)}
-                layout="grid"
               />
-            </Animated.View>
-          ))}
-        </View>
+            ))}
+          </View>
+        </Animated.View>
+
+        <View style={styles.divider} />
+
+        <Animated.View style={[styles.section, sFreq]}>
+          <Text style={styles.sectionEyebrow}>
+            HOW OFTEN YOU VISIT HERITAGE SITES
+          </Text>
+          <View style={styles.chipRow}>
+            {FREQUENCIES.map(f => (
+              <Chip
+                key={f.value}
+                label={f.label}
+                selected={visitFrequency === f.value}
+                onPress={() => setVisitFrequency(f.value)}
+              />
+            ))}
+          </View>
+        </Animated.View>
 
         <OBPrimaryButton
           label={"Continue  →"}
-          disabled={!motivation}
+          disabled={!canContinue}
           onPress={() => {
-            track('onboarding_motivation_set', {motivation});
-            navigation.navigate('OB03_Frequency');
+            track('onboarding_motivation_set', {
+              motivation,
+              visitFrequency,
+            });
+            navigation.navigate(ROUTES.ONBOARDING.OB05_REGION);
           }}
         />
       </View>
@@ -111,35 +195,68 @@ const OB02_Motivation: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: OB_COLORS.bg,
+    backgroundColor: BG.deep,
   },
   content: {
     flex: 1,
     justifyContent: 'space-between',
+    paddingTop: SPACING.sm,
   },
   header: {
-    paddingHorizontal: 28,
-    marginTop: 32,
+    paddingHorizontal: SPACING.xxl,
+    marginTop: SPACING.lg,
+  },
+  eyebrow: {
+    ...TYPE.uiTiny,
+    color: GOLD.text,
+    letterSpacing: 2.4,
+    marginBottom: SPACING.sm,
   },
   heading: {
+    ...TYPE.displayLarge,
     fontSize: 28,
     lineHeight: 36,
-    color: '#FFFFFF',
-    fontFamily: FONTS.extraBold,
-    marginBottom: 8,
   },
   sub: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#8C93A0',
-    fontFamily: FONTS.regular,
+    ...TYPE.uiSmall,
+    color: TEXT.secondary,
+    marginTop: SPACING.sm,
+  },
+  section: {
+    gap: SPACING.md,
+  },
+  sectionEyebrow: {
+    ...TYPE.uiTiny,
+    color: TEXT.muted,
+    letterSpacing: 1.8,
+    marginHorizontal: SPACING.xxl,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: SPACING.xxl,
     justifyContent: 'center',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: BORDER.subtle,
+    marginHorizontal: SPACING.xxl,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: SPACING.xxl,
+  },
+  chip: {
+    height: 48,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipText: {
+    ...TYPE.label,
   },
 });
 

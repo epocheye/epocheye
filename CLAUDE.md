@@ -163,6 +163,36 @@ The Lens screen is a live camera view that:
 
 Service: `src/services/lensStoryService.ts` (`streamLensStory`). User context (firstName, regions, motivation) is read from `useOnboardingStore` with a fallback to `useUser().profile`.
 
+**Lens components** (`src/screens/Lens/components/`):
+
+- `BottomCard`, `IdentificationCard`, `MonumentInfoSheet` — surface identification results and actions
+- `AncestorStorySheet` — renders the streaming story with typewriter effect
+- `HDScanOverlay`, `SegmentationOverlay`, `PulsingRing` — scan-state UI over the camera feed
+- `GLBViewer` — renders reconstructed 3D models (AR pipeline output)
+- `EpochChips`, `SearchSheet` — era filtering and manual monument search
+
+---
+
+## Vision & AR Pipeline Services (`src/services/`)
+
+Beyond SSE, a set of services back the Lens/AR experience:
+
+- `geminiVisionService.ts` / `geminiImageService.ts` / `geminiCacheService.ts` — Gemini-backed vision calls for identification and image generation, with a local response cache
+- `hdScanService.ts` — orchestrates the HD scan flow shown by `HDScanOverlay`
+- `segmentationService.ts` — subject segmentation used by `SegmentationOverlay`
+- `arReconstructionService.ts` — 3D reconstruction driving `GLBViewer`
+- `geofenceService.ts` / `zoneService.ts` — geofencing and heritage-zone detection
+- `usageTracker.ts` / `usageTelemetryService.ts` — client-side usage counters and telemetry emission
+- `fcmService.ts` — Firebase Cloud Messaging (push notifications)
+
+When adding a new service, prefer this directory for anything stateful or stream-oriented; keep pure request/response helpers in `src/utils/api/`.
+
+---
+
+## Firebase
+
+Android Firebase is wired up via `android/app/google-services.json` (committed) and the `com.google.gms.google-services` Gradle plugin. FCM push is handled by `src/services/fcmService.ts`. iOS Firebase config is not yet set up — add a `GoogleService-Info.plist` and the iOS pod wiring before enabling push on iOS.
+
 ---
 
 ## SSE Streaming Architecture

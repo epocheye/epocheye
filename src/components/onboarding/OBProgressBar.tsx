@@ -4,55 +4,63 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withSpring,
+  Easing,
 } from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {GOLD} from '../../constants/onboarding';
 
 interface Props {
-  current: number;
+  current: number; // 0-indexed
   total: number;
 }
 
-const DOT_SIZE = 8;
-const DOT_GAP = 10;
+const SEGMENT_HEIGHT = 3;
+const SEGMENT_GAP = 4;
 
-const Dot: React.FC<{index: number; current: number}> = ({index, current}) => {
-  const scale = useSharedValue(index < current ? 1 : index === current ? 1 : 0.8);
-  const opacity = useSharedValue(index < current ? 1 : index === current ? 1 : 0.3);
+const Segment: React.FC<{index: number; current: number}> = ({
+  index,
+  current,
+}) => {
+  const isCompleted = index < current;
+  const isActive = index === current;
+  const fill = useSharedValue(isCompleted ? 1 : 0);
 
   useEffect(() => {
     if (index < current) {
-      // Completed
-      scale.value = withTiming(1, {duration: 300});
-      opacity.value = withTiming(1, {duration: 300});
+      fill.value = withTiming(1, {
+        duration: 350,
+        easing: Easing.out(Easing.cubic),
+      });
     } else if (index === current) {
-      // Active
-      scale.value = withSpring(1.25, {damping: 12, stiffness: 200});
-      opacity.value = withTiming(1, {duration: 200});
+      fill.value = withTiming(1, {
+        duration: 400,
+        easing: Easing.out(Easing.cubic),
+      });
     } else {
-      // Upcoming
-      scale.value = withTiming(0.8, {duration: 300});
-      opacity.value = withTiming(0.3, {duration: 300});
+      fill.value = withTiming(0, {duration: 250});
     }
-  }, [current, index, scale, opacity]);
+  }, [current, index, fill]);
 
-  const dotStyle = useAnimatedStyle(() => ({
-    transform: [{scale: scale.value}],
-    opacity: opacity.value,
-    backgroundColor: index <= current ? '#E8A020' : '#3A3A3A',
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${fill.value * 100}%`,
+    backgroundColor: isActive ? GOLD.light : GOLD.primary,
   }));
 
-  return <Animated.View style={[styles.dot, dotStyle]} />;
+  return (
+    <View style={styles.segment}>
+      <Animated.View style={[styles.segmentFill, fillStyle]} />
+    </View>
+  );
 };
 
 const OBProgressBar: React.FC<Props> = ({current, total}) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, {paddingTop: insets.top + 12}]}>
-      <View style={styles.dotsRow}>
+    <View style={[styles.container, {paddingTop: insets.top + 14}]}>
+      <View style={styles.row}>
         {Array.from({length: total}, (_, i) => (
-          <Dot key={i} index={i} current={current} />
+          <Segment key={i} index={i} current={current} />
         ))}
       </View>
     </View>
@@ -61,18 +69,23 @@ const OBProgressBar: React.FC<Props> = ({current, total}) => {
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
-    paddingBottom: 8,
+    paddingHorizontal: 24,
+    paddingBottom: 12,
   },
-  dotsRow: {
+  row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: DOT_GAP,
+    gap: SEGMENT_GAP,
   },
-  dot: {
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
+  segment: {
+    flex: 1,
+    height: SEGMENT_HEIGHT,
+    borderRadius: SEGMENT_HEIGHT / 2,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+  },
+  segmentFill: {
+    height: '100%',
+    borderRadius: SEGMENT_HEIGHT / 2,
   },
 });
 

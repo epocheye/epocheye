@@ -8,22 +8,28 @@ import Animated, {
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import {FONTS} from '../../core/constants/theme';
+import {GOLD, RADIUS, TYPE} from '../../constants/onboarding';
 
 interface Props {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  icon?: React.ReactNode;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const OBPrimaryButton: React.FC<Props> = ({label, onPress, disabled = false}) => {
+const OBPrimaryButton: React.FC<Props> = ({
+  label,
+  onPress,
+  disabled = false,
+  icon,
+}) => {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{scale: scale.value}],
-    opacity: disabled ? 0.5 : 1,
+    opacity: disabled ? 0.6 : 1,
   }));
 
   const handlePressIn = () => {
@@ -31,13 +37,11 @@ const OBPrimaryButton: React.FC<Props> = ({label, onPress, disabled = false}) =>
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, {damping: 14, stiffness: 300});
+    scale.value = withSpring(1, {damping: 15, stiffness: 320});
   };
 
   const handlePress = () => {
-    if (disabled) {
-      return;
-    }
+    if (disabled) return;
     try {
       ReactNativeHapticFeedback.trigger('impactMedium', {
         enableVibrateFallback: true,
@@ -49,7 +53,11 @@ const OBPrimaryButton: React.FC<Props> = ({label, onPress, disabled = false}) =>
 
   return (
     <AnimatedPressable
-      style={[styles.wrapper, animatedStyle]}
+      style={[
+        styles.wrapper,
+        !disabled && styles.glow,
+        animatedStyle,
+      ]}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={handlePress}
@@ -57,14 +65,16 @@ const OBPrimaryButton: React.FC<Props> = ({label, onPress, disabled = false}) =>
       {disabled ? (
         <View style={styles.disabledBg}>
           <Text style={[styles.label, styles.disabledLabel]}>{label}</Text>
+          {icon ? <View style={styles.icon}>{icon}</View> : null}
         </View>
       ) : (
         <LinearGradient
-          colors={['#EDAF2A', '#D4900C']}
+          colors={['#D4B044', '#9A7828']}
           start={{x: 0, y: 0}}
           end={{x: 1, y: 1}}
           style={styles.gradient}>
           <Text style={styles.label}>{label}</Text>
+          {icon ? <View style={styles.icon}>{icon}</View> : null}
         </LinearGradient>
       )}
     </AnimatedPressable>
@@ -74,36 +84,42 @@ const OBPrimaryButton: React.FC<Props> = ({label, onPress, disabled = false}) =>
 const styles = StyleSheet.create({
   wrapper: {
     marginHorizontal: 24,
-    borderRadius: 14,
+    borderRadius: RADIUS.pill,
     overflow: 'hidden',
-    // Subtle glow shadow
-    shadowColor: '#E8A020',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 6,
+  },
+  glow: {
+    shadowColor: GOLD.primary,
+    shadowOffset: {width: 0, height: 0},
+    shadowOpacity: 0.45,
+    shadowRadius: 24,
+    elevation: 12,
   },
   gradient: {
-    height: 54,
-    borderRadius: 14,
+    height: 56,
+    borderRadius: RADIUS.pill,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 24,
   },
   disabledBg: {
-    height: 54,
-    borderRadius: 14,
+    height: 56,
+    borderRadius: RADIUS.pill,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#1E1C17',
+    paddingHorizontal: 24,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0A0A0A',
-    fontFamily: FONTS.bold,
+    ...TYPE.button,
+    color: '#FFFFFF',
   },
   disabledLabel: {
-    color: '#666',
+    color: 'rgba(255,255,255,0.25)',
+  },
+  icon: {
+    marginLeft: 8,
   },
 });
 

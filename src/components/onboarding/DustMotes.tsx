@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View } from 'react-native';
+import React, {useEffect} from 'react';
+import {View, StyleSheet} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -9,106 +9,104 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
-const PARTICLE_COUNT = 6;
-
 interface Particle {
   id: number;
   startX: number;
   size: number;
+  color: string;
   opacity: number;
   duration: number;
+  sway: number;
   delay: number;
 }
 
-/** Generate particle configs once at module level to avoid re-creation */
-function generateParticles(): Particle[] {
+const GOLD_COLOR = 'rgba(201,168,76,0.20)';
+const INDIGO_COLOR = 'rgba(139,159,232,0.12)';
+
+function generate(): Particle[] {
   const particles: Particle[] = [];
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
+  // 6 gold + 4 indigo
+  for (let i = 0; i < 10; i++) {
+    const isIndigo = i >= 6;
     particles.push({
       id: i,
       startX: Math.random() * 100,
-      size: 2 + Math.random() * 2,
-      opacity: 0.15 + Math.random() * 0.15,
-      duration: 6000 + Math.random() * 6000,
-      delay: Math.random() * 4000,
+      size: 1.5 + Math.random() * 2,
+      color: isIndigo ? INDIGO_COLOR : GOLD_COLOR,
+      opacity: 0.5 + Math.random() * 0.5,
+      duration: 8000 + Math.random() * 6000,
+      sway: (Math.random() - 0.5) * 160,
+      delay: Math.random() * 5000,
     });
   }
   return particles;
 }
 
-const PARTICLES = generateParticles();
+const PARTICLES = generate();
 
-interface DustMoteProps {
-  particle: Particle;
-}
-
-const DustMote: React.FC<DustMoteProps> = ({ particle }) => {
+const DustMote: React.FC<{p: Particle}> = ({p}) => {
   const translateY = useSharedValue(0);
   const translateX = useSharedValue(0);
 
   useEffect(() => {
-    // Drift upward and slightly horizontal in a loop
     translateY.value = withDelay(
-      particle.delay,
+      p.delay,
       withRepeat(
-        withTiming(-400, {
-          duration: particle.duration,
-          easing: Easing.linear,
-        }),
+        withTiming(-500, {duration: p.duration, easing: Easing.linear}),
         -1,
         false,
       ),
     );
     translateX.value = withDelay(
-      particle.delay,
+      p.delay,
       withRepeat(
-        withTiming((Math.random() - 0.5) * 60, {
-          duration: particle.duration,
-          easing: Easing.linear,
-        }),
+        withTiming(p.sway, {duration: p.duration, easing: Easing.linear}),
         -1,
         true,
       ),
     );
-  }, [translateY, translateX, particle.delay, particle.duration]);
+  }, [translateY, translateX, p.delay, p.duration, p.sway]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: translateY.value },
-      { translateX: translateX.value },
+      {translateY: translateY.value},
+      {translateX: translateX.value},
     ],
   }));
 
   return (
     <Animated.View
-      className="absolute bg-white"
       style={[
+        styles.mote,
         animatedStyle,
         {
-          left: `${particle.startX}%`,
-          bottom: -10,
-          width: particle.size,
-          height: particle.size,
-          borderRadius: particle.size / 2,
-          opacity: particle.opacity,
+          left: `${p.startX}%`,
+          width: p.size,
+          height: p.size,
+          borderRadius: p.size / 2,
+          backgroundColor: p.color,
+          opacity: p.opacity,
         },
       ]}
     />
   );
 };
 
-/**
- * Floating dust motes animation overlay.
- * Small white particles drift upward with staggered timing.
- */
 const DustMotes: React.FC = () => {
   return (
-    <View className="absolute inset-0 overflow-hidden" pointerEvents="none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {PARTICLES.map(p => (
-        <DustMote key={p.id} particle={p} />
+        <DustMote key={p.id} p={p} />
       ))}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  mote: {
+    position: 'absolute',
+    bottom: -10,
+  },
+});
 
 export default DustMotes;

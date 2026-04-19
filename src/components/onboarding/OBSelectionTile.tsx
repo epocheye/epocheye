@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  Text,
-  View,
-  Pressable,
-  StyleSheet,
-  Dimensions,
-} from 'react-native';
+import {Text, View, Pressable, StyleSheet, Dimensions} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -13,7 +7,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
-import {FONTS} from '../../core/constants/theme';
+import GlassCard from './GlassCard';
+import {GOLD, SPACING, TEXT, TYPE, RADIUS} from '../../constants/onboarding';
 
 interface Props {
   icon: React.ReactNode;
@@ -26,7 +21,7 @@ interface Props {
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const GRID_TILE_WIDTH = (SCREEN_WIDTH - 48 - 12) / 2;
+const GRID_TILE_WIDTH = (SCREEN_WIDTH - SPACING.screen * 2 - 12) / 2;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -48,14 +43,12 @@ const OBSelectionTile: React.FC<Props> = ({
   const handlePressIn = () => {
     scale.value = withTiming(0.96, {duration: 60});
   };
-
   const handlePressOut = () => {
-    scale.value = withSpring(selected ? 1.02 : 1, {
+    scale.value = withSpring(selected ? 1.01 : 1, {
       damping: 14,
       stiffness: 280,
     });
   };
-
   const handlePress = () => {
     try {
       ReactNativeHapticFeedback.trigger('impactLight', {
@@ -71,55 +64,54 @@ const OBSelectionTile: React.FC<Props> = ({
   return (
     <AnimatedPressable
       style={[
-        styles.tile,
-        isGrid ? styles.gridTile : styles.stackTile,
-        {
-          borderColor: selected
-            ? 'rgba(232, 160, 32, 0.7)'
-            : 'rgba(255, 255, 255, 0.08)',
-          backgroundColor: selected
-            ? 'rgba(232, 160, 32, 0.08)'
-            : 'rgba(255, 255, 255, 0.04)',
-        },
+        isGrid ? styles.gridWrap : styles.stackWrap,
         animatedStyle,
       ]}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={handlePress}>
-      {badge && (
+      <GlassCard
+        variant={selected ? 'gold' : 'default'}
+        radius={RADIUS.md}
+        style={StyleSheet.absoluteFill}>
+        <View />
+      </GlassCard>
+
+      {badge ? (
         <View
           style={[
             styles.badge,
-            {
-              backgroundColor: selected ? '#E8A020' : 'rgba(255,255,255,0.1)',
-            },
+            {backgroundColor: selected ? GOLD.primary : 'rgba(255,255,255,0.10)'},
           ]}>
           <Text
             style={[
               styles.badgeText,
-              {color: selected ? '#0D0D0D' : '#8C93A0'},
+              {color: selected ? TEXT.dark : TEXT.muted},
             ]}>
             {badge}
           </Text>
         </View>
-      )}
-
-      {/* Amber inner glow for selected state */}
-      {selected && <View style={styles.innerGlow} />}
+      ) : null}
 
       {isGrid ? (
         <View style={styles.gridContent}>
-          <View style={styles.iconWrapGrid}>{icon}</View>
+          <View style={styles.iconPillWrap}>
+            {selected ? <View style={styles.iconPill} /> : null}
+            <View style={styles.iconInner}>{icon}</View>
+          </View>
           <Text style={styles.gridLabel} numberOfLines={2}>
             {label}
           </Text>
         </View>
       ) : (
         <View style={styles.stackContent}>
-          <View style={styles.iconWrapStack}>{icon}</View>
-          <View style={styles.textWrapper}>
+          <View style={styles.iconPillWrap}>
+            {selected ? <View style={styles.iconPill} /> : null}
+            <View style={styles.iconInner}>{icon}</View>
+          </View>
+          <View style={styles.textWrap}>
             <Text style={styles.stackLabel}>{label}</Text>
-            {sublabel && <Text style={styles.sublabel}>{sublabel}</Text>}
+            {sublabel ? <Text style={styles.sublabel}>{sublabel}</Text> : null}
           </View>
         </View>
       )}
@@ -128,69 +120,68 @@ const OBSelectionTile: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-  tile: {
-    borderRadius: 14,
-    borderWidth: 1.5,
+  stackWrap: {
+    height: 76,
+    marginHorizontal: SPACING.screen,
+    borderRadius: RADIUS.md,
     overflow: 'hidden',
   },
-  gridTile: {
+  gridWrap: {
     width: GRID_TILE_WIDTH,
-    height: 110,
-  },
-  stackTile: {
-    height: 72,
-    marginHorizontal: 24,
-  },
-  innerGlow: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 14,
-    backgroundColor: 'rgba(232, 160, 32, 0.04)',
-  },
-  gridContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-    gap: 8,
-  },
-  iconWrapGrid: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gridLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    fontFamily: FONTS.semiBold,
-    textAlign: 'center',
+    height: 116,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
   },
   stackContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: SPACING.lg,
   },
-  iconWrapStack: {
-    width: 44,
-    alignItems: 'center',
-  },
-  textWrapper: {
+  gridContent: {
     flex: 1,
-    marginLeft: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.md,
+    gap: 10,
+  },
+  iconPillWrap: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconPill: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(201,168,76,0.15)',
+  },
+  iconInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textWrap: {
+    flex: 1,
+    marginLeft: 16,
   },
   stackLabel: {
+    ...TYPE.uiMedium,
+    color: TEXT.primary,
     fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    fontFamily: FONTS.semiBold,
   },
   sublabel: {
+    ...TYPE.uiSmall,
+    color: TEXT.muted,
     fontSize: 12,
-    color: '#8C93A0',
-    marginTop: 3,
-    fontFamily: FONTS.regular,
+    marginTop: 2,
+  },
+  gridLabel: {
+    ...TYPE.uiMedium,
+    color: TEXT.primary,
+    fontSize: 13,
+    textAlign: 'center',
   },
   badge: {
     position: 'absolute',
@@ -199,12 +190,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    zIndex: 1,
+    zIndex: 2,
   },
   badgeText: {
     fontSize: 10,
-    fontWeight: '700',
-    fontFamily: FONTS.bold,
+    fontFamily: TYPE.label.fontFamily,
   },
 });
 

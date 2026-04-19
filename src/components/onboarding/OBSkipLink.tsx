@@ -1,6 +1,6 @@
 import React from 'react';
-import {Text, TouchableOpacity, StyleSheet, Platform} from 'react-native';
-import {FONTS} from '../../core/constants/theme';
+import {Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {TEXT, TYPE} from '../../constants/onboarding';
 
 interface Props {
   label?: string;
@@ -21,15 +21,11 @@ const OBSkipLink: React.FC<Props> = ({label = 'Skip for now', onPress}) => {
 const styles = StyleSheet.create({
   container: {
     alignSelf: 'center',
-    padding: 12,
+    padding: 14,
   },
   text: {
-    color: '#8C93A0',
-    fontSize: 14,
-    fontFamily: Platform.select({
-      ios: FONTS.regular,
-      android: FONTS.regular,
-    }),
+    ...TYPE.uiSmall,
+    color: TEXT.dim,
   },
 });
 
