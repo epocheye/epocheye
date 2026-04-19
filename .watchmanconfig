@@ -1,5 +1,6 @@
 {
 	"ignore_dirs": [
+		"node_modules/@shopify/react-native-skia/android/.cxx",
 		"node_modules/react-native-fast-tflite/android/.cxx",
 		"node_modules/react-native-fast-tflite/android/src/main/cpp/lib"
 	]
