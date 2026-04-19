@@ -30,7 +30,17 @@
       "Bash(echo \"EXIT_CODE=$?\")",
       "Bash(npm ls *)",
       "Bash(npm i *)",
-      "Bash(grep -B 1 -A 10 \"Onboarding\\\\\\\\\\\\\\\\OB02\\\\|Onboarding\\\\\\\\\\\\\\\\OB05\")"
+      "Bash(grep -B 1 -A 10 \"Onboarding\\\\\\\\\\\\\\\\OB02\\\\|Onboarding\\\\\\\\\\\\\\\\OB05\")",
+      "Bash(./gradlew clean *)",
+      "Bash(./gradlew --stop)",
+      "Bash(./gradlew assembleRelease)",
+      "Bash(adb devices *)",
+      "Bash(./gradlew app:installDebug -PreactNativeDevServerPort=8081)",
+      "Bash(./gradlew app:installRelease)",
+      "Bash(./gradlew app:installRelease --no-configuration-cache)",
+      "Bash(adb shell *)",
+      "Bash(./gradlew app:installRelease --no-configuration-cache -PreactNativeArchitectures=arm64-v8a)",
+      "Bash(./gradlew app:installRelease --no-configuration-cache --no-daemon -PreactNativeArchitectures=arm64-v8a)"
     ]
   }
 }
