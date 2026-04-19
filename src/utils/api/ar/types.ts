@@ -3,6 +3,8 @@ export interface ReconstructRequest {
   object_label: string;
   image_base64?: string;
   image_url?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface ReconstructResponse {

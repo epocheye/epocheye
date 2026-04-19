@@ -167,6 +167,9 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   const [reconstructionLoading, setReconstructionLoading] = useState(false);
   const [reconstructionQuotaExceeded, setReconstructionQuotaExceeded] =
     useState(false);
+  const [reconstructionGateError, setReconstructionGateError] = useState<
+    string | null
+  >(null);
   const lastCapturedImageRef = useRef<string | null>(null);
 
   const arEnabled = useArQuotaStore(state => state.enabled && !state.maintenanceMode);
@@ -531,11 +534,14 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       }
       setReconstructionLoading(true);
       setReconstructionQuotaExceeded(false);
+      setReconstructionGateError(null);
       try {
         const result = await reconstructForLens({
           monumentId: monumentName,
           objectLabel,
           imageBase64: lastCapturedImageRef.current ?? undefined,
+          latitude: lastKnownCoords?.latitude ?? undefined,
+          longitude: lastKnownCoords?.longitude ?? undefined,
         });
         if (result.kind === 'success') {
           setReconstructionReady({
@@ -559,6 +565,11 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
             plan: result.info.current_plan,
           });
         } else {
+          // Backend site gate returns 403 with a human-readable message;
+          // surface it to the user instead of swallowing silently.
+          if (/heritage site|heritage artefact/i.test(result.message)) {
+            setReconstructionGateError(result.message);
+          }
           track('lens_reconstruction_error', { message: result.message });
         }
       } finally {
@@ -1034,7 +1045,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         {/* AR reconstruction CTA — shown after the object_scan SSE identifies an
             object and the reconstruct API returns a GLB. Tapping navigates to
             the dedicated composer screen. */}
-        {(reconstructionReady || reconstructionLoading || reconstructionQuotaExceeded) && (
+        {(reconstructionReady || reconstructionLoading || reconstructionQuotaExceeded || reconstructionGateError) && (
           <View style={[styles.reconstructionBar, { bottom: insets.bottom + 180 }]}>
             <ARQuotaPill compact />
             {reconstructionLoading && (
@@ -1052,6 +1063,9 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
               >
                 <Text style={styles.reconstructionCtaText}>Upgrade for more</Text>
               </Pressable>
+            )}
+            {reconstructionGateError && !reconstructionLoading && (
+              <Text style={styles.reconstructionText}>{reconstructionGateError}</Text>
             )}
           </View>
         )}

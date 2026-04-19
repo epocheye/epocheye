@@ -30,6 +30,8 @@ interface ReconstructInput {
   objectLabel: string;
   imageBase64?: string;
   imageUrl?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 /**
@@ -46,6 +48,8 @@ export async function reconstructForLens(
     object_label: input.objectLabel,
     image_base64: input.imageBase64,
     image_url: input.imageUrl,
+    latitude: input.latitude,
+    longitude: input.longitude,
   });
 
   if (result.success) {
