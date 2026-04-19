@@ -137,6 +137,11 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
 
   const [state, setState] = useState<LensDetectionState>('searching');
   const [matchedPlace, setMatchedPlace] = useState<Place | null>(null);
+  const [lastKnownCoords, setLastKnownCoords] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [locationContext, setLocationContext] = useState<string | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [showRing, setShowRing] = useState(true);
   const [ringMatched, setRingMatched] = useState(false);
@@ -247,6 +252,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         async position => {
           try {
             const { latitude, longitude } = position.coords;
+            setLastKnownCoords({ latitude, longitude });
 
             // Check geofence zones
             const zone = getActiveZone(latitude, longitude);
@@ -469,6 +475,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     setStoryStreaming(true);
     setStoryMode('monument');
     setIdentifiedObject(null);
+    setLocationContext(null);
     storySheetRef.current?.open();
 
     try {
@@ -485,6 +492,8 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         monumentName: matchedPlace.name,
         firstName,
         regions,
+        latitude: lastKnownCoords?.latitude ?? null,
+        longitude: lastKnownCoords?.longitude ?? null,
         mode: 'monument',
         onChunk: chunk => {
           setStoryLoading(false);
@@ -499,6 +508,9 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           setStoryLoading(false);
           setStoryStreaming(false);
         },
+        onLocationContext: context => {
+          setLocationContext(context);
+        },
       });
     } catch {
       const fallback = getFallbackStory(regions[0] ?? 'South Asia', firstName);
@@ -510,7 +522,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         source: 'fallback',
       });
     }
-  }, [firstName, matchedPlace, regions]);
+  }, [firstName, matchedPlace, regions, lastKnownCoords]);
 
   const triggerReconstruction = useCallback(
     async (monumentName: string, objectLabel: string) => {
@@ -591,6 +603,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     setStoryStreaming(true);
     setStoryMode('object_scan');
     setIdentifiedObject(null);
+    setLocationContext(null);
     setIsScanModeActive(true);
     setReconstructionReady(null);
     setReconstructionQuotaExceeded(false);
@@ -621,10 +634,15 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         firstName,
         regions,
         motivation,
+        latitude: lastKnownCoords?.latitude ?? null,
+        longitude: lastKnownCoords?.longitude ?? null,
         mode: 'object_scan',
         onChunk: chunk => {
           setStoryLoading(false);
           setStoryText(previous => previous + chunk);
+        },
+        onLocationContext: context => {
+          setLocationContext(context);
         },
         onDone: (monument, object) => {
           setStoryLoading(false);
@@ -667,7 +685,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         mode: 'object_scan',
       });
     }
-  }, [firstName, matchedPlace, motivation, regions, triggerReconstruction]);
+  }, [firstName, matchedPlace, motivation, regions, triggerReconstruction, lastKnownCoords]);
 
   const handleIdentify = useCallback(async () => {
     if (geminiLoading) {
@@ -983,6 +1001,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
             error={geminiError}
             isPremium={canShowDetails}
             isOffline={isOfflineResult}
+            locationContext={locationContext}
             onDismiss={handleDismissIdentification}
             onExpand={handleExpandIdentification}
             onUpgrade={handleUpgradePremium}

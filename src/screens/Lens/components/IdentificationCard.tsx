@@ -30,6 +30,7 @@ interface IdentificationCardProps {
   error: string | null;
   isPremium: boolean;
   isOffline?: boolean;
+  locationContext?: string | null;
   onDismiss: () => void;
   onExpand: () => void;
   onUpgrade: () => void;
@@ -41,6 +42,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
   error,
   isPremium,
   isOffline = false,
+  locationContext = null,
   onDismiss,
   onExpand,
   onUpgrade,
@@ -99,6 +101,12 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
       {!isLoading && identification && (
         <Pressable onPress={onExpand}>
           <Text style={styles.name}>{identification.name}</Text>
+
+          {locationContext ? (
+            <Text style={styles.locationContext} numberOfLines={2}>
+              {locationContext}
+            </Text>
+          ) : null}
 
           {identification.period ? (
             <Text style={styles.period}>{identification.period}</Text>
@@ -194,6 +202,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: FONTS.medium,
     marginBottom: 10,
+  },
+  locationContext: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: FONTS.regular,
+    marginBottom: 8,
   },
   significance: {
     color: '#C5C9D1',

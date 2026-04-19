@@ -5,6 +5,28 @@ interface SSEStreamConfig {
   timeout?: number;
   onMessage: (data: Record<string, unknown>) => void;
   onError: () => void;
+  onResponseHeaders?: (headers: Record<string, string>) => void;
+}
+
+function parseResponseHeaders(raw: string | null): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (!raw) {
+    return result;
+  }
+  for (const line of raw.split(/\r?\n/)) {
+    const idx = line.indexOf(':');
+    if (idx <= 0) {
+      continue;
+    }
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 1).trim();
+    if (key.length === 0) {
+      continue;
+    }
+    result[key] = value;
+    result[key.toLowerCase()] = value;
+  }
+  return result;
 }
 
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -44,12 +66,14 @@ export function createSSEStream({
   timeout = DEFAULT_TIMEOUT_MS,
   onMessage,
   onError,
+  onResponseHeaders,
 }: SSEStreamConfig): () => void {
   let hasErrored = false;
   let hasTerminalMessage = false;
   let isAborted = false;
   let lastProcessedIndex = 0;
   let pendingLine = '';
+  let headersDelivered = false;
 
   const safeOnError = () => {
     if (hasErrored || hasTerminalMessage || isAborted) {
@@ -123,7 +147,30 @@ export function createSSEStream({
     xhr.setRequestHeader('Content-Type', 'application/json');
   }
 
+  const deliverHeadersIfNeeded = () => {
+    if (headersDelivered || !onResponseHeaders) {
+      return;
+    }
+    try {
+      const raw = xhr.getAllResponseHeaders();
+      if (!raw) {
+        return;
+      }
+      headersDelivered = true;
+      onResponseHeaders(parseResponseHeaders(raw));
+    } catch {
+      // Response headers unavailable; we'll retry on the next event.
+    }
+  };
+
+  xhr.onreadystatechange = () => {
+    if (xhr.readyState >= 2) {
+      deliverHeadersIfNeeded();
+    }
+  };
+
   xhr.onprogress = () => {
+    deliverHeadersIfNeeded();
     try {
       processBuffer(xhr.responseText);
     } catch {
@@ -132,6 +179,7 @@ export function createSSEStream({
   };
 
   xhr.onload = () => {
+    deliverHeadersIfNeeded();
     if (xhr.status < 200 || xhr.status >= 300) {
       safeOnError();
       return;

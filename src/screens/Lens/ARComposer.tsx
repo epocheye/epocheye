@@ -1,6 +1,5 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Linking,
@@ -13,14 +12,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Box, ExternalLink, X } from 'lucide-react-native';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 import { FONTS } from '../../core/constants/theme';
+import GLBViewer from './components/GLBViewer';
 
 type Props = MainScreenProps<'ARComposer'>;
 
-// Today: thumbnail-first presentation with an "Open 3D model" handoff via
-// Linking.openURL, which routes to Android's Scene Viewer or the system
-// model-viewer on iOS. When @react-three/fiber + expo-gl are added to the
-// bundle, replace the thumbnail View below with a GLView + GLTFLoader; the
-// route, params, and quota flow stay identical.
+// Inline 3D rendering via @react-three/fiber + expo-gl with a Scene Viewer
+// intent fallback. If the in-bundle GL viewer fails to initialize (e.g. bare
+// RN rebuild pending), the Open 3D model CTA still hands the user off to the
+// system AR viewer so the experience degrades gracefully.
 const ARComposer: React.FC<Props> = ({ navigation, route }) => {
   const {
     monumentId,
@@ -33,6 +32,7 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
     scanCount = 0,
   } = route.params;
   const insets = useSafeAreaInsets();
+  const [inlineViewerFailed, setInlineViewerFailed] = useState(false);
 
   const openExternally = useCallback(() => {
     const intentUrl = `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(glbUrl)}&mode=ar_preferred#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;end;`;
@@ -60,18 +60,25 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       <View style={styles.previewWrap}>
-        {thumbnailUrl ? (
-          <Image
-            source={{ uri: thumbnailUrl }}
-            style={styles.preview}
-            resizeMode="contain"
-            accessibilityLabel={`${objectLabel} reconstruction preview`}
-          />
+        {inlineViewerFailed ? (
+          thumbnailUrl ? (
+            <Image
+              source={{ uri: thumbnailUrl }}
+              style={styles.preview}
+              resizeMode="contain"
+              accessibilityLabel={`${objectLabel} reconstruction preview`}
+            />
+          ) : (
+            <View style={styles.placeholder}>
+              <Text style={styles.placeholderText}>3D model ready</Text>
+            </View>
+          )
         ) : (
-          <View style={styles.placeholder}>
-            <ActivityIndicator color="#E8A020" />
-            <Text style={styles.placeholderText}>3D model ready</Text>
-          </View>
+          <GLBViewer
+            url={glbUrl}
+            autoRotate
+            onError={() => setInlineViewerFailed(true)}
+          />
         )}
 
         <View style={styles.badges}>

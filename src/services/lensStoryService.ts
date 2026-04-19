@@ -16,10 +16,13 @@ interface LensStoryParams {
   firstName: string;
   regions: string[];
   motivation?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   mode?: LensStoryMode;
   onChunk: (text: string) => void;
   onDone: (monument: string, object?: LensIdentifiedObject) => void;
   onError: () => void;
+  onLocationContext?: (context: string) => void;
 }
 
 type RNFile = {
@@ -28,14 +31,29 @@ type RNFile = {
   name: string;
 };
 
+function appendCoordinates(
+  formData: FormData,
+  latitude: number | null | undefined,
+  longitude: number | null | undefined,
+): void {
+  if (typeof latitude === 'number' && Number.isFinite(latitude)) {
+    formData.append('latitude', String(latitude));
+  }
+  if (typeof longitude === 'number' && Number.isFinite(longitude)) {
+    formData.append('longitude', String(longitude));
+  }
+}
+
 function buildLensFormData({
   imageUri,
   monumentName,
   firstName,
   regions,
+  latitude,
+  longitude,
 }: Pick<
   LensStoryParams,
-  'imageUri' | 'monumentName' | 'firstName' | 'regions'
+  'imageUri' | 'monumentName' | 'firstName' | 'regions' | 'latitude' | 'longitude'
 >): FormData {
   const formData = new FormData();
 
@@ -51,6 +69,7 @@ function buildLensFormData({
   formData.append('firstName', firstName);
   formData.append('regions', JSON.stringify(regions));
   formData.append('mode', 'monument');
+  appendCoordinates(formData, latitude, longitude);
 
   return formData;
 }
@@ -61,9 +80,17 @@ function buildObjectScanFormData({
   firstName,
   regions,
   motivation,
+  latitude,
+  longitude,
 }: Pick<
   LensStoryParams,
-  'imageUri' | 'monumentName' | 'firstName' | 'regions' | 'motivation'
+  | 'imageUri'
+  | 'monumentName'
+  | 'firstName'
+  | 'regions'
+  | 'motivation'
+  | 'latitude'
+  | 'longitude'
 >): FormData {
   const formData = new FormData();
 
@@ -80,6 +107,7 @@ function buildObjectScanFormData({
   formData.append('regions', JSON.stringify(regions));
   formData.append('motivation', motivation ?? 'heritage_visitor');
   formData.append('mode', 'object_scan');
+  appendCoordinates(formData, latitude, longitude);
 
   return formData;
 }
@@ -121,10 +149,13 @@ export function streamLensStory({
   firstName,
   regions,
   motivation,
+  latitude,
+  longitude,
   mode = 'monument',
   onChunk,
   onDone,
   onError,
+  onLocationContext,
 }: LensStoryParams): () => void {
   const safeMonumentName = monumentName.trim().length > 0 ? monumentName : 'Unknown Monument';
 
@@ -206,12 +237,16 @@ export function streamLensStory({
           firstName,
           regions,
           motivation,
+          latitude,
+          longitude,
         })
       : buildLensFormData({
           imageUri,
           monumentName,
           firstName,
           regions,
+          latitude,
+          longitude,
         });
 
   activeAbort = createSSEStream({
@@ -220,6 +255,15 @@ export function streamLensStory({
     timeout: 30000,
     onMessage: handleMessage,
     onError: handleBackendFailure,
+    onResponseHeaders: headers => {
+      if (!onLocationContext) {
+        return;
+      }
+      const value = headers['x-location-context'] ?? headers['X-Location-Context'];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        onLocationContext(value.trim());
+      }
+    },
   });
 
   return () => {
