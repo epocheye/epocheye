@@ -19,7 +19,6 @@ import {
   deleteSession,
   listMessages,
   listSessions,
-  sendMessage,
 } from '../../src/utils/api/chat/Chat';
 
 beforeEach(() => {
@@ -56,15 +55,6 @@ test('listMessages hits GET /api/v1/chat/sessions/:id/messages', async () => {
   mockClient.get.mockResolvedValueOnce({ data: [] });
   await listMessages('xyz');
   expect(mockClient.get).toHaveBeenCalledWith('/api/v1/chat/sessions/xyz/messages');
-});
-
-test('sendMessage posts content body', async () => {
-  mockClient.post.mockResolvedValueOnce({ data: { ok: true } });
-  await sendMessage('s1', 'Build a 3-day Konark itinerary');
-  expect(mockClient.post).toHaveBeenCalledWith(
-    '/api/v1/chat/sessions/s1/messages',
-    { content: 'Build a 3-day Konark itinerary' },
-  );
 });
 
 test('returns success=false on thrown error', async () => {

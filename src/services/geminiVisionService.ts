@@ -35,7 +35,7 @@ export type GeminiResult = GeminiSuccess | GeminiFailure;
 // ── Constants ──────────────────────────────────────────────────────
 
 const GEMINI_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 const TIMEOUT_MS = 15_000;
 

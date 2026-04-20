@@ -4,5 +4,6 @@ export {
   createSession,
   deleteSession,
   listMessages,
-  sendMessage,
+  streamMessage,
 } from './Chat';
+export type { StreamMessageCallbacks } from './Chat';

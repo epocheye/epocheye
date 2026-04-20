@@ -34,15 +34,16 @@ const SUGGESTIONS = [
 const PlanScreen: React.FC = () => {
   const {
     sessions,
-    activeSessionId,
     messages,
     loadingMessages,
     sending,
+    streaming,
     error,
     loadSessions,
     startNewSession,
     selectSession,
     sendUserMessage,
+    abortStream,
     removeSession,
   } = useChatStore();
 
@@ -55,10 +56,18 @@ const PlanScreen: React.FC = () => {
   }, [loadSessions]);
 
   useEffect(() => {
+    return () => {
+      abortStream();
+    };
+  }, [abortStream]);
+
+  useEffect(() => {
     if (messages.length > 0) {
       listRef.current?.scrollToEnd({ animated: true });
     }
-  }, [messages.length, sending]);
+  }, [messages.length, sending, streaming]);
+
+  const showThinking = sending && !streaming;
 
   const handleSend = useCallback(
     async (text?: string) => {
@@ -182,7 +191,7 @@ const PlanScreen: React.FC = () => {
             renderItem={renderMessage}
             contentContainerStyle={styles.list}
             ListFooterComponent={
-              sending ? (
+              showThinking ? (
                 <View style={styles.thinkingWrap}>
                   <ThinkingIndicator />
                 </View>

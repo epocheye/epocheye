@@ -4,7 +4,7 @@ import {
   deleteSession as deleteSessionApi,
   listMessages,
   listSessions,
-  sendMessage,
+  streamMessage,
   type ChatMessage,
   type ChatSession,
 } from '../utils/api/chat';
@@ -16,15 +16,31 @@ interface ChatStoreState {
   loadingSessions: boolean;
   loadingMessages: boolean;
   sending: boolean;
+  streaming: boolean;
   error: string | null;
 
   loadSessions: () => Promise<void>;
   startNewSession: () => Promise<ChatSession | null>;
   selectSession: (sessionId: string) => Promise<void>;
   sendUserMessage: (content: string) => Promise<void>;
+  abortStream: () => void;
   removeSession: (sessionId: string) => Promise<void>;
   clear: () => void;
 }
+
+// Module-local abort ref keeps the current SSE handle out of the React tree.
+let activeAbort: (() => void) | null = null;
+
+const runAbort = () => {
+  if (activeAbort) {
+    try {
+      activeAbort();
+    } catch {
+      /* ignore */
+    }
+    activeAbort = null;
+  }
+};
 
 export const useChatStore = create<ChatStoreState>((set, get) => ({
   sessions: [],
@@ -33,6 +49,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   loadingSessions: false,
   loadingMessages: false,
   sending: false,
+  streaming: false,
   error: null,
 
   loadSessions: async () => {
@@ -46,6 +63,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   startNewSession: async () => {
+    runAbort();
     const result = await createSession();
     if (!result.success) {
       set({ error: result.error.message });
@@ -57,12 +75,21 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       activeSessionId: newSession.id,
       messages: [],
       error: null,
+      sending: false,
+      streaming: false,
     }));
     return newSession;
   },
 
   selectSession: async (sessionId: string) => {
-    set({ activeSessionId: sessionId, loadingMessages: true, messages: [] });
+    runAbort();
+    set({
+      activeSessionId: sessionId,
+      loadingMessages: true,
+      messages: [],
+      sending: false,
+      streaming: false,
+    });
     const result = await listMessages(sessionId);
     if (result.success) {
       set({ messages: result.data, loadingMessages: false });
@@ -74,8 +101,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   sendUserMessage: async (content: string) => {
     const trimmed = content.trim();
     if (!trimmed) return;
+    if (get().sending) return;
 
-    // Ensure a session exists before sending.
     let activeId = get().activeSessionId;
     if (!activeId) {
       const created = await get().startNewSession();
@@ -83,43 +110,116 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       activeId = created.id;
     }
 
-    // Optimistically append the user message so the input clears immediately.
+    const optimisticUserId = `optimistic-user-${Date.now()}`;
+    const streamingAssistantId = `streaming-assistant-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+
     const optimisticUser: ChatMessage = {
-      id: `optimistic-${Date.now()}`,
+      id: optimisticUserId,
       session_id: activeId,
       role: 'user',
       content: trimmed,
-      created_at: new Date().toISOString(),
+      created_at: nowIso,
     };
+
     set(state => ({
       messages: [...state.messages, optimisticUser],
       sending: true,
+      streaming: false,
       error: null,
     }));
 
-    const result = await sendMessage(activeId, trimmed);
-    if (!result.success) {
-      // Roll back the optimistic message and surface the error.
-      set(state => ({
-        messages: state.messages.filter(m => m.id !== optimisticUser.id),
+    runAbort();
+
+    activeAbort = await streamMessage(activeId, trimmed, {
+      onUserMessage: canonicalUser => {
+        set(state => ({
+          messages: state.messages.map(m =>
+            m.id === optimisticUserId ? canonicalUser : m,
+          ),
+        }));
+      },
+      onChunk: text => {
+        set(state => {
+          const existing = state.messages.find(
+            m => m.id === streamingAssistantId,
+          );
+          if (existing) {
+            return {
+              ...state,
+              streaming: true,
+              messages: state.messages.map(m =>
+                m.id === streamingAssistantId
+                  ? { ...m, content: m.content + text }
+                  : m,
+              ),
+            };
+          }
+          const placeholder: ChatMessage = {
+            id: streamingAssistantId,
+            session_id: activeId!,
+            role: 'assistant',
+            content: text,
+            created_at: new Date().toISOString(),
+          };
+          return {
+            ...state,
+            streaming: true,
+            messages: [...state.messages, placeholder],
+          };
+        });
+      },
+      onDone: ({ assistantMessage }) => {
+        activeAbort = null;
+        set(state => {
+          const hasPlaceholder = state.messages.some(
+            m => m.id === streamingAssistantId,
+          );
+          const nextMessages = hasPlaceholder
+            ? state.messages.map(m =>
+                m.id === streamingAssistantId ? assistantMessage : m,
+              )
+            : [...state.messages, assistantMessage];
+          return {
+            ...state,
+            messages: nextMessages,
+            sending: false,
+            streaming: false,
+          };
+        });
+        void get().loadSessions();
+      },
+      onError: message => {
+        activeAbort = null;
+        set(state => ({
+          messages: state.messages.filter(
+            m => m.id !== optimisticUserId && m.id !== streamingAssistantId,
+          ),
+          sending: false,
+          streaming: false,
+          error: message,
+        }));
+      },
+    });
+  },
+
+  abortStream: () => {
+    runAbort();
+    set(state => {
+      if (!state.sending && !state.streaming) {
+        return state;
+      }
+      return {
+        ...state,
+        messages: state.messages.filter(
+          m =>
+            !m.id.startsWith('optimistic-user-') &&
+            !m.id.startsWith('streaming-assistant-'),
+        ),
         sending: false,
-        error: result.error.message,
-      }));
-      return;
-    }
-
-    const { user_message, assistant_message } = result.data;
-    set(state => ({
-      messages: [
-        ...state.messages.filter(m => m.id !== optimisticUser.id),
-        user_message,
-        assistant_message,
-      ],
-      sending: false,
-    }));
-
-    // Refresh the session list so the newly-titled session bubbles to the top.
-    void get().loadSessions();
+        streaming: false,
+      };
+    });
   },
 
   removeSession: async (sessionId: string) => {
@@ -130,6 +230,9 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         state.activeSessionId === sessionId ? null : state.activeSessionId,
       messages: state.activeSessionId === sessionId ? [] : state.messages,
     }));
+    if (get().activeSessionId === null) {
+      runAbort();
+    }
     const result = await deleteSessionApi(sessionId);
     if (!result.success) {
       set({ sessions: prev, error: result.error.message });
@@ -137,6 +240,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   clear: () => {
+    runAbort();
     set({
       sessions: [],
       activeSessionId: null,
@@ -144,6 +248,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       loadingSessions: false,
       loadingMessages: false,
       sending: false,
+      streaming: false,
       error: null,
     });
   },
