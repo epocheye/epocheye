@@ -19,6 +19,11 @@ import {
   type PriceCalculation,
 } from '../../utils/api/explorer-pass';
 import { createAuthenticatedClient } from '../../utils/api/auth';
+import {
+  toFriendlyPaymentError,
+  VERIFICATION_FAILED_ERROR,
+  ORDER_CREATE_FAILED_ERROR,
+} from '../utils/paymentErrors';
 
 export interface UseExplorerPassPurchaseReturn {
   purchasing: boolean;
@@ -74,7 +79,7 @@ export function useExplorerPassPurchase(): UseExplorerPassPurchaseReturn {
         const init = initResult.data;
 
         if (!init.razorpay_order_id || !init.amount_paise || !init.key_id) {
-          Alert.alert('Error', 'Could not create payment order. Please try again.');
+          Alert.alert(ORDER_CREATE_FAILED_ERROR.title, ORDER_CREATE_FAILED_ERROR.message);
           return null;
         }
 
@@ -109,10 +114,7 @@ export function useExplorerPassPurchase(): UseExplorerPassPurchaseReturn {
         });
 
         if (!confirmResult.success) {
-          Alert.alert(
-            'Payment Issue',
-            'Payment received but verification failed. Please contact support.',
-          );
+          Alert.alert(VERIFICATION_FAILED_ERROR.title, VERIFICATION_FAILED_ERROR.message);
           return null;
         }
 
@@ -132,12 +134,8 @@ export function useExplorerPassPurchase(): UseExplorerPassPurchaseReturn {
 
         return confirmResult.data.pass;
       } catch (error: unknown) {
-        // Razorpay throws when the user cancels the sheet or payment fails.
-        const message =
-          error && typeof error === 'object' && 'description' in error
-            ? String((error as { description: unknown }).description)
-            : 'Payment was cancelled or failed.';
-        Alert.alert('Payment Cancelled', message);
+        const friendly = toFriendlyPaymentError(error);
+        Alert.alert(friendly.title, friendly.message);
         return null;
       } finally {
         setPurchasing(false);

@@ -19,6 +19,12 @@ import {
 } from '../../utils/api/tours';
 import { useUser } from '../../context';
 import { createAuthenticatedClient } from '../../utils/api/auth';
+import {
+  toFriendlyPaymentError,
+  VERIFICATION_FAILED_ERROR,
+  ORDER_CREATE_FAILED_ERROR,
+  CHECKOUT_NOT_CONFIGURED_ERROR,
+} from '../utils/paymentErrors';
 
 export interface PurchaseResult {
   accessGranted: boolean;
@@ -66,17 +72,12 @@ export function useTourPurchase(): UseTourPurchaseReturn {
 
         // Paid tour — open Razorpay checkout
         if (!init.razorpay_order_id || !init.amount_paise) {
-          Alert.alert('Error', 'Could not create payment order. Please try again.');
+          Alert.alert(ORDER_CREATE_FAILED_ERROR.title, ORDER_CREATE_FAILED_ERROR.message);
           return null;
         }
 
-        // Surface a clear message instead of letting Razorpay throw a cryptic
-        // error when the public key isn't configured in .env.
         if (!RAZORPAY_KEY_ID?.trim()) {
-          Alert.alert(
-            'Payment unavailable',
-            'Checkout is not configured on this build. Please update the app.',
-          );
+          Alert.alert(CHECKOUT_NOT_CONFIGURED_ERROR.title, CHECKOUT_NOT_CONFIGURED_ERROR.message);
           return null;
         }
 
@@ -105,10 +106,7 @@ export function useTourPurchase(): UseTourPurchaseReturn {
         });
 
         if (!confirmResult.success) {
-          Alert.alert(
-            'Payment Issue',
-            'Payment received but verification failed. Please contact support.',
-          );
+          Alert.alert(VERIFICATION_FAILED_ERROR.title, VERIFICATION_FAILED_ERROR.message);
           return null;
         }
 
@@ -134,12 +132,8 @@ export function useTourPurchase(): UseTourPurchaseReturn {
           expiresAt: confirmResult.data.expires_at,
         };
       } catch (error: unknown) {
-        // Razorpay throws when user cancels or payment fails
-        const message =
-          error && typeof error === 'object' && 'description' in error
-            ? String((error as { description: unknown }).description)
-            : 'Payment was cancelled or failed.';
-        Alert.alert('Payment Cancelled', message);
+        const friendly = toFriendlyPaymentError(error);
+        Alert.alert(friendly.title, friendly.message);
         return null;
       } finally {
         setPurchasing(false);
