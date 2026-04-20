@@ -18,6 +18,7 @@ import AuthLiquidBackground from '../../components/onboarding/AuthLiquidBackgrou
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
 import { login, signup } from '../../utils/api/auth';
+import { googleSignIn } from '../../utils/api/auth/GoogleAuth';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { COLORS } from '../../core/constants/theme';
 import { useOnboardingStore } from '../../stores/onboardingStore';
@@ -42,6 +43,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     if (fromOnboarding) {
@@ -49,8 +51,22 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   }, [fromOnboarding]);
 
-  const handleGoogleAuth = () => {
-    Alert.alert('Coming Soon', 'Google sign-in will be available soon.');
+  const handleGoogleAuth = async () => {
+    setGoogleLoading(true);
+    const result = await googleSignIn();
+    setGoogleLoading(false);
+
+    if (result.success) {
+      if (fromOnboarding) {
+        track('onboarding_google_signup');
+        navigation.navigate('OB11_Notifications');
+      } else {
+        await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.COMPLETED, 'true');
+        navigation.navigate('OB11_Notifications');
+      }
+    } else if (result.error.statusCode !== 0) {
+      Alert.alert('Google sign in failed', result.error.message);
+    }
   };
 
   const handleAppleAuth = () => {
@@ -112,9 +128,10 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const renderInitial = () => (
     <View className="gap-5">
       <AuthButton
-        title="Sign up with Google"
+        title={googleLoading ? 'Signing in...' : 'Sign up with Google'}
         variant="google"
         onPress={handleGoogleAuth}
+        disabled={googleLoading}
       />
       <AuthButton
         title="Sign up with Apple"

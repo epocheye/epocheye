@@ -18,6 +18,7 @@ import AuthLiquidBackground from '../../components/onboarding/AuthLiquidBackgrou
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import OnboardingResolvedVisual from '../../components/onboarding/OnboardingResolvedVisual';
 import { login } from '../../utils/api/auth';
+import { googleSignIn } from '../../utils/api/auth/GoogleAuth';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { COLORS } from '../../core/constants/theme';
 
@@ -55,9 +56,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleGoogleAuth = () => {
-    Alert.alert('Coming Soon', 'Google sign-in will be available soon.');
+  const handleGoogleAuth = async () => {
+    setGoogleLoading(true);
+    const result = await googleSignIn();
+    setGoogleLoading(false);
+
+    if (result.success) {
+      await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.COMPLETED, 'true');
+      onLoginSuccess();
+    } else if (result.error.statusCode !== 0) {
+      Alert.alert('Google sign in failed', result.error.message);
+    }
   };
 
   const handleAppleAuth = () => {
@@ -126,9 +137,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
           {!showEmailForm ? (
             <View className="gap-5">
               <AuthButton
-                title="Continue with Google"
+                title={googleLoading ? 'Signing in...' : 'Continue with Google'}
                 variant="google"
                 onPress={handleGoogleAuth}
+                disabled={googleLoading}
               />
               <AuthButton
                 title="Continue with Apple"

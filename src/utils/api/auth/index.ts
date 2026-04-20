@@ -14,6 +14,7 @@ export {
 } from './Login';
 
 export { signup } from './Signup';
+export { googleSignIn } from './GoogleAuth';
 export type { SignupRequest, SignupResponse } from './Signup';
 
 // Token storage utilities

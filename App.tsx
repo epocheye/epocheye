@@ -2,11 +2,19 @@ import './global.css';
 
 import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AppNavigator from './src/navigation';
 import { NetworkProvider, useNetwork } from './src/context';
 import NoInternetScreen from './src/screens/NoInternetScreen';
 import { fcmInit } from './src/services/fcmService';
 import { useArQuotaStore } from './src/stores/arQuotaStore';
+
+GoogleSignin.configure({
+  webClientId:
+    '390327894507-b3s027ad3ak1s562p65vuc280dg39q4c.apps.googleusercontent.com',
+  offlineAccess: true,
+  scopes: ['profile', 'email'],
+});
 
 /**
  * Main app content that handles network state
