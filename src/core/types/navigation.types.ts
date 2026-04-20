@@ -24,20 +24,15 @@ export interface PlaceNavParam {
 
 /**
  * Onboarding Stack Parameter List
- * 12-screen Duolingo-style flow:
- * OB00_Splash → OB01_Welcome → ... → OB12_Arrival
+ * 4-screen Figma flow + retained auth/arrival screens:
+ * OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region
+ *   → OB10_SignUp (or OB10_Login) → OB11_Notifications → OB12_Arrival
  */
 export type OnboardingStackParamList = {
   OB00_Splash: undefined;
   OB01_Welcome: undefined;
-  OB02_Motivation: undefined;
-  OB03_Frequency: undefined;
-  OB04_Goal: undefined;
-  OB05_Region: undefined;
-  OB06_Name: undefined;
-  OB07_Promise: undefined;
-  OB08_DemoStory: undefined;
-  OB09_Reaction: undefined;
+  OB02_Name: undefined;
+  OB03_Region: undefined;
   OB10_SignUp: {fromOnboarding?: boolean} | undefined;
   OB10_Login: undefined;
   OB11_Notifications: undefined;

@@ -2,7 +2,10 @@ import { createAuthenticatedClient } from '../auth';
 import { createErrorResult, isApiError } from '../helpers';
 import type {
   ArResult,
+  JobStatusResponse,
   QuotaExceededResponse,
+  ReconstructOutcome,
+  ReconstructPendingResponse,
   ReconstructRequest,
   ReconstructResponse,
   ScanContributeRequest,
@@ -22,14 +25,23 @@ export async function getArConfig(): Promise<ArResult<UserArConfig>> {
 
 export async function reconstructObject(
   req: ReconstructRequest,
-): Promise<ArResult<ReconstructResponse>> {
+): Promise<ArResult<ReconstructOutcome>> {
   try {
     const client = createAuthenticatedClient();
-    const resp = await client.post<ReconstructResponse>(
+    const resp = await client.post<ReconstructResponse | ReconstructPendingResponse>(
       '/api/lens/reconstruct',
       req,
     );
-    return { success: true, data: resp.data };
+    if (resp.status === 202) {
+      return {
+        success: true,
+        data: { kind: 'pending', data: resp.data as ReconstructPendingResponse },
+      };
+    }
+    return {
+      success: true,
+      data: { kind: 'ready', data: resp.data as ReconstructResponse },
+    };
   } catch (error) {
     // 402 means the server accepted the request but refused on quota.
     // Surface this as a discriminated-union success=false variant so the
@@ -41,6 +53,20 @@ export async function reconstructObject(
         data: error.response.data as QuotaExceededResponse,
       };
     }
+    return createErrorResult(error);
+  }
+}
+
+export async function getReconstructionStatus(
+  jobId: string,
+): Promise<ArResult<JobStatusResponse>> {
+  try {
+    const client = createAuthenticatedClient();
+    const resp = await client.get<JobStatusResponse>(
+      `/api/lens/reconstruct/status/${encodeURIComponent(jobId)}`,
+    );
+    return { success: true, data: resp.data };
+  } catch (error) {
     return createErrorResult(error);
   }
 }

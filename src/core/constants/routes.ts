@@ -8,20 +8,15 @@
  */
 export const ROUTES = {
   /**
-   * Onboarding Stack Routes (12-screen Duolingo-style flow)
-   * OB00_Splash → OB01_Welcome → ... → OB12_Arrival
+   * Onboarding Stack Routes (4-screen Figma flow + retained auth/arrival screens)
+   * OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region
+   *   → OB10_SignUp (or OB10_Login) → OB11_Notifications → OB12_Arrival
    */
   ONBOARDING: {
     OB00_SPLASH: 'OB00_Splash',
     OB01_WELCOME: 'OB01_Welcome',
-    OB02_MOTIVATION: 'OB02_Motivation',
-    OB03_FREQUENCY: 'OB03_Frequency',
-    OB04_GOAL: 'OB04_Goal',
-    OB05_REGION: 'OB05_Region',
-    OB06_NAME: 'OB06_Name',
-    OB07_PROMISE: 'OB07_Promise',
-    OB08_DEMO_STORY: 'OB08_DemoStory',
-    OB09_REACTION: 'OB09_Reaction',
+    OB02_NAME: 'OB02_Name',
+    OB03_REGION: 'OB03_Region',
     OB10_SIGNUP: 'OB10_SignUp',
     OB10_LOGIN: 'OB10_Login',
     OB11_NOTIFICATIONS: 'OB11_Notifications',

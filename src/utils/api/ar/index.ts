@@ -7,4 +7,7 @@ export type {
   ArResult,
   ScanContributeRequest,
   ScanContributeResponse,
+  ReconstructPendingResponse,
+  JobStatusResponse,
+  ReconstructOutcome,
 } from './types';

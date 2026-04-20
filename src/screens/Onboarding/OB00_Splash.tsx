@@ -1,70 +1,53 @@
 import React, {useEffect} from 'react';
-import {View, StyleSheet, StatusBar, Dimensions} from 'react-native';
+import {Image, StatusBar, StyleSheet, Text, View} from 'react-native';
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
-  withTiming,
-  withSpring,
+  useSharedValue,
   withDelay,
+  withTiming,
   runOnJS,
 } from 'react-native-reanimated';
 import {ROUTES} from '../../core/constants/routes';
-import AnimatedLogo from '../../components/ui/AnimatedLogo';
-import DustMotes from '../../components/onboarding/DustMotes';
-import ARViewfinder from '../../components/onboarding/ARViewfinder';
-import {ACCENT, BG} from '../../constants/onboarding';
+import {COLORS, FONTS} from '../../core/constants/theme';
 import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB00_Splash'>;
 
-const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
+const HOLD_DURATION_MS = 1600;
 
 const OB00_Splash: React.FC<Props> = ({navigation}) => {
   const logoOpacity = useSharedValue(0);
-  const logoScale = useSharedValue(0.8);
+  const wordmarkOpacity = useSharedValue(0);
 
   useEffect(() => {
-    const goNext = () => {
-      navigation.replace(ROUTES.ONBOARDING.OB01_WELCOME);
-    };
+    const goNext = () => navigation.replace(ROUTES.ONBOARDING.OB01_WELCOME);
 
-    logoOpacity.value = withDelay(400, withTiming(1, {duration: 700}));
-    logoScale.value = withDelay(
-      400,
-      withSpring(1, {damping: 14, stiffness: 120}),
-    );
+    logoOpacity.value = withTiming(1, {duration: 700});
+    wordmarkOpacity.value = withDelay(500, withTiming(1, {duration: 600}));
 
-    const timer = setTimeout(() => {
-      runOnJS(goNext)();
-    }, 3000);
-
+    const timer = setTimeout(() => runOnJS(goNext)(), HOLD_DURATION_MS + 900);
     return () => clearTimeout(timer);
-  }, [navigation, logoOpacity, logoScale]);
+  }, [navigation, logoOpacity, wordmarkOpacity]);
 
-  const logoStyle = useAnimatedStyle(() => ({
-    opacity: logoOpacity.value,
-    transform: [{scale: logoScale.value}],
+  const logoStyle = useAnimatedStyle(() => ({opacity: logoOpacity.value}));
+  const wordmarkStyle = useAnimatedStyle(() => ({
+    opacity: wordmarkOpacity.value,
   }));
 
   return (
     <View style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        translucent
-        backgroundColor="transparent"
-      />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.bgWarm} translucent />
 
-      {/* Radial indigo bloom */}
-      <View style={styles.indigoBloom} pointerEvents="none" />
+      <Animated.View style={[styles.logoWrap, logoStyle]}>
+        <Image
+          source={require('../../assets/images/logo-white.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </Animated.View>
 
-      {/* Dust motes */}
-      <DustMotes />
-
-      {/* AR viewfinder with logo at center */}
-      <Animated.View style={[styles.viewfinder, logoStyle]}>
-        <ARViewfinder size={220}>
-          <AnimatedLogo size={80} variant="white" motion="drift" />
-        </ARViewfinder>
+      <Animated.View style={[styles.wordmarkWrap, wordmarkStyle]}>
+        <Text style={styles.wordmark}>epocheye</Text>
       </Animated.View>
     </View>
   );
@@ -73,23 +56,28 @@ const OB00_Splash: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BG.deep,
+    backgroundColor: '#111111',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  indigoBloom: {
+  logoWrap: {
+    width: 110,
+    height: 108,
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
+  },
+  wordmarkWrap: {
     position: 'absolute',
-    width: SCREEN_WIDTH * 1.3,
-    height: SCREEN_WIDTH * 1.3,
-    top: SCREEN_HEIGHT / 2 - SCREEN_WIDTH * 0.65,
-    left: -(SCREEN_WIDTH * 0.15),
-    borderRadius: SCREEN_WIDTH,
-    backgroundColor: ACCENT.indigoGlow,
-    opacity: 0.35,
-  },
-  viewfinder: {
+    bottom: 88,
     alignItems: 'center',
-    justifyContent: 'center',
+  },
+  wordmark: {
+    fontFamily: FONTS.medium,
+    fontSize: 36,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
 });
 

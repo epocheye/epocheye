@@ -4,7 +4,6 @@ import {
   View,
   TouchableOpacity,
   FlatList,
-  ImageBackground,
   ScrollView,
   Modal,
   InteractionManager,
@@ -124,7 +123,8 @@ interface PlaceCardProps {
 
 const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress }) => {
   const scale = useSharedValue(1);
-  const fallbackImageUri = getPlaceImage(place.categories);
+  const backendImage = place.image_urls?.find(Boolean);
+  const fallbackImageUri = backendImage ?? getPlaceImage(place.categories);
   const distanceKm = (place.distance_meters / 1000).toFixed(1);
   const shortDescription = place.categories[0] || 'Historic site';
 
@@ -152,8 +152,12 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress 
         accessibilityLabel={`Visit ${place.name}, ${distanceKm} km away`}
         accessibilityHint="Opens the site details screen"
       >
-        <ImageBackground
-          source={{ uri: fallbackImageUri }}
+        <ResolvedSubjectImage
+          subject={place.name}
+          context="nearby highlight card"
+          fallbackUri={fallbackImageUri}
+          enableRemoteResolve={!backendImage}
+          showSkeletonWhileLoading={!backendImage}
           style={cardStyles.image}
           imageStyle={cardStyles.imageMask}
         >
@@ -201,7 +205,7 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress 
             </View>
           </View>
           </LinearGradient>
-        </ImageBackground>
+        </ResolvedSubjectImage>
       </AnimatedTouchable>
     </Animated.View>
   );

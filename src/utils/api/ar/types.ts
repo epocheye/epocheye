@@ -7,6 +7,33 @@ export interface ReconstructRequest {
   longitude?: number;
 }
 
+export interface ReconstructPendingResponse {
+  job_id: string;
+  status: 'pending' | 'processing' | string;
+  phase: 'cold_start' | 'warming_up' | 'processing' | string;
+  eta_seconds: number;
+  monument_id: string;
+  object_label: string;
+  message: string;
+}
+
+export interface JobStatusResponse {
+  job_id: string;
+  status: 'pending' | 'processing' | 'succeeded' | 'failed' | string;
+  phase?: string;
+  eta_seconds?: number;
+  glb_url?: string;
+  thumbnail_url?: string;
+  provider?: string;
+  error?: string;
+  created_at: string;
+  completed_at?: string;
+}
+
+export type ReconstructOutcome =
+  | { kind: 'ready'; data: ReconstructResponse }
+  | { kind: 'pending'; data: ReconstructPendingResponse };
+
 export interface ReconstructResponse {
   monument_id: string;
   object_label: string;

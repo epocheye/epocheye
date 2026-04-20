@@ -1,141 +1,100 @@
 import React, {useEffect} from 'react';
-import {View, Image, StyleSheet, StatusBar, Platform} from 'react-native';
+import {
+  Image,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Animated, {
-  useSharedValue,
+  Easing,
   useAnimatedStyle,
+  useSharedValue,
   withDelay,
   withTiming,
-  withSpring,
-  Easing,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
-import {BlurView} from '@react-native-community/blur';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {CDN_BASE} from '../../core/constants/theme';
+import {COLORS, FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
-import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
-import DustMotes from '../../components/onboarding/DustMotes';
-import {BG, GOLD, TEXT, TYPE, BORDER, RADIUS, SPACING} from '../../constants/onboarding';
-import {track} from '../../services/analytics';
 import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB01_Welcome'>;
 
-const MONUMENT_BG = `${CDN_BASE}monuments/Konarka_Temple-2.jpg`;
-
 const OB01_Welcome: React.FC<Props> = ({navigation}) => {
   const insets = useSafeAreaInsets();
 
-  const bgScale = useSharedValue(1.08);
-  const eyebrowO = useSharedValue(0);
-  const line1 = useSharedValue(24);
-  const line1O = useSharedValue(0);
-  const accentO = useSharedValue(0);
-  const accentY = useSharedValue(18);
-  const subO = useSharedValue(0);
+  const headlineO = useSharedValue(0);
+  const headlineY = useSharedValue(18);
   const ctaO = useSharedValue(0);
   const ctaY = useSharedValue(22);
 
   useEffect(() => {
-    track('onboarding_started');
+    headlineO.value = withDelay(400, withTiming(1, {duration: 700}));
+    headlineY.value = withDelay(
+      400,
+      withTiming(0, {duration: 700, easing: Easing.out(Easing.cubic)}),
+    );
+    ctaO.value = withDelay(900, withTiming(1, {duration: 500}));
+    ctaY.value = withDelay(
+      900,
+      withTiming(0, {duration: 500, easing: Easing.out(Easing.cubic)}),
+    );
+  }, [headlineO, headlineY, ctaO, ctaY]);
 
-    bgScale.value = withTiming(1.0, {
-      duration: 4000,
-      easing: Easing.out(Easing.quad),
-    });
-
-    eyebrowO.value = withDelay(700, withTiming(1, {duration: 600}));
-    line1.value = withDelay(900, withSpring(0, {damping: 22, stiffness: 120}));
-    line1O.value = withDelay(900, withTiming(1, {duration: 500}));
-    accentY.value = withDelay(1200, withSpring(0, {damping: 20, stiffness: 110}));
-    accentO.value = withDelay(1200, withTiming(1, {duration: 600}));
-    subO.value = withDelay(1600, withTiming(1, {duration: 500}));
-    ctaO.value = withDelay(2000, withTiming(1, {duration: 500}));
-    ctaY.value = withDelay(2000, withSpring(0, {damping: 18, stiffness: 140}));
-  }, [bgScale, eyebrowO, line1, line1O, accentO, accentY, subO, ctaO, ctaY]);
-
-  const bgStyle = useAnimatedStyle(() => ({
-    transform: [{scale: bgScale.value}],
+  const sHeadline = useAnimatedStyle(() => ({
+    opacity: headlineO.value,
+    transform: [{translateY: headlineY.value}],
   }));
-  const sEyebrow = useAnimatedStyle(() => ({opacity: eyebrowO.value}));
-  const sLine1 = useAnimatedStyle(() => ({
-    opacity: line1O.value,
-    transform: [{translateY: line1.value}],
-  }));
-  const sAccent = useAnimatedStyle(() => ({
-    opacity: accentO.value,
-    transform: [{translateY: accentY.value}],
-  }));
-  const sSub = useAnimatedStyle(() => ({opacity: subO.value}));
   const sCta = useAnimatedStyle(() => ({
     opacity: ctaO.value,
     transform: [{translateY: ctaY.value}],
   }));
 
+  const onGetStarted = () => {
+    navigation.navigate(ROUTES.ONBOARDING.OB02_NAME);
+  };
+
   return (
     <View style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        translucent
-        backgroundColor="transparent"
-      />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Ken Burns background */}
-      <Animated.View style={[StyleSheet.absoluteFill, bgStyle]}>
+      <View style={styles.heroWrap}>
         <Image
-          source={{uri: MONUMENT_BG}}
-          style={StyleSheet.absoluteFillObject}
+          source={require('../../assets/images/onboarding.webp')}
+          style={styles.hero}
           resizeMode="cover"
         />
-      </Animated.View>
+        <LinearGradient
+          colors={['transparent', 'rgba(17,17,17,0.6)', '#111111']}
+          locations={[0, 0.7, 1]}
+          style={styles.heroFade}
+        />
+      </View>
 
-      <LinearGradient
-        colors={['transparent', 'rgba(7,6,12,0.45)', 'rgba(7,6,12,0.92)']}
-        locations={[0, 0.45, 0.85]}
-        style={StyleSheet.absoluteFillObject}
-      />
+      <View style={styles.bottom}>
+        <Animated.View style={[styles.headlineWrap, sHeadline]}>
+          <Text style={styles.headlineIntro}>It's time to</Text>
+          <Text style={styles.headlineAccent}>Experience</Text>
+        </Animated.View>
 
-      <DustMotes />
+        <Animated.View style={[styles.ctaWrap, sCta]}>
+          <Pressable
+            onPress={onGetStarted}
+            style={({pressed}) => [
+              styles.cta,
+              pressed && styles.ctaPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Get Started">
+            <Text style={styles.ctaLabel}>Get Started</Text>
+          </Pressable>
+        </Animated.View>
 
-      {/* Bottom glass sheet */}
-      <View style={[styles.sheetWrap, {paddingBottom: insets.bottom + 28}]}>
-        <View style={styles.sheet}>
-          {Platform.OS === 'ios' ? (
-            <BlurView
-              style={StyleSheet.absoluteFill}
-              blurType="dark"
-              blurAmount={20}
-              reducedTransparencyFallbackColor="rgba(12,9,6,0.9)"
-            />
-          ) : null}
-
-          <View style={styles.sheetContent}>
-            <Animated.Text style={[styles.eyebrow, sEyebrow]}>
-              HERITAGE · AR
-            </Animated.Text>
-
-            <Animated.Text style={[styles.headline, sLine1]}>
-              Every monument{'\n'}has a million stories.
-            </Animated.Text>
-
-            <Animated.Text style={[styles.accent, sAccent]}>
-              One of them is yours.
-            </Animated.Text>
-
-            <Animated.Text style={[styles.sub, sSub]}>
-              Seven steps to meet the ancestor who built your home.
-            </Animated.Text>
-
-            <Animated.View style={[styles.ctaWrap, sCta]}>
-              <OBPrimaryButton
-                label="Begin  →"
-                onPress={() =>
-                  navigation.navigate(ROUTES.ONBOARDING.OB02_MOTIVATION)
-                }
-              />
-            </Animated.View>
-          </View>
-        </View>
+        <Text style={[styles.footer, {marginBottom: insets.bottom + 12}]}>
+          Copyright @ epocheye 2026
+        </Text>
       </View>
     </View>
   );
@@ -144,54 +103,75 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BG.deep,
+    backgroundColor: '#111111',
   },
-  sheetWrap: {
+  heroWrap: {
+    height: '68%',
+    width: '100%',
+  },
+  hero: {
+    width: '100%',
+    height: '100%',
+  },
+  heroFade: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: SPACING.lg,
+    bottom: 0,
+    height: '45%',
   },
-  sheet: {
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: BORDER.subtle,
-    overflow: 'hidden',
-    backgroundColor:
-      Platform.OS === 'ios' ? 'rgba(12,9,6,0.35)' : 'rgba(12,9,6,0.92)',
+  bottom: {
+    flex: 1,
+    paddingHorizontal: 28,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingTop: 8,
   },
-  sheetContent: {
-    paddingHorizontal: SPACING.xxl,
-    paddingTop: SPACING.xxxl,
-    paddingBottom: SPACING.xl,
+  headlineWrap: {
+    alignItems: 'center',
+    marginBottom: 28,
   },
-  eyebrow: {
-    ...TYPE.uiTiny,
-    color: GOLD.text,
-    letterSpacing: 2.4,
+  headlineIntro: {
+    fontFamily: FONTS.handwritten,
+    fontSize: 44,
+    color: '#FFFFFF',
+    lineHeight: 52,
   },
-  headline: {
-    ...TYPE.displayLarge,
-    fontSize: 34,
-    lineHeight: 42,
-    marginTop: SPACING.md,
-  },
-  accent: {
-    ...TYPE.displayItalic,
-    color: GOLD.text,
-    fontSize: 20,
-    lineHeight: 28,
-    marginTop: SPACING.md,
-  },
-  sub: {
-    ...TYPE.uiSmall,
-    color: TEXT.secondary,
-    marginTop: SPACING.xl,
+  headlineAccent: {
+    fontFamily: FONTS.handwritten,
+    fontSize: 60,
+    color: COLORS.lime,
+    lineHeight: 68,
+    marginTop: -6,
   },
   ctaWrap: {
-    marginTop: SPACING.xxl,
-    marginHorizontal: -SPACING.xxl,
+    width: '100%',
+    alignItems: 'center',
+  },
+  cta: {
+    width: '100%',
+    height: 56,
+    borderRadius: 999,
+    backgroundColor: COLORS.sky,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaPressed: {
+    backgroundColor: COLORS.skyDark,
+    transform: [{scale: 0.98}],
+  },
+  ctaLabel: {
+    fontFamily: FONTS.medium,
+    fontSize: 17,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  footer: {
+    marginTop: 18,
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.45)',
+    letterSpacing: 0.4,
   },
 });
 

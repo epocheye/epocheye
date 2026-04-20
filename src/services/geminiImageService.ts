@@ -6,9 +6,9 @@
  * AsyncStorage so repeat visits to the same monument are instant and
  * don't burn quota.
  *
- * Model: `gemini-2.0-flash-exp-image-generation` — Google AI Studio key
- * works without additional billing setup. If the model rotates, change
- * GEMINI_IMAGE_MODEL below.
+ * Model: `gemini-2.5-flash-image` ("Nano Banana") — Google AI Studio
+ * key works without additional billing setup. If the model rotates,
+ * change GEMINI_IMAGE_MODEL below.
  */
 
 import axios from 'axios';
@@ -18,11 +18,14 @@ import { STORAGE_KEYS } from '../core/constants/storage-keys';
 
 // ── Configuration ──────────────────────────────────────────────────
 
-const GEMINI_IMAGE_MODEL = 'gemini-2.0-flash-exp-image-generation';
+const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent`;
 const TIMEOUT_MS = 30_000;
 const MAX_CACHE_ENTRIES = 60;
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+const NEGATIVE_CACHE_TTL_MS = 1000 * 60 * 10; // 10 min — stops retry storms on failures
+const RATE_LIMIT_COOLDOWN_MS = 1000 * 60; // 60s global pause after a 429
+const MAX_CONCURRENT_REQUESTS = 2;
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -47,7 +50,30 @@ interface PersistedEntry {
 
 const memoryCache = new Map<string, GeneratedImageResult>();
 const inflight = new Map<string, Promise<GeneratedImageResult | null>>();
+const negativeCache = new Map<string, number>(); // key → expiresAt
 let persistedLoaded = false;
+let rateLimitedUntil = 0;
+let activeRequests = 0;
+const requestQueue: Array<() => void> = [];
+
+function acquireSlot(): Promise<void> {
+  if (activeRequests < MAX_CONCURRENT_REQUESTS) {
+    activeRequests += 1;
+    return Promise.resolve();
+  }
+  return new Promise(resolve => {
+    requestQueue.push(() => {
+      activeRequests += 1;
+      resolve();
+    });
+  });
+}
+
+function releaseSlot(): void {
+  activeRequests -= 1;
+  const next = requestQueue.shift();
+  if (next) next();
+}
 
 function cacheKey({ subject, context }: GenerateMonumentImageParams): string {
   return `${subject.trim().toLowerCase()}::${(context ?? '').trim().toLowerCase()}`;
@@ -150,6 +176,7 @@ async function requestGemini(
     return null;
   }
 
+  await acquireSlot();
   try {
     const response = await axios.post(
       `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
@@ -169,6 +196,7 @@ async function requestGemini(
 
     const dataUri = extractImageDataUri(response.data);
     if (!dataUri) {
+      negativeCache.set(cacheKey(params), Date.now() + NEGATIVE_CACHE_TTL_MS);
       if (__DEV__) {
         console.warn('[geminiImageService] no image in response', params);
       }
@@ -186,6 +214,10 @@ async function requestGemini(
     void persistEntry(cacheKey(params), dataUri, cachedAt);
     return result;
   } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 429) {
+      rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+    }
+    negativeCache.set(cacheKey(params), Date.now() + NEGATIVE_CACHE_TTL_MS);
     if (__DEV__) {
       if (axios.isAxiosError(err)) {
         console.warn(
@@ -198,6 +230,8 @@ async function requestGemini(
       }
     }
     return null;
+  } finally {
+    releaseSlot();
   }
 }
 
@@ -223,6 +257,12 @@ export async function generateMonumentImage(
   const pending = inflight.get(key);
   if (pending) return pending;
 
+  const negativeUntil = negativeCache.get(key);
+  if (negativeUntil && negativeUntil > Date.now()) return null;
+  if (negativeUntil) negativeCache.delete(key);
+
+  if (Date.now() < rateLimitedUntil) return null;
+
   const promise = requestGemini(params).finally(() => {
     inflight.delete(key);
   });
@@ -243,6 +283,8 @@ export function peekMonumentImageFromMemory(
 
 export async function clearGeneratedImageCache(): Promise<void> {
   memoryCache.clear();
+  negativeCache.clear();
+  rateLimitedUntil = 0;
   try {
     await AsyncStorage.removeItem(STORAGE_KEYS.CACHE.GEMINI_IMAGE);
   } catch {

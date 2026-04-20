@@ -13,19 +13,28 @@ export const FONTS = {
   extraBold: 'MontserratAlternates-ExtraBold',
   italic: 'MontserratAlternates-Italic',
   mediumItalic: 'MontserratAlternates-MediumItalic',
+  handwritten: 'NothingYouCouldDo-Regular',
+  serifItalic: 'InstrumentSerif-Italic',
 } as const;
 
 export const COLORS = {
   /** Core backgrounds */
-  bg: '#000000',
-  bgWarm: '#080604',
+  bg: '#050505',
+  bgWarm: '#111111',
   bgCard: 'rgba(255,255,255,0.06)',
 
-  /** Brand amber */
-  amber: '#D4860A',
-  amberLight: '#E8A33A',
-  amberDark: '#B06F08',
-  amberSubtle: 'rgba(212,134,10,0.15)',
+  /** Primary accent (sky) — was amber. Keys kept for transition. */
+  amber: '#61A6D3',
+  amberLight: '#8FC3E2',
+  amberDark: '#4A86B0',
+  amberSubtle: 'rgba(97,166,211,0.15)',
+
+  /** Figma accents */
+  sky: '#61A6D3',
+  skyLight: '#8FC3E2',
+  skyDark: '#4A86B0',
+  lime: '#8EC24B',
+  limeDark: '#6FA037',
 
   /** Text hierarchy */
   textPrimary: '#FFFFFF',

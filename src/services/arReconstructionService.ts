@@ -1,6 +1,11 @@
-import { reconstructObject, contributeScan } from '../utils/api/ar';
+import {
+  reconstructObject,
+  contributeScan,
+  getReconstructionStatus,
+} from '../utils/api/ar';
 import type {
   QuotaExceededResponse,
+  ReconstructPendingResponse,
   ReconstructResponse,
 } from '../utils/api/ar';
 import { useArQuotaStore } from '../stores/arQuotaStore';
@@ -21,9 +26,22 @@ export type ArReconstructionResult =
       info: QuotaExceededResponse;
     }
   | {
+      kind: 'pending';
+      jobId: string;
+      phase: string;
+      etaSeconds: number;
+      message: string;
+    }
+  | {
       kind: 'error';
       message: string;
     };
+
+export interface PendingProgress {
+  phase: string;
+  etaSeconds: number;
+  message?: string;
+}
 
 interface ReconstructInput {
   monumentId: string;
@@ -34,12 +52,12 @@ interface ReconstructInput {
   longitude?: number;
 }
 
-/**
- * Kicks off a reconstruction request. Routes quota-exceeded responses to a
- * discriminated-union variant the caller can use to show the upgrade prompt
- * without inspecting axios internals. On success it optimistically applies
- * the new remaining count to the quota store so the pill updates instantly.
- */
+// Polling cadence for async cold-start jobs. Caps roughly match the server-
+// reported worst-case warmup (~8 min) plus a safety margin for first-ever
+// container pull on the inference host.
+const DEFAULT_POLL_INTERVAL_MS = 15_000;
+const DEFAULT_POLL_TIMEOUT_MS = 12 * 60_000;
+
 export async function reconstructForLens(
   input: ReconstructInput,
 ): Promise<ArReconstructionResult> {
@@ -53,9 +71,11 @@ export async function reconstructForLens(
   });
 
   if (result.success) {
-    // Cache hits report quota_remaining=0 but shouldn't touch the store —
-    // cached responses bypass the quota entirely on the server side.
-    const payload: ReconstructResponse = result.data;
+    if (result.data.kind === 'pending') {
+      return mapPending(result.data.data);
+    }
+
+    const payload: ReconstructResponse = result.data.data;
     if (!payload.cached) {
       useArQuotaStore
         .getState()
@@ -68,14 +88,12 @@ export async function reconstructForLens(
         );
     }
 
-    // Cached results skip StoreScan on the backend. Contribute the scan
-    // in the background so the monument still accumulates angles.
     if (payload.cached && input.imageBase64) {
       contributeScan({
         monument_id: input.monumentId,
         object_label: input.objectLabel,
         image_base64: input.imageBase64,
-      }).catch(() => {}); // fire-and-forget
+      }).catch(() => {});
     }
 
     return {
@@ -91,12 +109,8 @@ export async function reconstructForLens(
   }
 
   if ('quotaExceeded' in result && result.quotaExceeded) {
-    // Keep the quota store in sync with the server-side deny so the pill
-    // shows 0 remaining until the next refresh.
     const { data } = result;
-    useArQuotaStore
-      .getState()
-      .applyReconstructionResult(0, data.limit);
+    useArQuotaStore.getState().applyReconstructionResult(0, data.limit);
     return { kind: 'quota_exceeded', info: data };
   }
 
@@ -105,3 +119,82 @@ export async function reconstructForLens(
   return { kind: 'error', message };
 }
 
+function mapPending(p: ReconstructPendingResponse): ArReconstructionResult {
+  return {
+    kind: 'pending',
+    jobId: p.job_id,
+    phase: p.phase,
+    etaSeconds: p.eta_seconds,
+    message: p.message,
+  };
+}
+
+export interface PollOptions {
+  intervalMs?: number;
+  timeoutMs?: number;
+  onProgress?: (p: PendingProgress) => void;
+  isAborted?: () => boolean;
+}
+
+/**
+ * Polls the job status endpoint until the reconstruction finishes, fails, or
+ * the timeout elapses. Resolves to the same union the sync path returns so
+ * callers can treat both paths uniformly.
+ */
+export async function pollReconstructionJob(
+  jobId: string,
+  opts: PollOptions = {},
+): Promise<ArReconstructionResult> {
+  const interval = opts.intervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  const timeout = opts.timeoutMs ?? DEFAULT_POLL_TIMEOUT_MS;
+  const deadline = Date.now() + timeout;
+
+  while (Date.now() < deadline) {
+    if (opts.isAborted?.()) {
+      return { kind: 'error', message: 'Cancelled' };
+    }
+
+    const res = await getReconstructionStatus(jobId);
+    if (!res.success) {
+      const message = 'error' in res ? res.error.message : 'Status check failed';
+      return { kind: 'error', message };
+    }
+
+    const job = res.data;
+    if (job.status === 'succeeded' && job.glb_url) {
+      return {
+        kind: 'success',
+        glbUrl: job.glb_url,
+        thumbnailUrl: job.thumbnail_url,
+        provider: job.provider ?? 'sagemaker',
+        cached: false,
+        scanCount: 0,
+        quality: 'single_view',
+        isImproving: false,
+      };
+    }
+    if (job.status === 'failed') {
+      return {
+        kind: 'error',
+        message: job.error || 'Reconstruction failed',
+      };
+    }
+
+    opts.onProgress?.({
+      phase: job.phase ?? job.status,
+      etaSeconds: job.eta_seconds ?? 0,
+    });
+
+    await wait(interval);
+  }
+
+  return {
+    kind: 'error',
+    message:
+      "We're still preparing the 3D engine. Try again in a minute — your scan will be faster next time.",
+  };
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

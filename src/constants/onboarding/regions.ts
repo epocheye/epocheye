@@ -1,98 +1,53 @@
 /**
- * Region Data
- * Defines available ancestry regions for the onboarding selection screen.
- * Images are served from the CDN at jsdelivr.
+ * UNESCO region groupings used for the onboarding heritage picker.
+ * Single-select — the user picks one region their heritage belongs to.
  */
 
-import { CDN_BASE } from '../../core/constants/theme';
+import type { ImageSourcePropType } from 'react-native';
 
-export interface Region {
-  id: string;
-  name: string;
-  /** Short abbreviation displayed as fallback on the card */
-  abbreviation: string;
-  /** Accent color for the card's visual marker */
-  color: string;
-  /** CDN URL for the region's monument image */
-  imageUrl: string;
+export type UnescoRegion =
+  | 'asia_pacific'
+  | 'arab_states'
+  | 'north_america'
+  | 'latin_america_caribbean'
+  | 'europe'
+  | 'africa';
+
+export interface UnescoRegionEntry {
+  id: UnescoRegion;
+  label: string;
+  image: ImageSourcePropType;
 }
 
-export const REGIONS: Region[] = [
+export const UNESCO_REGIONS: readonly UnescoRegionEntry[] = [
   {
-    id: 'odisha',
-    name: 'Odisha',
-    abbreviation: 'OD',
-    color: '#D4860A',
-    imageUrl: `${CDN_BASE}/monuments/Konarka_Temple-2.jpg`,
+    id: 'asia_pacific',
+    label: 'Asia & the Pacific',
+    image: require('../../assets/images/asia.png'),
   },
   {
-    id: 'rajasthan',
-    name: 'Rajasthan',
-    abbreviation: 'RJ',
-    color: '#C9553A',
-    imageUrl: `${CDN_BASE}/monuments/chittorgarh-fort.jpg`,
+    id: 'arab_states',
+    label: 'Arab States',
+    image: require('../../assets/images/arabs.png'),
   },
   {
-    id: 'bengal',
-    name: 'Bengal',
-    abbreviation: 'BN',
-    color: '#3A8C6E',
-    imageUrl: `${CDN_BASE}/monuments/victoria.jpg`,
+    id: 'north_america',
+    label: 'North American',
+    image: require('../../assets/images/north.png'),
   },
   {
-    id: 'punjab',
-    name: 'Punjab',
-    abbreviation: 'PB',
-    color: '#D4860A',
-    imageUrl: `${CDN_BASE}/monuments/amritsar.jpg`,
+    id: 'latin_america_caribbean',
+    label: 'Latin American & Caribbean',
+    image: require('../../assets/images/latin.png'),
   },
   {
-    id: 'tamil_nadu',
-    name: 'Tamil Nadu',
-    abbreviation: 'TN',
-    color: '#8B5E3C',
-    imageUrl: `${CDN_BASE}/monuments/tamil.jpg`,
+    id: 'europe',
+    label: 'European',
+    image: require('../../assets/images/europe.png'),
   },
   {
-    id: 'kerala',
-    name: 'Kerala',
-    abbreviation: 'KL',
-    color: '#2E7D5B',
-    imageUrl: `${CDN_BASE}/monuments/kerala.jpg`,
+    id: 'africa',
+    label: 'African',
+    image: require('../../assets/images/african.png'),
   },
-  {
-    id: 'maharashtra',
-    name: 'Maharashtra',
-    abbreviation: 'MH',
-    color: '#A0522D',
-    imageUrl: `${CDN_BASE}/monuments/maharashtra.jpg`,
-  },
-  {
-    id: 'persia',
-    name: 'Persia',
-    abbreviation: 'PR',
-    color: '#6B4C8A',
-    imageUrl: `${CDN_BASE}/monuments/persia.jpg`,
-  },
-  {
-    id: 'china',
-    name: 'China',
-    abbreviation: 'CN',
-    color: '#B22234',
-    imageUrl: `${CDN_BASE}/monuments/china.jpg`,
-  },
-  {
-    id: 'the_ottomans',
-    name: 'The Ottomans',
-    abbreviation: 'OT',
-    color: '#1E6F8A',
-    imageUrl: `${CDN_BASE}/monuments/ottoman.jpg`,
-  },
-  {
-    id: 'mesopotamia',
-    name: 'Mesopotamia',
-    abbreviation: 'MS',
-    color: '#5C7A3D',
-    imageUrl: `${CDN_BASE}/monuments/mesopotamia.jpg`,
-  },
-];
+] as const;

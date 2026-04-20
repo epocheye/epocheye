@@ -57,7 +57,14 @@ import { getValidAccessToken } from '../../utils/api/auth';
 import { logVisit } from '../../utils/api/userActions';
 import { useARCore } from '../../shared/hooks/useARCore';
 import EpocheyeARView from '../../native/EpocheyeARView';
-import { reconstructForLens } from '../../services/arReconstructionService';
+import {
+  pollReconstructionJob,
+  reconstructForLens,
+} from '../../services/arReconstructionService';
+import type {
+  ArReconstructionResult,
+  PendingProgress,
+} from '../../services/arReconstructionService';
 import { useArQuotaStore } from '../../stores/arQuotaStore';
 import ARQuotaPill from '../../components/ARQuotaPill';
 import AncestorStorySheet, {
@@ -76,6 +83,23 @@ import SegmentationOverlay from './components/SegmentationOverlay';
 import * as segmentationService from '../../services/segmentationService';
 
 type Props = MainScreenProps<'Lens'>;
+
+function formatPendingLabel(phase: string, etaSeconds: number): string {
+  const safe = Math.max(0, Math.round(etaSeconds));
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  const eta =
+    minutes > 0
+      ? `~${minutes}m ${seconds.toString().padStart(2, '0')}s`
+      : `~${seconds}s`;
+  if (phase === 'cold_start') {
+    return `Starting 3D engine… ${eta}`;
+  }
+  if (phase === 'processing') {
+    return `Reconstructing… ${eta}`;
+  }
+  return `Preparing 3D engine… ${eta}`;
+}
 
 type MatchResult =
   | { kind: 'matched'; place: Place }
@@ -170,6 +194,14 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   const [reconstructionGateError, setReconstructionGateError] = useState<
     string | null
   >(null);
+  // Async cold-start state: server returned 202 and we're polling until the
+  // SAM 3D endpoint warms up.
+  const [reconstructionPending, setReconstructionPending] = useState<null | {
+    phase: string;
+    etaSeconds: number;
+    message?: string;
+  }>(null);
+  const reconstructionAbortedRef = useRef(false);
   const lastCapturedImageRef = useRef<string | null>(null);
 
   const arEnabled = useArQuotaStore(state => state.enabled && !state.maintenanceMode);
@@ -322,6 +354,11 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
 
   useEffect(() => {
     track('lens_opened');
+    return () => {
+      // Abort any in-flight reconstruction poll so it doesn't try to update
+      // state after the screen unmounts.
+      reconstructionAbortedRef.current = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -527,6 +564,43 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [firstName, matchedPlace, regions, lastKnownCoords]);
 
+  const applyReconstructionResult = useCallback(
+    (
+      result: ArReconstructionResult,
+      monumentName: string,
+      objectLabel: string,
+    ) => {
+      if (result.kind === 'success') {
+        setReconstructionReady({
+          glbUrl: result.glbUrl,
+          thumbnailUrl: result.thumbnailUrl,
+          provider: result.provider,
+          cached: result.cached,
+          objectLabel,
+          quality: result.quality,
+          scanCount: result.scanCount,
+        });
+        track('lens_reconstruction_ready', {
+          monument: monumentName,
+          object: objectLabel,
+          cached: result.cached ? 'true' : 'false',
+          provider: result.provider,
+        });
+      } else if (result.kind === 'quota_exceeded') {
+        setReconstructionQuotaExceeded(true);
+        track('lens_reconstruction_quota_hit', {
+          plan: result.info.current_plan,
+        });
+      } else if (result.kind === 'error') {
+        if (/heritage site|heritage artefact/i.test(result.message)) {
+          setReconstructionGateError(result.message);
+        }
+        track('lens_reconstruction_error', { message: result.message });
+      }
+    },
+    [],
+  );
+
   const triggerReconstruction = useCallback(
     async (monumentName: string, objectLabel: string) => {
       if (!arEnabled || !objectLabel) {
@@ -535,6 +609,8 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       setReconstructionLoading(true);
       setReconstructionQuotaExceeded(false);
       setReconstructionGateError(null);
+      setReconstructionPending(null);
+      reconstructionAbortedRef.current = false;
       try {
         const result = await reconstructForLens({
           monumentId: monumentName,
@@ -543,40 +619,39 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           latitude: lastKnownCoords?.latitude ?? undefined,
           longitude: lastKnownCoords?.longitude ?? undefined,
         });
-        if (result.kind === 'success') {
-          setReconstructionReady({
-            glbUrl: result.glbUrl,
-            thumbnailUrl: result.thumbnailUrl,
-            provider: result.provider,
-            cached: result.cached,
-            objectLabel,
-            quality: result.quality,
-            scanCount: result.scanCount,
+
+        if (result.kind === 'pending') {
+          // SAM 3D endpoint is cold or warming — poll the status endpoint
+          // until it flips to succeeded/failed. Keep the loading bar up so
+          // the user sees "Preparing 3D engine…" until the GLB lands.
+          setReconstructionPending({
+            phase: result.phase,
+            etaSeconds: result.etaSeconds,
+            message: result.message,
           });
-          track('lens_reconstruction_ready', {
+          track('lens_reconstruction_pending', {
             monument: monumentName,
             object: objectLabel,
-            cached: result.cached ? 'true' : 'false',
-            provider: result.provider,
+            phase: result.phase,
           });
-        } else if (result.kind === 'quota_exceeded') {
-          setReconstructionQuotaExceeded(true);
-          track('lens_reconstruction_quota_hit', {
-            plan: result.info.current_plan,
+          const final = await pollReconstructionJob(result.jobId, {
+            isAborted: () => reconstructionAbortedRef.current,
+            onProgress: (p: PendingProgress) =>
+              setReconstructionPending((prev) =>
+                prev ? { ...prev, phase: p.phase, etaSeconds: p.etaSeconds } : prev,
+              ),
           });
-        } else {
-          // Backend site gate returns 403 with a human-readable message;
-          // surface it to the user instead of swallowing silently.
-          if (/heritage site|heritage artefact/i.test(result.message)) {
-            setReconstructionGateError(result.message);
-          }
-          track('lens_reconstruction_error', { message: result.message });
+          setReconstructionPending(null);
+          applyReconstructionResult(final, monumentName, objectLabel);
+          return;
         }
+
+        applyReconstructionResult(result, monumentName, objectLabel);
       } finally {
         setReconstructionLoading(false);
       }
     },
-    [arEnabled],
+    [arEnabled, applyReconstructionResult, lastKnownCoords],
   );
 
   const openReconstruction = useCallback(() => {
@@ -618,6 +693,8 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     setIsScanModeActive(true);
     setReconstructionReady(null);
     setReconstructionQuotaExceeded(false);
+    setReconstructionPending(null);
+    reconstructionAbortedRef.current = true;
     lastCapturedImageRef.current = null;
 
     try {
@@ -1045,10 +1122,14 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         {/* AR reconstruction CTA — shown after the object_scan SSE identifies an
             object and the reconstruct API returns a GLB. Tapping navigates to
             the dedicated composer screen. */}
-        {(reconstructionReady || reconstructionLoading || reconstructionQuotaExceeded || reconstructionGateError) && (
+        {(reconstructionReady || reconstructionLoading || reconstructionPending || reconstructionQuotaExceeded || reconstructionGateError) && (
           <View style={[styles.reconstructionBar, { bottom: insets.bottom + 180 }]}>
             <ARQuotaPill compact />
-            {reconstructionLoading && (
+            {reconstructionPending ? (
+              <Text style={styles.reconstructionText}>
+                {formatPendingLabel(reconstructionPending.phase, reconstructionPending.etaSeconds)}
+              </Text>
+            ) : reconstructionLoading && (
               <Text style={styles.reconstructionText}>Building 3D model…</Text>
             )}
             {reconstructionReady && !reconstructionLoading && (

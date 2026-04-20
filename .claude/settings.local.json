@@ -40,7 +40,13 @@
       "Bash(./gradlew app:installRelease --no-configuration-cache)",
       "Bash(adb shell *)",
       "Bash(./gradlew app:installRelease --no-configuration-cache -PreactNativeArchitectures=arm64-v8a)",
-      "Bash(./gradlew app:installRelease --no-configuration-cache --no-daemon -PreactNativeArchitectures=arm64-v8a)"
+      "Bash(./gradlew app:installRelease --no-configuration-cache --no-daemon -PreactNativeArchitectures=arm64-v8a)",
+      "Bash(curl *)",
+      "mcp__claude_ai_Figma__whoami",
+      "mcp__claude_ai_Figma__get_metadata",
+      "mcp__claude_ai_Figma__get_design_context",
+      "Bash(npx -y sharp-cli -i src/assets/images/asia.png -o src/assets/images/asia-small.png resize 800 --withoutEnlargement)",
+      "Bash(npx -y sharp-cli -i src/assets/images/asia.png -o src/assets/images/asia.png resize 400 --withoutEnlargement --format png --compressionLevel 9 --quality 80)"
     ]
   }
 }

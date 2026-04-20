@@ -8,27 +8,34 @@ module.exports = {
       colors: {
         // Heritage-dark brand surfaces. Use these instead of hardcoded hex.
         ink: {
-          DEFAULT: '#0A0A0A', // page background
-          deep: '#000000',
-          warm: '#080604',
+          DEFAULT: '#050505', // page background
+          deep: '#020202',
+          warm: '#111111',
         },
         surface: {
-          1: '#141414', // cards
-          2: '#1C1C1C', // elevated
-          3: '#262626', // pressed / inner
+          1: '#0A0A0A', // cards
+          2: '#141414', // elevated
+          3: '#1C1C1C', // pressed / inner
         },
         brand: {
-          gold: '#C9A84C',
-          goldSoft: '#D4C5A0',
-          amber: '#D4860A',
-          amberLight: '#E8A33A',
-          amberDark: '#B06F08',
+          // Keys kept (gold/goldSoft/amber) so existing classNames compile.
+          // Values repointed to Figma sky/lime palette.
+          gold: '#61A6D3',
+          goldSoft: '#8FC3E2',
+          amber: '#61A6D3',
+          amberLight: '#8FC3E2',
+          amberDark: '#4A86B0',
+          sky: '#61A6D3',
+          skyLight: '#8FC3E2',
+          skyDark: '#4A86B0',
+          lime: '#8EC24B',
+          limeDark: '#6FA037',
         },
         parchment: {
-          DEFAULT: '#F5F0E8', // primary body text on dark
-          muted: '#B8AF9E',
-          dim: '#6B6357',
-          faint: '#8F8576',
+          DEFAULT: '#FFFFFF', // primary body text on dark
+          muted: 'rgba(255,255,255,0.72)',
+          dim: 'rgba(255,255,255,0.45)',
+          faint: 'rgba(255,255,255,0.28)',
         },
         status: {
           success: '#10B981',
@@ -37,10 +44,14 @@ module.exports = {
         },
       },
       boxShadow: {
-        'gold-glow': '0 0 24px rgba(201,168,76,0.25)',
-        'amber-glow': '0 0 32px rgba(212,134,10,0.35)',
+        'gold-glow': '0 0 24px rgba(97,166,211,0.25)',
+        'amber-glow': '0 0 32px rgba(97,166,211,0.35)',
+        'sky-glow': '0 0 24px rgba(97,166,211,0.3)',
+        'lime-glow': '0 0 24px rgba(142,194,75,0.3)',
       },
       fontFamily: {
+        'handwritten': ['NothingYouCouldDo-Regular'],
+        'serif-italic': ['InstrumentSerif-Italic'],
         'montserrat': ['MontserratAlternates-Regular'],
         'montserrat-thin': ['MontserratAlternates-Thin'],
         'montserrat-thin-italic': ['MontserratAlternates-ThinItalic'],
