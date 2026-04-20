@@ -7,12 +7,9 @@ type Props = OnboardingScreenProps<'OB10_Login'>;
 
 const OB10_Login: React.FC<Props> = ({ navigation }) => {
   const firstName = useOnboardingStore(state => state.firstName);
-  const demoMonument = useOnboardingStore(state => state.demoMonument);
-  const regions = useOnboardingStore(state => state.regions);
-  const visualSubject = demoMonument
-    ? `${demoMonument} heritage monument`
-    : regions.length > 0
-    ? `${regions[0]} ancestry and heritage site`
+  const region = useOnboardingStore(state => state.region);
+  const visualSubject = region
+    ? `${region.replace(/_/g, ' ')} ancestry and heritage site`
     : `${firstName || 'Explorer'} ancestry story`;
 
   return (

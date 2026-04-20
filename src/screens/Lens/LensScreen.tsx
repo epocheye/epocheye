@@ -35,6 +35,16 @@ import {
 } from '../../services/lensStoryService';
 import { usePlaces, useUser, useNetwork } from '../../context';
 import { useOnboardingStore } from '../../stores/onboardingStore';
+import type { UnescoRegion } from '../../constants/onboarding/regions';
+
+const REGION_LABELS: Record<string, string> = {
+  asia_pacific: 'Asia & the Pacific',
+  arab_states: 'Arab States',
+  north_america: 'North America',
+  latin_america_caribbean: 'Latin America & Caribbean',
+  europe: 'Europe',
+  africa: 'Africa',
+} satisfies Record<UnescoRegion, string>;
 import { useLensPremium } from '../../shared/hooks/useLensPremium';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 import { FONTS } from '../../core/constants/theme';
@@ -144,8 +154,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     state => state.ensureLocationTracking,
   );
   const storeFirstName = useOnboardingStore(state => state.firstName);
-  const storeMotivation = useOnboardingStore(state => state.motivation);
-  const storeRegions = useOnboardingStore(state => state.regions);
+  const storeRegion = useOnboardingStore(state => state.region);
 
   const { hasPermission, requestPermission } = useCameraPermission();
   const permissionRequestedRef = useRef(false);
@@ -256,15 +265,12 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     return fromStore.length > 0 ? fromStore : 'Explorer';
   }, [profile?.name, storeFirstName]);
 
-  const regions = useMemo(
-    () => (storeRegions.length > 0 ? storeRegions : ['South Asia']),
-    [storeRegions],
-  );
+  const regions = useMemo(() => {
+    const label = REGION_LABELS[storeRegion ?? ''];
+    return label ? [label] : ['South Asia'];
+  }, [storeRegion]);
 
-  const motivation = useMemo(
-    () => storeMotivation ?? 'heritage_visitor',
-    [storeMotivation],
-  );
+  const motivation = 'heritage_visitor';
 
   const transitionToNotFound = useCallback((isLocationDenied: boolean) => {
     setState('not_found');

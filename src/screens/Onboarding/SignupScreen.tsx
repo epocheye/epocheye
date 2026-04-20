@@ -35,8 +35,7 @@ const scrollContentStyle = {
 const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const fromOnboarding = route.params?.fromOnboarding ?? false;
   const storeFirstName = useOnboardingStore(s => s.firstName);
-  const storeDemoMonument = useOnboardingStore(s => s.demoMonument);
-  const storeRegions = useOnboardingStore(s => s.regions);
+  const storeRegion = useOnboardingStore(s => s.region);
 
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState('');
@@ -106,10 +105,8 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const headingText = fromOnboarding
     ? `Save ${storeFirstName || 'your'} story.`
     : 'Create your account';
-  const visualSubject = storeDemoMonument
-    ? `${storeDemoMonument} heritage monument`
-    : storeRegions.length > 0
-    ? `${storeRegions[0]} heritage monument`
+  const visualSubject = storeRegion
+    ? `${storeRegion.replace(/_/g, ' ')} heritage monument`
     : 'Heritage monument and ancestry story';
 
   const renderInitial = () => (

@@ -25,7 +25,8 @@ type Props = OnboardingScreenProps<'OB12_Arrival'>;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const OB12_Arrival: React.FC<Props> = () => {
-  const {firstName, demoMonument, regions} = useOnboardingStore();
+  const firstName = useOnboardingStore(s => s.firstName);
+  const region = useOnboardingStore(s => s.region);
   const completeOnboarding = useOnboardingStore(s => s.completeOnboarding);
   const onOnboardingComplete = useOnboardingComplete();
   const insets = useSafeAreaInsets();
@@ -66,11 +67,7 @@ const OB12_Arrival: React.FC<Props> = () => {
             },
             body: JSON.stringify({
               firstName: state.firstName,
-              motivation: state.motivation,
-              visitFrequency: state.visitFrequency,
-              goal: state.goal,
-              regions: state.regions,
-              reactionEmoji: state.reactionEmoji,
+              region: state.region,
             }),
           });
         }
@@ -113,11 +110,8 @@ const OB12_Arrival: React.FC<Props> = () => {
     transform: [{translateY: ctaY.value}],
   }));
 
-  const monumentImage = demoMonument
-    ? `${CDN_BASE}monuments/Konarka_Temple-2.jpg`
-    : regions.length > 0
-    ? `${CDN_BASE}monuments/Konarka_Temple-2.jpg`
-    : `${CDN_BASE}monuments/Konarka_Temple-2.jpg`;
+  const monumentImage = `${CDN_BASE}monuments/Konarka_Temple-2.jpg`;
+  void region;
 
   return (
     <View style={styles.container}>
@@ -151,7 +145,7 @@ const OB12_Arrival: React.FC<Props> = () => {
             <View style={styles.cardContent}>
               <Text style={styles.cardLabel}>YOUR FIRST DESTINATION</Text>
               <Text style={styles.cardTitle}>
-                {demoMonument || 'Explore nearby monuments'}
+                {'Explore nearby monuments'}
               </Text>
             </View>
           </Animated.View>
