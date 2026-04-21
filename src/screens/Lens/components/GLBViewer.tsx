@@ -19,8 +19,9 @@ import {
   Text,
   View,
 } from 'react-native';
+import '@react-three/fiber';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber/native';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Group, Object3D } from 'three';
 import { FONTS } from '../../../core/constants/theme';
 

@@ -81,9 +81,11 @@ describe('reconstructObject', () => {
     });
 
     expect(res.success).toBe(false);
-    if (!res.success) {
+    if (!res.success && 'quotaExceeded' in res) {
       expect(res.quotaExceeded).toBe(true);
       expect(res.data.upgrade_required).toBe(true);
+    } else {
+      throw new Error('expected quotaExceeded branch');
     }
   });
 
@@ -96,7 +98,7 @@ describe('reconstructObject', () => {
     });
     expect(res.success).toBe(false);
     if (!res.success) {
-      expect(res.quotaExceeded).toBeFalsy();
+      expect('quotaExceeded' in res).toBe(false);
     }
   });
 });

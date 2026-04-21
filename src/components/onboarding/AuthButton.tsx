@@ -16,6 +16,7 @@ interface AuthButtonProps {
   onPress: () => void;
   variant: AuthVariant;
   style?: ViewStyle;
+  disabled?: boolean;
 }
 
 const GoogleIcon = require('../../assets/images/Google.webp');
@@ -29,6 +30,7 @@ const AuthButton: React.FC<AuthButtonProps> = ({
   onPress,
   variant,
   style,
+  disabled = false,
 }) => {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const bgAnim = React.useRef(new Animated.Value(0)).current;
@@ -79,6 +81,8 @@ const AuthButton: React.FC<AuthButtonProps> = ({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={onPress}
+      disabled={disabled}
+      style={disabled ? { opacity: 0.6 } : undefined}
     >
       <Animated.View
         className={`h-14 flex-row items-center justify-center rounded-full px-5 ${

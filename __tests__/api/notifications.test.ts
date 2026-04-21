@@ -90,10 +90,10 @@ test('updateNotificationPreferences hits PUT /api/notifications/preferences', as
 
 test('registerDevice hits POST /api/notifications/register-device', async () => {
   mockClient.post.mockResolvedValueOnce({});
-  await registerDevice({ token: 'fcm-xyz', platform: 'android' });
+  await registerDevice({ device_token: 'fcm-xyz', device_type: 'android' });
   expect(mockClient.post).toHaveBeenCalledWith('/api/notifications/register-device', {
-    token: 'fcm-xyz',
-    platform: 'android',
+    device_token: 'fcm-xyz',
+    device_type: 'android',
   });
 });
 

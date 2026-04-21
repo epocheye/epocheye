@@ -3,7 +3,8 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    "nativewind-env.d.ts"
+    "nativewind-env.d.ts",
+    "react-three-fiber.d.ts"
   ],
   "exclude": [
     "**/node_modules",
