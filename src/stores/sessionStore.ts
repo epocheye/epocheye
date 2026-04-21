@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { bootstrapAuthSession } from '../utils/api/auth/tokenStorage';
+import { startVisitTracking, stopVisitTracking } from '../services/visitTrackingService';
 
 interface SessionStoreState {
   authenticated: boolean;
@@ -18,6 +19,7 @@ export const useSessionStore = create<SessionStoreState>(set => ({
       authenticated,
       bootstrapped: true,
     });
+    if (authenticated) startVisitTracking();
     return authenticated;
   },
   setAuthenticated: authenticated => {
@@ -25,5 +27,10 @@ export const useSessionStore = create<SessionStoreState>(set => ({
       authenticated,
       bootstrapped: true,
     });
+    if (authenticated) {
+      startVisitTracking();
+    } else {
+      stopVisitTracking();
+    }
   },
 }));

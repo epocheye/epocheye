@@ -18,6 +18,7 @@ import {
   BookOpen,
   Camera,
   ChevronRight,
+  Clock,
   LogOut,
   MapPin,
   MessageCircle,
@@ -382,27 +383,27 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </Animated.View>
           )}
 
-          {/* My Tours link */}
+          {/* Your journey (visit history) */}
           <Animated.View entering={FadeInDown.delay(200).duration(350)}>
             <TouchableOpacity
               className="mx-5 mb-5 flex-row items-center rounded-2xl border border-white/[0.08] bg-surface-1 p-4"
-              onPress={() => navigation.navigate(ROUTES.MAIN.MY_TOURS)}
+              onPress={() => navigation.navigate(ROUTES.MAIN.HISTORY)}
               activeOpacity={0.85}
               accessibilityRole="button"
-              accessibilityLabel="My Tours"
+              accessibilityLabel="View your journey"
             >
-              <View className="w-10 h-10 rounded-full bg-brand-gold/10 items-center justify-center mr-3">
-                <BookOpen size={18} color="#C9A84C" />
+              <View className="w-10 h-10 rounded-full bg-[rgba(201,168,76,0.15)] items-center justify-center mr-3">
+                <Clock size={18} color="#C9A84C" />
               </View>
               <View className="flex-1">
                 <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
-                  My Tours
+                  Your Journey
                 </Text>
                 <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] mt-0.5">
-                  Purchased and active tours
+                  Revisit the places you've explored
                 </Text>
               </View>
-              <ChevronRight size={18} color="#6B6357" />
+              <ChevronRight size={18} color="#C9A84C" />
             </TouchableOpacity>
           </Animated.View>
 

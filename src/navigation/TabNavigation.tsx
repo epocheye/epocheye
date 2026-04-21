@@ -1,11 +1,9 @@
 import React from 'react';
-import { View, Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { PlatformPressable } from '@react-navigation/elements';
 import Home from '../screens/Main/Home';
 import Explore from '../screens/Main/Explore';
-import Challenges from '../screens/Main/Challenges.tsx';
 import Saved from '../screens/Main/Saved';
 import SettingsScreen from '../screens/Main/SettingsScreen';
 import PlanScreen from '../screens/Plan/PlanScreen';
@@ -14,34 +12,22 @@ import {
   Bookmark,
   Map,
   Route,
-  Trophy,
   Settings,
-  Sparkles,
 } from 'lucide-react-native';
 import { ROUTES } from '../core/constants';
 import type { TabParamList } from '../core/types';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
-/** Tab icon size */
 const TAB_ICON_SIZE = 22;
 
-/**
- * Tab bar color tokens.
- * Named constants here so changes to branding only need one touchpoint.
- */
 const TAB_COLORS = {
-  /** Elevated dark background for the tab bar strip */
   barBackground: '#0A0A0A',
-  /** Gold-tinted separator above the tab bar */
   barBorder: 'rgba(201, 168, 76, 0.28)',
-  /** Icon/label color for the active (selected) tab */
   activeTint: '#C9A84C',
-  /** Icon/label color for inactive tabs */
   inactiveTint: '#6B6357',
 } as const;
 
-/** Tab bar style constants */
 const TAB_BAR_STYLE = {
   backgroundColor: TAB_COLORS.barBackground,
   borderTopColor: TAB_COLORS.barBorder,
@@ -51,7 +37,6 @@ const TAB_BAR_STYLE = {
   height: 68,
 } as const;
 
-/** Tab bar label style constants */
 const TAB_BAR_LABEL_STYLE = {
   fontFamily: 'MontserratAlternates-SemiBold',
   textTransform: 'uppercase',
@@ -64,9 +49,6 @@ interface TabNavigationProps {
   onLogout: () => void;
 }
 
-/**
- * Get the appropriate icon for a tab route
- */
 const getTabIcon = (
   routeName: keyof TabParamList,
   color: string,
@@ -80,8 +62,6 @@ const getTabIcon = (
       return <Map color={color} size={iconSize} />;
     case ROUTES.TABS.PLAN:
       return <Route color={color} size={iconSize} />;
-    case ROUTES.TABS.CHALLENGES:
-      return <Trophy color={color} size={iconSize} />;
     case ROUTES.TABS.SAVED:
       return <Bookmark color={color} size={iconSize} />;
     case ROUTES.TABS.SETTINGS:
@@ -90,60 +70,10 @@ const getTabIcon = (
   }
 };
 
-/**
- * Renders a "Coming Soon" overlay for disabled tabs.
- * Explicitly discards the original onPress so tapping the overlay area
- * cannot navigate to the screen, even through child press propagation.
- */
-const ComingSoonTabButton: React.FC<BottomTabBarButtonProps> = props => {
-  const { children, style, ...rest } = props;
-  return (
-    <PlatformPressable
-      {...rest}
-      style={[style, { position: 'relative' }]}
-      onPress={() => undefined}
-      accessibilityLabel="Coming soon"
-      accessibilityHint="This feature is not yet available"
-    >
-      {children}
-      <View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          borderRadius: 8,
-        }}
-      >
-        <Sparkles size={16} color="#C9A84C" />
-        <Text
-          style={{
-            color: '#C9A84C',
-            fontSize: 8,
-            fontWeight: '600',
-            marginTop: 2,
-            textAlign: 'center',
-          }}
-        >
-          Coming{'\n'}Soon
-        </Text>
-      </View>
-    </PlatformPressable>
-  );
-};
-
 const DefaultTabButton: React.FC<BottomTabBarButtonProps> = props => (
   <PlatformPressable {...props} />
 );
 
-/**
- * Bottom tab navigation for authenticated users
- * Contains Home, Explore, Challenges, Saved, and Settings tabs
- */
 const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
   return (
     <Tab.Navigator
@@ -160,27 +90,14 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
         tabBarLabelStyle: TAB_BAR_LABEL_STYLE,
         tabBarIcon: ({ color, size }) =>
           getTabIcon(route.name as keyof TabParamList, color, size),
-        tabBarButton: (btnProps: BottomTabBarButtonProps) => {
-          // Show "Coming Soon" overlay only for Challenges (Explore is now live)
-          if (route.name === ROUTES.TABS.CHALLENGES) {
-            return <ComingSoonTabButton {...btnProps} />;
-          }
-          return <DefaultTabButton {...btnProps} />;
-        },
+        tabBarButton: (btnProps: BottomTabBarButtonProps) => (
+          <DefaultTabButton {...btnProps} />
+        ),
       })}
     >
       <Tab.Screen name={ROUTES.TABS.HOME} component={Home} />
       <Tab.Screen name={ROUTES.TABS.EXPLORE} component={Explore} />
       <Tab.Screen name={ROUTES.TABS.PLAN} component={PlanScreen} />
-      <Tab.Screen
-        name={ROUTES.TABS.CHALLENGES}
-        component={Challenges}
-        listeners={{
-          tabPress: e => {
-            e.preventDefault();
-          },
-        }}
-      />
       <Tab.Screen name={ROUTES.TABS.SAVED} component={Saved} />
       <Tab.Screen name={ROUTES.TABS.SETTINGS}>
         {props => <SettingsScreen {...props} onLogout={onLogout} />}

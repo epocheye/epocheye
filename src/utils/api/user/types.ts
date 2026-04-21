@@ -42,11 +42,6 @@ export interface AvatarUploadResponse {
  */
 export interface UserStats {
   badges: number;
-  challenges: {
-    pending: number;
-    progress_by_status: Record<string, number>;
-    total: number;
-  };
 }
 
 /**

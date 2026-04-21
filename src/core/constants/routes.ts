@@ -32,11 +32,9 @@ export const ROUTES = {
     SITE_DETAIL: 'SiteDetail',
     AR_EXPERIENCE: 'ARExperience',
     AR_COMPOSER: 'ARComposer',
-    TOUR_LIST: 'TourList',
-    TOUR_DETAIL: 'TourDetail',
-    MY_TOURS: 'MyTours',
     PURCHASE: 'Purchase',
     NOTIFICATIONS: 'Notifications',
+    HISTORY: 'History',
   },
 
   /**
@@ -46,7 +44,6 @@ export const ROUTES = {
     HOME: 'Home',
     EXPLORE: 'Explore',
     PLAN: 'Plan',
-    CHALLENGES: 'Challenges',
     SAVED: 'Saved',
     SETTINGS: 'Settings',
   },

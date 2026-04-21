@@ -23,9 +23,6 @@ export type {
   UseResolvedSubjectImageResult,
 } from './useResolvedSubjectImage';
 
-export { useTourPurchase } from './useTourPurchase';
-export type { PurchaseResult, UseTourPurchaseReturn } from './useTourPurchase';
-
 export { usePremiumPurchase } from './usePremiumPurchase';
 export type { UsePremiumPurchaseReturn } from './usePremiumPurchase';
 

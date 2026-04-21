@@ -23,11 +23,13 @@ import {
   X,
 } from 'lucide-react-native';
 import { Linking } from 'react-native';
-import { validateCoupon } from '../../utils/api/tours';
-import type { CouponValidation } from '../../utils/api/tours';
+import { validateCoupon } from '../../utils/api/coupons';
+import type { CouponValidation } from '../../utils/api/coupons';
 import {
   getExplorerPassConfig,
+  getExplorerPassQuote,
   type ExplorerPassConfig,
+  type ExplorerPassQuote,
   type PricingTier,
 } from '../../utils/api/explorer-pass';
 import {
@@ -206,6 +208,8 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
   const [couponInput, setCouponInput] = useState('');
   const [couponValidating, setCouponValidating] = useState(false);
   const [couponResult, setCouponResult] = useState<CouponValidation | null>(null);
+  const [quote, setQuote] = useState<ExplorerPassQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const appliedCoupon = couponResult?.is_valid ? couponResult.code : undefined;
   const discountPercent = couponResult?.is_valid ? couponResult.discount_percent ?? 0 : 0;
 
@@ -255,15 +259,46 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
     [sortedTiers, selectedCount],
   );
 
-  // Pricing
-  const pricePerPlacePaise = matchedTier?.price_per_place_paise ?? 0;
-  const subtotalPaise = pricePerPlacePaise * selectedCount;
+  // Server-computed quote (per-place override-aware). Debounced 300ms.
+  useEffect(() => {
+    if (selectedCount === 0) {
+      setQuote(null);
+      return;
+    }
+    const placeIds = Array.from(selectedPlaceIds);
+    let cancelled = false;
+    setQuoteLoading(true);
+    const timer = setTimeout(async () => {
+      const res = await getExplorerPassQuote(placeIds);
+      if (cancelled) return;
+      if (res.success) {
+        setQuote(res.data);
+      } else {
+        setQuote(null);
+      }
+      setQuoteLoading(false);
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [selectedCount, selectedPlaceIds]);
+
+  // Pricing — prefer server quote; fall back to client tier math until quote arrives.
+  const fallbackPricePerPlace = matchedTier?.price_per_place_paise ?? 0;
+  const fallbackSubtotal = fallbackPricePerPlace * selectedCount;
+  const subtotalPaise = quote?.subtotal_paise ?? fallbackSubtotal;
+  const pricePerPlacePaise =
+    quote && selectedCount > 0
+      ? Math.round(quote.subtotal_paise / selectedCount)
+      : fallbackPricePerPlace;
   const discountPaise = discountPercent > 0 ? Math.round(subtotalPaise * discountPercent / 100) : 0;
-  const totalPaise = Math.max(100, subtotalPaise - discountPaise);
+  const totalPaise = Math.max(100, (quote?.total_paise ?? subtotalPaise) - discountPaise);
   const accessHours =
-    matchedTier && selectedCount === 1
+    quote?.max_access_hours ??
+    (matchedTier && selectedCount === 1
       ? matchedTier.access_hours_single
-      : matchedTier?.access_hours_multi ?? 0;
+      : matchedTier?.access_hours_multi ?? 0);
 
   // Handlers
   const togglePlace = useCallback((placeId: string) => {

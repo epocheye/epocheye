@@ -12,6 +12,7 @@ import type {
   ExplorerPassConfig,
   ExplorerPassConfirmPayload,
   ExplorerPassInitiateResult,
+  ExplorerPassQuote,
   PriceCalculation,
 } from './types';
 
@@ -23,6 +24,8 @@ export type {
   ExplorerPassConfirmPayload,
   ExplorerPass,
   CheckAccessResult,
+  ExplorerPassQuote,
+  QuoteLineItem,
 } from './types';
 
 /** GET /api/v1/explorer-pass/config — public pricing tiers. */
@@ -48,6 +51,21 @@ export async function calculateExplorerPassPrice(
       body.coupon_code = couponCode.toUpperCase().trim();
     }
     const resp = await client.post<PriceCalculation>('/api/v1/explorer-pass/calculate', body);
+    return { success: true, data: resp.data };
+  } catch (error) {
+    return createErrorResult(error);
+  }
+}
+
+/** POST /api/v1/explorer-pass/quote — server-computed per-place line items with override/tier pricing. */
+export async function getExplorerPassQuote(
+  placeIds: string[],
+): Promise<ApiResult<ExplorerPassQuote>> {
+  try {
+    const client = createAuthenticatedClient();
+    const resp = await client.post<ExplorerPassQuote>('/api/v1/explorer-pass/quote', {
+      place_ids: placeIds,
+    });
     return { success: true, data: resp.data };
   } catch (error) {
     return createErrorResult(error);

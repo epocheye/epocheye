@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
-  ImageBackground,
   StatusBar,
   Text,
   TextInput,
@@ -38,7 +37,8 @@ import { useDebounce } from '../../shared/hooks';
 import type { TabScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
 import type { Place } from '../../utils/api/places/types';
-import { buildSiteDetailData, getPlaceImage } from '../../shared/utils';
+import { buildSiteDetailData } from '../../shared/utils';
+import { placeTypeLabel } from '../../utils/places/placeTypeLabel';
 
 // ─── ExploreCard ──────────────────────────────────────────────────────────────
 
@@ -51,8 +51,8 @@ interface ExploreCardProps {
 const ExploreCard: React.FC<ExploreCardProps> = React.memo(
   ({ place, index, onPress }) => {
     const scale = useSharedValue(1);
-    const fallbackUri = getPlaceImage(place.categories);
     const distanceKm = (place.distance_meters / 1000).toFixed(1);
+    const friendlyTag = placeTypeLabel(place.place_type, place.categories);
 
     const animatedStyle = useAnimatedStyle(() => ({
       transform: [{ scale: scale.value }],
@@ -75,54 +75,57 @@ const ExploreCard: React.FC<ExploreCardProps> = React.memo(
           accessibilityRole="button"
           accessibilityLabel={`Visit ${place.name}`}
         >
-          <ImageBackground
-            source={{ uri: fallbackUri }}
-            style={{ height: 220 }}
-            imageStyle={{ borderRadius: 16 }}
+          <LinearGradient
+            colors={['#120E08', '#0A0806', '#120E08']}
+            locations={[0, 0.5, 1]}
+            style={{
+              height: 180,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(212,134,10,0.15)',
+              padding: 12,
+              justifyContent: 'space-between',
+            }}
           >
-            <LinearGradient
-              colors={['rgba(8,8,8,0.05)', 'rgba(8,8,8,0.9)']}
-              style={{
-                flex: 1,
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.1)',
-                padding: 12,
-                justifyContent: 'space-between',
-              }}
-            >
-              <View className="self-start flex-row items-center gap-1 rounded-full bg-[rgba(10,10,10,0.8)] border border-[rgba(201,168,76,0.35)] px-2 py-1">
-                <Compass color="#C9A84C" size={11} />
-                <Text className="text-parchment text-[10px] font-['MontserratAlternates-SemiBold']">
+            <View className="flex-row items-center gap-1.5 flex-wrap">
+              <View className="flex-row items-center gap-1 rounded-full bg-brand-amber/15 border border-brand-amber/30 px-2 py-0.5">
+                <Sparkles color="#D4860A" size={10} />
+                <Text className="text-brand-amber text-[9px] uppercase tracking-[0.5px] font-['MontserratAlternates-SemiBold']">
+                  {friendlyTag}
+                </Text>
+              </View>
+              <View className="flex-row items-center gap-1 rounded-full bg-[rgba(10,10,10,0.8)] border border-[rgba(201,168,76,0.35)] px-2 py-0.5">
+                <Compass color="#C9A84C" size={10} />
+                <Text className="text-parchment text-[9px] font-['MontserratAlternates-SemiBold']">
                   {distanceKm} km
                 </Text>
               </View>
+            </View>
 
-              <View>
+            <View>
+              <Text
+                className="text-parchment text-base font-['MontserratAlternates-Bold'] leading-5"
+                numberOfLines={3}
+              >
+                {place.name}
+              </Text>
+              <View className="flex-row items-center gap-1 mt-1">
+                <MapPin color="#B8AF9E" size={11} />
                 <Text
-                  className="text-parchment text-base font-['MontserratAlternates-Bold'] leading-5"
-                  numberOfLines={2}
+                  className="text-parchment-muted text-[11px] font-['MontserratAlternates-Medium'] flex-shrink"
+                  numberOfLines={1}
                 >
-                  {place.name}
+                  {place.city}
                 </Text>
-                <View className="flex-row items-center gap-1 mt-1">
-                  <MapPin color="#B8AF9E" size={11} />
-                  <Text
-                    className="text-parchment-muted text-[11px] font-['MontserratAlternates-Medium'] flex-shrink"
-                    numberOfLines={1}
-                  >
-                    {place.city}
-                  </Text>
-                </View>
-                <View className="mt-3 self-start flex-row items-center gap-1 rounded-full bg-brand-gold px-2.5 py-1.5">
-                  <Text className="text-ink text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold']">
-                    Explore
-                  </Text>
-                  <ArrowRight color="#0A0A0A" size={11} />
-                </View>
               </View>
-            </LinearGradient>
-          </ImageBackground>
+              <View className="mt-3 self-start flex-row items-center gap-1 rounded-full bg-brand-gold px-2.5 py-1.5">
+                <Text className="text-ink text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold']">
+                  Explore
+                </Text>
+                <ArrowRight color="#0A0A0A" size={11} />
+              </View>
+            </View>
+          </LinearGradient>
         </TouchableOpacity>
       </Animated.View>
     );

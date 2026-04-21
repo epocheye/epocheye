@@ -231,13 +231,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     navigation.navigate('ARExperience', { site });
   }, [navigation, site]);
 
-  const handleViewTours = useCallback(() => {
-    navigation.navigate(ROUTES.MAIN.TOUR_LIST, {
-      monumentId: site.id,
-      monumentName: site.name,
-    });
-  }, [navigation, site]);
-
   const handleImageScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offset = event.nativeEvent.contentOffset.x;
@@ -532,18 +525,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
             </TouchableOpacity>
           </Animated.View>
-
-          {/* CTA: View Tours */}
-          <TouchableOpacity
-            onPress={handleViewTours}
-            className="rounded-xl border border-[rgba(212,134,10,0.45)] py-3 items-center justify-center flex-row gap-2"
-            activeOpacity={0.88}
-          >
-            <BookOpen color="#D4860A" size={18} />
-            <Text className="text-brand-amber text-sm font-['MontserratAlternates-SemiBold']">
-              View Tours
-            </Text>
-          </TouchableOpacity>
 
           {/* Historical Overview */}
           <Animated.View

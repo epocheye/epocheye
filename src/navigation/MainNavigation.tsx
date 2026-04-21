@@ -5,11 +5,9 @@ import SiteDetailScreen from '../screens/Main/SiteDetailScreen';
 import ARExperienceScreen from '../screens/Main/ARExperienceScreen';
 import LensScreen from '../screens/Lens/LensScreen';
 import ARComposer from '../screens/Lens/ARComposer';
-import TourListScreen from '../screens/Main/TourListScreen';
-import TourDetailScreen from '../screens/Main/TourDetailScreen';
-import MyToursScreen from '../screens/Main/MyToursScreen';
 import PurchaseScreen from '../screens/Main/PurchaseScreen';
 import NotificationsScreen from '../screens/Main/NotificationsScreen';
+import HistoryScreen from '../screens/History/HistoryScreen';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -67,21 +65,6 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         }}
       />
       <Stack.Screen
-        name={ROUTES.MAIN.TOUR_LIST}
-        component={TourListScreen}
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        name={ROUTES.MAIN.TOUR_DETAIL}
-        component={TourDetailScreen}
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
-        name={ROUTES.MAIN.MY_TOURS}
-        component={MyToursScreen}
-        options={{ animation: 'slide_from_right' }}
-      />
-      <Stack.Screen
         name={ROUTES.MAIN.PURCHASE}
         component={PurchaseScreen}
         options={{
@@ -92,6 +75,11 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
       <Stack.Screen
         name={ROUTES.MAIN.NOTIFICATIONS}
         component={NotificationsScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name={ROUTES.MAIN.HISTORY}
+        component={HistoryScreen}
         options={{ animation: 'slide_from_right' }}
       />
     </Stack.Navigator>

@@ -5,10 +5,8 @@ import {
   TouchableOpacity,
   FlatList,
   ScrollView,
-  Modal,
   InteractionManager,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -32,8 +30,6 @@ import {
   Compass,
   RefreshCw,
   ScanEye,
-  BookOpen,
-  Clock,
 } from 'lucide-react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
@@ -49,12 +45,10 @@ import {
   elaboratePersonalizedFact,
 } from '../../utils/api/user';
 import type { PersonalizedFact } from '../../utils/api/user';
-import { getTours, getMyTours } from '../../utils/api/tours';
-import type { Tour, MyTour } from '../../utils/api/tours';
 import { getRecommendations } from '../../utils/api/recommendations';
 import type { Recommendation } from '../../utils/api/recommendations';
-import { STORAGE_KEYS } from '../../core/constants/storage-keys';
-import { buildSiteDetailData, getPlaceImage } from '../../shared/utils';
+import { buildSiteDetailData } from '../../shared/utils';
+import { placeTypeLabel } from '../../utils/places/placeTypeLabel';
 import { useExplorerPass } from '../../shared/hooks';
 import ExplorerPassPopup from '../../components/ExplorerPassPopup';
 import OnboardingTooltips from '../../components/OnboardingTooltips';
@@ -123,10 +117,8 @@ interface PlaceCardProps {
 
 const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress }) => {
   const scale = useSharedValue(1);
-  const backendImage = place.image_urls?.find(Boolean);
-  const fallbackImageUri = backendImage ?? getPlaceImage(place.categories);
   const distanceKm = (place.distance_meters / 1000).toFixed(1);
-  const shortDescription = place.categories[0] || 'Historic site';
+  const friendlyTag = placeTypeLabel(place.place_type, place.categories);
 
   const animatedCardStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -152,36 +144,35 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress 
         accessibilityLabel={`Visit ${place.name}, ${distanceKm} km away`}
         accessibilityHint="Opens the site details screen"
       >
-        <ResolvedSubjectImage
-          subject={place.name}
-          context="nearby highlight card"
-          fallbackUri={fallbackImageUri}
-          enableRemoteResolve={!backendImage}
-          showSkeletonWhileLoading={!backendImage}
-          style={cardStyles.image}
-          imageStyle={cardStyles.imageMask}
+        <LinearGradient
+          colors={['#120E08', '#0A0806', '#120E08']}
+          locations={[0, 0.5, 1]}
+          style={cardStyles.gradient}
         >
-          <LinearGradient
-            colors={['rgba(8,8,8,0.12)', 'rgba(212,134,10,0.06)', 'rgba(8,8,8,0.88)']}
-            locations={[0, 0.6, 1]}
-            style={cardStyles.gradient}
-          >
-          <View className="self-start flex-row items-center gap-1 rounded-full bg-[rgba(10,10,10,0.7)] border border-[rgba(201,168,76,0.35)] px-3 py-1.5">
-            <Compass color="#C9A84C" size={14} />
-            <Text className="text-parchment text-xs leading-4 font-['MontserratAlternates-SemiBold']">
-              {distanceKm} km away
-            </Text>
+          <View className="flex-row items-center gap-2">
+            <View className="flex-row items-center gap-1 rounded-full bg-brand-amber/15 border border-brand-amber/30 px-2.5 py-1">
+              <Sparkles color="#D4860A" size={11} />
+              <Text className="text-brand-amber text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold']">
+                {friendlyTag}
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-1 rounded-full bg-[rgba(10,10,10,0.7)] border border-[rgba(201,168,76,0.35)] px-2.5 py-1">
+              <Compass color="#C9A84C" size={11} />
+              <Text className="text-parchment text-[10px] leading-4 font-['MontserratAlternates-SemiBold']">
+                {distanceKm} km
+              </Text>
+            </View>
           </View>
 
           <View>
             <Text
-              className="text-parchment text-2xl leading-8 font-['MontserratAlternates-Bold']"
-              numberOfLines={2}
+              className="text-parchment text-[22px] leading-7 font-['MontserratAlternates-Bold']"
+              numberOfLines={3}
             >
               {place.name}
             </Text>
             <View className="flex-row items-center gap-1 mt-2">
-              <MapPin color="#B8AF9E" size={15} />
+              <MapPin color="#B8AF9E" size={14} />
               <Text
                 className="text-parchment-muted text-[13px] leading-[18px] font-['MontserratAlternates-Medium'] flex-shrink"
                 numberOfLines={1}
@@ -190,13 +181,6 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress 
               </Text>
             </View>
 
-            <Text
-              className="text-parchment-muted text-sm leading-5 mt-3 font-['MontserratAlternates-Regular']"
-              numberOfLines={2}
-            >
-              {shortDescription}
-            </Text>
-
             <View className="mt-4 self-start flex-row items-center gap-1 rounded-full bg-brand-gold px-3 py-2">
               <Text className="text-ink text-xs leading-4 uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
                 Explore the Era
@@ -204,8 +188,7 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress 
               <ArrowRight color="#0A0A0A" size={14} />
             </View>
           </View>
-          </LinearGradient>
-        </ResolvedSubjectImage>
+        </LinearGradient>
       </AnimatedTouchable>
     </Animated.View>
   );
@@ -261,8 +244,6 @@ const Home = ({ navigation }: Props) => {
   const [factDetailsById, setFactDetailsById] = useState<
     Record<string, string>
   >({});
-  const [tours, setTours] = useState<Tour[]>([]);
-  const [bannerTour, setBannerTour] = useState<MyTour | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(true);
   const { hasAnyActivePass, loading: explorerPassLoading } = useExplorerPass();
@@ -402,21 +383,6 @@ const Home = ({ navigation }: Props) => {
     };
   }, [loadPersonalizedFacts]);
 
-  // Load available tours for the Tours section
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      getTours().then(result => {
-        if (result.success) {
-          setTours(result.data.slice(0, 3));
-        }
-      });
-    });
-
-    return () => {
-      task.cancel();
-    };
-  }, []);
-
   useEffect(() => {
     const task = InteractionManager.runAfterInteractions(() => {
       setIsLoadingRecommendations(true);
@@ -436,41 +402,6 @@ const Home = ({ navigation }: Props) => {
       task.cancel();
     };
   }, [currentLocation?.latitude, currentLocation?.longitude]);
-
-  // Check if user has a free tour they haven't seen yet
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      async function checkFreeTourBanner() {
-        const dismissed = await AsyncStorage.getItem(
-          STORAGE_KEYS.TOURS.FREE_TOUR_BANNER_DISMISSED,
-        );
-        if (dismissed) {
-          return;
-        }
-
-        const result = await getMyTours();
-        if (!result.success) {
-          return;
-        }
-
-        const freeTour = result.data.find(
-          tour =>
-            tour.source === 'free_grant' &&
-            new Date(tour.expires_at).getTime() > Date.now(),
-        );
-
-        if (freeTour) {
-          setBannerTour(freeTour);
-        }
-      }
-
-      void checkFreeTourBanner();
-    });
-
-    return () => {
-      task.cancel();
-    };
-  }, []);
 
   const handleFactPress = useCallback(
     async (fact: PersonalizedFact) => {
@@ -680,80 +611,6 @@ const Home = ({ navigation }: Props) => {
                   </LinearGradient>
                 </TouchableOpacity>
               </Animated.View>
-            )}
-
-            {/* Tours section */}
-            {tours.length > 0 && (
-              <View className="mt-6 mb-2">
-                <View className="flex-row items-center justify-between mb-3">
-                  <View className="flex-row items-center gap-2">
-                    <BookOpen color="#D4860A" size={18} />
-                    <Text className="text-parchment text-[22px] leading-[30px] font-['MontserratAlternates-SemiBold']">
-                      Tours
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate(ROUTES.MAIN.TOUR_LIST)}
-                    accessibilityRole="button"
-                  >
-                    <Text className="text-brand-amber text-xs font-['MontserratAlternates-SemiBold']">
-                      See all
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 12, paddingRight: 8, paddingBottom: 4 }}
-                >
-                  {tours.map((tour, tourIndex) => (
-                    <Animated.View
-                      key={tour.id}
-                      entering={FadeInDown.delay(tourIndex * 60).duration(400)}
-                    >
-                      <TouchableOpacity
-                        onPress={() =>
-                          navigation.navigate(ROUTES.MAIN.TOUR_LIST, {
-                            monumentId: tour.monument_id,
-                            monumentName: tour.monument_name,
-                          })
-                        }
-                        className="w-44 rounded-[16px] p-3"
-                        style={{
-                          backgroundColor: NOIR.cardBg,
-                          borderWidth: 1,
-                          borderColor: NOIR.cardBorder,
-                        }}
-                        activeOpacity={0.85}
-                      >
-                      <Text className="text-brand-amber text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold'] mb-1" numberOfLines={1}>
-                        {tour.monument_name}
-                      </Text>
-                      <Text className="text-parchment text-sm font-['MontserratAlternates-Bold'] leading-5 mb-2" numberOfLines={2}>
-                        {tour.title}
-                      </Text>
-                      <View className="flex-row items-center gap-1.5">
-                        <Clock color="#6B6357" size={12} />
-                        <Text className="text-parchment-dim text-[11px] font-['MontserratAlternates-Regular']">
-                          {tour.duration_minutes} min
-                        </Text>
-                        <View className="ml-auto">
-                          {tour.price_paise === 0 ? (
-                            <Text className="text-status-success text-[11px] font-['MontserratAlternates-SemiBold']">
-                              Free
-                            </Text>
-                          ) : (
-                            <Text className="text-brand-gold text-[11px] font-['MontserratAlternates-SemiBold']">
-                              ₹{(tour.price_paise / 100).toFixed(0)}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                      </TouchableOpacity>
-                    </Animated.View>
-                  ))}
-                </ScrollView>
-              </View>
             )}
 
             {/* Recommended for you */}
@@ -1020,61 +877,6 @@ const Home = ({ navigation }: Props) => {
         </View>
       </LinearGradient>
 
-      {/* Free Tour Banner */}
-      {bannerTour && (
-        <Modal visible transparent animationType="slide">
-          <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }}>
-            <View className="rounded-t-3xl p-6" style={{ backgroundColor: NOIR.cardBg, borderTopWidth: 1, borderTopColor: 'rgba(201,168,76,0.3)' }}>
-              <Text className="text-brand-amber text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold'] mb-1">
-                Free Tour Waiting
-              </Text>
-              <Text className="text-parchment text-xl font-['MontserratAlternates-Bold'] mb-1">
-                {bannerTour.title}
-              </Text>
-              <Text className="text-parchment-muted text-sm font-['MontserratAlternates-Regular'] mb-5">
-                {bannerTour.monument_name} · {bannerTour.duration_minutes} min
-              </Text>
-              <TouchableOpacity
-                onPress={async () => {
-                  await AsyncStorage.setItem(
-                    STORAGE_KEYS.TOURS.FREE_TOUR_BANNER_DISMISSED,
-                    'true',
-                  );
-                  setBannerTour(null);
-                  navigation.navigate(ROUTES.MAIN.TOUR_DETAIL, {
-                    tourId: bannerTour.id,
-                    tourTitle: bannerTour.title,
-                  });
-                }}
-                className="bg-brand-amber rounded-2xl py-4 items-center mb-3 flex-row justify-center gap-2"
-                accessibilityRole="button"
-              >
-                <BookOpen color="#0A0A0A" size={18} />
-                <Text className="text-ink text-base font-['MontserratAlternates-Bold']">
-                  Start Tour
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={async () => {
-                  await AsyncStorage.setItem(
-                    STORAGE_KEYS.TOURS.FREE_TOUR_BANNER_DISMISSED,
-                    'true',
-                  );
-                  setBannerTour(null);
-                }}
-                className="rounded-2xl py-3 items-center"
-                style={{ backgroundColor: '#141414', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}
-                accessibilityRole="button"
-              >
-                <Text className="text-parchment-faint text-sm font-['MontserratAlternates-SemiBold']">
-                  Later
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      )}
-
       {/* Explorer Pass upsell popup (once per session if no active pass) */}
       <ExplorerPassPopup
         hasActivePass={hasAnyActivePass}
@@ -1091,14 +893,8 @@ const Home = ({ navigation }: Props) => {
 const cardStyles = {
   container: {
     width: 238,
-    height: 292,
+    height: 232,
     marginRight: 16,
-  },
-  image: {
-    flex: 1,
-  },
-  imageMask: {
-    borderRadius: 20,
   },
   gradient: {
     flex: 1,

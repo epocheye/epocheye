@@ -64,6 +64,23 @@ export interface ExplorerPass {
   is_active: boolean;
 }
 
+export interface QuoteLineItem {
+  place_id: string;
+  place_name: string;
+  price_paise: number;
+  access_hours: number;
+  source: 'override' | 'tier';
+}
+
+export interface ExplorerPassQuote {
+  line_items: QuoteLineItem[];
+  subtotal_paise: number;
+  total_paise: number;
+  max_access_hours: number;
+  tier_label: string;
+  tier_id: number;
+}
+
 export interface CheckAccessResult {
   has_access: boolean;
   expires_at?: string;
