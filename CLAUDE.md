@@ -191,7 +191,9 @@ When adding a new service, prefer this directory for anything stateful or stream
 
 ## Firebase
 
-Android Firebase is wired up via `android/app/google-services.json` (committed) and the `com.google.gms.google-services` Gradle plugin. FCM push is handled by `src/services/fcmService.ts`. iOS Firebase config is not yet set up — add a `GoogleService-Info.plist` and the iOS pod wiring before enabling push on iOS.
+**Android.** Wired via `android/app/google-services.json` (committed) and the `com.google.gms.google-services` Gradle plugin. FCM push handled by `src/services/fcmService.ts`.
+
+**iOS.** Wired via `ios/epocheye/GoogleService-Info.plist` (a placeholder ships in-repo — replace it with the real file downloaded from Firebase Console before first build), `FirebaseApp.configure()` in `ios/epocheye/AppDelegate.swift`, `$RNFirebaseAsStaticFramework = true` in the Podfile, and `FirebaseAppDelegateProxyEnabled = <false/>` in `Info.plist`. APNs is forwarded to FCM manually in AppDelegate (`didRegisterForRemoteNotificationsWithDeviceToken` → `Messaging.messaging().apnsToken`) and `UNUserNotificationCenter` / `MessagingDelegate` are set on launch. The Push Notifications capability is declared in `ios/epocheye/epocheye.entitlements` (`aps-environment = development` — flip to `production` for TestFlight/App Store). Before the first iOS push build, upload an APNs auth key in Firebase Console → Cloud Messaging.
 
 ---
 

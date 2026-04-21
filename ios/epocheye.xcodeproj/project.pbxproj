@@ -36,6 +36,12 @@
 		847222E81BD8424292EED0DD /* MontserratAlternates-ThinItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D138AE5EBF874F019BF7153F /* MontserratAlternates-ThinItalic.ttf */; };
 		83D849CEEE324B6CA7F5DF77 /* NothingYouCouldDo-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2F83083792A043719230D2BD /* NothingYouCouldDo-Regular.ttf */; };
 		FBD63FB07A5E4DE0942DEF24 /* sam_segment.tflite in Resources */ = {isa = PBXBuildFile; fileRef = 4064DEF2841846AF9AC2C09A /* sam_segment.tflite */; };
+		B1B10001BB10BB10BB100001 /* EpocheyeARView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100001 /* EpocheyeARView.swift */; };
+		B1B10001BB10BB10BB100002 /* EpocheyeARViewManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100002 /* EpocheyeARViewManager.swift */; };
+		B1B10001BB10BB10BB100003 /* EpocheyeARViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100003 /* EpocheyeARViewManager.m */; };
+		B1B10001BB10BB10BB100004 /* ARKitModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100004 /* ARKitModule.swift */; };
+		B1B10001BB10BB10BB100005 /* ARKitModule.m in Sources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100005 /* ARKitModule.m */; };
+		B1B10001BB10BB10BB100006 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100008 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -74,6 +80,14 @@
 		D138AE5EBF874F019BF7153F /* MontserratAlternates-ThinItalic.ttf */ = {isa = PBXFileReference; name = "MontserratAlternates-ThinItalic.ttf"; path = "../src/assets/fonts/MontserratAlternates-ThinItalic.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 		2F83083792A043719230D2BD /* NothingYouCouldDo-Regular.ttf */ = {isa = PBXFileReference; name = "NothingYouCouldDo-Regular.ttf"; path = "../src/assets/fonts/NothingYouCouldDo-Regular.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 		4064DEF2841846AF9AC2C09A /* sam_segment.tflite */ = {isa = PBXFileReference; name = "sam_segment.tflite"; path = "../src/assets/models/sam_segment.tflite"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		A1A10001AA10AA10AA100001 /* EpocheyeARView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EpocheyeARView.swift; path = epocheye/AR/EpocheyeARView.swift; sourceTree = "<group>"; };
+		A1A10001AA10AA10AA100002 /* EpocheyeARViewManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EpocheyeARViewManager.swift; path = epocheye/AR/EpocheyeARViewManager.swift; sourceTree = "<group>"; };
+		A1A10001AA10AA10AA100003 /* EpocheyeARViewManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = EpocheyeARViewManager.m; path = epocheye/AR/EpocheyeARViewManager.m; sourceTree = "<group>"; };
+		A1A10001AA10AA10AA100004 /* ARKitModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ARKitModule.swift; path = epocheye/AR/ARKitModule.swift; sourceTree = "<group>"; };
+		A1A10001AA10AA10AA100005 /* ARKitModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = ARKitModule.m; path = epocheye/AR/ARKitModule.m; sourceTree = "<group>"; };
+		A1A10001AA10AA10AA100006 /* epocheye-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "epocheye-Bridging-Header.h"; path = "epocheye/epocheye-Bridging-Header.h"; sourceTree = "<group>"; };
+		A1A10001AA10AA10AA100007 /* epocheye.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = epocheye.entitlements; path = epocheye/epocheye.entitlements; sourceTree = "<group>"; };
+		A1A10001AA10AA10AA100008 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "epocheye/GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,11 +107,27 @@
 			children = (
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				A1A10001AA10AA10AA100006 /* epocheye-Bridging-Header.h */,
+				A1A10001AA10AA10AA100007 /* epocheye.entitlements */,
+				A1A10001AA10AA10AA100008 /* GoogleService-Info.plist */,
+				C1C10001CC10CC10CC100001 /* AR */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 			);
 			name = epocheye;
+			sourceTree = "<group>";
+		};
+		C1C10001CC10CC10CC100001 /* AR */ = {
+			isa = PBXGroup;
+			children = (
+				A1A10001AA10AA10AA100001 /* EpocheyeARView.swift */,
+				A1A10001AA10AA10AA100002 /* EpocheyeARViewManager.swift */,
+				A1A10001AA10AA10AA100003 /* EpocheyeARViewManager.m */,
+				A1A10001AA10AA10AA100004 /* ARKitModule.swift */,
+				A1A10001AA10AA10AA100005 /* ARKitModule.m */,
+			);
+			name = AR;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
@@ -268,6 +298,7 @@
 				847222E81BD8424292EED0DD /* MontserratAlternates-ThinItalic.ttf in Resources */,
 				83D849CEEE324B6CA7F5DF77 /* NothingYouCouldDo-Regular.ttf in Resources */,
 				FBD63FB07A5E4DE0942DEF24 /* sam_segment.tflite in Resources */,
+				B1B10001BB10BB10BB100006 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -354,6 +385,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				B1B10001BB10BB10BB100001 /* EpocheyeARView.swift in Sources */,
+				B1B10001BB10BB10BB100002 /* EpocheyeARViewManager.swift in Sources */,
+				B1B10001BB10BB10BB100003 /* EpocheyeARViewManager.m in Sources */,
+				B1B10001BB10BB10BB100004 /* ARKitModule.swift in Sources */,
+				B1B10001BB10BB10BB100005 /* ARKitModule.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -366,7 +402,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = epocheye/epocheye.entitlements;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = epocheye/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -380,8 +419,9 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.epocheye;
 				PRODUCT_NAME = epocheye;
+				SWIFT_OBJC_BRIDGING_HEADER = "epocheye/epocheye-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -394,7 +434,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = epocheye/epocheye.entitlements;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = epocheye/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -407,8 +450,9 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.epocheye;
 				PRODUCT_NAME = epocheye;
+				SWIFT_OBJC_BRIDGING_HEADER = "epocheye/epocheye-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};

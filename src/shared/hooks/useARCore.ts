@@ -1,13 +1,13 @@
 /**
- * Hook that checks ARCore availability on mount.
+ * Hook that checks native AR availability on mount.
  *
  * Returns { arAvailable, arChecked } — `arChecked` is false until
  * the native check completes, so the UI can defer rendering the AR
- * toggle until we know for sure.
+ * toggle until we know for sure. Runs on both Android (ARCore) and
+ * iOS (ARKit world tracking).
  */
 
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 import { isARCoreAvailable } from '../../native/ARCoreModule';
 
 export interface UseARCoreReturn {
@@ -20,14 +20,15 @@ export function useARCore(): UseARCoreReturn {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS !== 'android') {
-      setChecked(true);
-      return;
-    }
+    let cancelled = false;
     void isARCoreAvailable().then(v => {
+      if (cancelled) return;
       setAvailable(v);
       setChecked(true);
     });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return { arAvailable: available, arChecked: checked };

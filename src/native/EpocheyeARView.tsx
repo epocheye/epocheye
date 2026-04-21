@@ -1,16 +1,13 @@
 /**
  * React Native wrapper for the native EpocheyeARView component.
  *
- * Renders the ARCore camera with 3D-anchored info cards on Android.
- * Returns `null` on iOS (the caller should render the 2D fallback).
+ * Renders the ARCore camera on Android and the ARKit/RealityKit camera on iOS,
+ * both wired to the native `EpocheyeARView` view manager name. Returns `null`
+ * when no identification payload is available (caller renders the 2D fallback).
  */
 
 import React from 'react';
-import {
-  Platform,
-  requireNativeComponent,
-  type ViewStyle,
-} from 'react-native';
+import { requireNativeComponent, type ViewStyle } from 'react-native';
 import type { GeminiIdentification } from '../services/geminiVisionService';
 
 interface NativeARViewProps {
@@ -25,10 +22,13 @@ interface NativeARViewProps {
   onARError?: (event: { nativeEvent: { error: string } }) => void;
 }
 
-const NativeARView =
-  Platform.OS === 'android'
-    ? requireNativeComponent<NativeARViewProps>('EpocheyeARView')
-    : null;
+const NativeARView = (() => {
+  try {
+    return requireNativeComponent<NativeARViewProps>('EpocheyeARView');
+  } catch {
+    return null;
+  }
+})();
 
 interface EpocheyeARViewProps {
   style?: ViewStyle;
@@ -38,10 +38,6 @@ interface EpocheyeARViewProps {
   onARError?: (error: string) => void;
 }
 
-/**
- * AR view component. Renders the native ARCore view on Android,
- * or `null` on iOS (caller should render the 2D IdentificationCard).
- */
 export default function EpocheyeARView({
   style,
   identification,

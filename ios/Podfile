@@ -8,11 +8,14 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
+# RN Firebase requires static framework linkage.
+$RNFirebaseAsStaticFramework = true
+
+# Static linkage is required when mixing GoogleMaps (static frameworks only)
+# with RN Firebase pods. The RN core itself supports either mode.
+linkage = ENV['USE_FRAMEWORKS'] || 'static'
+Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+use_frameworks! :linkage => linkage.to_sym
 
 target 'epocheye' do
   config = use_native_modules!
@@ -23,6 +26,12 @@ target 'epocheye' do
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
+  # Google Maps SDK (matches Android's PROVIDER_GOOGLE behaviour).
+  pod 'GoogleMaps'
+  pod 'Google-Maps-iOS-Utils'
+  rn_maps_path = '../node_modules/react-native-maps'
+  pod 'react-native-google-maps', :path => rn_maps_path
+
   post_install do |installer|
     react_native_post_install(
       installer,
@@ -30,5 +39,12 @@ target 'epocheye' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Silence deployment-target warnings from transitive pods (GoogleMaps etc.)
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings.delete 'IPHONEOS_DEPLOYMENT_TARGET'
+      end
+    end
   end
 end

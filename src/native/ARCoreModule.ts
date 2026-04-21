@@ -1,29 +1,36 @@
 /**
- * TypeScript bridge for the ARCore native module.
+ * TypeScript bridge for the native AR availability module.
  *
- * Exposes ARCore availability checks to the JS layer.
- * Returns `false` on iOS or when the native module is not registered.
+ * On Android it calls `ARCoreModule` (ARCore availability check).
+ * On iOS it calls `ARKitModule` (ARWorldTrackingConfiguration.isSupported).
+ * Returns `false` if neither native module is registered (e.g. running on
+ * an unsupported simulator or a device where the native code didn't link).
+ *
+ * The exported names stay as `isARCoreAvailable` / `isARCoreInstalled` so
+ * existing callers (`useARCore`, screens) don't need to change — the name
+ * is now a general "is native AR available" check.
  */
 
 import { NativeModules, Platform } from 'react-native';
 
-const { ARCoreModule } = NativeModules;
+const NativeARModule =
+  Platform.OS === 'ios'
+    ? NativeModules.ARKitModule
+    : NativeModules.ARCoreModule;
 
 export async function isARCoreAvailable(): Promise<boolean> {
-  if (Platform.OS !== 'android') return false;
-  if (!ARCoreModule) return false;
+  if (!NativeARModule) return false;
   try {
-    return await ARCoreModule.isAvailable();
+    return await NativeARModule.isAvailable();
   } catch {
     return false;
   }
 }
 
 export async function isARCoreInstalled(): Promise<boolean> {
-  if (Platform.OS !== 'android') return false;
-  if (!ARCoreModule) return false;
+  if (!NativeARModule) return false;
   try {
-    return await ARCoreModule.isInstalled();
+    return await NativeARModule.isInstalled();
   } catch {
     return false;
   }

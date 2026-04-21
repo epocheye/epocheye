@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  PLACEHOLDER. Replace this whole file with the GoogleService-Info.plist
+  you download from the Firebase Console:
+
+    Firebase Console → Project settings → General
+      → "Your apps" → Add iOS app
+      → iOS bundle ID: com.epocheye
+      → Download GoogleService-Info.plist
+      → overwrite this file
+
+  Then re-run: `bundle exec pod install`.
+-->
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>REPLACE_ME</string>
+	<key>BUNDLE_ID</key>
+	<string>com.epocheye</string>
+	<key>CLIENT_ID</key>
+	<string>REPLACE_ME.apps.googleusercontent.com</string>
+	<key>GCM_SENDER_ID</key>
+	<string>REPLACE_ME</string>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:000000000000:ios:0000000000000000000000</string>
+	<key>IS_ADS_ENABLED</key>
+	<false/>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false/>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true/>
+	<key>IS_GCM_ENABLED</key>
+	<true/>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true/>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>PROJECT_ID</key>
+	<string>replace-me</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.REPLACE_ME</string>
+	<key>STORAGE_BUCKET</key>
+	<string>replace-me.appspot.com</string>
+</dict>
+</plist>
