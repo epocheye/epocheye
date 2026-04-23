@@ -145,6 +145,11 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
   const isSingle = selectedCount === 1;
   const isBundle = selectedCount >= 2;
 
+  const placeNameById = useMemo(
+    () => Object.fromEntries(nearbyPlaces.map(p => [p.id, p.name])),
+    [nearbyPlaces],
+  );
+
   // Server-authoritative quote, 300ms debounce.
   useEffect(() => {
     if (selectedCount === 0) {
@@ -376,7 +381,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                     className="text-parchment-muted text-sm font-['MontserratAlternates-Regular'] flex-1 pr-3"
                     numberOfLines={1}
                   >
-                    {li.place_name || li.place_id}
+                    {li.place_name || placeNameById[li.place_id] || 'Selected place'}
                   </Text>
                   <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
                     {formatInr(li.price_paise)}
