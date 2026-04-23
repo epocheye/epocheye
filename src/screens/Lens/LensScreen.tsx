@@ -870,7 +870,10 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         setGeminiError(result.error);
         track('lens_identify_error', { error: result.error });
       }
-    } catch {
+    } catch (err) {
+      if (__DEV__) {
+        console.warn('[LensScreen.identify]', err);
+      }
       setGeminiError(
         "Couldn't identify this site — try holding your phone steady and try again",
       );

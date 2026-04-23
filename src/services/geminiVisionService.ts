@@ -9,6 +9,7 @@
  */
 
 import axios from 'axios';
+import RNFS from 'react-native-fs';
 import { GEMINI_API_KEY } from '@env';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -110,26 +111,11 @@ function extractJSON(text: string): GeminiIdentification | null {
   return null;
 }
 
-/**
- * Converts a file:// URI (from VisionCamera takePhoto) to a base64 string.
- * Works on both Android and iOS without react-native-fs.
- */
+// fetch('file://...') is unreliable on Android release builds (OkHttp scoped-storage
+// issues), so we use native file I/O via react-native-fs.
 export async function fileToBase64(uri: string): Promise<string> {
-  const normalizedUri = uri.startsWith('file://') ? uri : `file://${uri}`;
-  const response = await fetch(normalizedUri);
-  const blob = await response.blob();
-
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      // Strip the data:image/...;base64, prefix
-      const base64 = result.includes(',') ? result.split(',')[1] : result;
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+  const path = uri.startsWith('file://') ? uri.slice('file://'.length) : uri;
+  return RNFS.readFile(path, 'base64');
 }
 
 // ── Main API ────────────────────────────────────────────────────────
