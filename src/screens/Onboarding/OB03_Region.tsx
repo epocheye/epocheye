@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo} from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   Image,
   Pressable,
@@ -6,6 +6,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, {
@@ -15,19 +16,20 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {COLORS, FONTS} from '../../core/constants/theme';
-import {ROUTES} from '../../core/constants/routes';
-import {useOnboardingStore} from '../../stores/onboardingStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { COLORS, FONTS } from '../../core/constants/theme';
+import { ROUTES } from '../../core/constants/routes';
+import { useOnboardingStore } from '../../stores/onboardingStore';
 import {
   UNESCO_REGIONS,
   type UnescoRegion,
 } from '../../constants/onboarding/regions';
-import type {OnboardingScreenProps} from '../../core/types/navigation.types';
+import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB03_Region'>;
 
-const OB03_Region: React.FC<Props> = ({navigation}) => {
+const OB03_Region: React.FC<Props> = ({ navigation }) => {
+  const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const firstName = useOnboardingStore(s => s.firstName);
   const region = useOnboardingStore(s => s.region);
@@ -38,19 +40,19 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
   const gridO = useSharedValue(0);
 
   useEffect(() => {
-    headO.value = withDelay(150, withTiming(1, {duration: 600}));
+    headO.value = withDelay(150, withTiming(1, { duration: 600 }));
     headY.value = withDelay(
       150,
-      withTiming(0, {duration: 600, easing: Easing.out(Easing.cubic)}),
+      withTiming(0, { duration: 600, easing: Easing.out(Easing.cubic) }),
     );
-    gridO.value = withDelay(500, withTiming(1, {duration: 600}));
+    gridO.value = withDelay(500, withTiming(1, { duration: 600 }));
   }, [headO, headY, gridO]);
 
   const sHead = useAnimatedStyle(() => ({
     opacity: headO.value,
-    transform: [{translateY: headY.value}],
+    transform: [{ translateY: headY.value }],
   }));
-  const sGrid = useAnimatedStyle(() => ({opacity: gridO.value}));
+  const sGrid = useAnimatedStyle(() => ({ opacity: gridO.value }));
 
   const onSelect = useCallback(
     (id: UnescoRegion) => {
@@ -61,7 +63,9 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
 
   const onContinue = useCallback(() => {
     if (!region) return;
-    navigation.navigate(ROUTES.ONBOARDING.OB10_SIGNUP, {fromOnboarding: true});
+    navigation.navigate(ROUTES.ONBOARDING.OB10_SIGNUP, {
+      fromOnboarding: true,
+    });
   }, [region, navigation]);
 
   const greetingName = useMemo(
@@ -69,9 +73,18 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
     [firstName],
   );
 
+  const tileWidth = useMemo(
+    () => (screenWidth - GRID_HORIZONTAL_PADDING * 2 - GRID_COLUMN_GAP) / 2,
+    [screenWidth],
+  );
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
 
       <ScrollView
         contentContainerStyle={[
@@ -81,7 +94,8 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
             paddingBottom: insets.bottom + 120,
           },
         ]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View style={sHead}>
           <Text style={styles.kicker}>
             So, <Text style={styles.kickerName}>{greetingName}</Text> it is..
@@ -98,18 +112,22 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
               <Pressable
                 key={entry.id}
                 onPress={() => onSelect(entry.id)}
-                style={({pressed}) => [
+                style={({ pressed }) => [
                   styles.tile,
+                  { width: tileWidth },
                   pressed && styles.tilePressed,
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={entry.label}
-                accessibilityState={{selected}}>
+                accessibilityState={{ selected }}
+              >
                 <View
                   style={[
                     styles.tileImageWrap,
+                    { width: tileWidth },
                     selected && styles.tileImageWrapSelected,
-                  ]}>
+                  ]}
+                >
                   <Image
                     source={entry.image}
                     style={styles.tileImage}
@@ -122,7 +140,8 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
                     styles.tileLabel,
                     selected && styles.tileLabelSelected,
                   ]}
-                  numberOfLines={2}>
+                  numberOfLines={2}
+                >
                   {entry.label}
                 </Text>
               </Pressable>
@@ -131,17 +150,18 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
         </Animated.View>
       </ScrollView>
 
-      <View style={[styles.footer, {paddingBottom: insets.bottom + 20}]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
         <Pressable
           onPress={onContinue}
           disabled={!region}
-          style={({pressed}) => [
+          style={({ pressed }) => [
             styles.cta,
             !region && styles.ctaDisabled,
             pressed && !!region && styles.ctaPressed,
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Continue">
+          accessibilityLabel="Continue"
+        >
           <Text style={styles.ctaLabel}>Continue</Text>
         </Pressable>
       </View>
@@ -149,7 +169,8 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
   );
 };
 
-const TILE_WIDTH = 160;
+const GRID_HORIZONTAL_PADDING = 24;
+const GRID_COLUMN_GAP = 12;
 const TILE_IMAGE_HEIGHT = 114;
 
 const styles = StyleSheet.create({
@@ -158,7 +179,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111111',
   },
   scroll: {
-    paddingHorizontal: 24,
+    paddingHorizontal: GRID_HORIZONTAL_PADDING,
   },
   kicker: {
     fontFamily: FONTS.serifItalic,
@@ -180,18 +201,17 @@ const styles = StyleSheet.create({
     marginTop: 32,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    columnGap: GRID_COLUMN_GAP,
     rowGap: 22,
   },
   tile: {
-    width: TILE_WIDTH,
     alignItems: 'flex-start',
   },
   tilePressed: {
     opacity: 0.85,
   },
   tileImageWrap: {
-    width: TILE_WIDTH,
     height: TILE_IMAGE_HEIGHT,
     borderRadius: 10,
     overflow: 'hidden',
@@ -211,6 +231,7 @@ const styles = StyleSheet.create({
   },
   tileLabel: {
     marginTop: 8,
+    minHeight: 36,
     fontFamily: FONTS.medium,
     fontSize: 14,
     color: 'rgba(255,255,255,0.82)',
@@ -238,7 +259,7 @@ const styles = StyleSheet.create({
   },
   ctaPressed: {
     backgroundColor: COLORS.skyDark,
-    transform: [{scale: 0.98}],
+    transform: [{ scale: 0.98 }],
   },
   ctaDisabled: {
     backgroundColor: 'rgba(97,166,211,0.35)',

@@ -1,6 +1,7 @@
 package com.epocheye
 
 import android.app.Application
+import android.util.Log
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -14,7 +15,14 @@ class MainApplication : Application(), ReactApplication {
       context = applicationContext,
       packageList =
         PackageList(this).packages.apply {
-          add(com.epocheye.ar.ARCorePackage())
+          // On devices without Google Play Services for AR or with a broken
+          // ARCore install, instantiating ARCorePackage can throw at class-load
+          // time — that kills ReactHost and presents as a silent crash.
+          try {
+            add(com.epocheye.ar.ARCorePackage())
+          } catch (t: Throwable) {
+            Log.e("MainApplication", "ARCorePackage skipped", t)
+          }
         },
     )
   }

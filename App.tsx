@@ -9,12 +9,18 @@ import NoInternetScreen from './src/screens/NoInternetScreen';
 import { fcmInit } from './src/services/fcmService';
 import { useArQuotaStore } from './src/stores/arQuotaStore';
 
-GoogleSignin.configure({
-  webClientId:
-    '390327894507-b3s027ad3ak1s562p65vuc280dg39q4c.apps.googleusercontent.com',
-  offlineAccess: true,
-  scopes: ['profile', 'email'],
-});
+// Module-load configure() throws if the native module failed to autolink;
+// guard so a mis-linked build reaches the JS runtime instead of dying silently.
+try {
+  GoogleSignin.configure({
+    webClientId:
+      '390327894507-b3s027ad3ak1s562p65vuc280dg39q4c.apps.googleusercontent.com',
+    offlineAccess: true,
+    scopes: ['profile', 'email'],
+  });
+} catch (err) {
+  if (__DEV__) console.warn('[auth] GoogleSignin.configure failed', err);
+}
 
 /**
  * Main app content that handles network state

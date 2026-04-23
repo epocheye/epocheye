@@ -27,6 +27,7 @@ import {
   Map as MapIcon,
   MapPin,
   Search,
+  Sparkles,
   X,
 } from 'lucide-react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';

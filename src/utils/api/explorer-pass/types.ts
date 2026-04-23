@@ -1,29 +1,29 @@
-export interface PricingTier {
-  id: number;
-  min_places: number;
-  max_places: number | null;
-  price_per_place_paise: number;
-  label: string;
-  access_hours_single: number;
-  access_hours_multi: number;
-  sort_order: number;
-  is_active: boolean;
+export interface ExplorerPassConfigAdmin {
+  default_price_paise: number;
+  single_access_hours: number;
+  pass_default_hours: number;
+  pass_max_hours: number;
+  extension_24h_paise: number;
+  extension_48h_paise: number;
 }
 
-export interface ExplorerPassConfig {
-  tiers: PricingTier[];
-  enabled: boolean;
+export interface QuoteLineItem {
+  place_id: string;
+  place_name?: string;
+  price_paise: number;
+  source: 'override' | 'default' | 'extension';
 }
 
-export interface PriceCalculation {
+export interface ExplorerPassQuote {
+  line_items: QuoteLineItem[];
   place_count: number;
-  tier_id: number;
-  tier_label: string;
-  price_per_place_paise: number;
   subtotal_paise: number;
+  extension_paise: number;
   discount_amount_paise: number;
   total_paise: number;
   access_hours: number;
+  duration_hours: number;
+  is_single_place: boolean;
   coupon_applied?: string;
   discount_percent?: number;
 }
@@ -35,8 +35,8 @@ export interface ExplorerPassInitiateResult {
   currency: string;
   key_id: string;
   place_count: number;
-  tier_label: string;
   access_hours: number;
+  is_single_place: boolean;
   coupon_code?: string;
   discount_percent?: number;
   prefill: {
@@ -58,33 +58,24 @@ export interface ExplorerPass {
   place_ids: string[];
   place_count: number;
   total_amount_paise: number;
+  duration_hours: number;
   coupon_code?: string | null;
   purchased_at: string;
   expires_at: string;
   is_active: boolean;
 }
 
-export interface QuoteLineItem {
-  place_id: string;
-  place_name: string;
-  price_paise: number;
-  access_hours: number;
-  source: 'override' | 'tier';
-}
-
-export interface ExplorerPassQuote {
-  line_items: QuoteLineItem[];
-  subtotal_paise: number;
-  total_paise: number;
-  max_access_hours: number;
-  tier_label: string;
-  tier_id: number;
-}
-
 export interface CheckAccessResult {
   has_access: boolean;
   expires_at?: string;
   pass_id?: string;
+}
+
+export interface ScanReportPayload {
+  scan_id?: string;
+  reason: string;
+  notes?: string;
+  image_url?: string;
 }
 
 export type ApiResult<T> =

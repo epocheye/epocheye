@@ -1,6 +1,6 @@
 /**
  * Explorer Pass API module.
- * Wraps the /api/v1/explorer-pass endpoints served by the Go backend.
+ * Wraps the /api/v1/explorer-pass endpoints on the Go backend.
  */
 
 import { createAuthenticatedClient } from '../auth';
@@ -9,63 +9,40 @@ import type {
   ApiResult,
   CheckAccessResult,
   ExplorerPass,
-  ExplorerPassConfig,
   ExplorerPassConfirmPayload,
   ExplorerPassInitiateResult,
   ExplorerPassQuote,
-  PriceCalculation,
+  ScanReportPayload,
 } from './types';
 
 export type {
-  PricingTier,
-  ExplorerPassConfig,
-  PriceCalculation,
+  ExplorerPassConfigAdmin,
   ExplorerPassInitiateResult,
   ExplorerPassConfirmPayload,
   ExplorerPass,
   CheckAccessResult,
   ExplorerPassQuote,
   QuoteLineItem,
+  ScanReportPayload,
 } from './types';
 
-/** GET /api/v1/explorer-pass/config — public pricing tiers. */
-export async function getExplorerPassConfig(): Promise<ApiResult<ExplorerPassConfig>> {
-  try {
-    const client = createAuthenticatedClient();
-    const resp = await client.get<ExplorerPassConfig>('/api/v1/explorer-pass/config');
-    return { success: true, data: resp.data };
-  } catch (error) {
-    return createErrorResult(error);
-  }
-}
+type QuoteBody = {
+  place_ids: string[];
+  duration_hours?: number;
+  coupon_code?: string;
+};
 
-/** POST /api/v1/explorer-pass/calculate — price breakdown for selected places. */
-export async function calculateExplorerPassPrice(
-  placeIds: string[],
-  couponCode?: string,
-): Promise<ApiResult<PriceCalculation>> {
-  try {
-    const client = createAuthenticatedClient();
-    const body: Record<string, unknown> = { place_ids: placeIds };
-    if (couponCode) {
-      body.coupon_code = couponCode.toUpperCase().trim();
-    }
-    const resp = await client.post<PriceCalculation>('/api/v1/explorer-pass/calculate', body);
-    return { success: true, data: resp.data };
-  } catch (error) {
-    return createErrorResult(error);
-  }
-}
-
-/** POST /api/v1/explorer-pass/quote — server-computed per-place line items with override/tier pricing. */
+/** POST /api/v1/explorer-pass/quote — server-computed per-place line items + optional extension. */
 export async function getExplorerPassQuote(
   placeIds: string[],
+  options?: { durationHours?: number; couponCode?: string },
 ): Promise<ApiResult<ExplorerPassQuote>> {
   try {
     const client = createAuthenticatedClient();
-    const resp = await client.post<ExplorerPassQuote>('/api/v1/explorer-pass/quote', {
-      place_ids: placeIds,
-    });
+    const body: QuoteBody = { place_ids: placeIds };
+    if (options?.durationHours) body.duration_hours = options.durationHours;
+    if (options?.couponCode) body.coupon_code = options.couponCode.toUpperCase().trim();
+    const resp = await client.post<ExplorerPassQuote>('/api/v1/explorer-pass/quote', body);
     return { success: true, data: resp.data };
   } catch (error) {
     return createErrorResult(error);
@@ -75,14 +52,13 @@ export async function getExplorerPassQuote(
 /** POST /api/v1/explorer-pass/initiate — creates a Razorpay order. */
 export async function initiateExplorerPass(
   placeIds: string[],
-  couponCode?: string,
+  options?: { durationHours?: number; couponCode?: string },
 ): Promise<ApiResult<ExplorerPassInitiateResult>> {
   try {
     const client = createAuthenticatedClient();
-    const body: Record<string, unknown> = { place_ids: placeIds };
-    if (couponCode) {
-      body.coupon_code = couponCode.toUpperCase().trim();
-    }
+    const body: QuoteBody = { place_ids: placeIds };
+    if (options?.durationHours) body.duration_hours = options.durationHours;
+    if (options?.couponCode) body.coupon_code = options.couponCode.toUpperCase().trim();
     const resp = await client.post<ExplorerPassInitiateResult>('/api/v1/explorer-pass/initiate', body);
     return { success: true, data: resp.data };
   } catch (error) {
@@ -120,6 +96,22 @@ export async function checkPlaceAccess(placeId: string): Promise<ApiResult<Check
     const client = createAuthenticatedClient();
     const resp = await client.get<CheckAccessResult>(
       `/api/v1/explorer-pass/check-access?place_id=${encodeURIComponent(placeId)}`,
+    );
+    return { success: true, data: resp.data };
+  } catch (error) {
+    return createErrorResult(error);
+  }
+}
+
+/** POST /api/v1/scans/report-issue — user files a bad-scan report. */
+export async function reportScanIssue(
+  payload: ScanReportPayload,
+): Promise<ApiResult<{ report_id: string; status: string }>> {
+  try {
+    const client = createAuthenticatedClient();
+    const resp = await client.post<{ report_id: string; status: string }>(
+      '/api/v1/scans/report-issue',
+      payload,
     );
     return { success: true, data: resp.data };
   } catch (error) {

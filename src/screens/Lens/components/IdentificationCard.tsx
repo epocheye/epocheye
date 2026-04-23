@@ -6,21 +6,23 @@
  * premium-gated content (significance + fact), and offline badge.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import Animated, {
   FadeOut,
   SlideInUp,
 } from 'react-native-reanimated';
-import { Lock, WifiOff, X } from 'lucide-react-native';
+import { AlertTriangle, Lock, WifiOff, X } from 'lucide-react-native';
 import { FONTS } from '../../../core/constants/theme';
 import type { GeminiIdentification } from '../../../services/geminiVisionService';
+import ReportIssueModal from '../../../components/ui/ReportIssueModal';
 
 const AUTO_DISMISS_MS = 8_000;
 
@@ -48,6 +50,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
   onUpgrade,
 }) => {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     if (identification && !isLoading) {
@@ -94,7 +97,21 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
 
       {/* Error state */}
       {!isLoading && error && (
-        <Text style={styles.errorText}>{error}</Text>
+        <>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            onPress={() => setReportOpen(true)}
+            style={styles.reportBtn}
+            hitSlop={6}
+          >
+            <AlertTriangle color="#C9A84C" size={12} />
+            <Text style={styles.reportBtnText}>Report issue</Text>
+          </TouchableOpacity>
+          <ReportIssueModal
+            visible={reportOpen}
+            onClose={() => setReportOpen(false)}
+          />
+        </>
       )}
 
       {/* Identification result */}
@@ -190,6 +207,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: FONTS.regular,
     textAlign: 'center',
+  },
+  reportBtn: {
+    marginTop: 10,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(201,168,76,0.3)',
+    backgroundColor: 'rgba(201,168,76,0.08)',
+  },
+  reportBtnText: {
+    color: '#C9A84C',
+    fontSize: 11,
+    fontFamily: FONTS.medium,
   },
   name: {
     color: '#FFFFFF',

@@ -4,11 +4,7 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Image,
   StatusBar,
-  Dimensions,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
 } from 'react-native';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import ThinkingDots from '../../components/ui/ThinkingDots';
@@ -28,20 +24,17 @@ import {
   Heart,
   Share2,
   MapPin,
-  Clock3,
   Navigation,
   Camera,
   ChevronDown,
   ChevronUp,
   Sparkles,
   Bookmark,
-  BookOpen,
   Shield,
 } from 'lucide-react-native';
 import { formatPlaceType } from '../../shared/utils/formatters';
-import { ROUTES } from '../../core/constants';
 import { usePlaces, useUser } from '../../context';
-import { useResolvedSubjectImage, useExplorerPass } from '../../shared/hooks';
+import { useExplorerPass } from '../../shared/hooks';
 import {
   getPersonalizedFacts,
   elaboratePersonalizedFact,
@@ -49,8 +42,7 @@ import {
 import type { PersonalizedFact } from '../../utils/api/user';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const HERO_HEIGHT = 340;
+const HERO_HEIGHT = 180;
 
 const FACT_LOADING_LINES = [
   'Reading the stones...',
@@ -67,45 +59,17 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const isPlaceSaved = usePlaces(state => state.isPlaceSaved);
   const { checkAccess } = useExplorerPass();
 
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
 
-  // Personalized facts state
   const [facts, setFacts] = useState<PersonalizedFact[]>([]);
   const [factsLoading, setFactsLoading] = useState(true);
   const [expandedFactId, setExpandedFactId] = useState<string | null>(null);
   const [elaboratingFactId, setElaboratingFactId] = useState<string | null>(
     null,
   );
-
-  const { url: resolvedHeroImage, loading: resolvingHeroImage } =
-    useResolvedSubjectImage({
-      subject: site.name,
-      context: `${(site as any).formatted ?? site.city ?? ''} heritage monument`,
-      enabled: !!site.name,
-      remote: true,
-    });
-
-  const heroImages = useMemo(() => {
-    const existing =
-      Array.isArray(site.heroImages) && site.heroImages.length > 0
-        ? (site.heroImages.filter(
-            (img): img is string => typeof img === 'string',
-          ) as string[])
-        : [];
-    if (!resolvedHeroImage) {
-      return existing;
-    }
-    if (existing.includes(resolvedHeroImage)) {
-      return existing;
-    }
-    return [resolvedHeroImage, ...existing];
-  }, [resolvedHeroImage, site.heroImages]);
-
-  const showHeroSkeleton = heroImages.length === 0 && resolvingHeroImage;
 
   const scrollY = useSharedValue(0);
   const isSaved = isPlaceSaved(site.id);
@@ -146,14 +110,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     return null;
   }, [site]);
 
-  // Prefetch hero image
-  useEffect(() => {
-    if (resolvedHeroImage) {
-      void Image.prefetch(resolvedHeroImage);
-    }
-  }, [resolvedHeroImage]);
-
-  // Check explorer pass access
   useEffect(() => {
     checkAccess(site.id).then(result => {
       if (result?.has_access) {
@@ -162,7 +118,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   }, [checkAccess, site.id]);
 
-  // Fetch personalized facts
   useEffect(() => {
     let cancelled = false;
 
@@ -194,7 +149,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const stickyHeaderStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
       scrollY.value,
-      [100, 180],
+      [80, 140],
       [0, 1],
       Extrapolation.CLAMP,
     ),
@@ -231,13 +186,9 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     navigation.navigate('ARExperience', { site });
   }, [navigation, site]);
 
-  const handleImageScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const offset = event.nativeEvent.contentOffset.x;
-      setCurrentImageIndex(Math.round(offset / SCREEN_WIDTH));
-    },
-    [],
-  );
+  const handleShare = useCallback(() => {
+    // Share handler intentionally blank — TBD.
+  }, []);
 
   const handleElaborateFact = useCallback(
     async (fact: PersonalizedFact) => {
@@ -277,7 +228,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     <SafeAreaView className="flex-1 bg-ink-deep" edges={['top']}>
       <StatusBar barStyle="light-content" />
 
-      {/* Sticky header */}
+      {/* Sticky header (scroll past hero) */}
       <Animated.View
         className="absolute top-0 left-0 right-0 z-20 h-14 justify-center items-center px-14"
         style={[
@@ -300,63 +251,20 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         bounces={false}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        {/* Hero */}
+        {/* Compact banner — no images */}
         <View style={{ height: HERO_HEIGHT }}>
-          {showHeroSkeleton ? (
-            <View
-              style={{
-                width: SCREEN_WIDTH,
-                height: HERO_HEIGHT,
-                backgroundColor: '#141414',
-              }}
-              className="items-center justify-center"
-            >
-              <AnimatedLogo
-                size={44}
-                variant="white"
-                motion="pulse"
-                showRing
-              />
-              <Text className="text-parchment-muted text-[12px] mt-3 tracking-[0.8px] uppercase font-['MontserratAlternates-SemiBold']">
-                Rendering the scene
-              </Text>
-            </View>
-          ) : heroImages.length === 0 ? (
-            <View
-              style={{
-                width: SCREEN_WIDTH,
-                height: HERO_HEIGHT,
-                backgroundColor: '#0F0F0F',
-              }}
-            />
-          ) : (
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onMomentumScrollEnd={handleImageScroll}
-            >
-              {heroImages.map((image, index) => (
-                <Image
-                  key={`${image}-${index}`}
-                  source={{ uri: image }}
-                  style={{ width: SCREEN_WIDTH, height: HERO_HEIGHT }}
-                  resizeMode="cover"
-                />
-              ))}
-            </ScrollView>
-          )}
-
           <LinearGradient
-            colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.7)']}
+            colors={['#0A0A0A', '#1A1410']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
             style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
           />
 
-          {/* Hero controls */}
+          {/* Controls row */}
           <View className="absolute top-4 left-5 right-5 flex-row justify-between items-center">
             <TouchableOpacity
               onPress={() => navigation.goBack()}
-              className="w-10 h-10 rounded-full bg-black/45 border border-white/20 items-center justify-center"
+              className="w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
             >
               <ArrowLeft color="#F5F0E8" size={20} />
             </TouchableOpacity>
@@ -364,7 +272,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             <View className="flex-row gap-2">
               <TouchableOpacity
                 onPress={() => setIsLiked(prev => !prev)}
-                className="w-10 h-10 rounded-full bg-black/45 border border-white/20 items-center justify-center"
+                className="w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
               >
                 <Heart
                   color={isLiked ? '#E05C5C' : '#F5F0E8'}
@@ -375,7 +283,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               <TouchableOpacity
                 onPress={handleToggleSave}
                 disabled={isSaving}
-                className="w-10 h-10 rounded-full bg-black/45 border border-white/20 items-center justify-center"
+                className="w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
               >
                 {isSaving ? (
                   <AnimatedLogo
@@ -392,18 +300,21 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   />
                 )}
               </TouchableOpacity>
-              <TouchableOpacity className="w-10 h-10 rounded-full bg-black/45 border border-white/20 items-center justify-center">
+              <TouchableOpacity
+                onPress={handleShare}
+                className="w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
+              >
                 <Share2 color="#F5F0E8" size={20} />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Hero footer */}
-          <View className="absolute left-5 right-5 bottom-[18px]">
+          {/* Banner text */}
+          <View className="absolute left-5 right-5 bottom-[16px]">
             <Text className="text-brand-gold text-[11px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
               {placeType}
             </Text>
-            <Text className="text-parchment text-[28px] leading-9 font-['MontserratAlternates-Bold'] mt-1">
+            <Text className="text-parchment text-[26px] leading-8 font-['MontserratAlternates-Bold'] mt-1">
               {site.name}
             </Text>
             <View className="flex-row items-center gap-1 mt-1.5">
@@ -415,21 +326,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 {location}
               </Text>
             </View>
-
-            {heroImages.length > 1 && (
-              <View className="flex-row gap-1.5 mt-2.5">
-                {heroImages.map((_, index) => (
-                  <View
-                    key={`dot-${index}`}
-                    className={`h-2 rounded-full ${
-                      currentImageIndex === index
-                        ? 'w-[22px] bg-brand-gold'
-                        : 'w-2 bg-white/55'
-                    }`}
-                  />
-                ))}
-              </View>
-            )}
           </View>
         </View>
 
@@ -438,7 +334,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Info card */}
           <Animated.View
             entering={FadeInDown.delay(100).duration(400)}
-            className="rounded-[20px] bg-surface-1 border border-white/[0.08] p-4"
+            className="rounded-[20px] bg-surface-1 border border-white/[0.08] p-3.5"
           >
             {/* Category tags */}
             {categories.length > 0 && (
@@ -466,37 +362,22 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             )}
 
-            {/* Meta row */}
-            <View className="flex-row gap-3">
-              {distance && (
-                <View className="flex-1 flex-row items-center gap-2.5 rounded-xl bg-surface-2 p-3">
-                  <View className="w-7 h-7 rounded-full bg-[rgba(201,168,76,0.15)] items-center justify-center">
-                    <Navigation color="#C9A84C" size={16} />
-                  </View>
-                  <View>
-                    <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
-                      {distance}
-                    </Text>
-                    <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular']">
-                      Distance
-                    </Text>
-                  </View>
-                </View>
-              )}
-              <View className="flex-1 flex-row items-center gap-2.5 rounded-xl bg-surface-2 p-3">
+            {/* Distance (est. tour time removed) */}
+            {distance && (
+              <View className="flex-row items-center gap-2.5 rounded-xl bg-surface-2 p-3">
                 <View className="w-7 h-7 rounded-full bg-[rgba(201,168,76,0.15)] items-center justify-center">
-                  <Clock3 color="#C9A84C" size={16} />
+                  <Navigation color="#C9A84C" size={16} />
                 </View>
                 <View>
                   <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
-                    45 min
+                    {distance}
                   </Text>
                   <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular']">
-                    Est. Tour
+                    Distance
                   </Text>
                 </View>
               </View>
-            </View>
+            )}
           </Animated.View>
 
           {/* Explorer Pass badge */}

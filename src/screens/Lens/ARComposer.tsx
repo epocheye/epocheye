@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { Component, Suspense, lazy, useCallback, useState } from 'react';
 import {
   Alert,
   Image,
@@ -12,7 +12,26 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Box, ExternalLink, X } from 'lucide-react-native';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 import { FONTS } from '../../core/constants/theme';
-import GLBViewer from './components/GLBViewer';
+
+// Lazy-loaded so @react-three/fiber + expo-gl are NOT evaluated at app startup.
+// r3f v8 is incompatible with React 19 and throws at module-evaluation time,
+// crashing the entire JS bundle before AppRegistry runs if imported eagerly.
+const GLBViewer = lazy(() => import('./components/GLBViewer'));
+
+interface GLBErrorBoundaryProps {
+  onError: () => void;
+  children: React.ReactNode;
+}
+interface GLBErrorBoundaryState { crashed: boolean }
+
+class GLBErrorBoundary extends Component<GLBErrorBoundaryProps, GLBErrorBoundaryState> {
+  state: GLBErrorBoundaryState = { crashed: false };
+  static getDerivedStateFromError() { return { crashed: true }; }
+  componentDidCatch() { this.props.onError(); }
+  render() {
+    return this.state.crashed ? null : this.props.children;
+  }
+}
 
 type Props = MainScreenProps<'ARComposer'>;
 
@@ -74,11 +93,15 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
             </View>
           )
         ) : (
-          <GLBViewer
-            url={glbUrl}
-            autoRotate
-            onError={() => setInlineViewerFailed(true)}
-          />
+          <GLBErrorBoundary onError={() => setInlineViewerFailed(true)}>
+            <Suspense fallback={null}>
+              <GLBViewer
+                url={glbUrl}
+                autoRotate
+                onError={() => setInlineViewerFailed(true)}
+              />
+            </Suspense>
+          </GLBErrorBoundary>
         )}
 
         <View style={styles.badges}>
