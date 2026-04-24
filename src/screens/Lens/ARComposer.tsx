@@ -49,6 +49,8 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
     provider,
     quality = 'none',
     scanCount = 0,
+    isTestMode = false,
+    testObjectDescription,
   } = route.params;
   const insets = useSafeAreaInsets();
   const [inlineViewerFailed, setInlineViewerFailed] = useState(false);
@@ -134,7 +136,16 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Text style={styles.monumentLine}>From {monumentId}</Text>
+        {isTestMode ? (
+          <>
+            <Text style={styles.testName}>{monumentId}</Text>
+            {testObjectDescription ? (
+              <Text style={styles.testDesc}>{testObjectDescription}</Text>
+            ) : null}
+          </>
+        ) : (
+          <Text style={styles.monumentLine}>From {monumentId}</Text>
+        )}
         <Pressable
           style={styles.ctaPrimary}
           onPress={openExternally}
@@ -232,6 +243,18 @@ const styles = StyleSheet.create({
     color: '#8C93A0',
     fontFamily: FONTS.medium,
     fontSize: 12,
+  },
+  testName: {
+    color: '#F5F0E8',
+    fontFamily: FONTS.bold,
+    fontSize: 18,
+  },
+  testDesc: {
+    color: '#B8AF9E',
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
   ctaPrimary: {
     flexDirection: 'row',

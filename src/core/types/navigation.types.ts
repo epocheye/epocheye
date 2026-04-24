@@ -56,6 +56,9 @@ export type MainStackParamList = {
     provider: string;
     quality?: 'none' | 'single_view' | 'multi_view' | string;
     scanCount?: number;
+    /** Dev-only: when true, hide heritage context and show generic object info. */
+    isTestMode?: boolean;
+    testObjectDescription?: string;
   };
   Purchase: { preSelectedPlaceId?: string } | undefined;
   Notifications: undefined;

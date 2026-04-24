@@ -50,6 +50,10 @@ interface ReconstructInput {
   imageUrl?: string;
   latitude?: number;
   longitude?: number;
+  /** Gemini bbox [y0, x0, y1, x1] in 0-1000 scale for the tapped object. */
+  cropBBox?: [number, number, number, number];
+  /** Dev-only: send X-Dev-Bypass header so backend skips site + heritage gates. */
+  devBypass?: boolean;
 }
 
 // Polling cadence for async cold-start jobs. Caps roughly match the server-
@@ -61,14 +65,18 @@ const DEFAULT_POLL_TIMEOUT_MS = 12 * 60_000;
 export async function reconstructForLens(
   input: ReconstructInput,
 ): Promise<ArReconstructionResult> {
-  const result = await reconstructObject({
-    monument_id: input.monumentId,
-    object_label: input.objectLabel,
-    image_base64: input.imageBase64,
-    image_url: input.imageUrl,
-    latitude: input.latitude,
-    longitude: input.longitude,
-  });
+  const result = await reconstructObject(
+    {
+      monument_id: input.monumentId,
+      object_label: input.objectLabel,
+      image_base64: input.imageBase64,
+      image_url: input.imageUrl,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      crop_bbox_2d: input.cropBBox,
+    },
+    { devBypass: input.devBypass },
+  );
 
   if (result.success) {
     if (result.data.kind === 'pending') {

@@ -36,6 +36,7 @@ import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import type { TabScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
 import { useExplorerPass } from '../../shared/hooks';
+import { useDevSettingsStore } from '../../stores/devSettingsStore';
 
 // React Native's FormData.append accepts a file object with this shape.
 type RNFile = { uri: string; type: string; name: string };
@@ -476,9 +477,26 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             entering={FadeInDown.delay(320).duration(350)}
             className="items-center py-6"
           >
-            <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Medium']">
-              Version {APP_CONFIG.APP.VERSION}
-            </Text>
+            <TouchableOpacity
+              onLongPress={() => {
+                const next = !useDevSettingsStore.getState().devBypass;
+                useDevSettingsStore.getState().setDevBypass(next);
+                Alert.alert(
+                  'Dev bypass',
+                  next
+                    ? 'Enabled. Identify Object will now do generic object detection + tap-to-select.'
+                    : 'Disabled. Heritage identification flow restored.',
+                );
+              }}
+              delayLongPress={1200}
+              accessibilityRole="none"
+              accessible={false}
+            >
+              <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Medium']">
+                Version {APP_CONFIG.APP.VERSION}
+                {useDevSettingsStore(s => s.devBypass) ? ' · dev' : ''}
+              </Text>
+            </TouchableOpacity>
             <Text className="text-parchment-dim/60 text-[10px] font-['MontserratAlternates-Regular'] mt-1">
               Made with care for India's heritage
             </Text>

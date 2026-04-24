@@ -54,6 +54,12 @@ import {
   fileToBase64,
   type GeminiIdentification,
 } from '../../services/geminiVisionService';
+import {
+  detectObjects,
+  type DetectedObject,
+} from '../../services/geminiObjectDetectionService';
+import { useDevSettingsStore } from '../../stores/devSettingsStore';
+import ObjectPickerOverlay from './components/ObjectPickerOverlay';
 import { getActiveZone } from '../../services/geofenceService';
 import type { HeritageZone } from '../../core/config/geofence.types';
 import {
@@ -223,6 +229,13 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   const [geminiError, setGeminiError] = useState<string | null>(null);
   const [activeZone, setActiveZone] = useState<HeritageZone | null>(null);
   const [isOfflineResult, setIsOfflineResult] = useState(false);
+
+  // ── Dev bypass: generic object picker state ──
+  const devBypass = useDevSettingsStore(s => s.devBypass);
+  const [objectPicker, setObjectPicker] = useState<null | {
+    imageBase64: string;
+    objects: DetectedObject[];
+  }>(null);
 
   // Premium + network state
   const {
@@ -608,7 +621,15 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   const triggerReconstruction = useCallback(
-    async (monumentName: string, objectLabel: string) => {
+    async (
+      monumentName: string,
+      objectLabel: string,
+      extras?: {
+        imageBase64?: string;
+        cropBBox?: [number, number, number, number];
+        devBypass?: boolean;
+      },
+    ) => {
       if (!arEnabled || !objectLabel) {
         return;
       }
@@ -621,9 +642,12 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         const result = await reconstructForLens({
           monumentId: monumentName,
           objectLabel,
-          imageBase64: lastCapturedImageRef.current ?? undefined,
+          imageBase64:
+            extras?.imageBase64 ?? lastCapturedImageRef.current ?? undefined,
           latitude: lastKnownCoords?.latitude ?? undefined,
           longitude: lastKnownCoords?.longitude ?? undefined,
+          cropBBox: extras?.cropBBox,
+          devBypass: extras?.devBypass,
         });
 
         if (result.kind === 'pending') {
@@ -661,11 +685,18 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   const openReconstruction = useCallback(() => {
-    if (!reconstructionReady || !matchedPlace) {
+    if (!reconstructionReady) {
+      return;
+    }
+    const testCtx = testModeCtxRef.current;
+    // Dev-bypass scans don't have a matchedPlace — use the generic object
+    // name as the monument id label so the viewer can still render.
+    const monumentLabel = testCtx ? testCtx.name : matchedPlace?.name;
+    if (!monumentLabel) {
       return;
     }
     navigation.navigate(ROUTES.MAIN.AR_COMPOSER, {
-      monumentId: matchedPlace.name,
+      monumentId: monumentLabel,
       objectLabel: reconstructionReady.objectLabel,
       glbUrl: reconstructionReady.glbUrl,
       thumbnailUrl: reconstructionReady.thumbnailUrl,
@@ -673,11 +704,17 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       provider: reconstructionReady.provider,
       quality: reconstructionReady.quality,
       scanCount: reconstructionReady.scanCount,
+      isTestMode: testCtx !== null,
+      testObjectDescription: testCtx?.description,
     });
     track('lens_reconstruction_opened', {
-      monument: matchedPlace.name,
+      monument: monumentLabel,
       object: reconstructionReady.objectLabel,
+      test_mode: testCtx ? 'true' : 'false',
     });
+    // Clear the test-mode context after navigation so a subsequent
+    // heritage scan lands in the default card.
+    testModeCtxRef.current = null;
   }, [navigation, reconstructionReady, matchedPlace]);
 
   const handleScanObject = useCallback(async () => {
@@ -786,6 +823,39 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
+    // Dev bypass path: skip heritage identification, run generic object
+    // detection and let the user tap an object to reconstruct. Still costs
+    // a quota slot so the server-side quota stays honest.
+    if (devBypass) {
+      const allowed = await checkAndIncrement();
+      if (!allowed) {
+        navigation.navigate(ROUTES.MAIN.PURCHASE);
+        return;
+      }
+      setGeminiLoading(true);
+      setGeminiError(null);
+      setGeminiResult(null);
+      try {
+        const photo = await cameraRef.current?.takePhoto();
+        if (!photo) throw new Error('Photo capture failed');
+        const imageBase64 = await fileToBase64(photo.path);
+        const detection = await detectObjects(imageBase64);
+        if (!detection.success) {
+          setGeminiError(detection.error);
+          return;
+        }
+        setObjectPicker({ imageBase64, objects: detection.data });
+      } catch (err) {
+        if (__DEV__) {
+          console.warn('[LensScreen.identify.devBypass]', err);
+        }
+        setGeminiError('Detection failed — hold steady and try again');
+      } finally {
+        setGeminiLoading(false);
+      }
+      return;
+    }
+
     // Check usage / premium
     const allowed = await checkAndIncrement();
     if (!allowed) {
@@ -888,7 +958,30 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     matchedPlace,
     canUseOffline,
     navigation,
+    devBypass,
   ]);
+
+  // Dev bypass: tracks the last test-mode reconstruction context so that
+  // the generic object name + description can accompany the 3D view.
+  const testModeCtxRef = useRef<{ name: string; description: string } | null>(
+    null,
+  );
+
+  const handleObjectPickerConfirm = useCallback(
+    async (obj: DetectedObject) => {
+      if (!objectPicker) return;
+      testModeCtxRef.current = { name: obj.name, description: obj.description };
+      const imageBase64 = objectPicker.imageBase64;
+      setObjectPicker(null);
+      lastCapturedImageRef.current = imageBase64;
+      await triggerReconstruction('dev-test', obj.name, {
+        imageBase64,
+        cropBBox: obj.box_2d,
+        devBypass: true,
+      });
+    },
+    [objectPicker, triggerReconstruction],
+  );
 
   const handleDismissIdentification = useCallback(() => {
     setGeminiResult(null);
@@ -1169,7 +1262,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           onScanObject={handleScanObject}
           onBrowseMonuments={handleBrowseMonuments}
           onSearchManually={handleSearchManually}
-          onIdentify={canIdentify ? handleIdentify : undefined}
+          onIdentify={canIdentify || devBypass ? handleIdentify : undefined}
           identifyLoading={geminiLoading}
           remainingCalls={remainingCalls}
           onHDScan={canShowMask ? handleHDScan : undefined}
@@ -1195,6 +1288,15 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           places={nearbyPlaces}
           onSelectPlace={handleSelectPlace}
         />
+
+        {objectPicker && (
+          <ObjectPickerOverlay
+            imageBase64={objectPicker.imageBase64}
+            objects={objectPicker.objects}
+            onCancel={() => setObjectPicker(null)}
+            onConfirm={handleObjectPickerConfirm}
+          />
+        )}
       </View>
     </GestureHandlerRootView>
   );

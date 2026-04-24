@@ -9,7 +9,7 @@
  */
 
 import axios from 'axios';
-import RNFS from 'react-native-fs';
+import { readFile as fsReadFile } from '@dr.pogodin/react-native-fs';
 import { GEMINI_API_KEY } from '@env';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ function extractJSON(text: string): GeminiIdentification | null {
 // issues), so we use native file I/O via react-native-fs.
 export async function fileToBase64(uri: string): Promise<string> {
   const path = uri.startsWith('file://') ? uri.slice('file://'.length) : uri;
-  return RNFS.readFile(path, 'base64');
+  return fsReadFile(path, 'base64');
 }
 
 // ── Main API ────────────────────────────────────────────────────────

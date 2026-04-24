@@ -25,12 +25,16 @@ export async function getArConfig(): Promise<ArResult<UserArConfig>> {
 
 export async function reconstructObject(
   req: ReconstructRequest,
+  options?: { devBypass?: boolean },
 ): Promise<ArResult<ReconstructOutcome>> {
   try {
     const client = createAuthenticatedClient();
     const resp = await client.post<ReconstructResponse | ReconstructPendingResponse>(
       '/api/lens/reconstruct',
       req,
+      options?.devBypass
+        ? { headers: { 'X-Dev-Bypass': 'true' } }
+        : undefined,
     );
     if (resp.status === 202) {
       return {

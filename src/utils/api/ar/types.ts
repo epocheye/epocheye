@@ -5,6 +5,8 @@ export interface ReconstructRequest {
   image_url?: string;
   latitude?: number;
   longitude?: number;
+  /** Optional Gemini bbox [y0, x0, y1, x1] in 0-1000 scale. Server crops before SAM 3D. */
+  crop_bbox_2d?: [number, number, number, number];
 }
 
 export interface ReconstructPendingResponse {
