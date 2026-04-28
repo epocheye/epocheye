@@ -1,14 +1,20 @@
 import {
   reconstructObject,
+  recognizeObject,
   contributeScan,
   getReconstructionStatus,
 } from '../utils/api/ar';
 import type {
+  HitTestPose,
+  PlaceStrategy,
   QuotaExceededResponse,
+  RecognizeAsset,
+  RecognizePlacement,
   ReconstructPendingResponse,
   ReconstructResponse,
 } from '../utils/api/ar';
 import { useArQuotaStore } from '../stores/arQuotaStore';
+import { cacheGlbUrl, getCachedGlbUri } from './glbCache';
 
 export type ArReconstructionResult =
   | {
@@ -104,9 +110,11 @@ export async function reconstructForLens(
       }).catch(() => {});
     }
 
+    const glbUrl = await resolveGlbUri(payload.glb_url);
+
     return {
       kind: 'success',
-      glbUrl: payload.glb_url,
+      glbUrl,
       thumbnailUrl: payload.thumbnail_url,
       provider: payload.provider,
       cached: payload.cached,
@@ -170,9 +178,10 @@ export async function pollReconstructionJob(
 
     const job = res.data;
     if (job.status === 'succeeded' && job.glb_url) {
+      const glbUrl = await resolveGlbUri(job.glb_url);
       return {
         kind: 'success',
-        glbUrl: job.glb_url,
+        glbUrl,
         thumbnailUrl: job.thumbnail_url,
         provider: job.provider ?? 'sagemaker',
         cached: false,
@@ -205,4 +214,131 @@ export async function pollReconstructionJob(
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Catalog-mode recognition. Sends GPS + image to /api/v1/ar/recognize and
+ * returns a discriminated union the AR screen branches on. The shape mirrors
+ * the backend's place_strategy field:
+ *
+ *   - 'curated' / 'runtime_persisted' → render `placement` in AR
+ *   - 'pose_fallback'                 → mobile creates a Geospatial anchor itself
+ *   - 'viewer_only'                   → ARCore unavailable, open 3D viewer
+ *   - 'unknown'                       → show "Help us add this" sheet
+ *   - 'error'                         → network/server failure
+ */
+export type RecognizeOutcome =
+  | {
+      kind: 'placed';
+      strategy: 'curated' | 'runtime_persisted';
+      asset: RecognizeAsset & { glbUri: string };
+      placement: RecognizePlacement;
+      confidence: number;
+      knowledgeText?: string;
+    }
+  | {
+      kind: 'pose_fallback';
+      asset: RecognizeAsset & { glbUri: string };
+      confidence: number;
+      knowledgeText?: string;
+    }
+  | {
+      kind: 'viewer_only';
+      asset: RecognizeAsset & { glbUri: string };
+      confidence: number;
+      knowledgeText?: string;
+    }
+  | {
+      kind: 'unknown';
+      knowledgeText?: string;
+      confidence: number;
+    }
+  | {
+      kind: 'error';
+      message: string;
+    };
+
+interface RecognizeInput {
+  monumentId: string;
+  lat: number;
+  lng: number;
+  imageBase64: string;
+  hitTestPose?: HitTestPose;
+  arSupported?: boolean;
+}
+
+export async function recognizeForLens(
+  input: RecognizeInput,
+): Promise<RecognizeOutcome> {
+  const result = await recognizeObject({
+    monument_id: input.monumentId,
+    lat: input.lat,
+    lng: input.lng,
+    image_base64: input.imageBase64,
+    hit_test_pose: input.hitTestPose,
+    ar_supported: input.arSupported,
+  });
+  if (!result.success) {
+    const message =
+      'error' in result ? result.error.message : 'Recognition failed';
+    return { kind: 'error', message };
+  }
+  const data = result.data;
+  if (data.match === 'unknown') {
+    return {
+      kind: 'unknown',
+      knowledgeText: data.knowledge_text,
+      confidence: data.confidence,
+    };
+  }
+  if (!data.asset || !data.asset.glb_url) {
+    return { kind: 'error', message: 'Catalog match returned no asset' };
+  }
+
+  const glbUri = await resolveGlbUri(data.asset.glb_url);
+  const enrichedAsset = { ...data.asset, glbUri };
+
+  const strategy: PlaceStrategy = data.place_strategy ?? 'pose_fallback';
+  if (strategy === 'viewer_only') {
+    return {
+      kind: 'viewer_only',
+      asset: enrichedAsset,
+      confidence: data.confidence,
+      knowledgeText: data.knowledge_text,
+    };
+  }
+  if (strategy === 'pose_fallback') {
+    return {
+      kind: 'pose_fallback',
+      asset: enrichedAsset,
+      confidence: data.confidence,
+      knowledgeText: data.knowledge_text,
+    };
+  }
+  if (!data.placement) {
+    return { kind: 'error', message: 'Catalog match returned no placement' };
+  }
+  return {
+    kind: 'placed',
+    strategy,
+    asset: enrichedAsset,
+    placement: data.placement,
+    confidence: data.confidence,
+    knowledgeText: data.knowledge_text,
+  };
+}
+
+/**
+ * Returns a local file:// URI when the GLB is already cached on-device,
+ * otherwise returns the remote URL and kicks off a background download so
+ * the next request for the same model resolves instantly.
+ */
+async function resolveGlbUri(remoteUrl: string): Promise<string> {
+  if (!remoteUrl) return remoteUrl;
+  const cached = await getCachedGlbUri(remoteUrl).catch(() => null);
+  if (cached) return cached;
+  cacheGlbUrl(remoteUrl).catch(() => {
+    // best-effort prefetch — render proceeds with the remote URL
+  });
+  return remoteUrl;
 }

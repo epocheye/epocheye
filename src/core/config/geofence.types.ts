@@ -8,6 +8,12 @@
 export interface HeritageZone {
   id: string;
   name: string;
+  /**
+   * Stable slug used as the join key against monument_objects /
+   * monument_anchors / ar_reconstruction_cache. Required for AR catalog
+   * prefetch on zone entry.
+   */
+  monument_id: string;
   lat: number;
   lon: number;
   radiusMeters: number;

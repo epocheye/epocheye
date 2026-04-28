@@ -63,6 +63,16 @@ export type MainStackParamList = {
   Purchase: { preSelectedPlaceId?: string } | undefined;
   Notifications: undefined;
   History: undefined;
+  /** Admin-only: capture geo-anchors for the curated AR catalog. */
+  AnchorCapture: undefined;
+  /** No-ARCore fallback — render an asset in a 3D orbit/zoom viewer. */
+  Ar3dViewer: {
+    monumentId: string;
+    objectLabel: string;
+    glbUrl: string;
+    thumbnailUrl?: string;
+    knowledgeText?: string;
+  };
 };
 
 /**

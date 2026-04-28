@@ -25,6 +25,13 @@
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">
       
+      <!--
+        The same Google Maps API key authorises ARCore Geospatial requests, but
+        the "ARCore API" must be explicitly enabled for this key in Google Cloud
+        Console (APIs & Services → Library → "ARCore API"). Without it
+        Earth.getEarthState() returns ERROR_APK_VERSION_TOO_OLD or
+        ERROR_INTERNAL when first used at a heritage site.
+      -->
       <meta-data
         android:name="com.google.android.geo.API_KEY"
         android:value="AIzaSyAtDAq0FthJL3yC49neCn2jkzHNZHUnFFw"/>

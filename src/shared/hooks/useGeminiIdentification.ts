@@ -9,8 +9,9 @@
 import { useCallback, useState } from 'react';
 import Geolocation from '@react-native-community/geolocation';
 import {
+  identifyAny,
   identifyHeritage,
-  fileToBase64,
+  prepareImageForGemini,
   type GeminiIdentification,
 } from '../../services/geminiVisionService';
 import {
@@ -117,14 +118,15 @@ export function useGeminiIdentification(
         return;
       }
 
+      let preparedBase64: string | null = null;
       try {
         const photo = await cameraRef.current?.takePhoto();
         if (!photo) {
           throw new Error('Photo capture failed');
         }
 
-        const imageBase64 = await fileToBase64(photo.path);
-        const geminiResult = await identifyHeritage(imageBase64, siteHint);
+        preparedBase64 = await prepareImageForGemini(photo.path);
+        const geminiResult = await identifyHeritage(preparedBase64, siteHint);
 
         if (geminiResult.success) {
           setResult(geminiResult.data);
@@ -146,9 +148,22 @@ export function useGeminiIdentification(
             );
           }
         } else {
+          if (__DEV__) {
+            console.warn(
+              `[useGeminiIdentification] failure code=${geminiResult.code} error=${geminiResult.error}`,
+            );
+            // Run the plain-text probe so we can tell whether the API path
+            // itself is broken or only the heritage JSON parsing.
+            void identifyAny(preparedBase64).then(probe => {
+              console.log('[useGeminiIdentification] identifyAny probe:', probe);
+            });
+          }
           setError(geminiResult.error);
         }
-      } catch {
+      } catch (err) {
+        if (__DEV__) {
+          console.warn('[useGeminiIdentification] unexpected', err);
+        }
         setError(
           "Couldn't identify this site — try holding your phone steady and try again",
         );

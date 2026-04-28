@@ -29,9 +29,7 @@ import {
   Sparkles,
   Compass,
   RefreshCw,
-  ScanEye,
 } from 'lucide-react-native';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import ThinkingDots from '../../components/ui/ThinkingDots';
 import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
@@ -250,10 +248,7 @@ const Home = ({ navigation }: Props) => {
 
   const entrance = useSharedValue(24);
   const contentOpacity = useSharedValue(0);
-  const lensFabScale = useSharedValue(1);
   const passBorderPulse = useSharedValue(0);
-  const fabRingScale = useSharedValue(1);
-  const fabRingOpacity = useSharedValue(0.3);
   const refreshRotation = useSharedValue(0);
 
   useEffect(() => {
@@ -266,15 +261,7 @@ const Home = ({ navigation }: Props) => {
       ),
       -1,
     );
-    fabRingScale.value = withRepeat(
-      withTiming(1.3, { duration: 1500, easing: Easing.out(Easing.quad) }),
-      -1,
-    );
-    fabRingOpacity.value = withRepeat(
-      withTiming(0, { duration: 1500, easing: Easing.out(Easing.quad) }),
-      -1,
-    );
-  }, [contentOpacity, entrance, passBorderPulse, fabRingScale, fabRingOpacity]);
+  }, [contentOpacity, entrance, passBorderPulse]);
 
   useEffect(() => {
     void ensureLocationTracking();
@@ -285,42 +272,13 @@ const Home = ({ navigation }: Props) => {
     transform: [{ translateY: entrance.value }],
   }));
 
-  const lensFabStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: lensFabScale.value }],
-  }));
-
   const passBorderStyle = useAnimatedStyle(() => ({
     borderColor: `rgba(212, 134, 10, ${interpolate(passBorderPulse.value, [0, 1], [0.15, 0.5])})`,
-  }));
-
-  const fabRingStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: fabRingScale.value }],
-    opacity: fabRingOpacity.value,
   }));
 
   const refreshIconStyle = useAnimatedStyle(() => ({
     transform: [{ rotateZ: `${refreshRotation.value}deg` }],
   }));
-
-  const handleLensPressIn = () => {
-    lensFabScale.value = withSpring(0.92, { damping: 15, stiffness: 300 });
-  };
-
-  const handleLensPressOut = () => {
-    lensFabScale.value = withSpring(1, { damping: 15, stiffness: 300 });
-  };
-
-  const handleOpenLens = useCallback(() => {
-    try {
-      ReactNativeHapticFeedback.trigger('impactMedium', {
-        enableVibrateFallback: true,
-        ignoreAndroidSystemSettings: false,
-      });
-    } catch {
-      // Haptics are best-effort.
-    }
-    navigation.navigate(ROUTES.MAIN.LENS);
-  }, [navigation]);
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -857,24 +815,6 @@ const Home = ({ navigation }: Props) => {
             )}
           </ScrollView>
         </Animated.View>
-
-        <View style={fabStyle.fabContainer}>
-          <Animated.View
-            style={[fabStyle.fabRing, fabRingStyle]}
-          />
-          <AnimatedTouchable
-            style={[fabStyle.fab, lensFabStyle]}
-            onPress={handleOpenLens}
-            onPressIn={handleLensPressIn}
-            onPressOut={handleLensPressOut}
-            activeOpacity={0.9}
-            accessibilityRole="button"
-            accessibilityLabel="Open Lens"
-            accessibilityHint="Opens the Lens camera to detect nearby monuments"
-          >
-            <ScanEye color="#0A0A0A" size={24} />
-          </AnimatedTouchable>
-        </View>
       </LinearGradient>
 
       {/* Explorer Pass upsell popup (once per session if no active pass) */}
@@ -952,36 +892,6 @@ const skeletonStyles = {
     height: 30,
     borderRadius: 999,
     backgroundColor: 'rgba(201,168,76,0.25)',
-  },
-};
-
-const fabStyle = {
-  fabContainer: {
-    position: 'absolute' as const,
-    right: 20,
-    bottom: 88,
-    width: 56,
-    height: 56,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  fabRing: {
-    position: 'absolute' as const,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: '#E8A020',
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#E8A020',
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    borderWidth: 1,
-    borderColor: 'rgba(212,134,10,0.15)',
   },
 };
 

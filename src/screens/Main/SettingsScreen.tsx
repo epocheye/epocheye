@@ -37,6 +37,7 @@ import type { TabScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
 import { useExplorerPass } from '../../shared/hooks';
 import { useDevSettingsStore } from '../../stores/devSettingsStore';
+import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 
 // React Native's FormData.append accepts a file object with this shape.
 type RNFile = { uri: string; type: string; name: string };
@@ -48,6 +49,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   const profile = useUser(state => state.profile);
   const isLoading = useUser(state => state.isLoading);
   const updateProfile = useUser(state => state.updateProfile);
+  const isAdmin = useIsAdmin();
   const uploadUserAvatar = useUser(state => state.uploadUserAvatar);
   const clearUserData = useUser(state => state.clearUserData);
   const refreshUserData = useUser(state => state.refreshUserData);
@@ -380,6 +382,32 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   </Text>
                 </View>
                 <ChevronRight size={18} color="#D4860A" />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+
+          {/* Admin: Anchor capture (only when is_admin claim on JWT) */}
+          {isAdmin && (
+            <Animated.View entering={FadeInDown.delay(180).duration(350)}>
+              <TouchableOpacity
+                className="mx-5 mb-5 flex-row items-center rounded-2xl border border-[rgba(72,187,120,0.3)] bg-[rgba(72,187,120,0.06)] p-4"
+                onPress={() => navigation.navigate(ROUTES.MAIN.ANCHOR_CAPTURE)}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Capture AR anchor at this site"
+              >
+                <View className="w-10 h-10 rounded-full bg-[rgba(72,187,120,0.18)] items-center justify-center mr-3">
+                  <MapPin size={18} color="#48BB78" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
+                    Capture Anchor
+                  </Text>
+                  <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] mt-0.5">
+                    Admin only · Record an object's geo position on-site
+                  </Text>
+                </View>
+                <ChevronRight size={18} color="#48BB78" />
               </TouchableOpacity>
             </Animated.View>
           )}

@@ -187,6 +187,14 @@ function handleLocationUpdate(position: GeolocationResponse): void {
   if (hasMovedOutsideRadius(newLocation) && canMakeApiCall()) {
     usePlacesStore.getState().refreshNearbyPlaces().catch(() => undefined);
   }
+
+  // Heritage-site arrival detection — fires a local notification + prefetches
+  // the AR catalog when the user crosses into one of the curated zones.
+  // Imported lazily to avoid pulling Notifee into the bundle path of a
+  // store init when the app is started cold.
+  void import('../services/siteDetectionService').then(m =>
+    m.checkZoneEntry(newLocation.latitude, newLocation.longitude),
+  );
 }
 
 export const usePlacesStore = create<PlacesStoreState>((set, get) => ({

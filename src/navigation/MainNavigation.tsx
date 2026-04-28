@@ -8,6 +8,8 @@ import ARComposer from '../screens/Lens/ARComposer';
 import PurchaseScreen from '../screens/Main/PurchaseScreen';
 import NotificationsScreen from '../screens/Main/NotificationsScreen';
 import HistoryScreen from '../screens/History/HistoryScreen';
+import AnchorCaptureScreen from '../screens/Admin/AnchorCaptureScreen';
+import Ar3dViewerScreen from '../screens/Main/Ar3dViewerScreen';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -81,6 +83,16 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         name={ROUTES.MAIN.HISTORY}
         component={HistoryScreen}
         options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name={ROUTES.MAIN.ANCHOR_CAPTURE}
+        component={AnchorCaptureScreen}
+        options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
+      />
+      <Stack.Screen
+        name={ROUTES.MAIN.AR_3D_VIEWER}
+        component={Ar3dViewerScreen}
+        options={{ animation: 'fade', presentation: 'fullScreenModal' }}
       />
     </Stack.Navigator>
   );

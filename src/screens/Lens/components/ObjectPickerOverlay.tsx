@@ -101,7 +101,7 @@ const ObjectPickerOverlay: React.FC<Props> = ({
 
       {selected && (
         <Animated.View entering={FadeIn.duration(160)} style={styles.confirmCard}>
-          <Text style={styles.confirmTitle}>Reconstruct this?</Text>
+          <Text style={styles.confirmTitle}>What we see</Text>
           <Text style={styles.confirmName}>{selected.name}</Text>
           <Text style={styles.confirmDesc}>{selected.description}</Text>
           <View style={styles.confirmRow}>
@@ -109,9 +109,9 @@ const ObjectPickerOverlay: React.FC<Props> = ({
               style={[styles.confirmBtn, styles.confirmBtnGhost]}
               onPress={() => setSelected(null)}
               accessibilityRole="button"
-              accessibilityLabel="Cancel"
+              accessibilityLabel="Back to objects"
             >
-              <Text style={styles.confirmBtnGhostText}>Cancel</Text>
+              <Text style={styles.confirmBtnGhostText}>Back</Text>
             </Pressable>
             <Pressable
               style={[styles.confirmBtn, styles.confirmBtnPrimary]}
@@ -121,9 +121,9 @@ const ObjectPickerOverlay: React.FC<Props> = ({
                 onConfirm(chosen);
               }}
               accessibilityRole="button"
-              accessibilityLabel="Reconstruct"
+              accessibilityLabel="View in 3D"
             >
-              <Text style={styles.confirmBtnPrimaryText}>Reconstruct</Text>
+              <Text style={styles.confirmBtnPrimaryText}>View in 3D</Text>
             </Pressable>
           </View>
         </Animated.View>

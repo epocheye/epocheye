@@ -20,6 +20,9 @@ class ARCorePackage : ReactPackage {
     override fun createViewManagers(
         reactContext: ReactApplicationContext
     ): List<ViewManager<*, *>> {
-        return listOf(EpocheyeARViewManager(reactContext))
+        return listOf(
+            EpocheyeARViewManager(reactContext),
+            EpocheyeGeospatialARViewManager(reactContext),
+        )
     }
 }

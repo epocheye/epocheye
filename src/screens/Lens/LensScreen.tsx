@@ -50,8 +50,10 @@ import type { MainScreenProps } from '../../core/types/navigation.types';
 import { FONTS } from '../../core/constants/theme';
 import { ROUTES } from '../../core/constants';
 import {
-  identifyHeritage,
   fileToBase64,
+  identifyAny,
+  identifyHeritage,
+  prepareImageForGemini,
   type GeminiIdentification,
 } from '../../services/geminiVisionService';
 import {
@@ -236,6 +238,15 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     imageBase64: string;
     objects: DetectedObject[];
   }>(null);
+
+  // ── Dev-only: "Describe Anything" pipeline check ──
+  // Sends a captured frame to Gemini with a free-form "describe in one sentence"
+  // prompt, bypassing the heritage-only template. Used to verify the camera →
+  // resize → API path works on any everyday object before site testing.
+  const [describeAnythingText, setDescribeAnythingText] = useState<string | null>(
+    null,
+  );
+  const [describeAnythingLoading, setDescribeAnythingLoading] = useState(false);
 
   // Premium + network state
   const {
@@ -838,7 +849,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       try {
         const photo = await cameraRef.current?.takePhoto();
         if (!photo) throw new Error('Photo capture failed');
-        const imageBase64 = await fileToBase64(photo.path);
+        const imageBase64 = await prepareImageForGemini(photo.path);
         const detection = await detectObjects(imageBase64);
         if (!detection.success) {
           setGeminiError(detection.error);
@@ -900,15 +911,16 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
+    let preparedBase64: string | null = null;
     try {
       const photo = await cameraRef.current?.takePhoto();
       if (!photo) {
         throw new Error('Photo capture failed');
       }
 
-      const imageBase64 = await fileToBase64(photo.path);
+      preparedBase64 = await prepareImageForGemini(photo.path);
       const siteHint = activeZone?.name ?? matchedPlace?.name;
-      const result = await identifyHeritage(imageBase64, siteHint);
+      const result = await identifyHeritage(preparedBase64, siteHint);
 
       if (result.success) {
         setGeminiResult(result.data);
@@ -937,8 +949,20 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           );
         }
       } else {
+        if (__DEV__) {
+          console.warn(
+            `[LensScreen.identify] failure code=${result.code} error=${result.error}`,
+          );
+          // Plain-text probe isolates whether the API path works at all.
+          void identifyAny(preparedBase64).then(probe => {
+            console.log('[LensScreen.identify] identifyAny probe:', probe);
+          });
+        }
         setGeminiError(result.error);
-        track('lens_identify_error', { error: result.error });
+        track('lens_identify_error', {
+          error: result.error,
+          code: result.code,
+        });
       }
     } catch (err) {
       if (__DEV__) {
@@ -967,6 +991,26 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     null,
   );
 
+  // Dev bypass: auto-fire object detection once when Lens opens.
+  // The 800ms delay lets vision-camera fully initialize before takePhoto;
+  // capturing too early returns a black/empty frame on some Android devices.
+  const autoDetectFiredRef = useRef(false);
+  useEffect(() => {
+    if (
+      !devBypass ||
+      autoDetectFiredRef.current ||
+      !hasPermission ||
+      !device
+    ) {
+      return;
+    }
+    autoDetectFiredRef.current = true;
+    const t = setTimeout(() => {
+      void handleIdentify();
+    }, 800);
+    return () => clearTimeout(t);
+  }, [devBypass, hasPermission, device, handleIdentify]);
+
   const handleObjectPickerConfirm = useCallback(
     async (obj: DetectedObject) => {
       if (!objectPicker) return;
@@ -988,6 +1032,33 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     setGeminiError(null);
     setIsOfflineResult(false);
   }, []);
+
+  const handleDescribeAnything = useCallback(async () => {
+    if (describeAnythingLoading) return;
+    setDescribeAnythingLoading(true);
+    setDescribeAnythingText(null);
+    try {
+      const photo = await cameraRef.current?.takePhoto();
+      if (!photo) {
+        setDescribeAnythingText('Couldn’t capture a photo — try again');
+        return;
+      }
+      const prepared = await prepareImageForGemini(photo.path);
+      const probe = await identifyAny(prepared);
+      if (probe.success) {
+        setDescribeAnythingText(probe.text);
+      } else {
+        setDescribeAnythingText(`Probe failed: ${probe.error}`);
+      }
+    } catch (err) {
+      if (__DEV__) {
+        console.warn('[LensScreen.describeAnything]', err);
+      }
+      setDescribeAnythingText('Probe threw — see Metro logs');
+    } finally {
+      setDescribeAnythingLoading(false);
+    }
+  }, [describeAnythingLoading]);
 
   const handleExpandIdentification = useCallback(() => {
     if (matchedPlace) {
@@ -1200,15 +1271,69 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
 
         <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
           <Text style={styles.topBarTitle}>LENS</Text>
-          <Pressable
-            style={styles.closeButton}
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Close Lens"
-          >
-            <X size={18} color="#FFFFFF" />
-          </Pressable>
+          <View style={styles.topBarActions}>
+            {__DEV__ && (
+              <View
+                style={[
+                  styles.devProbeButton,
+                  devBypass ? styles.devBypassOn : styles.devBypassOff,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.devProbeButtonText,
+                    devBypass && styles.devBypassOnText,
+                  ]}
+                >
+                  BYPASS: {devBypass ? 'ON' : 'OFF'}
+                </Text>
+              </View>
+            )}
+            {__DEV__ && (
+              <Pressable
+                style={[
+                  styles.devProbeButton,
+                  describeAnythingLoading && styles.devProbeButtonLoading,
+                ]}
+                onPress={handleDescribeAnything}
+                disabled={describeAnythingLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Describe anything (dev)"
+              >
+                <Text style={styles.devProbeButtonText}>
+                  {describeAnythingLoading ? 'PROBING…' : 'DEV: DESCRIBE'}
+                </Text>
+              </Pressable>
+            )}
+            <Pressable
+              style={styles.closeButton}
+              onPress={() => navigation.goBack()}
+              accessibilityRole="button"
+              accessibilityLabel="Close Lens"
+            >
+              <X size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
         </View>
+
+        {__DEV__ && describeAnythingText && (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(200)}
+            style={[styles.devProbeBanner, { top: insets.top + 56 }]}
+          >
+            <Text style={styles.devProbeBannerLabel}>DEV PROBE</Text>
+            <Text style={styles.devProbeBannerText}>{describeAnythingText}</Text>
+            <Pressable
+              onPress={() => setDescribeAnythingText(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss probe result"
+              hitSlop={8}
+            >
+              <X size={14} color="#F5F0E8" />
+            </Pressable>
+          </Animated.View>
+        )}
 
         {showRing ? (
           <PulsingRing
@@ -1341,6 +1466,67 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  devProbeButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(232, 160, 32, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(232, 160, 32, 0.6)',
+  },
+  devProbeButtonLoading: {
+    opacity: 0.6,
+  },
+  devBypassOn: {
+    backgroundColor: 'rgba(72, 187, 120, 0.18)',
+    borderColor: 'rgba(72, 187, 120, 0.7)',
+  },
+  devBypassOff: {
+    backgroundColor: 'rgba(120, 120, 120, 0.15)',
+    borderColor: 'rgba(180, 180, 180, 0.4)',
+  },
+  devBypassOnText: {
+    color: '#48BB78',
+  },
+  devProbeButtonText: {
+    color: '#E8A020',
+    fontSize: 10,
+    letterSpacing: 1.2,
+    fontFamily: FONTS.bold,
+  },
+  devProbeBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(10,10,10,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(232, 160, 32, 0.4)',
+  },
+  devProbeBannerLabel: {
+    color: '#E8A020',
+    fontSize: 9,
+    letterSpacing: 1.4,
+    fontFamily: FONTS.bold,
+  },
+  devProbeBannerText: {
+    flex: 1,
+    color: '#F5F0E8',
+    fontSize: 12,
+    fontFamily: FONTS.regular,
+    lineHeight: 16,
   },
   geofenceBanner: {
     position: 'absolute',

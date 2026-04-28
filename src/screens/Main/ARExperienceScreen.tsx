@@ -40,6 +40,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useIsFocused } from '@react-navigation/native';
 import {
   ArrowLeft,
   Camera,
@@ -66,9 +67,30 @@ import { ROUTES } from '../../core/constants';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 import type { HeritageZone } from '../../core/config/geofence.types';
 
+import { useDevSettingsStore } from '../../stores/devSettingsStore';
+import {
+  detectObjects,
+  type DetectedObject,
+} from '../../services/geminiObjectDetectionService';
+import {
+  identifyAny,
+  prepareImageForGemini,
+} from '../../services/geminiVisionService';
+import {
+  pollReconstructionJob,
+  recognizeForLens,
+  reconstructForLens,
+  type ArReconstructionResult,
+  type PendingProgress,
+} from '../../services/arReconstructionService';
+import { submitUnknownScan } from '../../utils/api/ar';
+import { isArcoreAvailable } from '../../services/arcoreService';
+import { useArQuotaStore } from '../../stores/arQuotaStore';
+
 import EpocheyeARView from '../../native/EpocheyeARView';
 import IdentificationCard from '../Lens/components/IdentificationCard';
 import HDScanOverlay from '../Lens/components/HDScanOverlay';
+import ObjectPickerOverlay from '../Lens/components/ObjectPickerOverlay';
 
 type Props = MainScreenProps<'ARExperience'>;
 
@@ -83,6 +105,8 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
   const { arAvailable } = useARCore();
+  const isFocused = useIsFocused();
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   // Geofence state
   const [activeZone, setActiveZone] = useState<HeritageZone | null>(null);
@@ -99,6 +123,46 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
 
   // Info modal
   const [showInfo, setShowInfo] = useState(false);
+
+  // ── Dev bypass: generic multi-object detection workflow ──
+  const devBypass = useDevSettingsStore(s => s.devBypass);
+  const arEnabled = useArQuotaStore(s => s.enabled && !s.maintenanceMode);
+  const [objectPicker, setObjectPicker] = useState<null | {
+    imageBase64: string;
+    objects: DetectedObject[];
+  }>(null);
+  const [bypassLoading, setBypassLoading] = useState(false);
+  const [bypassError, setBypassError] = useState<string | null>(null);
+  const [reconstructionReady, setReconstructionReady] = useState<null | {
+    glbUrl: string;
+    thumbnailUrl?: string;
+    provider: string;
+    cached: boolean;
+    objectLabel: string;
+    quality?: string;
+    scanCount?: number;
+  }>(null);
+  const [reconstructionLoading, setReconstructionLoading] = useState(false);
+  const [reconstructionPending, setReconstructionPending] = useState<null | {
+    phase: string;
+    etaSeconds: number;
+  }>(null);
+  // "Help us add this" prompt — set when recognise returns match='unknown'.
+  const [unknownPrompt, setUnknownPrompt] = useState<null | {
+    imageBase64: string;
+    lat: number;
+    lng: number;
+    knowledgeText?: string;
+  }>(null);
+  const reconstructionAbortedRef = useRef(false);
+  const testCtxRef = useRef<{ name: string; description: string } | null>(null);
+  const autoDetectFiredRef = useRef(false);
+
+  // ── Dev probe ("Describe Anything") ──
+  const [describeAnythingText, setDescribeAnythingText] = useState<string | null>(
+    null,
+  );
+  const [describeAnythingLoading, setDescribeAnythingLoading] = useState(false);
 
   // Gemini identification hook
   const {
@@ -159,13 +223,293 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
     };
   }, [site.name, profile?.name]);
 
+  const applyReconstructionResult = useCallback(
+    (
+      result: ArReconstructionResult,
+      monumentName: string,
+      objectLabel: string,
+    ) => {
+      if (result.kind === 'success') {
+        setReconstructionReady({
+          glbUrl: result.glbUrl,
+          thumbnailUrl: result.thumbnailUrl,
+          provider: result.provider,
+          cached: result.cached,
+          objectLabel,
+          quality: result.quality,
+          scanCount: result.scanCount,
+        });
+      } else if (result.kind === 'error') {
+        setBypassError(result.message);
+      }
+    },
+    [],
+  );
+
+  const triggerReconstruction = useCallback(
+    async (
+      monumentName: string,
+      objectLabel: string,
+      extras: {
+        imageBase64: string;
+        cropBBox?: [number, number, number, number];
+      },
+    ) => {
+      if (!arEnabled || !objectLabel) return;
+      setReconstructionLoading(true);
+      setReconstructionPending(null);
+      reconstructionAbortedRef.current = false;
+      try {
+        const result = await reconstructForLens({
+          monumentId: monumentName,
+          objectLabel,
+          imageBase64: extras.imageBase64,
+          cropBBox: extras.cropBBox,
+          devBypass: true,
+        });
+        if (result.kind === 'pending') {
+          setReconstructionPending({
+            phase: result.phase,
+            etaSeconds: result.etaSeconds,
+          });
+          const final = await pollReconstructionJob(result.jobId, {
+            isAborted: () => reconstructionAbortedRef.current,
+            onProgress: (p: PendingProgress) =>
+              setReconstructionPending(prev =>
+                prev ? { ...prev, phase: p.phase, etaSeconds: p.etaSeconds } : prev,
+              ),
+          });
+          setReconstructionPending(null);
+          applyReconstructionResult(final, monumentName, objectLabel);
+          return;
+        }
+        applyReconstructionResult(result, monumentName, objectLabel);
+      } finally {
+        setReconstructionLoading(false);
+      }
+    },
+    [arEnabled, applyReconstructionResult],
+  );
+
+  const runDevBypassDetection = useCallback(async () => {
+    if (bypassLoading) return;
+    setBypassLoading(true);
+    setBypassError(null);
+    try {
+      const photo = await cameraRef.current?.takePhoto();
+      if (!photo) throw new Error('Photo capture failed');
+      const imageBase64 = await prepareImageForGemini(photo.path);
+      const detection = await detectObjects(imageBase64);
+      if (!detection.success) {
+        setBypassError(detection.error);
+        return;
+      }
+      setObjectPicker({ imageBase64, objects: detection.data });
+    } catch (err) {
+      if (__DEV__) console.warn('[ARExperience.devBypass]', err);
+      setBypassError('Detection failed — hold steady and try again');
+    } finally {
+      setBypassLoading(false);
+    }
+  }, [bypassLoading]);
+
   const handleIdentify = useCallback(async () => {
+    if (devBypass) {
+      await runDevBypassDetection();
+      return;
+    }
     if (!canIdentify) {
       navigation.navigate(ROUTES.MAIN.PURCHASE);
       return;
     }
     await identify(cameraRef);
-  }, [canIdentify, identify, navigation]);
+  }, [devBypass, runDevBypassDetection, canIdentify, identify, navigation]);
+
+  const handleObjectPickerConfirm = useCallback(
+    async (obj: DetectedObject) => {
+      if (!objectPicker) return;
+      testCtxRef.current = { name: obj.name, description: obj.description };
+      const imageBase64 = objectPicker.imageBase64;
+      setObjectPicker(null);
+      // Production catalog flow when we're at a real heritage site (geofence
+      // active) — Gemini classifies against the curated asset catalog and the
+      // backend resolves the placement. Falls back to the legacy reconstruct
+      // pipeline only in dev BYPASS mode (home testing without a curated site).
+      if (!devBypass) {
+        await triggerCatalogRecognize(imageBase64);
+        return;
+      }
+      await triggerReconstruction(site.name, obj.name, {
+        imageBase64,
+        cropBBox: obj.box_2d,
+      });
+    },
+    // triggerCatalogRecognize is declared below; eslint-react-hooks accepts
+    // forward references in useCallback when the dependency is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [objectPicker, triggerReconstruction, site.name, devBypass],
+  );
+
+  // Catalog-mode recognition path. Called when the user picks an object at
+  // a real heritage site. Captures GPS, checks ARCore availability, calls
+  // recognizeForLens, branches on place_strategy:
+  //   - placed/runtime_persisted/pose_fallback → set the AR composer state
+  //   - viewer_only → push to the 3D viewer screen
+  //   - unknown → prompt for "Help us add this" submission
+  const triggerCatalogRecognize = useCallback(
+    async (imageBase64: string) => {
+      setReconstructionLoading(true);
+      setReconstructionPending(null);
+      try {
+        const arSupported = await isArcoreAvailable();
+        const lat = (site as { lat?: number; latitude?: number }).lat
+          ?? (site as { latitude?: number }).latitude
+          ?? 0;
+        const lng = (site as { lng?: number; longitude?: number }).lng
+          ?? (site as { longitude?: number }).longitude
+          ?? 0;
+
+        const outcome = await recognizeForLens({
+          monumentId: site.name,
+          lat,
+          lng,
+          imageBase64,
+          arSupported,
+        });
+
+        if (outcome.kind === 'error') {
+          setBypassError(outcome.message);
+          return;
+        }
+        if (outcome.kind === 'unknown') {
+          setUnknownPrompt({ imageBase64, lat, lng, knowledgeText: outcome.knowledgeText });
+          return;
+        }
+        if (outcome.kind === 'viewer_only') {
+          navigation.navigate(ROUTES.MAIN.AR_3D_VIEWER, {
+            monumentId: site.name,
+            objectLabel: outcome.asset.object_label,
+            glbUrl: outcome.asset.glbUri,
+            thumbnailUrl: outcome.asset.thumbnail_url,
+            knowledgeText: outcome.knowledgeText,
+          });
+          return;
+        }
+        // 'placed' or 'pose_fallback' — both render in AR. The native AR view
+        // resolves the actual anchor (curated placement OR pose fallback).
+        setReconstructionReady({
+          glbUrl: outcome.asset.glbUri,
+          thumbnailUrl: outcome.asset.thumbnail_url,
+          provider: 'catalog',
+          cached: outcome.kind === 'placed' && outcome.strategy === 'curated',
+          objectLabel: outcome.asset.object_label,
+          quality: 'single_view',
+          scanCount: 0,
+        });
+      } finally {
+        setReconstructionLoading(false);
+      }
+    },
+    [site, navigation],
+  );
+
+  const handleHelpAddThis = useCallback(
+    async (suggestedLabel: string) => {
+      const prompt = unknownPrompt;
+      if (!prompt) return;
+      setUnknownPrompt(null);
+      try {
+        const res = await submitUnknownScan({
+          monument_id: site.name,
+          image_base64: prompt.imageBase64,
+          suggested_label: suggestedLabel,
+          lat: prompt.lat,
+          lng: prompt.lng,
+        });
+        if (!res.success) {
+          setBypassError(
+            'error' in res ? res.error.message : 'Failed to submit',
+          );
+          return;
+        }
+        // Friendly toast-equivalent: re-use bypassError for now (it's just a
+        // banner). Will get its own non-error toast in a follow-up.
+        setBypassError(
+          res.data.merged
+            ? 'Thanks — added to an existing report. We\'ll generate this soon.'
+            : 'Thanks — submitted. We\'ll generate this soon.',
+        );
+      } catch (err) {
+        setBypassError(
+          err instanceof Error ? err.message : 'Failed to submit',
+        );
+      }
+    },
+    [unknownPrompt, site.name],
+  );
+
+  const handleOpenReconstruction = useCallback(() => {
+    if (!reconstructionReady) return;
+    const ctx = testCtxRef.current;
+    navigation.navigate(ROUTES.MAIN.AR_COMPOSER, {
+      monumentId: site.name,
+      objectLabel: reconstructionReady.objectLabel,
+      glbUrl: reconstructionReady.glbUrl,
+      thumbnailUrl: reconstructionReady.thumbnailUrl,
+      cached: reconstructionReady.cached,
+      provider: reconstructionReady.provider,
+      quality: reconstructionReady.quality,
+      scanCount: reconstructionReady.scanCount,
+      isTestMode: ctx !== null,
+      testObjectDescription: ctx?.description,
+    });
+    testCtxRef.current = null;
+  }, [navigation, reconstructionReady, site.name]);
+
+  const handleDescribeAnything = useCallback(async () => {
+    if (describeAnythingLoading) return;
+    setDescribeAnythingLoading(true);
+    setDescribeAnythingText(null);
+    try {
+      const photo = await cameraRef.current?.takePhoto();
+      if (!photo) {
+        setDescribeAnythingText('Couldn’t capture a photo — try again');
+        return;
+      }
+      const prepared = await prepareImageForGemini(photo.path);
+      const probe = await identifyAny(prepared);
+      if (probe.success) setDescribeAnythingText(probe.text);
+      else setDescribeAnythingText(`Probe failed: ${probe.error}`);
+    } catch (err) {
+      if (__DEV__) console.warn('[ARExperience.describeAnything]', err);
+      setDescribeAnythingText('Probe threw — see Metro logs');
+    } finally {
+      setDescribeAnythingLoading(false);
+    }
+  }, [describeAnythingLoading]);
+
+  // Auto-fire object detection once when the screen is ready, if devBypass is on.
+  useEffect(() => {
+    if (
+      !devBypass ||
+      autoDetectFiredRef.current ||
+      !hasPermission ||
+      !device
+    ) {
+      return;
+    }
+    autoDetectFiredRef.current = true;
+    const t = setTimeout(() => {
+      void runDevBypassDetection();
+    }, 800);
+    return () => clearTimeout(t);
+  }, [devBypass, hasPermission, device, runDevBypassDetection]);
+
+  useEffect(() => {
+    return () => {
+      reconstructionAbortedRef.current = true;
+    };
+  }, []);
 
   const handleExpandIdentification = useCallback(() => {
     navigation.navigate(ROUTES.MAIN.SITE_DETAIL, { site });
@@ -265,14 +609,37 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
     <GestureHandlerRootView className="flex-1">
       <View className="flex-1 bg-ink-deep">
         {/* Camera layer */}
-        {device && (
+        {device && !cameraError && (
           <VisionCamera
             ref={cameraRef}
             style={StyleSheet.absoluteFill}
             device={device}
-            isActive
+            isActive={isFocused && !objectPicker}
             photo
+            onError={err => {
+              if (__DEV__) {
+                console.warn('[ARExperience.camera]', err.code, err.message);
+              }
+              setCameraError(err.message);
+            }}
           />
+        )}
+
+        {cameraError && (
+          <View style={styles.cameraErrorOverlay}>
+            <Text style={styles.cameraErrorTitle}>Camera unavailable</Text>
+            <Text style={styles.cameraErrorBody}>{cameraError}</Text>
+            <Text style={styles.cameraErrorHint}>
+              Close other camera apps (Snapchat, Instagram, system Camera) then
+              tap retry.
+            </Text>
+            <TouchableOpacity
+              style={styles.cameraErrorRetry}
+              onPress={() => setCameraError(null)}
+            >
+              <Text style={styles.cameraErrorRetryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* AR overlay — native ARCore view if available + has identification */}
@@ -364,14 +731,70 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
               <ArrowLeft color="#FFFFFF" size={22} />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setShowInfo(true)}
-              className="w-11 h-11 rounded-full bg-black/50 items-center justify-center"
-            >
-              <HelpCircle color="#FFFFFF" size={22} />
-            </TouchableOpacity>
+            <View className="flex-row items-center gap-2">
+              {__DEV__ && (
+                <View
+                  style={[
+                    styles.devPill,
+                    devBypass ? styles.devBypassOn : styles.devBypassOff,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.devPillText,
+                      devBypass && styles.devBypassOnText,
+                    ]}
+                  >
+                    BYPASS: {devBypass ? 'ON' : 'OFF'}
+                  </Text>
+                </View>
+              )}
+              {__DEV__ && (
+                <TouchableOpacity
+                  onPress={handleDescribeAnything}
+                  disabled={describeAnythingLoading}
+                  style={[
+                    styles.devPill,
+                    styles.devProbePill,
+                    describeAnythingLoading && styles.devPillLoading,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Describe anything (dev)"
+                >
+                  <Text style={styles.devPillText}>
+                    {describeAnythingLoading ? 'PROBING…' : 'DEV: DESCRIBE'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                onPress={() => setShowInfo(true)}
+                className="w-11 h-11 rounded-full bg-black/50 items-center justify-center"
+              >
+                <HelpCircle color="#FFFFFF" size={22} />
+              </TouchableOpacity>
+            </View>
           </View>
         </SafeAreaView>
+
+        {__DEV__ && describeAnythingText && (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(200)}
+            style={[styles.devProbeBanner, { top: insets.top + 60 }]}
+          >
+            <Text style={styles.devProbeBannerLabel}>DEV PROBE</Text>
+            <Text style={styles.devProbeBannerText}>{describeAnythingText}</Text>
+            <TouchableOpacity
+              onPress={() => setDescribeAnythingText(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss probe result"
+              hitSlop={8}
+            >
+              <X color="#F5F0E8" size={14} />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
 
         {/* Monument name overlay */}
         <View className="absolute left-5 right-5" style={{ top: insets.top + 80 }}>
@@ -436,6 +859,75 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
             )}
           </TouchableOpacity>
         </View>
+
+        {/* Dev-bypass: reconstruction CTA */}
+        {(reconstructionReady || reconstructionLoading || reconstructionPending || bypassError) && (
+          <View style={[styles.reconstructionBar, { bottom: 420 }]}>
+            {reconstructionPending ? (
+              <Text style={styles.reconstructionText}>
+                {reconstructionPending.phase === 'cold_start'
+                  ? `Starting 3D engine… ~${Math.max(0, Math.round(reconstructionPending.etaSeconds))}s`
+                  : `Reconstructing… ~${Math.max(0, Math.round(reconstructionPending.etaSeconds))}s`}
+              </Text>
+            ) : reconstructionLoading ? (
+              <Text style={styles.reconstructionText}>Building 3D model…</Text>
+            ) : null}
+            {reconstructionReady && !reconstructionLoading && (
+              <TouchableOpacity
+                style={styles.reconstructionCta}
+                onPress={handleOpenReconstruction}
+              >
+                <Text style={styles.reconstructionCtaText}>View in 3D</Text>
+              </TouchableOpacity>
+            )}
+            {bypassError && !reconstructionLoading && (
+              <Text style={styles.reconstructionText}>{bypassError}</Text>
+            )}
+          </View>
+        )}
+
+        {/* Dev-bypass: object picker overlay */}
+        {objectPicker && (
+          <ObjectPickerOverlay
+            imageBase64={objectPicker.imageBase64}
+            objects={objectPicker.objects}
+            onCancel={() => setObjectPicker(null)}
+            onConfirm={handleObjectPickerConfirm}
+          />
+        )}
+
+        {bypassLoading && !objectPicker && (
+          <View style={[styles.bypassLoadingPill, { top: insets.top + 60 }]}>
+            <Text style={styles.bypassLoadingText}>Detecting objects…</Text>
+          </View>
+        )}
+
+        {/* "Help us add this" prompt for match='unknown' results. */}
+        {unknownPrompt && (
+          <View style={styles.helpAddOverlay}>
+            <View style={styles.helpAddCard}>
+              <Text style={styles.helpAddTitle}>Not in our catalog yet</Text>
+              <Text style={styles.helpAddBody}>
+                We don't have this object modelled. Help us add it — type a
+                short label so our team can curate it.
+              </Text>
+              <View style={styles.helpAddRow}>
+                <TouchableOpacity
+                  style={styles.helpAddSecondary}
+                  onPress={() => setUnknownPrompt(null)}
+                >
+                  <Text style={styles.helpAddSecondaryText}>Dismiss</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.helpAddPrimary}
+                  onPress={() => handleHelpAddThis('this object')}
+                >
+                  <Text style={styles.helpAddPrimaryText}>Submit</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Timeline Drawer */}
         <Animated.View
@@ -576,5 +1068,210 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
     </GestureHandlerRootView>
   );
 };
+
+const styles = StyleSheet.create({
+  devPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  devProbePill: {
+    backgroundColor: 'rgba(232, 160, 32, 0.18)',
+    borderColor: 'rgba(232, 160, 32, 0.6)',
+  },
+  devPillLoading: {
+    opacity: 0.6,
+  },
+  devPillText: {
+    color: '#E8A020',
+    fontSize: 10,
+    letterSpacing: 1.2,
+    fontFamily: 'MontserratAlternates-Bold',
+  },
+  devBypassOn: {
+    backgroundColor: 'rgba(72, 187, 120, 0.18)',
+    borderColor: 'rgba(72, 187, 120, 0.7)',
+  },
+  devBypassOff: {
+    backgroundColor: 'rgba(120, 120, 120, 0.15)',
+    borderColor: 'rgba(180, 180, 180, 0.4)',
+  },
+  devBypassOnText: {
+    color: '#48BB78',
+  },
+  devProbeBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(10,10,10,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(232, 160, 32, 0.4)',
+  },
+  devProbeBannerLabel: {
+    color: '#E8A020',
+    fontSize: 9,
+    letterSpacing: 1.4,
+    fontFamily: 'MontserratAlternates-Bold',
+  },
+  devProbeBannerText: {
+    flex: 1,
+    color: '#F5F0E8',
+    fontSize: 12,
+    fontFamily: 'MontserratAlternates-Regular',
+    lineHeight: 16,
+  },
+  reconstructionBar: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 10,
+    backgroundColor: 'rgba(13,13,13,0.92)',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(232,160,32,0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    zIndex: 6,
+  },
+  reconstructionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'MontserratAlternates-Medium',
+    paddingHorizontal: 4,
+  },
+  reconstructionCta: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#E8A020',
+    borderRadius: 999,
+  },
+  reconstructionCtaText: {
+    color: '#0D0D0D',
+    fontSize: 12,
+    fontFamily: 'MontserratAlternates-Bold',
+  },
+  bypassLoadingPill: {
+    position: 'absolute',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(13,13,13,0.92)',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(72, 187, 120, 0.5)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    zIndex: 5,
+  },
+  bypassLoadingText: {
+    color: '#48BB78',
+    fontSize: 12,
+    fontFamily: 'MontserratAlternates-SemiBold',
+  },
+  helpAddOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    zIndex: 30,
+  },
+  helpAddCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#101015',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  helpAddTitle: {
+    color: '#F5F0E8',
+    fontSize: 16,
+    fontFamily: 'MontserratAlternates-SemiBold',
+    marginBottom: 8,
+  },
+  helpAddBody: {
+    color: 'rgba(245,240,232,0.7)',
+    fontSize: 13,
+    fontFamily: 'MontserratAlternates-Regular',
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  helpAddRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  helpAddSecondary: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  helpAddSecondaryText: {
+    color: 'rgba(245,240,232,0.8)',
+    fontFamily: 'MontserratAlternates-Medium',
+    fontSize: 12,
+  },
+  helpAddPrimary: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#D4860A',
+  },
+  helpAddPrimaryText: {
+    color: '#0A0A0A',
+    fontFamily: 'MontserratAlternates-SemiBold',
+    fontSize: 12,
+  },
+  cameraErrorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0D0D0D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    zIndex: 20,
+  },
+  cameraErrorTitle: {
+    color: '#F5F0E8',
+    fontSize: 18,
+    fontFamily: 'MontserratAlternates-Bold',
+    marginBottom: 8,
+  },
+  cameraErrorBody: {
+    color: '#E8A020',
+    fontSize: 13,
+    fontFamily: 'MontserratAlternates-Medium',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  cameraErrorHint: {
+    color: '#8D8D92',
+    fontSize: 12,
+    fontFamily: 'MontserratAlternates-Regular',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 18,
+  },
+  cameraErrorRetry: {
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    backgroundColor: '#E8A020',
+    borderRadius: 999,
+  },
+  cameraErrorRetryText: {
+    color: '#0D0D0D',
+    fontSize: 14,
+    fontFamily: 'MontserratAlternates-Bold',
+  },
+});
 
 export default ARExperienceScreen;

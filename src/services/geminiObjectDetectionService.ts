@@ -34,47 +34,94 @@ const GEMINI_ENDPOINT =
 const TIMEOUT_MS = 15_000;
 
 const PROMPT = [
-  'Detect every distinct, clearly-visible object in this image.',
-  'Return ONLY a JSON array (no markdown, no code fences, no prose before or after).',
+  'Detect the main distinct, clearly-visible objects in this image.',
+  'Return ONLY a JSON array (no markdown, no code fences, no prose).',
   'Each item: {"name": string, "description": string, "box_2d": [ymin, xmin, ymax, xmax]}.',
-  '- name: concise object name, 1-3 words (e.g. "ceramic vase", "wooden chair").',
-  '- description: one short phrase describing it.',
-  '- box_2d: tight bounding box in 0-1000 normalised coordinates.',
-  'Return at most 8 items, prefer salient and non-overlapping objects.',
+  '- name: 1-3 words (e.g. "spray bottle", "wooden chair").',
+  '- description: ONE short phrase, max 8 words.',
+  '- box_2d: tight bbox in 0-1000 normalised coords.',
+  'Return at most 5 items. Prefer salient, foreground, non-overlapping objects.',
+  'Skip walls, floors, ceilings, and large background surfaces.',
 ].join('\n');
 
-function extractArray(text: string): DetectedObject[] | null {
-  const tryParse = (s: string): DetectedObject[] | null => {
-    try {
-      const parsed = JSON.parse(s);
-      if (!Array.isArray(parsed)) return null;
-      return parsed.filter(
-        (item): item is DetectedObject =>
-          item &&
-          typeof item.name === 'string' &&
-          typeof item.description === 'string' &&
-          Array.isArray(item.box_2d) &&
-          item.box_2d.length === 4 &&
-          item.box_2d.every((n: unknown) => typeof n === 'number'),
-      );
-    } catch {
-      return null;
-    }
-  };
+function validateArray(parsed: unknown): DetectedObject[] | null {
+  if (!Array.isArray(parsed)) return null;
+  const items = parsed.filter(
+    (item): item is DetectedObject =>
+      item &&
+      typeof item.name === 'string' &&
+      typeof item.description === 'string' &&
+      Array.isArray(item.box_2d) &&
+      item.box_2d.length === 4 &&
+      item.box_2d.every((n: unknown) => typeof n === 'number'),
+  );
+  return items.length > 0 ? items : null;
+}
 
-  const direct = tryParse(text);
+function findArrayInValue(value: unknown): DetectedObject[] | null {
+  const direct = validateArray(value);
+  if (direct) return direct;
+  if (value && typeof value === 'object') {
+    for (const v of Object.values(value as Record<string, unknown>)) {
+      const found = findArrayInValue(v);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function tryParseAndExtract(s: string): DetectedObject[] | null {
+  try {
+    return findArrayInValue(JSON.parse(s));
+  } catch {
+    return null;
+  }
+}
+
+function extractArray(text: string): DetectedObject[] | null {
+  const direct = tryParseAndExtract(text);
   if (direct) return direct;
 
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fence) {
-    const fenced = tryParse(fence[1].trim());
+    const fenced = tryParseAndExtract(fence[1].trim());
     if (fenced) return fenced;
   }
 
-  const bracket = text.match(/\[[\s\S]*\]/);
-  if (bracket) {
-    const arr = tryParse(bracket[0]);
+  // Greedy + non-greedy bracket attempts.
+  const bracketGreedy = text.match(/\[[\s\S]*\]/);
+  if (bracketGreedy) {
+    const arr = tryParseAndExtract(bracketGreedy[0]);
     if (arr) return arr;
+  }
+
+  // Last resort: object wrapping that wasn't valid JSON at the top-level.
+  const objectMatch = text.match(/\{[\s\S]*\}/);
+  if (objectMatch) {
+    const obj = tryParseAndExtract(objectMatch[0]);
+    if (obj) return obj;
+  }
+
+  // Salvage truncated arrays: response was cut mid-object by maxOutputTokens.
+  // Strategy: find the last `},` that sits inside the outer array, take
+  // everything up to and including the `}`, and close the array with `]`.
+  const arrayStart = text.indexOf('[');
+  if (arrayStart >= 0) {
+    const lastObjectClose = text.lastIndexOf('},');
+    if (lastObjectClose > arrayStart) {
+      const salvaged = text.slice(arrayStart, lastObjectClose + 1) + ']';
+      const arr = tryParseAndExtract(salvaged);
+      if (arr) {
+        if (__DEV__) {
+          console.warn(
+            '[detectObjects] response was truncated — salvaged',
+            arr.length,
+            'objects',
+          );
+        }
+        return arr;
+      }
+    }
   }
 
   return null;
@@ -104,7 +151,8 @@ export async function detectObjects(imageBase64: string): Promise<DetectResult> 
         ],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 1024,
+          maxOutputTokens: 2048,
+          responseMimeType: 'application/json',
         },
       },
       { timeout: TIMEOUT_MS },
@@ -112,15 +160,25 @@ export async function detectObjects(imageBase64: string): Promise<DetectResult> 
 
     const text: string =
       response.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    if (__DEV__) {
+      console.log('[detectObjects] textLen=' + text.length);
+      console.log('[detectObjects] preview:', text.slice(0, 400));
+    }
     if (!text) {
       return { success: false, error: 'Empty response from Gemini' };
     }
 
     const parsed = extractArray(text);
     if (!parsed) {
+      if (__DEV__) {
+        console.warn('[detectObjects] parse failed — full text:', text);
+      }
       return { success: false, error: 'Could not parse detection response' };
     }
 
+    if (__DEV__) {
+      console.log('[detectObjects] parsed', parsed.length, 'objects');
+    }
     return { success: true, data: parsed };
   } catch (err) {
     if (axios.isAxiosError(err)) {
