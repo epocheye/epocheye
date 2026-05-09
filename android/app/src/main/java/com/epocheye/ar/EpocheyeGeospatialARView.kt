@@ -53,6 +53,13 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
      */
     var onGeospatialPose: ((Double, Double, Double, Double) -> Unit)? = null
 
+    /**
+     * Fires when JS dispatches `performHitTest`. `ok=true` carries a real
+     * plane-intersection pose; `ok=false` means no plane was detected and
+     * the caller should fall through to pose_fallback.
+     */
+    var onHitTestResult: ((Boolean, Double, Double, Double, Double) -> Unit)? = null
+
     private var arSceneView: ARSceneView? = null
     private val placedLabels = mutableSetOf<String>()
     private var earthReady = false
@@ -167,6 +174,64 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
         }
         post {
             onGeospatialPose?.invoke(
+                pose.latitude,
+                pose.longitude,
+                pose.altitude,
+                pose.heading,
+            )
+        }
+    }
+
+    /**
+     * Performs an ARCore plane HitTest at the given screen coordinates and
+     * resolves the hit's world pose into a Geospatial pose (lat/lng/alt +
+     * heading). Emits onHitTestResult with `ok=false` if no plane was hit
+     * (caller should fall back to pose_fallback).
+     *
+     * Requires an active ARCore session — no-ops with `ok=false` if Earth
+     * tracking is not ready or if VisionCamera owns the camera in the
+     * current screen layout.
+     */
+    fun performHitTest(screenX: Float, screenY: Float) {
+        val sceneView = arSceneView
+        val session = sceneView?.session
+        val frame = try {
+            sceneView?.frame
+        } catch (t: Throwable) {
+            null
+        }
+        val earth = session?.earth
+        if (frame == null || earth == null || earth.trackingState != TrackingState.TRACKING) {
+            post { onHitTestResult?.invoke(false, 0.0, 0.0, 0.0, 0.0) }
+            return
+        }
+
+        val hits = try {
+            frame.hitTest(screenX, screenY)
+        } catch (t: Throwable) {
+            Log.w(TAG, "hitTest failed: ${t.message}")
+            null
+        }
+        val hit = hits?.firstOrNull()
+        if (hit == null) {
+            post { onHitTestResult?.invoke(false, 0.0, 0.0, 0.0, 0.0) }
+            return
+        }
+
+        val pose = try {
+            earth.getGeospatialPose(hit.hitPose)
+        } catch (t: Throwable) {
+            Log.w(TAG, "getGeospatialPose failed: ${t.message}")
+            null
+        }
+        if (pose == null) {
+            post { onHitTestResult?.invoke(false, 0.0, 0.0, 0.0, 0.0) }
+            return
+        }
+
+        post {
+            onHitTestResult?.invoke(
+                true,
                 pose.latitude,
                 pose.longitude,
                 pose.altitude,

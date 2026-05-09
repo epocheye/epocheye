@@ -22,6 +22,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -57,6 +58,8 @@ import { useGeminiIdentification } from '../../shared/hooks/useGeminiIdentificat
 import { useARCore } from '../../shared/hooks/useARCore';
 import { getActiveZone } from '../../services/geofenceService';
 import { fetchZones } from '../../services/zoneService';
+import { prefetchSiteForMonument } from '../../services/sitePrefetchService';
+import { usePlacesStore } from '../../stores/placesStore';
 import { getPersonalizedFacts } from '../../utils/api/user';
 import type { PersonalizedFact } from '../../utils/api/user';
 import { useUser } from '../../context';
@@ -91,6 +94,11 @@ import EpocheyeARView from '../../native/EpocheyeARView';
 import IdentificationCard from '../Lens/components/IdentificationCard';
 import HDScanOverlay from '../Lens/components/HDScanOverlay';
 import ObjectPickerOverlay from '../Lens/components/ObjectPickerOverlay';
+import NearbyAnchorsList from './components/NearbyAnchorsList';
+import type {
+  SiteBundleAsset,
+  SiteBundlePlacement,
+} from '../../utils/api/ar';
 
 type Props = MainScreenProps<'ARExperience'>;
 
@@ -154,6 +162,8 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
     lng: number;
     knowledgeText?: string;
   }>(null);
+  const [unknownLabel, setUnknownLabel] = useState('');
+  const [unknownSubmitting, setUnknownSubmitting] = useState(false);
   const reconstructionAbortedRef = useRef(false);
   const testCtxRef = useRef<{ name: string; description: string } | null>(null);
   const autoDetectFiredRef = useRef(false);
@@ -190,6 +200,27 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
       setActiveZone(zone);
     }
   }, [site.lat, site.lon]);
+
+  // Backstop prefetch — siteDetectionService normally fires this on geofence
+  // entry, but if the user opens the lens cold (no zone transition this session)
+  // we still want the catalog warm before they tap "Identify".
+  useEffect(() => {
+    void prefetchSiteForMonument(site.name);
+  }, [site.name]);
+
+  // Live GPS for the nearby-anchors overlay. Falls back to the site's static
+  // lat/lon when location tracking hasn't started yet.
+  const liveLocation = usePlacesStore(s => s.currentLocation);
+  const currentLat =
+    liveLocation?.latitude ??
+    (site as { lat?: number; latitude?: number }).lat ??
+    (site as { latitude?: number }).latitude ??
+    null;
+  const currentLng =
+    liveLocation?.longitude ??
+    (site as { lng?: number; longitude?: number }).lng ??
+    (site as { longitude?: number }).longitude ??
+    null;
 
   // Request permission on mount
   useEffect(() => {
@@ -413,39 +444,67 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
     [site, navigation],
   );
 
-  const handleHelpAddThis = useCallback(
-    async (suggestedLabel: string) => {
-      const prompt = unknownPrompt;
-      if (!prompt) return;
-      setUnknownPrompt(null);
-      try {
-        const res = await submitUnknownScan({
-          monument_id: site.name,
-          image_base64: prompt.imageBase64,
-          suggested_label: suggestedLabel,
-          lat: prompt.lat,
-          lng: prompt.lng,
-        });
-        if (!res.success) {
-          setBypassError(
-            'error' in res ? res.error.message : 'Failed to submit',
-          );
-          return;
-        }
-        // Friendly toast-equivalent: re-use bypassError for now (it's just a
-        // banner). Will get its own non-error toast in a follow-up.
+  const handleHelpAddThis = useCallback(async () => {
+    const prompt = unknownPrompt;
+    if (!prompt) return;
+    const label = unknownLabel.trim();
+    if (!label) return;
+    setUnknownSubmitting(true);
+    try {
+      const res = await submitUnknownScan({
+        monument_id: site.name,
+        image_base64: prompt.imageBase64,
+        suggested_label: label,
+        lat: prompt.lat,
+        lng: prompt.lng,
+      });
+      if (!res.success) {
         setBypassError(
-          res.data.merged
-            ? 'Thanks — added to an existing report. We\'ll generate this soon.'
-            : 'Thanks — submitted. We\'ll generate this soon.',
+          'error' in res ? res.error.message : 'Failed to submit',
         );
-      } catch (err) {
-        setBypassError(
-          err instanceof Error ? err.message : 'Failed to submit',
-        );
+        return;
       }
+      setUnknownPrompt(null);
+      setUnknownLabel('');
+      setBypassError(
+        res.data.merged
+          ? "Thanks — added to an existing report. We'll generate this soon."
+          : "Thanks — submitted. We'll generate this soon.",
+      );
+    } catch (err) {
+      setBypassError(err instanceof Error ? err.message : 'Failed to submit');
+    } finally {
+      setUnknownSubmitting(false);
+    }
+  }, [unknownPrompt, unknownLabel, site.name]);
+
+  const dismissUnknownPrompt = useCallback(() => {
+    if (unknownSubmitting) return;
+    setUnknownPrompt(null);
+    setUnknownLabel('');
+  }, [unknownSubmitting]);
+
+  const handleNearbyAnchorTap = useCallback(
+    (asset: SiteBundleAsset, placement: SiteBundlePlacement) => {
+      // User explicitly picked a curated asset from the nearby-anchors overlay.
+      // Skip recognize entirely and route straight to the composer with that
+      // asset's GLB. The placement's source/confidence is bundled metadata
+      // for the composer to render any relevant badges later.
+      void placement; // reserved for future composer affordances
+      testCtxRef.current = null;
+      navigation.navigate(ROUTES.MAIN.AR_COMPOSER, {
+        monumentId: site.name,
+        objectLabel: asset.object_label,
+        glbUrl: asset.glb_url,
+        thumbnailUrl: asset.thumbnail_url,
+        cached: true,
+        provider: 'catalog',
+        quality: 'single_view',
+        scanCount: 0,
+        isTestMode: false,
+      });
     },
-    [unknownPrompt, site.name],
+    [navigation, site.name],
   );
 
   const handleOpenReconstruction = useCallback(() => {
@@ -824,6 +883,19 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
+        {/* Nearby curated anchors — pill list of assets with closest placement */}
+        <View
+          pointerEvents="box-none"
+          style={styles.nearbyAnchors}
+        >
+          <NearbyAnchorsList
+            monumentId={site.name}
+            currentLat={currentLat}
+            currentLng={currentLng}
+            onSelect={handleNearbyAnchorTap}
+          />
+        </View>
+
         {/* Object Identification action button */}
         <View className="absolute left-5 right-5 bottom-[210px]">
           <TouchableOpacity
@@ -908,21 +980,45 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.helpAddCard}>
               <Text style={styles.helpAddTitle}>Not in our catalog yet</Text>
               <Text style={styles.helpAddBody}>
-                We don't have this object modelled. Help us add it — type a
-                short label so our team can curate it.
+                We don&apos;t have this object modelled. Tell us what it is —
+                a short label helps the curation team build it.
               </Text>
+              <TextInput
+                value={unknownLabel}
+                onChangeText={setUnknownLabel}
+                editable={!unknownSubmitting}
+                placeholder="e.g. side panel, statue, frieze"
+                placeholderTextColor="rgba(245,240,232,0.35)"
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={60}
+                returnKeyType="send"
+                onSubmitEditing={handleHelpAddThis}
+                style={styles.helpAddInput}
+              />
               <View style={styles.helpAddRow}>
                 <TouchableOpacity
-                  style={styles.helpAddSecondary}
-                  onPress={() => setUnknownPrompt(null)}
+                  style={[
+                    styles.helpAddSecondary,
+                    unknownSubmitting && styles.helpAddDisabled,
+                  ]}
+                  disabled={unknownSubmitting}
+                  onPress={dismissUnknownPrompt}
                 >
                   <Text style={styles.helpAddSecondaryText}>Dismiss</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.helpAddPrimary}
-                  onPress={() => handleHelpAddThis('this object')}
+                  style={[
+                    styles.helpAddPrimary,
+                    (unknownSubmitting || !unknownLabel.trim()) &&
+                      styles.helpAddDisabled,
+                  ]}
+                  disabled={unknownSubmitting || !unknownLabel.trim()}
+                  onPress={handleHelpAddThis}
                 >
-                  <Text style={styles.helpAddPrimaryText}>Submit</Text>
+                  <Text style={styles.helpAddPrimaryText}>
+                    {unknownSubmitting ? 'Submitting…' : 'Submit'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1128,6 +1224,13 @@ const styles = StyleSheet.create({
     fontFamily: 'MontserratAlternates-Regular',
     lineHeight: 16,
   },
+  nearbyAnchors: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 290,
+    zIndex: 4,
+  },
   reconstructionBar: {
     position: 'absolute',
     alignSelf: 'center',
@@ -1203,7 +1306,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'MontserratAlternates-Regular',
     lineHeight: 19,
+    marginBottom: 12,
+  },
+  helpAddInput: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontFamily: 'MontserratAlternates-Regular',
+    fontSize: 13,
+    color: '#F5F0E8',
     marginBottom: 16,
+  },
+  helpAddDisabled: {
+    opacity: 0.45,
   },
   helpAddRow: {
     flexDirection: 'row',

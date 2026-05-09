@@ -25,6 +25,9 @@ import com.facebook.react.uimanager.events.RCTEventEmitter
  * Imperative commands (dispatch via UIManager.dispatchViewManagerCommand):
  *   - 'requestPoseSnapshot' — emits onGeospatialPose with the current Earth pose
  *   - 'addRuntimeAnchor'    — args: [jsonEntry: string]; appends an anchor at runtime
+ *   - 'performHitTest'      — args: [screenX: number, screenY: number]; emits
+ *                             onHitTestResult with the resolved world pose or
+ *                             { ok: false } if no plane hit / Earth not tracking
  *
  * Anchors must be JSON-stringified (RN bridges can't pass nested arrays
  * efficiently to view props in old-arch). Each entry: { label, glb_uri,
@@ -75,6 +78,18 @@ class EpocheyeGeospatialARViewManager(
                 .getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onGeospatialPose", event)
         }
+        view.onHitTestResult = { ok, lat, lng, altitude, heading ->
+            val event = Arguments.createMap().apply {
+                putBoolean("ok", ok)
+                putDouble("lat", lat)
+                putDouble("lng", lng)
+                putDouble("altitude", altitude)
+                putDouble("heading_deg", heading)
+            }
+            reactContext
+                .getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onHitTestResult", event)
+        }
 
         return view
     }
@@ -88,6 +103,7 @@ class EpocheyeGeospatialARViewManager(
         return MapBuilder.of(
             "requestPoseSnapshot", CMD_REQUEST_POSE_SNAPSHOT,
             "addRuntimeAnchor", CMD_ADD_RUNTIME_ANCHOR,
+            "performHitTest", CMD_PERFORM_HIT_TEST,
         )
     }
 
@@ -103,6 +119,11 @@ class EpocheyeGeospatialARViewManager(
                 val entry = args?.getString(0)
                 view.addRuntimeAnchor(entry)
             }
+            CMD_PERFORM_HIT_TEST -> {
+                val x = args?.getDouble(0)?.toFloat() ?: return
+                val y = args?.getDouble(1)?.toFloat() ?: return
+                view.performHitTest(x, y)
+            }
         }
     }
 
@@ -117,6 +138,11 @@ class EpocheyeGeospatialARViewManager(
                 val entry = args?.getString(0)
                 view.addRuntimeAnchor(entry)
             }
+            "performHitTest" -> {
+                val x = args?.getDouble(0)?.toFloat() ?: return
+                val y = args?.getDouble(1)?.toFloat() ?: return
+                view.performHitTest(x, y)
+            }
         }
     }
 
@@ -127,6 +153,7 @@ class EpocheyeGeospatialARViewManager(
             .put("onAnchorPlaced", MapBuilder.of("registrationName", "onAnchorPlaced"))
             .put("onARError", MapBuilder.of("registrationName", "onARError"))
             .put("onGeospatialPose", MapBuilder.of("registrationName", "onGeospatialPose"))
+            .put("onHitTestResult", MapBuilder.of("registrationName", "onHitTestResult"))
             .build()
     }
 
@@ -138,5 +165,6 @@ class EpocheyeGeospatialARViewManager(
     companion object {
         private const val CMD_REQUEST_POSE_SNAPSHOT = 1
         private const val CMD_ADD_RUNTIME_ANCHOR = 2
+        private const val CMD_PERFORM_HIT_TEST = 3
     }
 }
