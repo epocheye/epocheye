@@ -3,17 +3,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { PlatformPressable } from '@react-navigation/elements';
 import Home from '../screens/Main/Home';
-import Explore from '../screens/Main/Explore';
-import Saved from '../screens/Main/Saved';
-import SettingsScreen from '../screens/Main/SettingsScreen';
-import PlanScreen from '../screens/Plan/PlanScreen';
-import {
-  HomeIcon,
-  Bookmark,
-  Map,
-  Route,
-  Settings,
-} from 'lucide-react-native';
+import Passport from '../screens/Main/Passport';
+import Daily from '../screens/Main/Daily';
+import Profile from '../screens/Main/Profile';
+import { Map as MapIcon, Ticket, Clock, UserRound } from 'lucide-react-native';
 import { ROUTES } from '../core/constants';
 import type { TabParamList } from '../core/types';
 
@@ -45,10 +38,6 @@ const TAB_BAR_LABEL_STYLE = {
   marginBottom: 2,
 } as const;
 
-interface TabNavigationProps {
-  onLogout: () => void;
-}
-
 const getTabIcon = (
   routeName: keyof TabParamList,
   color: string,
@@ -57,16 +46,14 @@ const getTabIcon = (
   const iconSize = size ?? TAB_ICON_SIZE;
   switch (routeName) {
     case ROUTES.TABS.HOME:
-      return <HomeIcon color={color} size={iconSize} />;
-    case ROUTES.TABS.EXPLORE:
-      return <Map color={color} size={iconSize} />;
-    case ROUTES.TABS.PLAN:
-      return <Route color={color} size={iconSize} />;
-    case ROUTES.TABS.SAVED:
-      return <Bookmark color={color} size={iconSize} />;
-    case ROUTES.TABS.SETTINGS:
+      return <MapIcon color={color} size={iconSize} />;
+    case ROUTES.TABS.PASSPORT:
+      return <Ticket color={color} size={iconSize} />;
+    case ROUTES.TABS.DAILY:
+      return <Clock color={color} size={iconSize} />;
+    case ROUTES.TABS.PROFILE:
     default:
-      return <Settings color={color} size={iconSize} />;
+      return <UserRound color={color} size={iconSize} />;
   }
 };
 
@@ -74,7 +61,7 @@ const DefaultTabButton: React.FC<BottomTabBarButtonProps> = props => (
   <PlatformPressable {...props} />
 );
 
-const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
+const TabNavigation: React.FC = () => {
   return (
     <Tab.Navigator
       initialRouteName={ROUTES.TABS.HOME}
@@ -96,12 +83,9 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
       })}
     >
       <Tab.Screen name={ROUTES.TABS.HOME} component={Home} />
-      <Tab.Screen name={ROUTES.TABS.EXPLORE} component={Explore} />
-      <Tab.Screen name={ROUTES.TABS.PLAN} component={PlanScreen} />
-      <Tab.Screen name={ROUTES.TABS.SAVED} component={Saved} />
-      <Tab.Screen name={ROUTES.TABS.SETTINGS}>
-        {props => <SettingsScreen {...props} onLogout={onLogout} />}
-      </Tab.Screen>
+      <Tab.Screen name={ROUTES.TABS.PASSPORT} component={Passport} />
+      <Tab.Screen name={ROUTES.TABS.DAILY} component={Daily} />
+      <Tab.Screen name={ROUTES.TABS.PROFILE} component={Profile} />
     </Tab.Navigator>
   );
 };

@@ -380,7 +380,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             )}
           </Animated.View>
 
-          {/* Explorer Pass badge */}
+          {/* Passport badge */}
           {hasAccess && (
             <Animated.View
               entering={FadeIn.delay(200)}
@@ -388,7 +388,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             >
               <Shield color="#10B981" size={16} />
               <Text className="text-status-success text-sm font-['MontserratAlternates-SemiBold']">
-                Explorer Pass Active
+                Passport Active
               </Text>
             </Animated.View>
           )}

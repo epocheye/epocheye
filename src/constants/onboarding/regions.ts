@@ -37,7 +37,7 @@ export const UNESCO_REGIONS: readonly UnescoRegionEntry[] = [
   },
   {
     id: 'latin_america_caribbean',
-    label: 'Latin American & Caribbean',
+    label: 'Latin American',
     image: require('../../assets/images/latin.png'),
   },
   {

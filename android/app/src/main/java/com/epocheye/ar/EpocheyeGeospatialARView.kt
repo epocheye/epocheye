@@ -40,7 +40,7 @@ import org.json.JSONArray
  */
 class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
 
-    var anchorsJson: String? = null
+    private var anchorsJson: String? = null
     var onARReady: (() -> Unit)? = null
     var onAnchorPlaced: ((String) -> Unit)? = null
     var onARError: ((String) -> Unit)? = null
@@ -274,9 +274,10 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
             val arr = JSONArray(json)
             for (i in 0 until arr.length()) {
                 val entry = arr.optJSONObject(i) ?: continue
-                val label = entry.optString("label").ifBlank { continue }
-                if (label in placedLabels) continue
-                val glbUri = entry.optString("glb_uri").ifBlank { continue }
+                val label = entry.optString("label")
+                if (label.isBlank() || label in placedLabels) continue
+                val glbUri = entry.optString("glb_uri")
+                if (glbUri.isBlank()) continue
 
                 val lat = entry.optDouble("lat", Double.NaN)
                 val lng = entry.optDouble("lng", Double.NaN)
@@ -324,20 +325,14 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
             return
         }
 
-        // Async model load. SceneView's modelLoader exposes both a coroutine
-        // and a callback API across 2.x; we use the suspended one indirectly
-        // via launchScope to avoid hard-coding either signature.
         try {
-            sceneView.lifecycleScope.launchWhenCreated {
-                val modelInstance = try {
-                    sceneView.modelLoader.loadModelInstance(Uri.parse(glbUri).toString())
-                } catch (t: Throwable) {
-                    Log.e(TAG, "loadModelInstance failed for $label", t)
-                    null
-                }
+            sceneView.modelLoader.loadModelInstanceAsync(
+                Uri.parse(glbUri).toString(),
+                { it },
+            ) { modelInstance ->
                 if (modelInstance == null) {
                     post { onARError?.invoke("model load failed: $label") }
-                    return@launchWhenCreated
+                    return@loadModelInstanceAsync
                 }
                 try {
                     val modelNode = ModelNode(
@@ -352,7 +347,8 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
                 }
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "lifecycle launch failed for $label", t)
+            Log.e(TAG, "model load dispatch failed for $label", t)
+            post { onARError?.invoke("model load dispatch failed: $label") }
         }
     }
 

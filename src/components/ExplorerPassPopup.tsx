@@ -1,5 +1,5 @@
 /**
- * A modal popup that nudges the user to get an Explorer Pass.
+ * A modal popup that nudges the user to get a Passport.
  * Shown once per session on the Home screen (if the user has no active pass).
  */
 
@@ -77,10 +77,10 @@ const ExplorerPassPopup: React.FC<ExplorerPassPopupProps> = ({
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.title}>Get Your Explorer Pass</Text>
+          <Text style={styles.title}>Get Your Passport</Text>
           <Text style={styles.body}>
-            Unlock heritage sites near you with a one-time Explorer Pass. The
-            more places you pick, the less you pay per site.
+            Unlock heritage sites near you with a one-time Passport. The more
+            places you pick, the less you pay per site.
           </Text>
 
           <TouchableOpacity

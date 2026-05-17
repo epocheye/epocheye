@@ -57,7 +57,11 @@
       "Bash(sed \"s/'\\\\].*//\")",
       "Bash(awk -F':' '{print $2}')",
       "Bash(keytool *)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(javap -p io/github/sceneview/SceneView.class)",
+      "Bash(javap -p io/github/sceneview/loaders/ModelLoader.class)",
+      "Bash(./gradlew.bat :app:compileDebugKotlin --console=plain)",
+      "Bash(adb uninstall *)"
     ]
   }
 }

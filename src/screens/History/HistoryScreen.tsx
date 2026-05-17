@@ -157,7 +157,7 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
             <View className="items-center py-20">
               <MapPin color="#6B6357" size={32} />
               <Text className="text-parchment-muted text-sm mt-3 font-['MontserratAlternates-Regular']">
-                No visits yet. Activate an Explorer Pass and start exploring.
+                No visits yet. Activate a Passport and start exploring.
               </Text>
             </View>
           ) : (

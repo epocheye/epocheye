@@ -24,8 +24,8 @@ export interface PlaceNavParam {
 
 /**
  * Onboarding Stack Parameter List
- * 4-screen Figma flow + retained auth/arrival screens:
- * OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region
+ * 5-screen Figma flow + retained auth/arrival screens:
+ * OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region → OB04_Pull
  *   → OB10_SignUp (or OB10_Login) → OB11_Notifications → OB12_Arrival
  */
 export type OnboardingStackParamList = {
@@ -33,6 +33,7 @@ export type OnboardingStackParamList = {
   OB01_Welcome: undefined;
   OB02_Name: undefined;
   OB03_Region: undefined;
+  OB04_Pull: undefined;
   OB10_SignUp: {fromOnboarding?: boolean} | undefined;
   OB10_Login: undefined;
   OB11_Notifications: undefined;
@@ -73,17 +74,19 @@ export type MainStackParamList = {
     thumbnailUrl?: string;
     knowledgeText?: string;
   };
+  /** Settings — pushed route, reached from Profile tab's ⋯ menu. */
+  Settings: undefined;
 };
 
 /**
  * Tab Navigator Parameter List
+ * 4-tab Figma layout: Home · Passport · Daily · Profile.
  */
 export type TabParamList = {
   Home: undefined;
-  Explore: undefined;
-  Plan: undefined;
-  Saved: undefined;
-  Settings: undefined;
+  Passport: undefined;
+  Daily: undefined;
+  Profile: undefined;
 };
 
 /**

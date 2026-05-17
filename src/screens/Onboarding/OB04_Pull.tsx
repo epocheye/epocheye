@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import {
   Image,
   Pressable,
@@ -16,55 +16,60 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONTS } from '../../core/constants/theme';
-import { ROUTES } from '../../core/constants/routes';
-import { useOnboardingStore } from '../../stores/onboardingStore';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {COLORS, FONTS} from '../../core/constants/theme';
+import {ROUTES} from '../../core/constants/routes';
+import {useOnboardingStore} from '../../stores/onboardingStore';
 import {
-  UNESCO_REGIONS,
-  type UnescoRegion,
-} from '../../constants/onboarding/regions';
-import type { OnboardingScreenProps } from '../../core/types/navigation.types';
+  HERITAGE_INTERESTS,
+  type HeritageInterest,
+  type HeritageInterestEntry,
+} from '../../constants/onboarding/pulls';
+import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
-type Props = OnboardingScreenProps<'OB03_Region'>;
+type Props = OnboardingScreenProps<'OB04_Pull'>;
 
-const OB03_Region: React.FC<Props> = ({ navigation }) => {
-  const { width: screenWidth } = useWindowDimensions();
+const OB04_Pull: React.FC<Props> = ({navigation}) => {
+  const {width: screenWidth} = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const firstName = useOnboardingStore(s => s.firstName);
-  const region = useOnboardingStore(s => s.region);
-  const setRegion = useOnboardingStore(s => s.setRegion);
+  const pulls = useOnboardingStore(s => s.pulls);
+  const togglePull = useOnboardingStore(s => s.togglePull);
 
   const headO = useSharedValue(0);
   const headY = useSharedValue(12);
   const gridO = useSharedValue(0);
 
   useEffect(() => {
-    headO.value = withDelay(150, withTiming(1, { duration: 600 }));
+    headO.value = withDelay(150, withTiming(1, {duration: 600}));
     headY.value = withDelay(
       150,
-      withTiming(0, { duration: 600, easing: Easing.out(Easing.cubic) }),
+      withTiming(0, {duration: 600, easing: Easing.out(Easing.cubic)}),
     );
-    gridO.value = withDelay(500, withTiming(1, { duration: 600 }));
+    gridO.value = withDelay(500, withTiming(1, {duration: 600}));
   }, [headO, headY, gridO]);
 
   const sHead = useAnimatedStyle(() => ({
     opacity: headO.value,
-    transform: [{ translateY: headY.value }],
+    transform: [{translateY: headY.value}],
   }));
-  const sGrid = useAnimatedStyle(() => ({ opacity: gridO.value }));
+  const sGrid = useAnimatedStyle(() => ({opacity: gridO.value}));
 
   const onSelect = useCallback(
-    (id: UnescoRegion) => {
-      setRegion(region === id ? null : id);
+    (id: HeritageInterest) => {
+      togglePull(id);
     },
-    [region, setRegion],
+    [togglePull],
   );
 
+  const canContinue = pulls.length > 0;
+
   const onContinue = useCallback(() => {
-    if (!region) return;
-    navigation.navigate(ROUTES.ONBOARDING.OB04_PULL);
-  }, [region, navigation]);
+    if (!canContinue) return;
+    navigation.navigate(ROUTES.ONBOARDING.OB10_SIGNUP, {
+      fromOnboarding: true,
+    });
+  }, [canContinue, navigation]);
 
   const greetingName = useMemo(
     () => (firstName ? firstName : 'friend'),
@@ -92,40 +97,35 @@ const OB03_Region: React.FC<Props> = ({ navigation }) => {
             paddingBottom: insets.bottom + 120,
           },
         ]}
-        showsVerticalScrollIndicator={false}
-      >
+        showsVerticalScrollIndicator={false}>
         <Animated.View style={sHead}>
           <Text style={styles.kicker}>
-            So, <Text style={styles.kickerName}>{greetingName}</Text> it is..
+            So, <Text style={styles.kickerName}>{greetingName}</Text> ...
           </Text>
-          <Text style={styles.question}>
-            Where does your{'\n'}Heritage belong to?
-          </Text>
+          <Text style={styles.question}>What pulls you in??</Text>
         </Animated.View>
 
         <Animated.View style={[styles.grid, sGrid]}>
-          {UNESCO_REGIONS.map(entry => {
-            const selected = region === entry.id;
+          {HERITAGE_INTERESTS.map((entry: HeritageInterestEntry) => {
+            const selected = pulls.includes(entry.id);
             return (
               <Pressable
                 key={entry.id}
                 onPress={() => onSelect(entry.id)}
-                style={({ pressed }) => [
+                style={({pressed}) => [
                   styles.tile,
-                  { width: tileWidth },
+                  {width: tileWidth},
                   pressed && styles.tilePressed,
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={entry.label}
-                accessibilityState={{ selected }}
-              >
+                accessibilityState={{selected}}>
                 <View
                   style={[
                     styles.tileImageWrap,
-                    { width: tileWidth },
+                    {width: tileWidth},
                     selected && styles.tileImageWrapSelected,
-                  ]}
-                >
+                  ]}>
                   <Image
                     source={entry.image}
                     style={styles.tileImage}
@@ -138,8 +138,7 @@ const OB03_Region: React.FC<Props> = ({ navigation }) => {
                     styles.tileLabel,
                     selected && styles.tileLabelSelected,
                   ]}
-                  numberOfLines={2}
-                >
+                  numberOfLines={1}>
                   {entry.label}
                 </Text>
               </Pressable>
@@ -148,17 +147,16 @@ const OB03_Region: React.FC<Props> = ({ navigation }) => {
         </Animated.View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
+      <View style={[styles.footer, {paddingBottom: insets.bottom + 20}]}>
         <Pressable
           onPress={onContinue}
-          disabled={!region}
-          style={({ pressed }) => [
+          disabled={!canContinue}
+          style={({pressed}) => [
             styles.cta,
-            pressed && !!region && styles.ctaPressed,
+            pressed && canContinue && styles.ctaPressed,
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Continue"
-        >
+          accessibilityLabel="Continue">
           <Text style={styles.ctaLabel}>Continue</Text>
         </Pressable>
       </View>
@@ -228,7 +226,7 @@ const styles = StyleSheet.create({
   },
   tileLabel: {
     marginTop: 8,
-    minHeight: 36,
+    minHeight: 20,
     fontFamily: FONTS.medium,
     fontSize: 14,
     color: 'rgba(255,255,255,0.82)',
@@ -256,7 +254,7 @@ const styles = StyleSheet.create({
   },
   ctaPressed: {
     backgroundColor: COLORS.skyDark,
-    transform: [{ scale: 0.98 }],
+    transform: [{scale: 0.98}],
   },
   ctaLabel: {
     fontFamily: FONTS.medium,
@@ -266,4 +264,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OB03_Region;
+export default OB04_Pull;

@@ -31,7 +31,10 @@ import {
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
 import { usePlaces } from '../../context';
-import type { TabScreenProps } from '../../core/types/navigation.types';
+// TODO: Saved.tsx is orphaned after the 4-tab restructure (Map/Passport/Daily/Profile).
+// File kept in case Saved tab is re-introduced. Props type relaxed since the screen
+// is no longer mounted under any TabParamList entry.
+import type { TabMainNavigationProp } from '../../core/types/navigation.types';
 import type { SavedPlace } from '../../utils/api/places/types';
 import { buildSiteDetailData, getPlaceImage } from '../../shared/utils';
 import { ROUTES } from '../../core/constants';
@@ -226,7 +229,7 @@ PlaceCard.displayName = 'PlaceCard';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-type Props = TabScreenProps<'Saved'>;
+type Props = { navigation: TabMainNavigationProp };
 
 const Saved: React.FC<Props> = ({ navigation }) => {
   const savedPlaces = usePlaces(state => state.savedPlaces);
@@ -443,7 +446,7 @@ const Saved: React.FC<Props> = ({ navigation }) => {
             </Text>
             {activeFilter === 'All' && (
               <TouchableOpacity
-                onPress={() => navigation.navigate('Home')}
+                onPress={() => navigation.navigate(ROUTES.TABS.HOME)}
                 className="mt-6 bg-brand-gold rounded-xl px-6 py-3 flex-row items-center gap-2"
                 accessibilityRole="button"
               >

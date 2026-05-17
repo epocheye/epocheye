@@ -8,10 +8,12 @@ import {persist, createJSONStorage} from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {STORAGE_KEYS} from '../core/constants/storage-keys';
 import type {UnescoRegion} from '../constants/onboarding/regions';
+import type {HeritageInterest} from '../constants/onboarding/pulls';
 
 export interface OnboardingState {
   firstName: string;
   region: UnescoRegion | null;
+  pulls: HeritageInterest[];
   onboardingComplete: boolean;
   guestMode: boolean;
 }
@@ -19,6 +21,8 @@ export interface OnboardingState {
 export interface OnboardingActions {
   setFirstName: (name: string) => void;
   setRegion: (region: UnescoRegion | null) => void;
+  setPulls: (pulls: HeritageInterest[]) => void;
+  togglePull: (pull: HeritageInterest) => void;
   setGuestMode: (v: boolean) => void;
   completeOnboarding: () => void;
   resetOnboarding: () => void;
@@ -27,6 +31,7 @@ export interface OnboardingActions {
 const initialState: OnboardingState = {
   firstName: '',
   region: null,
+  pulls: [],
   onboardingComplete: false,
   guestMode: false,
 };
@@ -39,6 +44,15 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
       setFirstName: name => set({firstName: name}),
 
       setRegion: region => set({region}),
+
+      setPulls: pulls => set({pulls}),
+
+      togglePull: pull =>
+        set(state => ({
+          pulls: state.pulls.includes(pull)
+            ? state.pulls.filter(p => p !== pull)
+            : [...state.pulls, pull],
+        })),
 
       setGuestMode: v => set({guestMode: v}),
 
@@ -55,12 +69,23 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
     {
       name: 'epocheye-onboarding',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
-      migrate: () => ({...initialState}),
+      version: 3,
+      // Preserve prior fields when migrating; default new fields (`pulls`) to []
+      migrate: (persisted: unknown) => {
+        const prev = (persisted as Partial<OnboardingState> | undefined) ?? {};
+        return {
+          firstName: prev.firstName ?? '',
+          region: prev.region ?? null,
+          pulls: prev.pulls ?? [],
+          onboardingComplete: prev.onboardingComplete ?? false,
+          guestMode: prev.guestMode ?? false,
+        };
+      },
       partialize: state =>
         ({
           firstName: state.firstName,
           region: state.region,
+          pulls: state.pulls,
           onboardingComplete: state.onboardingComplete,
           guestMode: state.guestMode,
         }) as Partial<OnboardingState & OnboardingActions>,

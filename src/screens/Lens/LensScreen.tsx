@@ -41,7 +41,7 @@ const REGION_LABELS: Record<string, string> = {
   asia_pacific: 'Asia & the Pacific',
   arab_states: 'Arab States',
   north_america: 'North America',
-  latin_america_caribbean: 'Latin America & Caribbean',
+  latin_america_caribbean: 'Latin America',
   europe: 'Europe',
   africa: 'Africa',
 } satisfies Record<UnescoRegion, string>;
@@ -221,7 +221,9 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   const reconstructionAbortedRef = useRef(false);
   const lastCapturedImageRef = useRef<string | null>(null);
 
-  const arEnabled = useArQuotaStore(state => state.enabled && !state.maintenanceMode);
+  const arEnabled = useArQuotaStore(
+    state => state.enabled && !state.maintenanceMode,
+  );
 
   // ── Gemini identification state ──
   const [geminiResult, setGeminiResult] = useState<GeminiIdentification | null>(
@@ -243,9 +245,9 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   // Sends a captured frame to Gemini with a free-form "describe in one sentence"
   // prompt, bypassing the heritage-only template. Used to verify the camera →
   // resize → API path works on any everyday object before site testing.
-  const [describeAnythingText, setDescribeAnythingText] = useState<string | null>(
-    null,
-  );
+  const [describeAnythingText, setDescribeAnythingText] = useState<
+    string | null
+  >(null);
   const [describeAnythingLoading, setDescribeAnythingLoading] = useState(false);
 
   // Premium + network state
@@ -678,8 +680,10 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           const final = await pollReconstructionJob(result.jobId, {
             isAborted: () => reconstructionAbortedRef.current,
             onProgress: (p: PendingProgress) =>
-              setReconstructionPending((prev) =>
-                prev ? { ...prev, phase: p.phase, etaSeconds: p.etaSeconds } : prev,
+              setReconstructionPending(prev =>
+                prev
+                  ? { ...prev, phase: p.phase, etaSeconds: p.etaSeconds }
+                  : prev,
               ),
           });
           setReconstructionPending(null);
@@ -827,7 +831,14 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         mode: 'object_scan',
       });
     }
-  }, [firstName, matchedPlace, motivation, regions, triggerReconstruction, lastKnownCoords]);
+  }, [
+    firstName,
+    matchedPlace,
+    motivation,
+    regions,
+    triggerReconstruction,
+    lastKnownCoords,
+  ]);
 
   const handleIdentify = useCallback(async () => {
     if (geminiLoading) {
@@ -996,12 +1007,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   // capturing too early returns a black/empty frame on some Android devices.
   const autoDetectFiredRef = useRef(false);
   useEffect(() => {
-    if (
-      !devBypass ||
-      autoDetectFiredRef.current ||
-      !hasPermission ||
-      !device
-    ) {
+    if (!devBypass || autoDetectFiredRef.current || !hasPermission || !device) {
       return;
     }
     autoDetectFiredRef.current = true;
@@ -1323,7 +1329,9 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
             style={[styles.devProbeBanner, { top: insets.top + 56 }]}
           >
             <Text style={styles.devProbeBannerLabel}>DEV PROBE</Text>
-            <Text style={styles.devProbeBannerText}>{describeAnythingText}</Text>
+            <Text style={styles.devProbeBannerText}>
+              {describeAnythingText}
+            </Text>
             <Pressable
               onPress={() => setDescribeAnythingText(null)}
               accessibilityRole="button"
@@ -1349,18 +1357,34 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         {/* AR reconstruction CTA — shown after the object_scan SSE identifies an
             object and the reconstruct API returns a GLB. Tapping navigates to
             the dedicated composer screen. */}
-        {(reconstructionReady || reconstructionLoading || reconstructionPending || reconstructionQuotaExceeded || reconstructionGateError) && (
-          <View style={[styles.reconstructionBar, { bottom: insets.bottom + 180 }]}>
+        {(reconstructionReady ||
+          reconstructionLoading ||
+          reconstructionPending ||
+          reconstructionQuotaExceeded ||
+          reconstructionGateError) && (
+          <View
+            style={[styles.reconstructionBar, { bottom: insets.bottom + 180 }]}
+          >
             <ARQuotaPill compact />
             {reconstructionPending ? (
               <Text style={styles.reconstructionText}>
-                {formatPendingLabel(reconstructionPending.phase, reconstructionPending.etaSeconds)}
+                {formatPendingLabel(
+                  reconstructionPending.phase,
+                  reconstructionPending.etaSeconds,
+                )}
               </Text>
-            ) : reconstructionLoading && (
-              <Text style={styles.reconstructionText}>Building 3D model…</Text>
+            ) : (
+              reconstructionLoading && (
+                <Text style={styles.reconstructionText}>
+                  Building 3D model…
+                </Text>
+              )
             )}
             {reconstructionReady && !reconstructionLoading && (
-              <Pressable style={styles.reconstructionCta} onPress={openReconstruction}>
+              <Pressable
+                style={styles.reconstructionCta}
+                onPress={openReconstruction}
+              >
                 <Text style={styles.reconstructionCtaText}>View in 3D</Text>
               </Pressable>
             )}
@@ -1369,11 +1393,15 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
                 style={styles.reconstructionCta}
                 onPress={handleUpgradePremium}
               >
-                <Text style={styles.reconstructionCtaText}>Upgrade for more</Text>
+                <Text style={styles.reconstructionCtaText}>
+                  Upgrade for more
+                </Text>
               </Pressable>
             )}
             {reconstructionGateError && !reconstructionLoading && (
-              <Text style={styles.reconstructionText}>{reconstructionGateError}</Text>
+              <Text style={styles.reconstructionText}>
+                {reconstructionGateError}
+              </Text>
             )}
           </View>
         )}

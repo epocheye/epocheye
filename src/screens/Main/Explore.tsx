@@ -35,7 +35,8 @@ import { GOOGLE_MAPS_API_KEY } from '@env';
 import mapStyle from '../../content/mapstyle.json';
 import { usePlaces } from '../../context';
 import { useDebounce } from '../../shared/hooks';
-import type { TabScreenProps } from '../../core/types/navigation.types';
+// TODO: Explore.tsx is orphaned after the 4-tab restructure. Kept for re-introduction.
+import type { TabMainNavigationProp } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
 import type { Place } from '../../utils/api/places/types';
 import { buildSiteDetailData } from '../../shared/utils';
@@ -268,7 +269,7 @@ PlaceMapView.displayName = 'PlaceMapView';
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-type Props = TabScreenProps<'Explore'>;
+type Props = { navigation: TabMainNavigationProp };
 
 const Explore: React.FC<Props> = ({ navigation }) => {
   const nearbyPlaces = usePlaces(state => state.nearbyPlaces);

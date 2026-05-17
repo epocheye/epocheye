@@ -1,898 +1,523 @@
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  Image,
+  Pressable,
   StatusBar,
+  StyleSheet,
   Text,
+  TextInput,
   View,
-  TouchableOpacity,
-  FlatList,
-  ScrollView,
-  InteractionManager,
 } from 'react-native';
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-  withRepeat,
-  withSequence,
-  Easing,
-  withSpring,
-  FadeInDown,
-  interpolate,
-} from 'react-native-reanimated';
-import {
-  Bell,
-  MapPin,
-  ArrowRight,
-  X,
-  Sparkles,
-  Compass,
-  RefreshCw,
-} from 'lucide-react-native';
-import AnimatedLogo from '../../components/ui/AnimatedLogo';
-import ThinkingDots from '../../components/ui/ThinkingDots';
-import ResolvedSubjectImage from '../../components/ui/ResolvedSubjectImage';
-import { usePlaces } from '../../context';
-import { useUser } from '../../context';
-import type { TabScreenProps } from '../../core/types/navigation.types';
-import { ROUTES } from '../../core/constants';
-import type { Place } from '../../utils/api/places/types';
-import {
-  getPersonalizedFacts,
-  elaboratePersonalizedFact,
-} from '../../utils/api/user';
-import type { PersonalizedFact } from '../../utils/api/user';
-import { getRecommendations } from '../../utils/api/recommendations';
-import type { Recommendation } from '../../utils/api/recommendations';
-import { buildSiteDetailData } from '../../shared/utils';
-import { placeTypeLabel } from '../../utils/places/placeTypeLabel';
-import { useExplorerPass } from '../../shared/hooks';
-import ExplorerPassPopup from '../../components/ExplorerPassPopup';
-import OnboardingTooltips from '../../components/OnboardingTooltips';
-
-const FACT_LOADING_LINES = [
-  'Tracing your heritage...',
-  'Weaving nearby context...',
-  'Preparing your insights...',
-  'Connecting the threads...',
-  'Reading the monuments...',
-];
-
-const NOIR = {
-  bg: '#000000',
-  cardBg: '#0A0A0A',
-  cardBorder: 'rgba(212, 134, 10, 0.12)',
-  glowAmber: 'rgba(212, 134, 10, 0.08)',
-  amber: '#D4860A',
-  gold: '#C9A84C',
-  warmWhite: '#F5F0E8',
-} as const;
-
-function buildFallbackFacts(
-  userName: string,
-  places: Place[],
-): PersonalizedFact[] {
-  const nearest = places[0];
-  const nearestName = nearest?.name ?? 'your nearby monument';
-  const firstCategory = nearest?.categories[0] ?? 'heritage';
-
-  return [
-    {
-      id: 'fallback-1',
-      headline: 'Your route holds hidden layers',
-      summary: `${userName}, ${nearestName} is linked to lesser-known ${firstCategory.toLowerCase()} traditions that shifted over generations.`,
-      detail: `${nearestName} carries traces of daily rituals and civic memory that most visitors walk past. Look closely at the layout and ornament — the stories are already there.`,
-    },
-    {
-      id: 'fallback-2',
-      headline: 'Architecture reveals social memory',
-      summary:
-        'Many preserved sites encode daily rituals, trade patterns, and migration stories in plain sight through layout and ornament.',
-      detail:
-        'The placement of doorways, the height of columns, the orientation of courtyards — each was a deliberate choice that reflected the values and relationships of its builders.',
-    },
-    {
-      id: 'fallback-3',
-      headline: 'Monuments were living spaces',
-      summary:
-        'Historical sites were active civic hubs, not static relics; ceremonies, decisions, and storytelling happened there regularly.',
-      detail:
-        'Pull up any of the nearby sites and you can start to trace those threads — the overlapping eras, the repurposed walls, the names that stuck even as the original meaning faded.',
-    },
-  ];
-}
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import MapView, {Marker, PROVIDER_GOOGLE, type Region} from 'react-native-maps';
+import {GOOGLE_MAPS_API_KEY} from '@env';
+import {Search, X} from 'lucide-react-native';
+import mapStyle from '../../content/mapstyle.json';
+import {COLORS, FONTS} from '../../core/constants/theme';
+import {ROUTES} from '../../core/constants/routes';
+import {usePlaces} from '../../context';
+import {buildSiteDetailData} from '../../shared/utils';
+import type {Place} from '../../utils/api/places/types';
+import type {TabScreenProps} from '../../core/types/navigation.types';
 
 type Props = TabScreenProps<'Home'>;
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+type ViewMode = 'nearby' | 'virtual';
 
-interface PlaceCardProps {
-  place: Place;
-  index: number;
-  onPress: (place: Place) => void;
-}
-
-const PlaceCard: React.FC<PlaceCardProps> = React.memo(({ place, index, onPress }) => {
-  const scale = useSharedValue(1);
-  const distanceKm = (place.distance_meters / 1000).toFixed(1);
-  const friendlyTag = placeTypeLabel(place.place_type, place.categories);
-
-  const animatedCardStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-  };
-
-  return (
-    <Animated.View entering={FadeInDown.delay(index * 80).duration(500)}>
-      <AnimatedTouchable
-        style={[cardStyles.container, animatedCardStyle]}
-        onPress={() => onPress(place)}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        activeOpacity={0.9}
-        accessibilityRole="button"
-        accessibilityLabel={`Visit ${place.name}, ${distanceKm} km away`}
-        accessibilityHint="Opens the site details screen"
-      >
-        <LinearGradient
-          colors={['#120E08', '#0A0806', '#120E08']}
-          locations={[0, 0.5, 1]}
-          style={cardStyles.gradient}
-        >
-          <View className="flex-row items-center gap-2">
-            <View className="flex-row items-center gap-1 rounded-full bg-brand-amber/15 border border-brand-amber/30 px-2.5 py-1">
-              <Sparkles color="#D4860A" size={11} />
-              <Text className="text-brand-amber text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold']">
-                {friendlyTag}
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-1 rounded-full bg-[rgba(10,10,10,0.7)] border border-[rgba(201,168,76,0.35)] px-2.5 py-1">
-              <Compass color="#C9A84C" size={11} />
-              <Text className="text-parchment text-[10px] leading-4 font-['MontserratAlternates-SemiBold']">
-                {distanceKm} km
-              </Text>
-            </View>
-          </View>
-
-          <View>
-            <Text
-              className="text-parchment text-[22px] leading-7 font-['MontserratAlternates-Bold']"
-              numberOfLines={3}
-            >
-              {place.name}
-            </Text>
-            <View className="flex-row items-center gap-1 mt-2">
-              <MapPin color="#B8AF9E" size={14} />
-              <Text
-                className="text-parchment-muted text-[13px] leading-[18px] font-['MontserratAlternates-Medium'] flex-shrink"
-                numberOfLines={1}
-              >
-                {place.city}, {place.country}
-              </Text>
-            </View>
-
-            <View className="mt-4 self-start flex-row items-center gap-1 rounded-full bg-brand-gold px-3 py-2">
-              <Text className="text-ink text-xs leading-4 uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
-                Explore the Era
-              </Text>
-              <ArrowRight color="#0A0A0A" size={14} />
-            </View>
-          </View>
-        </LinearGradient>
-      </AnimatedTouchable>
-    </Animated.View>
-  );
-});
-
-PlaceCard.displayName = 'PlaceCard';
-
-const SkeletonCard: React.FC = () => {
-  const pulse = useSharedValue(0.55);
-
-  useEffect(() => {
-    pulse.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 900, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0.55, { duration: 900, easing: Easing.inOut(Easing.quad) }),
-      ),
-      -1,
-      false,
-    );
-  }, [pulse]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: pulse.value,
-  }));
-
-  return (
-    <Animated.View style={[skeletonStyles.card, animatedStyle]}>
-      <View style={skeletonStyles.pill} />
-      <View style={skeletonStyles.title} />
-      <View style={skeletonStyles.line} />
-      <View style={[skeletonStyles.line, skeletonStyles.lineShort]} />
-      <View style={skeletonStyles.cta} />
-    </Animated.View>
-  );
+const DEFAULT_REGION: Region = {
+  latitude: 20.5937,
+  longitude: 78.9629,
+  latitudeDelta: 12,
+  longitudeDelta: 12,
 };
 
-const Home = ({ navigation }: Props) => {
+function formatDistance(meters: number): string {
+  if (!Number.isFinite(meters) || meters <= 0) return '';
+  if (meters < 950) return `${Math.round(meters)} m`;
+  return `${(meters / 1000).toFixed(1)} km`;
+}
+
+function deriveLocationTitle(places: Place[]): string {
+  const nearest = places[0];
+  if (!nearest) return 'Heritage near you';
+  const city = nearest.city?.trim();
+  const country = nearest.country?.trim();
+  if (city && country) return `${city}, ${country}`;
+  if (city) return city;
+  if (country) return country;
+  return 'Heritage near you';
+}
+
+function lineCategory(place: Place): string {
+  const cat = place.categories?.[0];
+  if (cat) return `Built · ${cat}`;
+  return 'Built · heritage site';
+}
+
+function lineEra(place: Place): string {
+  if (place.significance) {
+    return place.significance.slice(0, 56);
+  }
+  if (place.place_type) {
+    return `Type · ${place.place_type}`;
+  }
+  return place.address_line2 || place.state || 'Tap to learn more';
+}
+
+const Home: React.FC<Props> = ({navigation}) => {
+  const insets = useSafeAreaInsets();
   const nearbyPlaces = usePlaces(state => state.nearbyPlaces);
-  const isLoadingNearby = usePlaces(state => state.isLoadingNearby);
-  const nearbyError = usePlaces(state => state.nearbyError);
-  const ensureLocationTracking = usePlaces(state => state.ensureLocationTracking);
   const currentLocation = usePlaces(state => state.currentLocation);
-  const profile = useUser(state => state.profile);
-
-  const [factsVisible, setFactsVisible] = useState(true);
-  const [isLoadingFacts, setIsLoadingFacts] = useState(true);
-  const [factsError, setFactsError] = useState<string | null>(null);
-  const [facts, setFacts] = useState<PersonalizedFact[]>([]);
-  const [activeFactId, setActiveFactId] = useState<string | null>(null);
-  const [elaboratingFactId, setElaboratingFactId] = useState<string | null>(
-    null,
+  const ensureLocationTracking = usePlaces(
+    state => state.ensureLocationTracking,
   );
-  const [factDetailsById, setFactDetailsById] = useState<
-    Record<string, string>
-  >({});
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(true);
-  const { hasAnyActivePass, loading: explorerPassLoading } = useExplorerPass();
 
-  const entrance = useSharedValue(24);
-  const contentOpacity = useSharedValue(0);
-  const passBorderPulse = useSharedValue(0);
-  const refreshRotation = useSharedValue(0);
-
-  useEffect(() => {
-    entrance.value = withSpring(0, { damping: 20, stiffness: 200 });
-    contentOpacity.value = withTiming(1, { duration: 400 });
-    passBorderPulse.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 2000 }),
-        withTiming(0, { duration: 2000 }),
-      ),
-      -1,
-    );
-  }, [contentOpacity, entrance, passBorderPulse]);
+  const [viewMode, setViewMode] = useState<ViewMode>('nearby');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
     void ensureLocationTracking();
   }, [ensureLocationTracking]);
 
-  const entranceStyle = useAnimatedStyle(() => ({
-    opacity: contentOpacity.value,
-    transform: [{ translateY: entrance.value }],
-  }));
-
-  const passBorderStyle = useAnimatedStyle(() => ({
-    borderColor: `rgba(212, 134, 10, ${interpolate(passBorderPulse.value, [0, 1], [0.15, 0.5])})`,
-  }));
-
-  const refreshIconStyle = useAnimatedStyle(() => ({
-    transform: [{ rotateZ: `${refreshRotation.value}deg` }],
-  }));
-
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }, []);
-
-  const userName = profile?.name || 'Explorer';
-  const topNearbyPlaces = useMemo(
-    () => (nearbyPlaces || []).slice(0, 20),
+  const allPlaces = useMemo(
+    () => (Array.isArray(nearbyPlaces) ? nearbyPlaces : []),
     [nearbyPlaces],
   );
-  const handleVisitPlace = useCallback(
+
+  const filteredPlaces = useMemo(() => {
+    const list = viewMode === 'nearby' ? allPlaces : [];
+    const q = searchText.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      p =>
+        p.name.toLowerCase().includes(q) ||
+        p.city?.toLowerCase().includes(q) ||
+        p.country?.toLowerCase().includes(q),
+    );
+  }, [allPlaces, viewMode, searchText]);
+
+  const featuredPlace: Place | null = filteredPlaces[0] ?? null;
+
+  const initialRegion = useMemo<Region>(() => {
+    if (currentLocation) {
+      return {
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        latitudeDelta: 0.4,
+        longitudeDelta: 0.4,
+      };
+    }
+    if (featuredPlace) {
+      return {
+        latitude: featuredPlace.lat,
+        longitude: featuredPlace.lon,
+        latitudeDelta: 0.4,
+        longitudeDelta: 0.4,
+      };
+    }
+    return DEFAULT_REGION;
+  }, [currentLocation, featuredPlace]);
+
+  const locationTitle = useMemo(
+    () => deriveLocationTitle(allPlaces),
+    [allPlaces],
+  );
+
+  const handleLearnMore = useCallback(
     (place: Place) => {
-      navigation.navigate('SiteDetail', {
+      navigation.navigate(ROUTES.MAIN.SITE_DETAIL, {
         site: buildSiteDetailData(place),
       });
     },
     [navigation],
   );
 
-  const loadPersonalizedFacts = useCallback(async () => {
-    setIsLoadingFacts(true);
-    setFactsError(null);
-
-    const result = await getPersonalizedFacts({
-      limit: 3,
-      userName,
-      nearbyPlaces: topNearbyPlaces.slice(0, 3).map(place => place.name),
-      regionHint: topNearbyPlaces[0]?.country,
-    });
-
-    if (result.success && result.data.facts?.length > 0) {
-      setFacts(result.data.facts.slice(0, 3));
-      setFactDetailsById({});
-      setActiveFactId(null);
-      setIsLoadingFacts(false);
-      return;
-    }
-
-    setFacts(buildFallbackFacts(userName, topNearbyPlaces));
-    setFactsError(
-      result.success
-        ? 'Showing curated insights for now.'
-        : 'Showing curated insights for your area.',
-    );
-    setFactDetailsById({});
-    setActiveFactId(null);
-    setIsLoadingFacts(false);
-  }, [topNearbyPlaces, userName]);
-
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      void loadPersonalizedFacts();
-    });
-
-    return () => {
-      task.cancel();
-    };
-  }, [loadPersonalizedFacts]);
-
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      setIsLoadingRecommendations(true);
-      getRecommendations({
-        limit: 8,
-        lat: currentLocation?.latitude,
-        lon: currentLocation?.longitude,
-      }).then(result => {
-        if (result.success) {
-          setRecommendations(result.data.items ?? []);
-        }
-        setIsLoadingRecommendations(false);
+  const handleViewInAR = useCallback(
+    (place: Place) => {
+      navigation.navigate(ROUTES.MAIN.AR_EXPERIENCE, {
+        site: buildSiteDetailData(place),
       });
-    });
-
-    return () => {
-      task.cancel();
-    };
-  }, [currentLocation?.latitude, currentLocation?.longitude]);
-
-  const handleFactPress = useCallback(
-    async (fact: PersonalizedFact) => {
-      const isExpanded = activeFactId === fact.id;
-      if (isExpanded) {
-        setActiveFactId(null);
-        return;
-      }
-
-      setActiveFactId(fact.id);
-
-      const existingDetail = factDetailsById[fact.id] ?? fact.detail;
-      if (existingDetail) {
-        if (!factDetailsById[fact.id]) {
-          setFactDetailsById(prev => ({ ...prev, [fact.id]: existingDetail }));
-        }
-        return;
-      }
-
-      setElaboratingFactId(fact.id);
-      const result = await elaboratePersonalizedFact({
-        factId: fact.id,
-        headline: fact.headline,
-        summary: fact.summary,
-        userName,
-        nearbyPlaceName: topNearbyPlaces[0]?.name,
-      });
-      setElaboratingFactId(null);
-
-      if (result.success) {
-        setFactDetailsById(prev => ({
-          ...prev,
-          [fact.id]: result.data.detail,
-        }));
-        return;
-      }
-
-      setFactDetailsById(prev => ({
-        ...prev,
-        [fact.id]: `${fact.summary} This connects to ${
-          topNearbyPlaces[0]?.name ?? 'nearby heritage sites'
-        } through shared routes, ritual patterns, and artisan exchange across generations.`,
-      }));
     },
-    [activeFactId, factDetailsById, topNearbyPlaces, userName],
+    [navigation],
   );
 
-  const renderPlaceItem = useCallback(
-    ({ item, index }: { item: Place; index: number }) => (
-      <PlaceCard place={item} index={index} onPress={handleVisitPlace} />
-    ),
-    [handleVisitPlace],
-  );
+  const handleMarkerPress = useCallback((place: Place) => {
+    mapRef.current?.animateToRegion(
+      {
+        latitude: place.lat,
+        longitude: place.lon,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      },
+      500,
+    );
+  }, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-ink-deep">
+    <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient
-        colors={['#000000', '#0A0806', '#000000']}
-        locations={[0, 0.5, 1]}
-        style={{ flex: 1 }}
-      >
-        <Animated.View style={[{ flex: 1 }, entranceStyle]}>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: 20,
-              paddingTop: 16,
-              paddingBottom: 120,
-            }}
-          >
-            {/* Header */}
-            <View
-              className="flex-row items-center justify-between mb-6"
-              accessibilityRole="header"
-            >
-              <View className="flex-1 pr-4" style={{ position: 'relative' }}>
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: -20,
-                    left: -30,
-                    width: 160,
-                    height: 100,
-                    borderRadius: 80,
-                    backgroundColor: NOIR.glowAmber,
-                  }}
-                />
-                <Text className="text-parchment-muted text-xs uppercase tracking-[1px] font-['MontserratAlternates-SemiBold']">
-                  {greeting}
-                </Text>
-                <Text className="text-parchment text-[32px] leading-10 font-['MontserratAlternates-Bold'] mt-1">
-                  {userName}
-                </Text>
-                <Text className="text-parchment-muted text-[15px] leading-[22px] font-['MontserratAlternates-Medium'] mt-1">
-                  Ready to uncover history today?
-                </Text>
-              </View>
-              <TouchableOpacity
-                className="w-11 h-11 rounded-xl items-center justify-center"
-                style={{
-                  borderWidth: 1,
-                  borderColor: NOIR.cardBorder,
-                  backgroundColor: NOIR.cardBg,
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Notifications"
-                accessibilityHint="Opens your notification centre"
-              >
-                <Bell color="#F5F0E8" size={20} />
-              </TouchableOpacity>
-            </View>
+      <SafeAreaView edges={['top']} style={styles.safeTop} />
 
-            {/* Nearby Highlights */}
-            <View style={{ height: 1, backgroundColor: 'rgba(201,168,76,0.15)', marginBottom: 20 }} />
-            <View className="mb-4">
-              <View className="flex-row items-center gap-2">
-                <Sparkles color="#C9A84C" size={18} />
-                <Text className="text-parchment text-[22px] leading-[30px] font-['MontserratAlternates-SemiBold']">
-                  Nearby Highlights
-                </Text>
-              </View>
-              <Text className="text-parchment-dim text-[13px] leading-[18px] font-['MontserratAlternates-Regular'] mt-1">
-                Curated sites around your location
-              </Text>
-              {nearbyError ? (
-                <Text className="text-status-warning text-[13px] leading-[18px] font-['MontserratAlternates-Medium'] mt-2">
-                  {nearbyError}
-                </Text>
-              ) : null}
-            </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTextWrap}>
+          <Text style={styles.kicker}>Heritage Near You</Text>
+          <Text style={styles.title} numberOfLines={1}>
+            {locationTitle}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => setSearchOpen(prev => !prev)}
+          hitSlop={10}
+          style={styles.searchButton}
+          accessibilityRole="button"
+          accessibilityLabel={searchOpen ? 'Close search' : 'Open search'}>
+          {searchOpen ? (
+            <X color="#FFFFFF" size={20} />
+          ) : (
+            <Search color="#FFFFFF" size={20} />
+          )}
+        </Pressable>
+      </View>
 
-            {isLoadingNearby ? (
-              <View className="flex-row gap-3 mb-4">
-                <SkeletonCard />
-                <SkeletonCard />
-              </View>
-            ) : topNearbyPlaces.length === 0 ? (
-              <View className="mb-4 rounded-[20px] bg-surface-1 border border-[rgba(255,255,255,0.08)] py-7 px-5 items-center justify-center gap-2">
-                <MapPin color="#C9A84C" size={36} />
-                <Text className="text-parchment text-lg leading-6 text-center font-['MontserratAlternates-SemiBold']">
-                  No monuments discovered nearby yet
-                </Text>
-                <Text className="text-parchment-muted text-sm leading-5 text-center font-['MontserratAlternates-Regular']">
-                  Try moving to a nearby heritage district or check location
-                  permissions.
-                </Text>
-              </View>
-            ) : (
-              <FlatList
-                horizontal
-                data={topNearbyPlaces}
-                renderItem={renderPlaceItem}
-                keyExtractor={item => item.id}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled
-                initialNumToRender={4}
-                maxToRenderPerBatch={3}
-                windowSize={5}
-                contentContainerStyle={{ paddingRight: 8, paddingBottom: 8 }}
+      {/* Segmented control */}
+      <View style={styles.segmentRow}>
+        <View style={styles.segmentTrack}>
+          <Pressable
+            onPress={() => setViewMode('nearby')}
+            style={[
+              styles.segmentBtn,
+              viewMode === 'nearby' && styles.segmentBtnActive,
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{selected: viewMode === 'nearby'}}>
+            <Text
+              style={[
+                styles.segmentLabel,
+                viewMode === 'nearby' && styles.segmentLabelActive,
+              ]}>
+              Nearby
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setViewMode('virtual')}
+            style={[
+              styles.segmentBtn,
+              viewMode === 'virtual' && styles.segmentBtnActive,
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{selected: viewMode === 'virtual'}}>
+            <Text
+              style={[
+                styles.segmentLabel,
+                viewMode === 'virtual' && styles.segmentLabelActive,
+              ]}>
+              Virtual
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Optional search input */}
+      {searchOpen ? (
+        <View style={styles.searchWrap}>
+          <Search color="rgba(255,255,255,0.4)" size={16} />
+          <TextInput
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Search heritage sites"
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            style={styles.searchInput}
+            autoFocus
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {searchText.length > 0 ? (
+            <Pressable onPress={() => setSearchText('')} hitSlop={8}>
+              <X color="rgba(255,255,255,0.45)" size={14} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* Map */}
+      <View style={styles.mapWrap}>
+        {viewMode === 'nearby' ? (
+          <MapView
+            ref={mapRef}
+            provider={PROVIDER_GOOGLE}
+            style={StyleSheet.absoluteFill}
+            initialRegion={initialRegion}
+            customMapStyle={mapStyle}
+            showsUserLocation
+            showsMyLocationButton={false}
+            toolbarEnabled={false}
+            // @ts-expect-error googleMapsApiKey is RN-native only, not in type defs
+            googleMapsApiKey={GOOGLE_MAPS_API_KEY?.trim()}>
+            {filteredPlaces.map(place => (
+              <Marker
+                key={place.id}
+                coordinate={{latitude: place.lat, longitude: place.lon}}
+                title={place.name}
+                description={`${place.city ?? ''}${place.city ? ', ' : ''}${place.country ?? ''}`}
+                onPress={() => handleMarkerPress(place)}
+                pinColor={COLORS.sky}
               />
+            ))}
+          </MapView>
+        ) : (
+          <View style={styles.virtualEmpty}>
+            <Text style={styles.virtualEmptyTitle}>Virtual tours</Text>
+            <Text style={styles.virtualEmptyBody}>
+              Browse heritage sites worldwide. Coming soon.
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Bottom featured card */}
+      {featuredPlace ? (
+        <View
+          style={[
+            styles.featureCard,
+            {bottom: insets.bottom + 84}, // sits above tab bar
+          ]}
+          accessibilityRole="summary">
+          <View style={styles.featureImageWrap}>
+            {featuredPlace.image_urls?.[0] ? (
+              <Image
+                source={{uri: featuredPlace.image_urls[0]}}
+                style={styles.featureImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.featureImagePlaceholder} />
             )}
-
-            {/* Explorer Pass banner */}
-            {!explorerPassLoading && !hasAnyActivePass && (
-              <Animated.View
-                entering={FadeInDown.delay(200).duration(500)}
-                style={[{ marginTop: 24, borderRadius: 20, overflow: 'hidden', borderWidth: 1 }, passBorderStyle]}
-              >
-                <TouchableOpacity
-                  onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
-                  activeOpacity={0.9}
-                  accessibilityRole="button"
-                  accessibilityLabel="Get Explorer Pass"
-                >
-                  <LinearGradient
-                    colors={['#0A0A0A', '#1A1206', '#0A0A0A']}
-                    locations={[0, 0.5, 1]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{ padding: 18 }}
-                  >
-                    <View className="flex-row items-center gap-3">
-                      <View className="w-12 h-12 rounded-full bg-brand-amber/15 items-center justify-center">
-                        <Sparkles color="#D4860A" size={22} />
-                      </View>
-                      <View className="flex-1">
-                        <View className="flex-row items-center gap-2 mb-0.5">
-                          <Text className="text-brand-amber text-[10px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
-                            Explorer Pass
-                          </Text>
-                          <View style={{ backgroundColor: '#D4860A', borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 }}>
-                            <Text className="text-ink-deep text-[8px] uppercase tracking-[0.5px] font-['MontserratAlternates-Bold']">
-                              PREMIUM
-                            </Text>
-                          </View>
-                        </View>
-                        <Text className="text-parchment text-base font-['MontserratAlternates-Bold'] mt-0.5">
-                          Unlock heritage sites near you
-                        </Text>
-                        <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Regular'] mt-0.5">
-                          Tap to choose places
-                        </Text>
-                      </View>
-                      <ArrowRight color="#D4860A" size={20} />
-                    </View>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-            )}
-
-            {/* Recommended for you */}
-            {(isLoadingRecommendations || recommendations.length > 0) && (
-              <View className="mt-6 mb-2">
-                <View className="flex-row items-center gap-2 mb-3">
-                  <Compass color="#C9A84C" size={18} />
-                  <Text className="text-parchment text-[22px] leading-[30px] font-['MontserratAlternates-SemiBold']">
-                    Recommended for you
-                  </Text>
-                </View>
-                {isLoadingRecommendations ? (
-                  <View className="flex-row gap-3">
-                    <SkeletonCard />
-                    <SkeletonCard />
-                  </View>
-                ) : (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 12, paddingRight: 8, paddingBottom: 4 }}
-                  >
-                    {recommendations.map((rec, recIndex) => (
-                      <Animated.View
-                        key={rec.monument_id}
-                        entering={FadeInDown.delay(recIndex * 60).duration(400)}
-                      >
-                        <TouchableOpacity
-                          onPress={() =>
-                            navigation.navigate('SiteDetail', {
-                              site: {
-                                id: rec.monument_id,
-                                name: rec.name,
-                                city: rec.city,
-                                country: rec.country,
-                                lat: rec.latitude,
-                                lon: rec.longitude,
-                                formatted: [rec.city, rec.state, rec.country]
-                                  .filter(Boolean)
-                                  .join(', '),
-                              },
-                            })
-                          }
-                          className="w-48 rounded-[16px] p-3"
-                          style={{
-                            backgroundColor: NOIR.cardBg,
-                            borderWidth: 1,
-                            borderColor: NOIR.cardBorder,
-                          }}
-                          activeOpacity={0.85}
-                        >
-                          <Text
-                            className="text-brand-amber text-[10px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold'] mb-1"
-                            numberOfLines={1}
-                          >
-                            {rec.state || rec.country || 'Heritage'}
-                          </Text>
-                          <Text
-                            className="text-parchment text-sm font-['MontserratAlternates-Bold'] leading-5 mb-2"
-                            numberOfLines={2}
-                          >
-                            {rec.name}
-                          </Text>
-                          <Text
-                            className="text-parchment-dim text-[11px] font-['MontserratAlternates-Regular']"
-                            numberOfLines={1}
-                          >
-                            {rec.reason}
-                          </Text>
-                        </TouchableOpacity>
-                      </Animated.View>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
-            )}
-
-            {/* Insights */}
-            {factsVisible && (
-              <View className="mt-6 mb-3">
-                <View className="flex-row items-center justify-between mb-4">
-                  <Text className="text-parchment text-lg leading-6 font-['MontserratAlternates-SemiBold']">
-                    Insights For You
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setFactsVisible(false)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Dismiss insights"
-                  >
-                    <X color="#6B6357" size={20} />
-                  </TouchableOpacity>
-                </View>
-
-                {isLoadingFacts ? (
-                  <View
-                    className="items-center py-6 gap-4 rounded-[20px]"
-                    style={{ backgroundColor: NOIR.cardBg, borderWidth: 1, borderColor: NOIR.cardBorder }}
-                  >
-                    <AnimatedLogo size={58} motion="orbit" variant="white" />
-                    <ThinkingDots messages={FACT_LOADING_LINES} />
-                    <Text className="text-parchment-muted text-xs leading-[18px] text-center font-['MontserratAlternates-Regular']">
-                      Preparing expandable details you can tap into.
-                    </Text>
-                  </View>
-                ) : (
-                  <View className="gap-3">
-                    {factsError ? (
-                      <Text className="text-parchment-faint text-[11px] leading-4 mb-0.5 font-['MontserratAlternates-Regular']">
-                        {factsError}
-                      </Text>
-                    ) : null}
-
-                    {facts.map((fact, factIndex) => {
-                      const isExpanded = activeFactId === fact.id;
-                      const isElaborating = elaboratingFactId === fact.id;
-                      const detailText =
-                        factDetailsById[fact.id] ?? fact.detail;
-                      const factMonument = fact.monument || topNearbyPlaces[factIndex]?.name;
-
-                      return (
-                        <Animated.View
-                          key={fact.id}
-                          entering={FadeInDown.delay(factIndex * 100).duration(400)}
-                        >
-                          <TouchableOpacity
-                            className="rounded-2xl p-3.5"
-                            style={[
-                              {
-                                backgroundColor: NOIR.cardBg,
-                                borderWidth: 1,
-                                borderColor: isExpanded ? 'rgba(212, 134, 10, 0.3)' : NOIR.cardBorder,
-                              },
-                              isExpanded && {
-                                shadowColor: '#D4860A',
-                                shadowOpacity: 0.12,
-                                shadowRadius: 16,
-                                shadowOffset: { width: 0, height: 4 },
-                                elevation: 8,
-                              },
-                            ]}
-                            onPress={() => {
-                              handleFactPress(fact).catch(() => {
-                                setFactDetailsById(prev => ({
-                                  ...prev,
-                                  [fact.id]: `${fact.summary} This connects to ${
-                                    topNearbyPlaces[0]?.name ??
-                                    'nearby heritage sites'
-                                  } through shared routes, ritual patterns, and artisan exchange across generations.`,
-                                }));
-                              });
-                            }}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Open insight ${factIndex + 1}`}
-                            accessibilityHint="Shows a detailed explanation"
-                          >
-                            <View className="flex-row items-start gap-3">
-                              {factMonument ? (
-                                <ResolvedSubjectImage
-                                  subject={factMonument}
-                                  context="insight card"
-                                  style={{ width: 72, height: 72, borderRadius: 14 }}
-                                  imageStyle={{ borderRadius: 14 }}
-                                />
-                              ) : (
-                                <View
-                                  style={{
-                                    width: 72,
-                                    height: 72,
-                                    borderRadius: 14,
-                                    backgroundColor: 'rgba(212,134,10,0.1)',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                  }}
-                                >
-                                  <Sparkles color="#D4860A" size={24} />
-                                </View>
-                              )}
-                              <View className="flex-1">
-                                <Text className="text-parchment text-sm leading-5 font-['MontserratAlternates-SemiBold']">
-                                  {fact.headline}
-                                </Text>
-                                <Text
-                                  className="text-parchment-muted text-[13px] leading-[19px] mt-1 font-['MontserratAlternates-Regular']"
-                                  numberOfLines={isExpanded ? undefined : 2}
-                                >
-                                  {fact.summary}
-                                </Text>
-                              </View>
-                            </View>
-
-                            {isExpanded ? (
-                              <View className="mt-3 pt-3 border-t border-[rgba(255,255,255,0.06)]">
-                                {isElaborating ? (
-                                  <ThinkingDots
-                                    messages={['Expanding this insight...']}
-                                    color="#B8AF9E"
-                                  />
-                                ) : detailText ? (
-                                  <Text className="text-brand-goldSoft text-[13px] leading-5 font-['MontserratAlternates-Regular']">
-                                    {detailText}
-                                  </Text>
-                                ) : null}
-                              </View>
-                            ) : null}
-
-                            <Text className="mt-2 text-parchment-faint text-[10px] leading-[14px] uppercase tracking-[0.7px] font-['MontserratAlternates-SemiBold']">
-                              {isExpanded ? 'Tap to collapse' : 'Tap to expand'}
-                            </Text>
-                          </TouchableOpacity>
-                        </Animated.View>
-                      );
-                    })}
-
-                    <TouchableOpacity
-                      onPress={() => {
-                        refreshRotation.value = withSequence(
-                          withTiming(360, { duration: 600 }),
-                          withTiming(0, { duration: 0 }),
-                        );
-                        loadPersonalizedFacts().catch(() => {
-                          setFacts(
-                            buildFallbackFacts(userName, topNearbyPlaces),
-                          );
-                          setFactsError(
-                            'Showing curated insights for your area.',
-                          );
-                          setIsLoadingFacts(false);
-                        });
-                      }}
-                      className="mt-2 flex-row items-center self-end gap-1"
-                      accessibilityRole="button"
-                      accessibilityLabel="Refresh insights"
-                    >
-                      <Text className="text-brand-gold text-xs leading-4 uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
-                        Refresh Insights
-                      </Text>
-                      <Animated.View style={refreshIconStyle}>
-                        <RefreshCw color="#C9A84C" size={16} />
-                      </Animated.View>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            )}
-          </ScrollView>
-        </Animated.View>
-      </LinearGradient>
-
-      {/* Explorer Pass upsell popup (once per session if no active pass) */}
-      <ExplorerPassPopup
-        hasActivePass={hasAnyActivePass}
-        onGetPass={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
-      />
-
-      {/* First-launch feature walkthrough */}
-      <OnboardingTooltips />
-    </SafeAreaView>
+          </View>
+          <View style={styles.featureBody}>
+            <Text style={styles.featureDistance} numberOfLines={1}>
+              {featuredPlace.distance_meters > 0
+                ? `Nearest · ${formatDistance(featuredPlace.distance_meters)}`
+                : 'Featured'}
+            </Text>
+            <Text style={styles.featureName} numberOfLines={1}>
+              {featuredPlace.name}
+            </Text>
+            <Text style={styles.featureMeta} numberOfLines={1}>
+              {lineCategory(featuredPlace)}
+            </Text>
+            <Text style={styles.featureMeta} numberOfLines={1}>
+              {lineEra(featuredPlace)}
+            </Text>
+            <View style={styles.featureActions}>
+              <Pressable
+                onPress={() => handleViewInAR(featuredPlace)}
+                style={({pressed}) => [
+                  styles.featurePrimary,
+                  pressed && styles.featureBtnPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`View ${featuredPlace.name} in AR`}>
+                <Text style={styles.featurePrimaryLabel}>View in AR</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleLearnMore(featuredPlace)}
+                style={({pressed}) => [
+                  styles.featureSecondary,
+                  pressed && styles.featureBtnPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Learn more about ${featuredPlace.name}`}>
+                <Text style={styles.featureSecondaryLabel}>Learn More</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
+    </View>
   );
 };
 
-// Only styles that cannot be expressed as className (animated views, image masks, FAB position)
-const cardStyles = {
-  container: {
-    width: 238,
-    height: 232,
-    marginRight: 16,
+const styles = StyleSheet.create({
+  container: {flex: 1, backgroundColor: '#0A0A0A'},
+  safeTop: {backgroundColor: '#0A0A0A'},
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
-  gradient: {
-    flex: 1,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: NOIR.cardBorder,
-    padding: 16,
-    justifyContent: 'space-between' as const,
-    shadowColor: '#D4860A',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-};
-
-const skeletonStyles = {
-  card: {
-    width: 210,
-    height: 248,
-    borderRadius: 16,
-    backgroundColor: NOIR.cardBg,
-    borderWidth: 1,
-    borderColor: NOIR.cardBorder,
-    padding: 16,
-    justifyContent: 'flex-end' as const,
-  },
-  pill: {
-    width: 86,
-    height: 24,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginBottom: 12,
+  headerTextWrap: {flex: 1},
+  kicker: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 0.3,
   },
   title: {
-    width: '75%' as const,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    marginBottom: 8,
+    marginTop: 2,
+    fontFamily: FONTS.bold,
+    fontSize: 22,
+    color: '#FFFFFF',
   },
-  line: {
-    width: '100%' as const,
-    height: 14,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginBottom: 8,
+  searchButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  lineShort: {
-    width: '64%' as const,
+  segmentRow: {
+    paddingHorizontal: 24,
+    paddingBottom: 12,
   },
-  cta: {
-    marginTop: 8,
-    width: 124,
-    height: 30,
+  segmentTrack: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    padding: 3,
     borderRadius: 999,
-    backgroundColor: 'rgba(201,168,76,0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
-};
+  segmentBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  segmentBtnActive: {
+    backgroundColor: COLORS.sky,
+  },
+  segmentLabel: {
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+  },
+  segmentLabelActive: {
+    color: '#FFFFFF',
+  },
+  searchWrap: {
+    marginHorizontal: 24,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: FONTS.regular,
+    fontSize: 14,
+    color: '#FFFFFF',
+    padding: 0,
+  },
+  mapWrap: {
+    flex: 1,
+    overflow: 'hidden',
+    backgroundColor: '#0A0A0A',
+  },
+  virtualEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  virtualEmptyTitle: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  virtualEmptyBody: {
+    marginTop: 6,
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.55)',
+    textAlign: 'center',
+  },
+  featureCard: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    shadowOffset: {width: 0, height: 8},
+    elevation: 8,
+  },
+  featureImageWrap: {
+    width: 132,
+    height: 132,
+    backgroundColor: '#222',
+  },
+  featureImage: {width: '100%', height: '100%'},
+  featureImagePlaceholder: {
+    flex: 1,
+    backgroundColor: 'rgba(212,134,10,0.22)',
+  },
+  featureBody: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  featureDistance: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 11,
+    color: '#D24A2C',
+    letterSpacing: 0.4,
+  },
+  featureName: {
+    marginTop: 2,
+    fontFamily: FONTS.bold,
+    fontSize: 18,
+    color: '#111111',
+  },
+  featureMeta: {
+    marginTop: 2,
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    color: 'rgba(0,0,0,0.55)',
+  },
+  featureActions: {
+    marginTop: 8,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  featurePrimary: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#111111',
+  },
+  featureSecondary: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#2A2A2A',
+  },
+  featureBtnPressed: {
+    opacity: 0.85,
+  },
+  featurePrimaryLabel: {
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    color: '#FFFFFF',
+  },
+  featureSecondaryLabel: {
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    color: '#FFFFFF',
+  },
+});
 
 export default Home;

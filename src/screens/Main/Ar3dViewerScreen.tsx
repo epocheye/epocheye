@@ -14,7 +14,7 @@
  * it with the screen chrome / knowledge text / dismiss button.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { Component, Suspense, lazy, useCallback, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -26,9 +26,28 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
-import GLBViewer from '../Lens/components/GLBViewer';
 import { COLORS, FONTS, FONT_SIZES, SPACING } from '../../core/constants/theme';
 import type { MainStackParamList } from '../../core/types/navigation.types';
+
+// Lazy-loaded so @react-three/fiber + expo-gl are NOT evaluated at app startup.
+// r3f v8 is incompatible with React 19 and throws at module-evaluation time,
+// crashing the entire JS bundle before AppRegistry runs if imported eagerly.
+const GLBViewer = lazy(() => import('../Lens/components/GLBViewer'));
+
+interface GLBErrorBoundaryProps {
+  onError: () => void;
+  children: React.ReactNode;
+}
+interface GLBErrorBoundaryState { crashed: boolean }
+
+class GLBErrorBoundary extends Component<GLBErrorBoundaryProps, GLBErrorBoundaryState> {
+  state: GLBErrorBoundaryState = { crashed: false };
+  static getDerivedStateFromError() { return { crashed: true }; }
+  componentDidCatch() { this.props.onError(); }
+  render() {
+    return this.state.crashed ? null : this.props.children;
+  }
+}
 
 type RouteProp = {
   key: string;
@@ -73,11 +92,15 @@ const Ar3dViewerScreen: React.FC = () => {
             <Text style={styles.errorText}>{loadError}</Text>
           </View>
         ) : (
-          <GLBViewer
-            url={glbUrl}
-            autoRotate
-            onError={(e) => setLoadError(e?.message || 'Failed to load 3D model')}
-          />
+          <GLBErrorBoundary onError={() => setLoadError('3D preview unavailable on this device.')}>
+            <Suspense fallback={<View style={styles.errorBox} />}>
+              <GLBViewer
+                url={glbUrl}
+                autoRotate
+                onError={(e) => setLoadError(e?.message || 'Failed to load 3D model')}
+              />
+            </Suspense>
+          </GLBErrorBoundary>
         )}
       </View>
 

@@ -33,7 +33,7 @@ import { useUser } from '../../context';
 import { PermissionService } from '../../shared/services/permission.service';
 import { APP_CONFIG } from '../../core/config';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
-import type { TabScreenProps } from '../../core/types/navigation.types';
+import type { MainScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
 import { useExplorerPass } from '../../shared/hooks';
 import { useDevSettingsStore } from '../../stores/devSettingsStore';
@@ -42,7 +42,7 @@ import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 // React Native's FormData.append accepts a file object with this shape.
 type RNFile = { uri: string; type: string; name: string };
 
-type Props = TabScreenProps<'Settings'> & { onLogout?: () => void };
+type Props = MainScreenProps<'Settings'> & { onLogout?: () => void };
 
 const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   const { hasAnyActivePass, loading: explorerPassLoading } = useExplorerPass();
@@ -360,7 +360,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </Animated.View>
           )}
 
-          {/* Explorer Pass CTA */}
+          {/* Passport CTA */}
           {!explorerPassLoading && !hasAnyActivePass && (
             <Animated.View entering={FadeInDown.delay(140).duration(350)}>
               <TouchableOpacity
@@ -368,14 +368,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
                 activeOpacity={0.85}
                 accessibilityRole="button"
-                accessibilityLabel="Get Explorer Pass"
+                accessibilityLabel="Get Passport"
               >
                 <View className="w-10 h-10 rounded-full bg-brand-amber/15 items-center justify-center mr-3">
                   <Sparkles size={18} color="#D4860A" />
                 </View>
                 <View className="flex-1">
                   <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
-                    Get Explorer Pass
+                    Get Passport
                   </Text>
                   <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] mt-0.5">
                     Unlock heritage sites near you

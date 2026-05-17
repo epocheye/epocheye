@@ -12,8 +12,8 @@ export interface PaywallModalProps {
 
 const PaywallModal: React.FC<PaywallModalProps> = ({
   visible,
-  title = 'Unlock with Explorer Pass',
-  message = 'Get your Explorer Pass to unlock this feature and access heritage sites near you.',
+  title = 'Unlock with Passport',
+  message = 'Get your Passport to unlock this feature and access heritage sites near you.',
   onClose,
   onUpgrade,
 }) => {
@@ -54,7 +54,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
           >
             <Sparkles color="#0A0A0A" size={18} />
             <Text className="text-[#0A0A0A] text-base font-['MontserratAlternates-Bold']">
-              Get Explorer Pass
+              Get Passport
             </Text>
           </TouchableOpacity>
 

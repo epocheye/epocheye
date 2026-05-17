@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, { useEffect } from 'react';
 import {
   Image,
   Pressable,
@@ -15,14 +15,14 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {COLORS, FONTS} from '../../core/constants/theme';
-import {ROUTES} from '../../core/constants/routes';
-import type {OnboardingScreenProps} from '../../core/types/navigation.types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { COLORS, FONTS } from '../../core/constants/theme';
+import { ROUTES } from '../../core/constants/routes';
+import type { OnboardingScreenProps } from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB01_Welcome'>;
 
-const OB01_Welcome: React.FC<Props> = ({navigation}) => {
+const OB01_Welcome: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
 
   const headlineO = useSharedValue(0);
@@ -31,25 +31,25 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
   const ctaY = useSharedValue(22);
 
   useEffect(() => {
-    headlineO.value = withDelay(400, withTiming(1, {duration: 700}));
+    headlineO.value = withDelay(400, withTiming(1, { duration: 700 }));
     headlineY.value = withDelay(
       400,
-      withTiming(0, {duration: 700, easing: Easing.out(Easing.cubic)}),
+      withTiming(0, { duration: 700, easing: Easing.out(Easing.cubic) }),
     );
-    ctaO.value = withDelay(900, withTiming(1, {duration: 500}));
+    ctaO.value = withDelay(900, withTiming(1, { duration: 500 }));
     ctaY.value = withDelay(
       900,
-      withTiming(0, {duration: 500, easing: Easing.out(Easing.cubic)}),
+      withTiming(0, { duration: 500, easing: Easing.out(Easing.cubic) }),
     );
   }, [headlineO, headlineY, ctaO, ctaY]);
 
   const sHeadline = useAnimatedStyle(() => ({
     opacity: headlineO.value,
-    transform: [{translateY: headlineY.value}],
+    transform: [{ translateY: headlineY.value }],
   }));
   const sCta = useAnimatedStyle(() => ({
     opacity: ctaO.value,
-    transform: [{translateY: ctaY.value}],
+    transform: [{ translateY: ctaY.value }],
   }));
 
   const onGetStarted = () => {
@@ -58,7 +58,11 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
 
       <View style={styles.heroWrap}>
         <Image
@@ -82,17 +86,15 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
         <Animated.View style={[styles.ctaWrap, sCta]}>
           <Pressable
             onPress={onGetStarted}
-            style={({pressed}) => [
-              styles.cta,
-              pressed && styles.ctaPressed,
-            ]}
+            style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
             accessibilityRole="button"
-            accessibilityLabel="Get Started">
+            accessibilityLabel="Get Started"
+          >
             <Text style={styles.ctaLabel}>Get Started</Text>
           </Pressable>
         </Animated.View>
 
-        <Text style={[styles.footer, {marginBottom: insets.bottom + 12}]}>
+        <Text style={[styles.footer, { marginBottom: insets.bottom + 12 }]}>
           Copyright @ epocheye 2026
         </Text>
       </View>
@@ -158,7 +160,7 @@ const styles = StyleSheet.create({
   },
   ctaPressed: {
     backgroundColor: COLORS.skyDark,
-    transform: [{scale: 0.98}],
+    transform: [{ scale: 0.98 }],
   },
   ctaLabel: {
     fontFamily: FONTS.medium,

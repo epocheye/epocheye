@@ -28,10 +28,7 @@ import {
   getExplorerPassQuote,
   type ExplorerPassQuote,
 } from '../../utils/api/explorer-pass';
-import {
-  useExplorerPass,
-  useExplorerPassPurchase,
-} from '../../shared/hooks';
+import { useExplorerPass, useExplorerPassPurchase } from '../../shared/hooks';
 import { usePlacesStore } from '../../stores/placesStore';
 import { formatPlaceType } from '../../shared/utils/formatters';
 import type { MainScreenProps } from '../../core/types/navigation.types';
@@ -93,7 +90,9 @@ const PlaceSelectCard: React.FC<PlaceSelectCardProps> = React.memo(
               className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] mt-0.5"
               numberOfLines={1}
             >
-              {place.place_type ? formatPlaceType(place.place_type) : place.city}
+              {place.place_type
+                ? formatPlaceType(place.place_type)
+                : place.city}
             </Text>
           </View>
 
@@ -131,7 +130,9 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [couponInput, setCouponInput] = useState('');
   const [couponValidating, setCouponValidating] = useState(false);
-  const [couponResult, setCouponResult] = useState<CouponValidation | null>(null);
+  const [couponResult, setCouponResult] = useState<CouponValidation | null>(
+    null,
+  );
   const appliedCoupon = couponResult?.is_valid ? couponResult.code : undefined;
 
   const [quote, setQuote] = useState<ExplorerPassQuote | null>(null);
@@ -220,7 +221,16 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
       await refreshPasses();
       navigation.goBack();
     }
-  }, [appliedCoupon, durationHours, isBundle, navigation, purchase, refreshPasses, selectedCount, selectedPlaceIds]);
+  }, [
+    appliedCoupon,
+    durationHours,
+    isBundle,
+    navigation,
+    purchase,
+    refreshPasses,
+    selectedCount,
+    selectedPlaceIds,
+  ]);
 
   const totalPaise = quote?.total_paise ?? 0;
   const subtotalPaise = quote?.subtotal_paise ?? 0;
@@ -263,20 +273,20 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
             <View className="flex-row items-center gap-2 mb-2">
               <Sparkles color="#D4860A" size={16} />
               <Text className="text-brand-amber text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
-                {isBundle ? 'Custom Explorer Pass' : 'Single Place Access'}
+                {isBundle ? 'Custom Passport' : 'Single Place Access'}
               </Text>
             </View>
             <Text className="text-parchment text-[22px] leading-7 font-['MontserratAlternates-Bold']">
               {isBundle
                 ? 'Unlock multiple heritage sites'
                 : isSingle
-                  ? 'Unlock this heritage site'
-                  : 'Pick places to unlock'}
+                ? 'Unlock this heritage site'
+                : 'Pick places to unlock'}
             </Text>
             <Text className="text-parchment-muted text-sm leading-5 mt-2 font-['MontserratAlternates-Regular']">
               {isBundle
                 ? `Your pass is built from the places you select. Default 24 hours; extendable up to 3 days. We'll notify you before access ends.`
-                : `Every place has 12 hours of access from the moment you buy it. Pick two or more to build a custom Explorer Pass and save time.`}
+                : `Every place has 12 hours of access from the moment you buy it. Pick two or more to build a custom Passport and save time.`}
             </Text>
           </Animated.View>
 
@@ -331,7 +341,9 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                   >
                     <Text
                       className={`text-sm font-['MontserratAlternates-SemiBold'] ${
-                        durationHours === h ? 'text-brand-gold' : 'text-parchment'
+                        durationHours === h
+                          ? 'text-brand-gold'
+                          : 'text-parchment'
                       }`}
                     >
                       {formatDuration(h)}
@@ -360,7 +372,8 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                 </Text>
               </View>
               <Text className="text-parchment-dim text-xs leading-[18px] font-['MontserratAlternates-Regular']">
-                You'll have 12 hours to explore. We'll remind you 1 hour and 15 minutes before it ends.
+                You'll have 12 hours to explore. We'll remind you 1 hour and 15
+                minutes before it ends.
               </Text>
             </Animated.View>
           )}
@@ -376,12 +389,17 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
 
               {quote.line_items.map(li => (
-                <View key={li.place_id} className="flex-row justify-between mb-2">
+                <View
+                  key={li.place_id}
+                  className="flex-row justify-between mb-2"
+                >
                   <Text
                     className="text-parchment-muted text-sm font-['MontserratAlternates-Regular'] flex-1 pr-3"
                     numberOfLines={1}
                   >
-                    {li.place_name || placeNameById[li.place_id] || 'Selected place'}
+                    {li.place_name ||
+                      placeNameById[li.place_id] ||
+                      'Selected place'}
                   </Text>
                   <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
                     {formatInr(li.price_paise)}
@@ -504,8 +522,8 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                 {couponResult.reason === 'expired'
                   ? 'This code has expired.'
                   : couponResult.reason === 'exhausted'
-                    ? 'This code has reached its usage limit.'
-                    : 'Invalid promo code. Please check and try again.'}
+                  ? 'This code has reached its usage limit.'
+                  : 'Invalid promo code. Please check and try again.'}
               </Text>
             )}
           </Animated.View>
@@ -530,8 +548,8 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                     {selectedCount === 0
                       ? 'Select a place to continue'
                       : quote
-                        ? `Confirm · ${formatInr(totalPaise)}`
-                        : 'Calculating…'}
+                      ? `Confirm · ${formatInr(totalPaise)}`
+                      : 'Calculating…'}
                   </Text>
                 </>
               )}

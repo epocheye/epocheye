@@ -8,8 +8,8 @@
  */
 export const ROUTES = {
   /**
-   * Onboarding Stack Routes (4-screen Figma flow + retained auth/arrival screens)
-   * OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region
+   * Onboarding Stack Routes (5-screen Figma flow + retained auth/arrival screens)
+   * OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region → OB04_Pull
    *   → OB10_SignUp (or OB10_Login) → OB11_Notifications → OB12_Arrival
    */
   ONBOARDING: {
@@ -17,6 +17,7 @@ export const ROUTES = {
     OB01_WELCOME: 'OB01_Welcome',
     OB02_NAME: 'OB02_Name',
     OB03_REGION: 'OB03_Region',
+    OB04_PULL: 'OB04_Pull',
     OB10_SIGNUP: 'OB10_SignUp',
     OB10_LOGIN: 'OB10_Login',
     OB11_NOTIFICATIONS: 'OB11_Notifications',
@@ -37,17 +38,17 @@ export const ROUTES = {
     HISTORY: 'History',
     ANCHOR_CAPTURE: 'AnchorCapture',
     AR_3D_VIEWER: 'Ar3dViewer',
+    SETTINGS: 'Settings',
   },
 
   /**
-   * Tab Navigator Routes
+   * Tab Navigator Routes (4-tab Figma layout: Home · Passport · Daily · Profile)
    */
   TABS: {
     HOME: 'Home',
-    EXPLORE: 'Explore',
-    PLAN: 'Plan',
-    SAVED: 'Saved',
-    SETTINGS: 'Settings',
+    PASSPORT: 'Passport',
+    DAILY: 'Daily',
+    PROFILE: 'Profile',
   },
 } as const;
 

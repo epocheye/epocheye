@@ -39,9 +39,9 @@ const STEPS: Step[] = [
   },
   {
     icon: <Sparkles color="#D4860A" size={28} />,
-    title: 'Explorer Pass',
+    title: 'Passport',
     description:
-      'Get your Explorer Pass to unlock full experiences at the sites you want to visit.',
+      'Get your Passport to unlock full experiences at the sites you want to visit.',
   },
   {
     icon: <Bookmark color="#D4860A" size={28} />,

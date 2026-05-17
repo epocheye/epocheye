@@ -104,7 +104,6 @@ const OB02_Name: React.FC<Props> = ({navigation}) => {
             disabled={!canContinue}
             style={({pressed}) => [
               styles.cta,
-              !canContinue && styles.ctaDisabled,
               pressed && canContinue && styles.ctaPressed,
             ]}
             accessibilityRole="button"
@@ -177,9 +176,6 @@ const styles = StyleSheet.create({
   ctaPressed: {
     backgroundColor: COLORS.skyDark,
     transform: [{scale: 0.98}],
-  },
-  ctaDisabled: {
-    backgroundColor: 'rgba(97,166,211,0.35)',
   },
   ctaLabel: {
     fontFamily: FONTS.medium,

@@ -139,7 +139,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
             <Pressable style={styles.lockedRow} onPress={onUpgrade}>
               <Lock size={12} color="#E8A020" />
               <Text style={styles.lockedText}>
-                Unlock full details with Explorer Pass
+                Unlock full details with Passport
               </Text>
             </Pressable>
           ) : null}
