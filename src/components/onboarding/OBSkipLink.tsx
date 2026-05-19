@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {Text, TouchableOpacity} from 'react-native';
 import {TEXT, TYPE} from '../../constants/onboarding';
 
 interface Props {
@@ -10,23 +10,12 @@ interface Props {
 const OBSkipLink: React.FC<Props> = ({label = 'Skip for now', onPress}) => {
   return (
     <TouchableOpacity
-      style={styles.container}
+      className="self-center p-[14px]"
       onPress={onPress}
       hitSlop={{top: 10, bottom: 10, left: 20, right: 20}}>
-      <Text style={styles.text}>{label}</Text>
+      <Text style={{...TYPE.uiSmall, color: TEXT.dim}}>{label}</Text>
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    alignSelf: 'center',
-    padding: 14,
-  },
-  text: {
-    ...TYPE.uiSmall,
-    color: TEXT.dim,
-  },
-});
 
 export default OBSkipLink;

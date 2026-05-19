@@ -5,15 +5,15 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {Pressable, StyleSheet, Text, View} from 'react-native';
 import BottomSheet, {
   BottomSheetFlatList,
   BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
 import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
-import type { Place } from '../../../utils/api/places';
-import { FONTS } from '../../../core/constants/theme';
-import { getPlaceImage } from '../../../shared/utils';
+import type {Place} from '../../../utils/api/places';
+import {FONTS} from '../../../core/constants/theme';
+import {getPlaceImage} from '../../../shared/utils';
 
 export interface SearchSheetRef {
   open: () => void;
@@ -26,7 +26,7 @@ interface SearchSheetProps {
 }
 
 const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
-  ({ places, onSelectPlace }, ref) => {
+  ({places, onSelectPlace}, ref) => {
     const sheetRef = useRef<BottomSheet>(null);
     const [query, setQuery] = useState('');
 
@@ -68,9 +68,8 @@ const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
         snapPoints={snapPoints}
         enablePanDownToClose
         backgroundStyle={styles.sheetBackground}
-        handleIndicatorStyle={styles.handle}
-      >
-        <View style={styles.content}>
+        handleIndicatorStyle={styles.handle}>
+        <View className="flex-1 px-5">
           <BottomSheetTextInput
             value={query}
             onChangeText={setQuery}
@@ -84,29 +83,37 @@ const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
             keyExtractor={(item: Place) => item.id}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.listContent}
-            renderItem={({ item }: { item: Place }) => (
+            contentContainerStyle={{paddingBottom: 24}}
+            renderItem={({item}: {item: Place}) => (
               <Pressable
-                style={styles.item}
+                className="flex-row items-center border-b border-[rgba(255,255,255,0.08)] py-[14px]"
                 onPress={() => {
                   onSelectPlace(item);
                   sheetRef.current?.close();
-                }}
-              >
+                }}>
                 <ResolvedSubjectImage
                   subject={item.name}
-                  context={`${item.city} ${item.country} ${item.categories.join(
-                    ', ',
-                  )}`}
+                  context={`${item.city} ${item.country} ${item.categories.join(', ')}`}
                   fallbackUri={getPlaceImage(item.categories)}
-                  style={styles.itemImage}
-                  imageStyle={styles.itemImage}
+                  style={{
+                    width: 54,
+                    height: 54,
+                    borderRadius: 10,
+                    backgroundColor: '#1A1A1A',
+                  }}
+                  imageStyle={{borderRadius: 10}}
                   loadingLabel="Loading..."
                 />
 
-                <View style={styles.itemTextWrap}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.itemMeta}>
+                <View className="flex-1 ml-3">
+                  <Text
+                    className="text-parchment text-[15px]"
+                    style={{fontFamily: FONTS.semiBold}}>
+                    {item.name}
+                  </Text>
+                  <Text
+                    className="mt-0.5 text-grey-muted text-[12px]"
+                    style={{fontFamily: FONTS.regular}}>
                     {item.city} · {(item.distance_meters / 1000).toFixed(1)} km
                     away
                   </Text>
@@ -114,7 +121,9 @@ const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
               </Pressable>
             )}
             ListEmptyComponent={
-              <Text style={styles.emptyText}>
+              <Text
+                className="mt-7 text-grey-muted text-center text-[13px]"
+                style={{fontFamily: FONTS.regular}}>
                 No monuments match your search.
               </Text>
             }
@@ -125,6 +134,7 @@ const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
   },
 );
 
+// BottomSheet-specific styling and BottomSheetTextInput must remain in StyleSheet
 const styles = StyleSheet.create({
   sheetBackground: {
     backgroundColor: '#0D0D0D',
@@ -135,10 +145,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#2A2A2A',
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
+  // BottomSheetTextInput does not accept className — keep as style object
   input: {
     borderRadius: 12,
     backgroundColor: '#1A1A1A',
@@ -148,44 +155,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 14,
-  },
-  listContent: {
-    paddingBottom: 24,
-  },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-    paddingVertical: 14,
-  },
-  itemImage: {
-    width: 54,
-    height: 54,
-    borderRadius: 10,
-    backgroundColor: '#1A1A1A',
-  },
-  itemTextWrap: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  itemName: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontFamily: FONTS.semiBold,
-  },
-  itemMeta: {
-    marginTop: 2,
-    color: '#8C93A0',
-    fontSize: 12,
-    fontFamily: FONTS.regular,
-  },
-  emptyText: {
-    marginTop: 28,
-    color: '#8C93A0',
-    textAlign: 'center',
-    fontSize: 13,
-    fontFamily: FONTS.regular,
   },
 });
 

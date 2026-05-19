@@ -4,14 +4,12 @@ import {
   type ImageResizeMode,
   type ImageStyle,
   StyleProp,
-  StyleSheet,
   Text,
   View,
   ViewStyle,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useResolvedSubjectImage } from '../../shared/hooks';
-import { FONTS } from '../../core/constants/theme';
 import AnimatedLogo from './AnimatedLogo';
 
 interface ResolvedSubjectImageProps {
@@ -26,6 +24,16 @@ interface ResolvedSubjectImageProps {
   enableRemoteResolve?: boolean;
   children?: React.ReactNode;
 }
+
+const IMAGE_BASE_STYLE: ImageStyle = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  width: '100%',
+  height: '100%',
+};
 
 const ResolvedSubjectImage: React.FC<ResolvedSubjectImageProps> = ({
   subject,
@@ -55,16 +63,12 @@ const ResolvedSubjectImage: React.FC<ResolvedSubjectImageProps> = ({
   }, [url, fallbackUri]);
 
   const resolvedUrl = useMemo(() => {
-    if (!url || primaryFailed) {
-      return null;
-    }
+    if (!url || primaryFailed) return null;
     return url;
   }, [primaryFailed, url]);
 
   const fallback = useMemo(() => {
-    if (!fallbackUri || fallbackFailed) {
-      return null;
-    }
+    if (!fallbackUri || fallbackFailed) return null;
     return fallbackUri;
   }, [fallbackFailed, fallbackUri]);
 
@@ -77,11 +81,11 @@ const ResolvedSubjectImage: React.FC<ResolvedSubjectImageProps> = ({
   }
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[{overflow: 'hidden'}, style]}>
       {imageUri ? (
         <Image
           source={{ uri: imageUri }}
-          style={[styles.image, imageStyle]}
+          style={[IMAGE_BASE_STYLE, imageStyle]}
           resizeMode={resizeMode}
           onError={() => {
             if (resolvedUrl) {
@@ -96,17 +100,28 @@ const ResolvedSubjectImage: React.FC<ResolvedSubjectImageProps> = ({
       {shouldRenderSkeleton ? (
         <LinearGradient
           colors={['#1B1B1B', '#131313', '#1B1B1B']}
-          style={styles.loadingWrap}
-        >
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 20,
+            gap: 10,
+          }}>
           <AnimatedLogo
             size={26}
             variant="white"
             motion="pulse"
             showRing={false}
           />
-          <Text style={styles.loadingText}>{loadingLabel}</Text>
-          <View style={styles.shimmerLine} />
-          <View style={[styles.shimmerLine, styles.shimmerLineShort]} />
+          <Text className="text-[#B8AF9E] font-montserrat text-[12px] text-center">
+            {loadingLabel}
+          </Text>
+          <View className="w-[86%] h-[10px] rounded-[5px] bg-[#2A2A2A]" />
+          <View className="w-[62%] h-[10px] rounded-[5px] bg-[#2A2A2A]" />
         </LinearGradient>
       ) : null}
 
@@ -114,38 +129,5 @@ const ResolvedSubjectImage: React.FC<ResolvedSubjectImageProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    overflow: 'hidden',
-  },
-  image: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-  },
-  loadingWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  loadingText: {
-    color: '#B8AF9E',
-    fontSize: 12,
-    textAlign: 'center',
-    fontFamily: FONTS.regular,
-  },
-  shimmerLine: {
-    width: '86%',
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#2A2A2A',
-  },
-  shimmerLineShort: {
-    width: '62%',
-  },
-});
 
 export default ResolvedSubjectImage;

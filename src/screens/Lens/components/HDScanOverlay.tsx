@@ -11,7 +11,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import {
   Canvas,
   Image as SkiaImage,
@@ -52,7 +52,7 @@ const HDScanOverlay: React.FC<HDScanOverlayProps> = ({
   if (skiaImages.length === 0) return null;
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+    <View pointerEvents="none" className="absolute inset-0">
       <Canvas style={{ width, height }}>
         {skiaImages.map((img, idx) => {
           if (!img) return null;

@@ -1,5 +1,5 @@
 import React, {useEffect} from 'react';
-import {Image, StatusBar, StyleSheet, Text, View} from 'react-native';
+import {Image, StatusBar, Text, View} from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -8,7 +8,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import {ROUTES} from '../../core/constants/routes';
-import {COLORS, FONTS} from '../../core/constants/theme';
+import {COLORS} from '../../core/constants/theme';
 import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB00_Splash'>;
@@ -35,50 +35,24 @@ const OB00_Splash: React.FC<Props> = ({navigation}) => {
   }));
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-ink-warm items-center justify-center">
       <StatusBar barStyle="light-content" backgroundColor={COLORS.bgWarm} translucent />
 
-      <Animated.View style={[styles.logoWrap, logoStyle]}>
+      <Animated.View className="w-[110px] h-[108px]" style={logoStyle}>
         <Image
           source={require('../../assets/images/logo-white.png')}
-          style={styles.logo}
+          className="w-full h-full"
           resizeMode="contain"
         />
       </Animated.View>
 
-      <Animated.View style={[styles.wordmarkWrap, wordmarkStyle]}>
-        <Text style={styles.wordmark}>epocheye</Text>
+      <Animated.View className="absolute bottom-[88px] items-center" style={wordmarkStyle}>
+        <Text className="font-montserrat-medium text-[36px] text-parchment tracking-[0.5px]">
+          epocheye
+        </Text>
       </Animated.View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#111111',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoWrap: {
-    width: 110,
-    height: 108,
-  },
-  logo: {
-    width: '100%',
-    height: '100%',
-  },
-  wordmarkWrap: {
-    position: 'absolute',
-    bottom: 88,
-    alignItems: 'center',
-  },
-  wordmark: {
-    fontFamily: FONTS.medium,
-    fontSize: 36,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-});
 
 export default OB00_Splash;

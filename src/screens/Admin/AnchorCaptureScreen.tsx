@@ -20,7 +20,6 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  StyleSheet,
   Alert,
   ActivityIndicator,
 } from 'react-native';
@@ -28,7 +27,7 @@ import Geolocation from '@react-native-community/geolocation';
 
 import { captureAnchor } from '../../utils/api/ar';
 import { useCurrentZoneStore } from '../../stores/currentZoneStore';
-import { COLORS, FONTS } from '../../core/constants/theme';
+import { FONTS } from '../../core/constants/theme';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 
 type Props = MainScreenProps<'AnchorCapture'>;
@@ -119,152 +118,101 @@ export default function AnchorCaptureScreen({ navigation }: Props): React.ReactE
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Anchor Capture</Text>
-      <Text style={styles.subtitle}>
+    <ScrollView
+      className="flex-1 bg-surface-1"
+      contentContainerStyle={{padding: 24, paddingTop: 60}}
+    >
+      <Text className="text-parchment text-[24px] font-montserrat-bold mb-2">Anchor Capture</Text>
+      <Text className="text-grey-muted text-[13px] font-montserrat mb-6 leading-[18px]">
         Stand at the object, point the phone at it, and tap Read pose. Walk
         between captures.
       </Text>
 
-      <Text style={styles.label}>Monument ID</Text>
+      <Text className="text-grey-muted text-[12px] font-montserrat-medium mt-4 mb-[6px] uppercase tracking-[1px]">
+        Monument ID
+      </Text>
       <TextInput
         value={monumentId}
         onChangeText={setMonumentId}
         placeholder="konark"
         placeholderTextColor="#666"
         autoCapitalize="none"
-        style={styles.input}
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.05)',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          borderRadius: 8,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          color: '#F5F0E8',
+          fontSize: 14,
+          fontFamily: FONTS.regular,
+        }}
       />
 
-      <Text style={styles.label}>Object label</Text>
+      <Text className="text-grey-muted text-[12px] font-montserrat-medium mt-4 mb-[6px] uppercase tracking-[1px]">
+        Object label
+      </Text>
       <TextInput
         value={objectLabel}
         onChangeText={setObjectLabel}
         placeholder="main_chariot_wheel"
         placeholderTextColor="#666"
         autoCapitalize="none"
-        style={styles.input}
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.05)',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          borderRadius: 8,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          color: '#F5F0E8',
+          fontSize: 14,
+          fontFamily: FONTS.regular,
+        }}
       />
 
       <TouchableOpacity
-        style={styles.button}
+        className="bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.15)] rounded-[10px] py-[14px] items-center mt-6"
         onPress={readPose}
         disabled={reading}>
         {reading ? (
-          <ActivityIndicator color={COLORS.textPrimary} />
+          <ActivityIndicator color="#F5F0E8" />
         ) : (
-          <Text style={styles.buttonText}>Read pose</Text>
+          <Text className="text-parchment text-[14px] font-montserrat-semibold tracking-[0.5px]">
+            Read pose
+          </Text>
         )}
       </TouchableOpacity>
 
       {pose && (
-        <View style={styles.poseBox}>
-          <Text style={styles.poseLine}>lat: {pose.lat.toFixed(6)}</Text>
-          <Text style={styles.poseLine}>lng: {pose.lng.toFixed(6)}</Text>
-          <Text style={styles.poseLine}>
+        <View className="bg-[rgba(72,187,120,0.08)] border border-[rgba(72,187,120,0.3)] rounded-[8px] p-[14px] mt-4">
+          <Text className="text-[#48BB78] text-[12px] font-montserrat leading-[18px]">lat: {pose.lat.toFixed(6)}</Text>
+          <Text className="text-[#48BB78] text-[12px] font-montserrat leading-[18px]">lng: {pose.lng.toFixed(6)}</Text>
+          <Text className="text-[#48BB78] text-[12px] font-montserrat leading-[18px]">
             altitude: {pose.altitude != null ? `${pose.altitude.toFixed(2)} m` : '—'}
           </Text>
-          <Text style={styles.poseLine}>
+          <Text className="text-[#48BB78] text-[12px] font-montserrat leading-[18px]">
             heading: {pose.heading != null ? `${pose.heading.toFixed(1)}°` : '—'}
           </Text>
-          <Text style={styles.poseLine}>accuracy: ±{pose.accuracy.toFixed(1)} m</Text>
+          <Text className="text-[#48BB78] text-[12px] font-montserrat leading-[18px]">accuracy: ±{pose.accuracy.toFixed(1)} m</Text>
         </View>
       )}
 
       <TouchableOpacity
-        style={[styles.button, styles.primary]}
+        className="bg-accent-amber border border-accent-amber rounded-[10px] py-[14px] items-center mt-4"
         onPress={submit}
         disabled={submitting}>
         {submitting ? (
           <ActivityIndicator color="#000" />
         ) : (
-          <Text style={[styles.buttonText, styles.primaryText]}>Save anchor</Text>
+          <Text className="text-black text-[14px] font-montserrat-semibold tracking-[0.5px]">Save anchor</Text>
         )}
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text style={styles.cancel}>Cancel</Text>
+        <Text className="text-grey-muted text-[13px] font-montserrat-medium text-center mt-6">Cancel</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A0A' },
-  content: { padding: 24, paddingTop: 60 },
-  title: {
-    color: COLORS.textPrimary,
-    fontSize: 24,
-    fontFamily: FONTS.bold,
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: COLORS.textMuted,
-    fontSize: 13,
-    fontFamily: FONTS.regular,
-    marginBottom: 24,
-    lineHeight: 18,
-  },
-  label: {
-    color: COLORS.textMuted,
-    fontSize: 12,
-    fontFamily: FONTS.medium,
-    marginTop: 16,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    fontFamily: FONTS.regular,
-  },
-  button: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderColor: 'rgba(255,255,255,0.15)',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  buttonText: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    fontFamily: FONTS.semiBold,
-    letterSpacing: 0.5,
-  },
-  primary: {
-    backgroundColor: '#E8A020',
-    borderColor: '#E8A020',
-    marginTop: 16,
-  },
-  primaryText: { color: '#000' },
-  poseBox: {
-    backgroundColor: 'rgba(72, 187, 120, 0.08)',
-    borderColor: 'rgba(72, 187, 120, 0.3)',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 14,
-    marginTop: 16,
-  },
-  poseLine: {
-    color: '#48BB78',
-    fontSize: 12,
-    fontFamily: FONTS.regular,
-    lineHeight: 18,
-  },
-  cancel: {
-    color: COLORS.textMuted,
-    fontSize: 13,
-    fontFamily: FONTS.medium,
-    textAlign: 'center',
-    marginTop: 24,
-  },
-});

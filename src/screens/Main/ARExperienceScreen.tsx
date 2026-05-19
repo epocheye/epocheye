@@ -20,7 +20,6 @@ import {
   Dimensions,
   Linking,
   Pressable,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -671,7 +670,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
         {device && !cameraError && (
           <VisionCamera
             ref={cameraRef}
-            style={StyleSheet.absoluteFill}
+            style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
             device={device}
             isActive={isFocused && !objectPicker}
             photo
@@ -685,18 +684,18 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         {cameraError && (
-          <View style={styles.cameraErrorOverlay}>
-            <Text style={styles.cameraErrorTitle}>Camera unavailable</Text>
-            <Text style={styles.cameraErrorBody}>{cameraError}</Text>
-            <Text style={styles.cameraErrorHint}>
+          <View className="absolute inset-0 bg-grey-dark items-center justify-center p-8 z-[20]">
+            <Text className="text-parchment text-[18px] font-montserrat-bold mb-2">Camera unavailable</Text>
+            <Text className="text-accent-amber text-[13px] font-montserrat-medium text-center mb-4">{cameraError}</Text>
+            <Text className="text-[#8D8D92] text-[12px] font-montserrat text-center mb-6 leading-[18px]">
               Close other camera apps (Snapchat, Instagram, system Camera) then
               tap retry.
             </Text>
             <TouchableOpacity
-              style={styles.cameraErrorRetry}
+              className="px-7 py-3 bg-accent-amber rounded-full"
               onPress={() => setCameraError(null)}
             >
-              <Text style={styles.cameraErrorRetryText}>Retry</Text>
+              <Text className="text-[#0D0D0D] text-[14px] font-montserrat-bold">Retry</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -704,7 +703,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* AR overlay — native ARCore view if available + has identification */}
         {arAvailable && geminiResult && (
           <EpocheyeARView
-            style={StyleSheet.absoluteFill}
+            style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
             identification={geminiResult}
             arEnabled
             onCardTapped={handleExpandIdentification}
@@ -793,17 +792,9 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
             <View className="flex-row items-center gap-2">
               {__DEV__ && (
                 <View
-                  style={[
-                    styles.devPill,
-                    devBypass ? styles.devBypassOn : styles.devBypassOff,
-                  ]}
+                  className={`px-[10px] py-[6px] rounded-full border ${devBypass ? 'bg-[rgba(72,187,120,0.18)] border-[rgba(72,187,120,0.7)]' : 'bg-[rgba(120,120,120,0.15)] border-[rgba(180,180,180,0.4)]'}`}
                 >
-                  <Text
-                    style={[
-                      styles.devPillText,
-                      devBypass && styles.devBypassOnText,
-                    ]}
-                  >
+                  <Text className={`text-[10px] tracking-[1.2px] font-montserrat-bold ${devBypass ? 'text-[#48BB78]' : 'text-accent-amber'}`}>
                     BYPASS: {devBypass ? 'ON' : 'OFF'}
                   </Text>
                 </View>
@@ -812,15 +803,12 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
                 <TouchableOpacity
                   onPress={handleDescribeAnything}
                   disabled={describeAnythingLoading}
-                  style={[
-                    styles.devPill,
-                    styles.devProbePill,
-                    describeAnythingLoading && styles.devPillLoading,
-                  ]}
+                  className="px-[10px] py-[6px] rounded-full bg-[rgba(232,160,32,0.18)] border border-[rgba(232,160,32,0.6)]"
+                  style={describeAnythingLoading ? {opacity: 0.6} : undefined}
                   accessibilityRole="button"
                   accessibilityLabel="Describe anything (dev)"
                 >
-                  <Text style={styles.devPillText}>
+                  <Text className="text-accent-amber text-[10px] tracking-[1.2px] font-montserrat-bold">
                     {describeAnythingLoading ? 'PROBING…' : 'DEV: DESCRIBE'}
                   </Text>
                 </TouchableOpacity>
@@ -840,10 +828,11 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(200)}
-            style={[styles.devProbeBanner, { top: insets.top + 60 }]}
+            className="absolute left-4 right-4 z-[5] flex-row items-center gap-[10px] px-3 py-[10px] rounded-xl bg-[rgba(10,10,10,0.92)] border border-[rgba(232,160,32,0.4)]"
+            style={{top: insets.top + 60}}
           >
-            <Text style={styles.devProbeBannerLabel}>DEV PROBE</Text>
-            <Text style={styles.devProbeBannerText}>{describeAnythingText}</Text>
+            <Text className="text-accent-amber text-[9px] tracking-[1.4px] font-montserrat-bold">DEV PROBE</Text>
+            <Text className="flex-1 text-parchment text-[12px] font-montserrat leading-[16px]">{describeAnythingText}</Text>
             <TouchableOpacity
               onPress={() => setDescribeAnythingText(null)}
               accessibilityRole="button"
@@ -886,7 +875,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Nearby curated anchors — pill list of assets with closest placement */}
         <View
           pointerEvents="box-none"
-          style={styles.nearbyAnchors}
+          className="absolute left-0 right-0 bottom-[290px] z-[4]"
         >
           <NearbyAnchorsList
             monumentId={site.name}
@@ -934,26 +923,26 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Dev-bypass: reconstruction CTA */}
         {(reconstructionReady || reconstructionLoading || reconstructionPending || bypassError) && (
-          <View style={[styles.reconstructionBar, { bottom: 420 }]}>
+          <View className="absolute self-center flex-row items-center gap-x-[10px] bg-[rgba(13,13,13,0.92)] rounded-full border border-[rgba(232,160,32,0.3)] px-3 py-2 z-[6] bottom-[420px]">
             {reconstructionPending ? (
-              <Text style={styles.reconstructionText}>
+              <Text className="text-parchment text-[12px] font-montserrat-medium px-1">
                 {reconstructionPending.phase === 'cold_start'
                   ? `Starting 3D engine… ~${Math.max(0, Math.round(reconstructionPending.etaSeconds))}s`
                   : `Reconstructing… ~${Math.max(0, Math.round(reconstructionPending.etaSeconds))}s`}
               </Text>
             ) : reconstructionLoading ? (
-              <Text style={styles.reconstructionText}>Building 3D model…</Text>
+              <Text className="text-parchment text-[12px] font-montserrat-medium px-1">Building 3D model…</Text>
             ) : null}
             {reconstructionReady && !reconstructionLoading && (
               <TouchableOpacity
-                style={styles.reconstructionCta}
+                className="px-3 py-[6px] bg-accent-amber rounded-full"
                 onPress={handleOpenReconstruction}
               >
-                <Text style={styles.reconstructionCtaText}>View in 3D</Text>
+                <Text className="text-[#0D0D0D] text-[12px] font-montserrat-bold">View in 3D</Text>
               </TouchableOpacity>
             )}
             {bypassError && !reconstructionLoading && (
-              <Text style={styles.reconstructionText}>{bypassError}</Text>
+              <Text className="text-parchment text-[12px] font-montserrat-medium px-1">{bypassError}</Text>
             )}
           </View>
         )}
@@ -969,17 +958,20 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         {bypassLoading && !objectPicker && (
-          <View style={[styles.bypassLoadingPill, { top: insets.top + 60 }]}>
-            <Text style={styles.bypassLoadingText}>Detecting objects…</Text>
+          <View
+            className="absolute self-center bg-[rgba(13,13,13,0.92)] rounded-full border border-[rgba(72,187,120,0.5)] px-[14px] py-2 z-[5]"
+            style={{top: insets.top + 60}}
+          >
+            <Text className="text-[#48BB78] text-[12px] font-montserrat-semibold">Detecting objects…</Text>
           </View>
         )}
 
         {/* "Help us add this" prompt for match='unknown' results. */}
         {unknownPrompt && (
-          <View style={styles.helpAddOverlay}>
-            <View style={styles.helpAddCard}>
-              <Text style={styles.helpAddTitle}>Not in our catalog yet</Text>
-              <Text style={styles.helpAddBody}>
+          <View className="absolute inset-0 bg-[rgba(0,0,0,0.6)] items-center justify-center px-6 z-[30]">
+            <View className="w-full max-w-[360px] bg-[#101015] rounded-2xl p-5 border border-[rgba(255,255,255,0.08)]">
+              <Text className="text-parchment text-[16px] font-montserrat-semibold mb-2">Not in our catalog yet</Text>
+              <Text className="text-[rgba(245,240,232,0.7)] text-[13px] font-montserrat leading-[19px] mb-3">
                 We don&apos;t have this object modelled. Tell us what it is —
                 a short label helps the curation team build it.
               </Text>
@@ -994,29 +986,35 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
                 maxLength={60}
                 returnKeyType="send"
                 onSubmitEditing={handleHelpAddThis}
-                style={styles.helpAddInput}
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  borderColor: 'rgba(255,255,255,0.12)',
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  fontFamily: 'MontserratAlternates-Regular',
+                  fontSize: 13,
+                  color: '#F5F0E8',
+                  marginBottom: 16,
+                }}
               />
-              <View style={styles.helpAddRow}>
+              <View className="flex-row justify-end gap-3">
                 <TouchableOpacity
-                  style={[
-                    styles.helpAddSecondary,
-                    unknownSubmitting && styles.helpAddDisabled,
-                  ]}
+                  className="px-[14px] py-2 rounded-[8px] bg-[rgba(255,255,255,0.06)]"
+                  style={unknownSubmitting ? {opacity: 0.45} : undefined}
                   disabled={unknownSubmitting}
                   onPress={dismissUnknownPrompt}
                 >
-                  <Text style={styles.helpAddSecondaryText}>Dismiss</Text>
+                  <Text className="text-[rgba(245,240,232,0.8)] font-montserrat-medium text-[12px]">Dismiss</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[
-                    styles.helpAddPrimary,
-                    (unknownSubmitting || !unknownLabel.trim()) &&
-                      styles.helpAddDisabled,
-                  ]}
+                  className="px-[14px] py-2 rounded-[8px] bg-[#D4860A]"
+                  style={(unknownSubmitting || !unknownLabel.trim()) ? {opacity: 0.45} : undefined}
                   disabled={unknownSubmitting || !unknownLabel.trim()}
                   onPress={handleHelpAddThis}
                 >
-                  <Text style={styles.helpAddPrimaryText}>
+                  <Text className="text-[#0A0A0A] font-montserrat-semibold text-[12px]">
                     {unknownSubmitting ? 'Submitting…' : 'Submit'}
                   </Text>
                 </TouchableOpacity>
@@ -1164,232 +1162,5 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
     </GestureHandlerRootView>
   );
 };
-
-const styles = StyleSheet.create({
-  devPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  devProbePill: {
-    backgroundColor: 'rgba(232, 160, 32, 0.18)',
-    borderColor: 'rgba(232, 160, 32, 0.6)',
-  },
-  devPillLoading: {
-    opacity: 0.6,
-  },
-  devPillText: {
-    color: '#E8A020',
-    fontSize: 10,
-    letterSpacing: 1.2,
-    fontFamily: 'MontserratAlternates-Bold',
-  },
-  devBypassOn: {
-    backgroundColor: 'rgba(72, 187, 120, 0.18)',
-    borderColor: 'rgba(72, 187, 120, 0.7)',
-  },
-  devBypassOff: {
-    backgroundColor: 'rgba(120, 120, 120, 0.15)',
-    borderColor: 'rgba(180, 180, 180, 0.4)',
-  },
-  devBypassOnText: {
-    color: '#48BB78',
-  },
-  devProbeBanner: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: 'rgba(10,10,10,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(232, 160, 32, 0.4)',
-  },
-  devProbeBannerLabel: {
-    color: '#E8A020',
-    fontSize: 9,
-    letterSpacing: 1.4,
-    fontFamily: 'MontserratAlternates-Bold',
-  },
-  devProbeBannerText: {
-    flex: 1,
-    color: '#F5F0E8',
-    fontSize: 12,
-    fontFamily: 'MontserratAlternates-Regular',
-    lineHeight: 16,
-  },
-  nearbyAnchors: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 290,
-    zIndex: 4,
-  },
-  reconstructionBar: {
-    position: 'absolute',
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 10,
-    backgroundColor: 'rgba(13,13,13,0.92)',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.3)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    zIndex: 6,
-  },
-  reconstructionText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: 'MontserratAlternates-Medium',
-    paddingHorizontal: 4,
-  },
-  reconstructionCta: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#E8A020',
-    borderRadius: 999,
-  },
-  reconstructionCtaText: {
-    color: '#0D0D0D',
-    fontSize: 12,
-    fontFamily: 'MontserratAlternates-Bold',
-  },
-  bypassLoadingPill: {
-    position: 'absolute',
-    alignSelf: 'center',
-    backgroundColor: 'rgba(13,13,13,0.92)',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(72, 187, 120, 0.5)',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    zIndex: 5,
-  },
-  bypassLoadingText: {
-    color: '#48BB78',
-    fontSize: 12,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  helpAddOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    zIndex: 30,
-  },
-  helpAddCard: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#101015',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  helpAddTitle: {
-    color: '#F5F0E8',
-    fontSize: 16,
-    fontFamily: 'MontserratAlternates-SemiBold',
-    marginBottom: 8,
-  },
-  helpAddBody: {
-    color: 'rgba(245,240,232,0.7)',
-    fontSize: 13,
-    fontFamily: 'MontserratAlternates-Regular',
-    lineHeight: 19,
-    marginBottom: 12,
-  },
-  helpAddInput: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontFamily: 'MontserratAlternates-Regular',
-    fontSize: 13,
-    color: '#F5F0E8',
-    marginBottom: 16,
-  },
-  helpAddDisabled: {
-    opacity: 0.45,
-  },
-  helpAddRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-  helpAddSecondary: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  helpAddSecondaryText: {
-    color: 'rgba(245,240,232,0.8)',
-    fontFamily: 'MontserratAlternates-Medium',
-    fontSize: 12,
-  },
-  helpAddPrimary: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#D4860A',
-  },
-  helpAddPrimaryText: {
-    color: '#0A0A0A',
-    fontFamily: 'MontserratAlternates-SemiBold',
-    fontSize: 12,
-  },
-  cameraErrorOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0D0D0D',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    zIndex: 20,
-  },
-  cameraErrorTitle: {
-    color: '#F5F0E8',
-    fontSize: 18,
-    fontFamily: 'MontserratAlternates-Bold',
-    marginBottom: 8,
-  },
-  cameraErrorBody: {
-    color: '#E8A020',
-    fontSize: 13,
-    fontFamily: 'MontserratAlternates-Medium',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  cameraErrorHint: {
-    color: '#8D8D92',
-    fontSize: 12,
-    fontFamily: 'MontserratAlternates-Regular',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 18,
-  },
-  cameraErrorRetry: {
-    paddingHorizontal: 28,
-    paddingVertical: 12,
-    backgroundColor: '#E8A020',
-    borderRadius: 999,
-  },
-  cameraErrorRetryText: {
-    color: '#0D0D0D',
-    fontSize: 14,
-    fontFamily: 'MontserratAlternates-Bold',
-  },
-});
 
 export default ARExperienceScreen;

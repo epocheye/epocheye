@@ -319,3 +319,5 @@ type Props = TabScreenProps<'Home'>;
 After implementation, Codex by OpenAI will review the code. Write as if shipping to production.
 
 # REMEMBER CODEX WILL REVIEW YOUR OUTPUT AFTER YOU FINISH EVERY TIME.
+
+# Remember to use the Ask questions tool and ask me your doubts before proceeding to edit. THIS IS MUST

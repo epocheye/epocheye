@@ -4,14 +4,12 @@ import {
   Image,
   Linking,
   Pressable,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Box, ExternalLink, X } from 'lucide-react-native';
 import type { MainScreenProps } from '../../core/types/navigation.types';
-import { FONTS } from '../../core/constants/theme';
 
 // Lazy-loaded so @react-three/fiber + expo-gl are NOT evaluated at app startup.
 // r3f v8 is incompatible with React 19 and throws at module-evaluation time,
@@ -68,11 +66,16 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
   }, [glbUrl]);
 
   return (
-    <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <Text style={styles.headerTitle}>{objectLabel.toUpperCase()}</Text>
+    <View className="flex-1 bg-surface-1">
+      <View
+        className="px-4 pb-3 flex-row items-center justify-between"
+        style={{paddingTop: insets.top + 10}}
+      >
+        <Text className="text-parchment font-montserrat-bold text-[13px] tracking-[2.5px]">
+          {objectLabel.toUpperCase()}
+        </Text>
         <Pressable
-          style={styles.closeButton}
+          className="w-[34px] h-[34px] rounded-full items-center justify-center bg-[rgba(255,255,255,0.08)]"
           onPress={() => navigation.goBack()}
           accessibilityLabel="Close 3D composer"
         >
@@ -80,18 +83,20 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
         </Pressable>
       </View>
 
-      <View style={styles.previewWrap}>
+      <View className="flex-1 items-center justify-center px-6">
         {inlineViewerFailed ? (
           thumbnailUrl ? (
             <Image
               source={{ uri: thumbnailUrl }}
-              style={styles.preview}
+              className="w-full h-[80%]"
               resizeMode="contain"
               accessibilityLabel={`${objectLabel} reconstruction preview`}
             />
           ) : (
-            <View style={styles.placeholder}>
-              <Text style={styles.placeholderText}>3D model ready</Text>
+            <View className="items-center gap-y-3">
+              <Text className="text-accent-amber font-montserrat-semibold text-[14px]">
+                3D model ready
+              </Text>
             </View>
           )
         ) : (
@@ -106,28 +111,28 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
           </GLBErrorBoundary>
         )}
 
-        <View style={styles.badges}>
-          <View style={styles.badge}>
+        <View className="absolute top-5 self-center flex-row gap-x-2">
+          <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(232,160,32,0.14)] rounded-full border border-[rgba(232,160,32,0.35)]">
             <Box size={12} color="#E8A020" />
-            <Text style={styles.badgeText}>
+            <Text className="text-accent-amber font-montserrat-semibold text-[11px]">
               {cached ? 'Cached' : 'Generated'} · {provider}
             </Text>
           </View>
           {quality === 'multi_view' && (
-            <View style={[styles.badge, styles.badgeGreen]}>
-              <Text style={[styles.badgeText, styles.badgeGreenText]}>
+            <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(76,175,80,0.14)] rounded-full border border-[rgba(76,175,80,0.35)]">
+              <Text className="text-[#4CAF50] font-montserrat-semibold text-[11px]">
                 Community 3D
               </Text>
             </View>
           )}
           {quality === 'single_view' && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Basic 3D</Text>
+            <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(232,160,32,0.14)] rounded-full border border-[rgba(232,160,32,0.35)]">
+              <Text className="text-accent-amber font-montserrat-semibold text-[11px]">Basic 3D</Text>
             </View>
           )}
           {scanCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
+            <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(232,160,32,0.14)] rounded-full border border-[rgba(232,160,32,0.35)]">
+              <Text className="text-accent-amber font-montserrat-semibold text-[11px]">
                 {scanCount} {scanCount === 1 ? 'scan' : 'scans'}
               </Text>
             </View>
@@ -135,148 +140,38 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </View>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+      <View
+        className="px-6 pt-4 border-t border-[rgba(255,255,255,0.06)] items-center gap-y-[10px]"
+        style={{paddingBottom: insets.bottom + 16}}
+      >
         {isTestMode ? (
           <>
-            <Text style={styles.testName}>{monumentId}</Text>
+            <Text className="text-parchment font-montserrat-bold text-[18px]">{monumentId}</Text>
             {testObjectDescription ? (
-              <Text style={styles.testDesc}>{testObjectDescription}</Text>
+              <Text className="text-[#B8AF9E] font-montserrat text-[13px] text-center px-2">
+                {testObjectDescription}
+              </Text>
             ) : null}
           </>
         ) : (
-          <Text style={styles.monumentLine}>From {monumentId}</Text>
+          <Text className="text-grey-muted font-montserrat-medium text-[12px]">
+            From {monumentId}
+          </Text>
         )}
         <Pressable
-          style={styles.ctaPrimary}
+          className="flex-row items-center gap-x-2 px-[22px] py-[13px] rounded-xl bg-accent-amber"
           onPress={openExternally}
           accessibilityRole="button"
         >
           <ExternalLink size={16} color="#0D0D0D" />
-          <Text style={styles.ctaPrimaryText}>Open 3D model</Text>
+          <Text className="text-[#0D0D0D] font-montserrat-bold text-[15px]">Open 3D model</Text>
         </Pressable>
-        <Text style={styles.hint}>
+        <Text className="text-grey-muted font-montserrat text-[11px] text-center px-3">
           Opens in your device's AR / 3D viewer. Pinch to zoom, drag to rotate.
         </Text>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0A0A0A' },
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontFamily: FONTS.bold,
-    fontSize: 13,
-    letterSpacing: 2.5,
-  },
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  previewWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  preview: { width: '100%', height: '80%' },
-  placeholder: {
-    alignItems: 'center',
-    rowGap: 12,
-  },
-  placeholderText: {
-    color: '#E8A020',
-    fontFamily: FONTS.semiBold,
-    fontSize: 14,
-  },
-  badges: {
-    position: 'absolute',
-    top: 20,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    columnGap: 8,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: 'rgba(232,160,32,0.14)',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.35)',
-  },
-  badgeText: {
-    color: '#E8A020',
-    fontFamily: FONTS.semiBold,
-    fontSize: 11,
-  },
-  badgeGreen: {
-    backgroundColor: 'rgba(76,175,80,0.14)',
-    borderColor: 'rgba(76,175,80,0.35)',
-  },
-  badgeGreenText: {
-    color: '#4CAF50',
-  },
-  footer: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-    rowGap: 10,
-  },
-  monumentLine: {
-    color: '#8C93A0',
-    fontFamily: FONTS.medium,
-    fontSize: 12,
-  },
-  testName: {
-    color: '#F5F0E8',
-    fontFamily: FONTS.bold,
-    fontSize: 18,
-  },
-  testDesc: {
-    color: '#B8AF9E',
-    fontFamily: FONTS.regular,
-    fontSize: 13,
-    textAlign: 'center',
-    paddingHorizontal: 8,
-  },
-  ctaPrimary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 8,
-    paddingHorizontal: 22,
-    paddingVertical: 13,
-    borderRadius: 12,
-    backgroundColor: '#E8A020',
-  },
-  ctaPrimaryText: {
-    color: '#0D0D0D',
-    fontFamily: FONTS.bold,
-    fontSize: 15,
-  },
-  hint: {
-    color: '#8C93A0',
-    fontFamily: FONTS.regular,
-    fontSize: 11,
-    textAlign: 'center',
-    paddingHorizontal: 12,
-  },
-});
 
 export default ARComposer;

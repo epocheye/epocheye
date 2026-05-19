@@ -1,11 +1,11 @@
-import React, { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { MapPin } from 'lucide-react-native';
+import React, {forwardRef, useImperativeHandle, useMemo, useRef} from 'react';
+import {StyleSheet, Text, View} from 'react-native';
+import BottomSheet, {BottomSheetScrollView} from '@gorhom/bottom-sheet';
+import {MapPin} from 'lucide-react-native';
 import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
-import type { Place } from '../../../utils/api/places';
-import { FONTS } from '../../../core/constants/theme';
-import { getPlaceImage } from '../../../shared/utils';
+import type {Place} from '../../../utils/api/places';
+import {FONTS} from '../../../core/constants/theme';
+import {getPlaceImage} from '../../../shared/utils';
 
 export interface MonumentInfoSheetRef {
   open: () => void;
@@ -19,7 +19,7 @@ interface MonumentInfoSheetProps {
 const MonumentInfoSheet = forwardRef<
   MonumentInfoSheetRef,
   MonumentInfoSheetProps
->(({ place }, ref) => {
+>(({place}, ref) => {
   const sheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ['60%'], []);
 
@@ -49,10 +49,12 @@ const MonumentInfoSheet = forwardRef<
       snapPoints={snapPoints}
       enablePanDownToClose
       backgroundStyle={styles.sheetBackground}
-      handleIndicatorStyle={styles.handle}
-    >
-      <BottomSheetScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>{place?.name ?? 'Monument'}</Text>
+      handleIndicatorStyle={styles.handle}>
+      <BottomSheetScrollView
+        contentContainerStyle={{paddingHorizontal: 20, paddingBottom: 24}}>
+        <Text className="text-parchment text-[20px] leading-7 font-montserrat-bold">
+          {place?.name ?? 'Monument'}
+        </Text>
 
         {place?.name ? (
           <ResolvedSubjectImage
@@ -60,31 +62,40 @@ const MonumentInfoSheet = forwardRef<
             context={`${place.city} ${place.country} monument info`}
             fallbackUri={getPlaceImage(place.categories)}
             enableRemoteResolve
-            style={styles.infoImage}
-            imageStyle={styles.infoImage}
+            style={{marginTop: 12, width: '100%', height: 140, borderRadius: 12, backgroundColor: '#1A1A1A'}}
+            imageStyle={{borderRadius: 12}}
             loadingLabel="Loading monument visual..."
           />
         ) : null}
 
-        <Text style={styles.address}>{fullAddress}</Text>
+        <Text className="mt-[10px] text-grey-muted text-[14px] leading-5 font-montserrat">
+          {fullAddress}
+        </Text>
 
-        <View style={styles.categoriesWrap}>
+        <View className="mt-4 flex-row flex-wrap gap-2">
           {(place?.categories ?? []).map(category => (
-            <View key={category} style={styles.categoryPill}>
-              <Text style={styles.categoryText}>{category}</Text>
+            <View
+              key={category}
+              className="rounded-[20px] border border-[rgba(201,168,76,0.3)] px-[10px] py-[5px]">
+              <Text className="text-accent-amber text-[12px] font-montserrat-medium capitalize">
+                {category}
+              </Text>
             </View>
           ))}
         </View>
 
-        <View style={styles.distanceRow}>
+        <View className="mt-5 flex-row items-center">
           <MapPin size={16} color="#E8A020" />
-          <Text style={styles.distanceText}>{distanceKm}</Text>
+          <Text className="ml-2 text-parchment text-[14px] font-montserrat-medium">
+            {distanceKm}
+          </Text>
         </View>
       </BottomSheetScrollView>
     </BottomSheet>
   );
 });
 
+// BottomSheet-specific styling must remain in StyleSheet — library reads these as plain objects
 const styles = StyleSheet.create({
   sheetBackground: {
     backgroundColor: '#0D0D0D',
@@ -94,60 +105,6 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 999,
     backgroundColor: '#2A2A2A',
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    lineHeight: 28,
-    fontFamily: FONTS.bold,
-  },
-  infoImage: {
-    marginTop: 12,
-    width: '100%',
-    height: 140,
-    borderRadius: 12,
-    backgroundColor: '#1A1A1A',
-  },
-  address: {
-    marginTop: 10,
-    color: '#8C93A0',
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: FONTS.regular,
-  },
-  categoriesWrap: {
-    marginTop: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  categoryPill: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.3)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  categoryText: {
-    color: '#E8A020',
-    fontSize: 12,
-    fontFamily: FONTS.medium,
-    textTransform: 'capitalize',
-  },
-  distanceRow: {
-    marginTop: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  distanceText: {
-    marginLeft: 8,
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: FONTS.medium,
   },
 });
 

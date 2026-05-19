@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleProp, View, ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
@@ -106,12 +106,17 @@ const AnimatedLogo: React.FC<AnimatedLogoProps> = ({
   const LogoComponent = variant === 'black' ? LogoBlack : LogoWhite;
 
   return (
-    <View style={[styles.wrapper, { width: size, height: size }, style]}>
+    <View
+      className="items-center justify-center"
+      style={[{ width: size, height: size }, style]}
+    >
       {showRing && (
         <Animated.View
           style={[
-            styles.ring,
             {
+              position: 'absolute',
+              borderWidth: 1,
+              borderRadius: 999,
               width: size + 12,
               height: size + 12,
               borderColor: ringColor,
@@ -126,17 +131,5 @@ const AnimatedLogo: React.FC<AnimatedLogoProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  wrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ring: {
-    position: 'absolute',
-    borderWidth: 1,
-    borderRadius: 999,
-  },
-});
 
 export default AnimatedLogo;

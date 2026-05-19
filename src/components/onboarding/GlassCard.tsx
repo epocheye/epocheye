@@ -50,6 +50,8 @@ const GlassCard: React.FC<Props> = ({
     variant === 'gold' ? BORDER.goldStrong : BORDER.subtle;
   const borderWidth = borderless ? 0 : variant === 'gold' ? 1.5 : 1;
 
+  // Dynamic containerStyle kept as object — borderRadius, borderWidth, borderColor,
+  // and backgroundColor are all driven by props and cannot be static Tailwind classes.
   const containerStyle: ViewStyle = {
     borderRadius: radius,
     borderWidth,
@@ -68,8 +70,10 @@ const GlassCard: React.FC<Props> = ({
           reducedTransparencyFallbackColor="rgba(20,18,14,0.92)"
         />
       ) : null}
-      {variant === 'gold' ? <View style={styles.goldInner} pointerEvents="none" /> : null}
-      <View style={styles.content}>{children}</View>
+      {variant === 'gold' ? (
+        <View className="absolute inset-0 bg-ob-goldFaint" pointerEvents="none" />
+      ) : null}
+      <View className="relative">{children}</View>
     </>
   );
 
@@ -82,15 +86,5 @@ const GlassCard: React.FC<Props> = ({
   }
   return <View style={[containerStyle, style]}>{content}</View>;
 };
-
-const styles = StyleSheet.create({
-  content: {
-    position: 'relative',
-  },
-  goldInner: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(201,168,76,0.04)',
-  },
-});
 
 export default GlassCard;

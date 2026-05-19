@@ -16,7 +16,7 @@
  * asset is shown once even if it has multiple placements (closest wins).
  */
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { ArrowUpRight } from 'lucide-react-native';
 
 import { getActiveSiteBundle } from '../../../services/sitePrefetchService';
@@ -102,67 +102,29 @@ const NearbyAnchorsList: React.FC<Props> = ({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.row}
-      style={styles.container}
+      contentContainerStyle={{paddingHorizontal: 16, columnGap: 8, alignItems: 'center'}}
+      className="max-h-[44px]"
     >
       {entries.map(({ asset, placement, distance }) => (
         <TouchableOpacity
           key={`${asset.asset_id}:${placement.id}`}
-          style={styles.pill}
+          className="flex-row items-center gap-x-[6px] px-3 py-2 rounded-full bg-[rgba(13,13,13,0.92)] border border-[rgba(232,160,32,0.35)] max-w-[200px]"
           onPress={() => onSelect(asset, placement)}
           accessibilityRole="button"
           accessibilityLabel={`${asset.object_label}, ${Math.round(distance)} meters away`}
         >
           <ArrowUpRight color="#E8A020" size={12} />
-          <Text style={styles.label} numberOfLines={1}>
+          <Text className="text-parchment font-montserrat-semibold text-[12px] shrink" numberOfLines={1}>
             {asset.object_label}
           </Text>
-          <View style={styles.dot} />
-          <Text style={styles.distance}>{Math.round(distance)}m</Text>
+          <View className="w-[3px] h-[3px] rounded-[2px] bg-[rgba(245,240,232,0.4)]" />
+          <Text className="text-accent-amber font-montserrat-medium text-[11px]">
+            {Math.round(distance)}m
+          </Text>
         </TouchableOpacity>
       ))}
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    maxHeight: 44,
-  },
-  row: {
-    paddingHorizontal: 16,
-    columnGap: 8,
-    alignItems: 'center',
-  },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(13,13,13,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.35)',
-    maxWidth: 200,
-  },
-  label: {
-    color: '#F5F0E8',
-    fontFamily: 'MontserratAlternates-SemiBold',
-    fontSize: 12,
-    flexShrink: 1,
-  },
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: 'rgba(245,240,232,0.4)',
-  },
-  distance: {
-    color: '#E8A020',
-    fontFamily: 'MontserratAlternates-Medium',
-    fontSize: 11,
-  },
-});
 
 export default NearbyAnchorsList;

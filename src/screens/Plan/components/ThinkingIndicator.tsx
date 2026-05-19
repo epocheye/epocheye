@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -8,7 +8,6 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { FONTS } from '../../../core/constants/theme';
 
 const PHRASES = [
   'Consulting ASI archives…',
@@ -78,45 +77,18 @@ const ThinkingIndicator: React.FC = () => {
   const dot3Style = useAnimatedStyle(() => ({ opacity: 0.3 + dot3.value * 0.7 }));
 
   return (
-    <Animated.View style={[styles.row, containerStyle]}>
-      <View style={styles.dots}>
-        <Animated.View style={[styles.dot, dot1Style]} />
-        <Animated.View style={[styles.dot, dot2Style]} />
-        <Animated.View style={[styles.dot, dot3Style]} />
+    <Animated.View
+      className="flex-row items-center gap-[10px] px-[14px] py-[10px] bg-[#121212] rounded-[14px] self-start border border-[rgba(232,160,32,0.25)]"
+      style={[containerStyle, {borderWidth: 0.5}]}
+    >
+      <View className="flex-row gap-1">
+        <Animated.View className="w-[6px] h-[6px] rounded-[3px] bg-accent-amber" style={dot1Style} />
+        <Animated.View className="w-[6px] h-[6px] rounded-[3px] bg-accent-amber" style={dot2Style} />
+        <Animated.View className="w-[6px] h-[6px] rounded-[3px] bg-accent-amber" style={dot3Style} />
       </View>
-      <Text style={styles.phrase}>{PHRASES[phraseIndex]}</Text>
+      <Text className="text-[#C9A84C] font-montserrat-medium text-[13px]">{PHRASES[phraseIndex]}</Text>
     </Animated.View>
   );
 };
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: '#121212',
-    borderRadius: 14,
-    alignSelf: 'flex-start',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(232,160,32,0.25)',
-  },
-  dots: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#E8A020',
-  },
-  phrase: {
-    color: '#C9A84C',
-    fontFamily: FONTS.medium,
-    fontSize: 13,
-  },
-});
 
 export default ThinkingIndicator;

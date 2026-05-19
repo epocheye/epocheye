@@ -15,7 +15,6 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -23,7 +22,6 @@ import '@react-three/fiber';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber/native';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Group, Object3D } from 'three';
-import { FONTS } from '../../../core/constants/theme';
 
 interface GLBViewerProps {
   url: string;
@@ -74,16 +72,18 @@ const GLBViewer: React.FC<GLBViewerProps> = ({
 
   if (failed) {
     return (
-      <View style={styles.fallback}>
-        <Text style={styles.fallbackText}>3D preview unavailable</Text>
+      <View className="flex-1 items-center justify-center">
+        <Text className="text-grey-muted text-[13px] font-montserrat-medium">
+          3D preview unavailable
+        </Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 w-full">
       <Canvas
-        style={styles.canvas}
+        style={{ flex: 1, backgroundColor: 'transparent' }}
         camera={{ position: [0, 0.4, 2.4], fov: 45 }}
         onCreated={() => {
           // Canvas ready — the GLB scene will resolve via Suspense.
@@ -123,47 +123,13 @@ const LoadingFallback: React.FC<{ onTimeout: () => void }> = ({ onTimeout }) => 
   }
 
   return (
-    <View style={styles.loadingOverlay} pointerEvents="none">
+    <View className="absolute inset-0 items-center justify-center gap-y-2" pointerEvents="none">
       <ActivityIndicator color="#E8A020" />
-      <Text style={styles.loadingText}>Loading 3D model…</Text>
+      <Text className="text-accent-amber text-[13px] font-montserrat-medium">
+        Loading 3D model…
+      </Text>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: '100%',
-  },
-  canvas: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    rowGap: 8,
-  },
-  loadingText: {
-    color: '#E8A020',
-    fontFamily: FONTS.medium,
-    fontSize: 13,
-  },
-  fallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fallbackText: {
-    color: '#8C93A0',
-    fontFamily: FONTS.medium,
-    fontSize: 13,
-  },
-});
 
 export default GLBViewer;

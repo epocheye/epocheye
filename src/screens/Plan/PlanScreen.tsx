@@ -5,7 +5,6 @@ import {
   Platform,
   Pressable,
   StatusBar,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -19,7 +18,6 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react-native';
-import { FONTS } from '../../core/constants/theme';
 import { useChatStore } from '../../stores/chatStore';
 import type { ChatMessage } from '../../utils/api/chat';
 import ThinkingIndicator from './components/ThinkingIndicator';
@@ -88,12 +86,16 @@ const PlanScreen: React.FC = () => {
     const isUser = item.role === 'user';
     return (
       <View
-        style={[
-          styles.bubble,
-          isUser ? styles.bubbleUser : styles.bubbleAssistant,
-        ]}
-      >
-        <Text style={[styles.bubbleText, isUser && styles.bubbleTextUser]}>
+        className={`max-w-[88%] px-[14px] py-[10px] rounded-2xl ${
+          isUser
+            ? 'self-end bg-accent-amber'
+            : 'self-start bg-[#121212]'
+        }`}
+        style={isUser ? undefined : {borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.06)'}}>
+        <Text
+          className={`font-montserrat text-[14px] leading-5 ${
+            isUser ? 'text-surface-1 font-montserrat-medium' : 'text-[#E8DFD1]'
+          }`}>
           {item.content}
         </Text>
       </View>
@@ -103,52 +105,54 @@ const PlanScreen: React.FC = () => {
   const empty = messages.length === 0 && !loadingMessages;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView className="flex-1 bg-surface-1" edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
 
-      <View style={styles.header}>
+      <View
+        className="flex-row items-center px-4 pt-[6px] pb-[10px]"
+        style={{borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)'}}>
         <TouchableOpacity
           onPress={() => setShowHistory(s => !s)}
           hitSlop={12}
-          style={styles.headerButton}
-        >
+          className="p-[6px]">
           <History size={20} color="#E8A020" />
         </TouchableOpacity>
-        <View style={styles.headerCenter}>
+        <View className="flex-1 flex-row items-center justify-center gap-x-[6px]">
           <Sparkles size={16} color="#C9A84C" />
-          <Text style={styles.headerTitle}>Plan</Text>
+          <Text className="text-parchment font-montserrat-semibold text-[17px]">Plan</Text>
         </View>
         <TouchableOpacity
           onPress={handleNewChat}
           hitSlop={12}
-          style={styles.headerButton}
-        >
+          className="p-[6px]">
           <Plus size={20} color="#E8A020" />
         </TouchableOpacity>
       </View>
 
       {showHistory && (
-        <View style={styles.historyPanel}>
+        <View
+          className="px-4 py-[10px] gap-y-2 bg-[#101010]"
+          style={{borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)'}}>
           {sessions.length === 0 ? (
-            <Text style={styles.historyEmpty}>No past conversations yet</Text>
+            <Text className="text-[#6E6A60] font-montserrat text-[13px] py-1">
+              No past conversations yet
+            </Text>
           ) : (
             sessions.slice(0, 8).map(s => (
-              <View key={s.id} style={styles.historyRow}>
+              <View key={s.id} className="flex-row items-center gap-x-[10px]">
                 <Pressable
-                  style={styles.historyItem}
+                  className="flex-1 py-[6px]"
                   onPress={() => {
                     void selectSession(s.id);
                     setShowHistory(false);
-                  }}
-                >
-                  <Text style={styles.historyTitle} numberOfLines={1}>
+                  }}>
+                  <Text className="text-[#E8DFD1] font-montserrat-medium text-[13px]" numberOfLines={1}>
                     {s.title}
                   </Text>
                 </Pressable>
                 <TouchableOpacity
                   hitSlop={10}
-                  onPress={() => void removeSession(s.id)}
-                >
+                  onPress={() => void removeSession(s.id)}>
                   <Trash2 size={16} color="#6E6A60" />
                 </TouchableOpacity>
               </View>
@@ -158,27 +162,25 @@ const PlanScreen: React.FC = () => {
       )}
 
       <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {empty ? (
-          <View style={styles.emptyWrap}>
+          <View className="flex-1 items-center justify-center px-7 gap-y-[10px]">
             <Sparkles size={34} color="#C9A84C" />
-            <Text style={styles.emptyTitle}>
+            <Text className="text-parchment font-montserrat-semibold text-[18px] text-center mt-[6px]">
               Where shall we wander through history?
             </Text>
-            <Text style={styles.emptySub}>
+            <Text className="text-[#8C8578] font-montserrat text-[14px] text-center mb-3">
               Ask about monuments, build a custom tour, or trace an era.
             </Text>
-            <View style={styles.suggestionsWrap}>
+            <View className="w-full gap-y-2 mt-1">
               {SUGGESTIONS.map(s => (
                 <TouchableOpacity
                   key={s}
-                  style={styles.suggestion}
-                  onPress={() => void handleSend(s)}
-                >
-                  <Text style={styles.suggestionText}>{s}</Text>
+                  className="px-[14px] py-3 bg-[#121212] rounded-[14px]"
+                  style={{borderWidth: 0.5, borderColor: 'rgba(232,160,32,0.18)'}}
+                  onPress={() => void handleSend(s)}>
+                  <Text className="text-[#E8DFD1] font-montserrat text-[13px]">{s}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -189,10 +191,10 @@ const PlanScreen: React.FC = () => {
             data={messages}
             keyExtractor={m => m.id}
             renderItem={renderMessage}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={{paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14, gap: 10}}
             ListFooterComponent={
               showThinking ? (
-                <View style={styles.thinkingWrap}>
+                <View className="pt-[6px]">
                   <ThinkingIndicator />
                 </View>
               ) : null
@@ -203,15 +205,21 @@ const PlanScreen: React.FC = () => {
           />
         )}
 
-        {error ? <Text style={styles.errorLine}>{error}</Text> : null}
+        {error ? (
+          <Text className="text-[#FF6B6B] font-montserrat text-[13px] px-4 pb-1">
+            {error}
+          </Text>
+        ) : null}
 
-        <View style={styles.inputBar}>
+        <View
+          className="flex-row items-end gap-x-[10px] px-4 pt-2 pb-3 bg-surface-1"
+          style={{borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.06)'}}>
           <TextInput
             value={input}
             onChangeText={setInput}
             placeholder="Ask or plan…"
             placeholderTextColor="#6E6A60"
-            style={styles.textInput}
+            className="flex-1 text-parchment font-montserrat text-[14px] px-[14px] pt-[10px] pb-[10px] bg-[#121212] rounded-[18px] max-h-[120px]"
             multiline
             editable={!sending}
             onSubmitEditing={() => void handleSend()}
@@ -220,11 +228,9 @@ const PlanScreen: React.FC = () => {
           <TouchableOpacity
             onPress={() => void handleSend()}
             disabled={!input.trim() || sending}
-            style={[
-              styles.sendButton,
-              (!input.trim() || sending) && styles.sendButtonDisabled,
-            ]}
-          >
+            className={`w-10 h-10 rounded-full bg-accent-amber items-center justify-center${
+              (!input.trim() || sending) ? ' opacity-50' : ''
+            }`}>
             <Send size={16} color="#0A0A0A" />
           </TouchableOpacity>
         </View>
@@ -232,175 +238,5 @@ const PlanScreen: React.FC = () => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A0A' },
-  flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-  },
-  headerButton: { padding: 6 },
-  headerCenter: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  headerTitle: {
-    color: '#F5F0E8',
-    fontFamily: FONTS.semiBold,
-    fontSize: 17,
-  },
-  historyPanel: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
-    backgroundColor: '#101010',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-  },
-  historyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  historyItem: {
-    flex: 1,
-    paddingVertical: 6,
-  },
-  historyTitle: {
-    color: '#E8DFD1',
-    fontFamily: FONTS.medium,
-    fontSize: 13,
-  },
-  historyEmpty: {
-    color: '#6E6A60',
-    fontFamily: FONTS.regular,
-    fontSize: 13,
-    paddingVertical: 4,
-  },
-  emptyWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-    gap: 10,
-  },
-  emptyTitle: {
-    color: '#F5F0E8',
-    fontFamily: FONTS.semiBold,
-    fontSize: 18,
-    textAlign: 'center',
-    marginTop: 6,
-  },
-  emptySub: {
-    color: '#8C8578',
-    fontFamily: FONTS.regular,
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  suggestionsWrap: {
-    width: '100%',
-    gap: 8,
-    marginTop: 4,
-  },
-  suggestion: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: '#121212',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(232,160,32,0.18)',
-  },
-  suggestionText: {
-    color: '#E8DFD1',
-    fontFamily: FONTS.regular,
-    fontSize: 13,
-  },
-  list: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 14,
-    gap: 10,
-  },
-  bubble: {
-    maxWidth: '88%',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
-  },
-  bubbleAssistant: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#121212',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  bubbleUser: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#E8A020',
-  },
-  bubbleText: {
-    color: '#E8DFD1',
-    fontFamily: FONTS.regular,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  bubbleTextUser: {
-    color: '#0A0A0A',
-    fontFamily: FONTS.medium,
-  },
-  thinkingWrap: {
-    paddingTop: 6,
-  },
-  errorLine: {
-    color: '#FF6B6B',
-    fontFamily: FONTS.regular,
-    fontSize: 13,
-    paddingHorizontal: 16,
-    paddingBottom: 4,
-  },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.06)',
-    backgroundColor: '#0A0A0A',
-  },
-  textInput: {
-    flex: 1,
-    color: '#F5F0E8',
-    fontFamily: FONTS.regular,
-    fontSize: 14,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 10,
-    backgroundColor: '#121212',
-    borderRadius: 18,
-    maxHeight: 120,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E8A020',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-});
 
 export default PlanScreen;

@@ -13,8 +13,8 @@
  * the mask to the preview's visible rect before drawing.
  */
 
-import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, {useMemo} from 'react';
+import {View} from 'react-native';
 import {
   AlphaType,
   Canvas,
@@ -22,7 +22,7 @@ import {
   Image as SkiaImage,
   Skia,
 } from '@shopify/react-native-skia';
-import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
+import {useDerivedValue, type SharedValue} from 'react-native-reanimated';
 
 const MASK_SIZE = 257;
 const MASK_STRIDE = MASK_SIZE * 4; // RGBA bytes per row
@@ -92,8 +92,9 @@ const SegmentationOverlay: React.FC<SegmentationOverlayProps> = ({
   }, [maskShared]);
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Canvas style={{ width, height }}>
+    <View pointerEvents="none" className="absolute inset-0">
+      {/* Canvas requires a plain style prop for dimensions — not className compatible */}
+      <Canvas style={{width, height}}>
         <SkiaImage
           image={image}
           x={0}

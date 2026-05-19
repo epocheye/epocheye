@@ -1,5 +1,5 @@
 import React, {useEffect} from 'react';
-import {View, StyleSheet} from 'react-native';
+import {View} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -47,8 +47,10 @@ const Segment: React.FC<{index: number; current: number}> = ({
   }));
 
   return (
-    <View style={styles.segment}>
-      <Animated.View style={[styles.segmentFill, fillStyle]} />
+    <View
+      className="flex-1 overflow-hidden rounded-full bg-[rgba(255,255,255,0.12)]"
+      style={{height: SEGMENT_HEIGHT}}>
+      <Animated.View className="h-full rounded-full" style={fillStyle} />
     </View>
   );
 };
@@ -57,8 +59,8 @@ const OBProgressBar: React.FC<Props> = ({current, total}) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, {paddingTop: insets.top + 14}]}>
-      <View style={styles.row}>
+    <View className="px-6 pb-3" style={{paddingTop: insets.top + 14}}>
+      <View className="flex-row" style={{gap: SEGMENT_GAP}}>
         {Array.from({length: total}, (_, i) => (
           <Segment key={i} index={i} current={current} />
         ))}
@@ -66,27 +68,5 @@ const OBProgressBar: React.FC<Props> = ({current, total}) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 24,
-    paddingBottom: 12,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: SEGMENT_GAP,
-  },
-  segment: {
-    flex: 1,
-    height: SEGMENT_HEIGHT,
-    borderRadius: SEGMENT_HEIGHT / 2,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    overflow: 'hidden',
-  },
-  segmentFill: {
-    height: '100%',
-    borderRadius: SEGMENT_HEIGHT / 2,
-  },
-});
 
 export default OBProgressBar;

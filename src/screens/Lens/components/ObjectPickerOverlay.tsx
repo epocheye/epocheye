@@ -11,7 +11,6 @@ import {
   Image,
   LayoutChangeEvent,
   Pressable,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -25,8 +24,6 @@ interface Props {
   onCancel: () => void;
   onConfirm: (obj: DetectedObject) => void;
 }
-
-const BOX_COLOR = '#D4AF37';
 
 const ObjectPickerOverlay: React.FC<Props> = ({
   imageBase64,
@@ -49,13 +46,13 @@ const ObjectPickerOverlay: React.FC<Props> = ({
   return (
     <Animated.View
       entering={FadeIn.duration(180)}
-      style={styles.root}
+      className="absolute inset-0 z-[50]"
       pointerEvents="box-none"
     >
-      <View style={styles.backdrop} />
+      <View className="absolute inset-0 bg-[rgba(0,0,0,0.94)]" />
 
-      <View style={styles.frame} onLayout={handleFrameLayout}>
-        <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
+      <View className="flex-1 relative" onLayout={handleFrameLayout}>
+        <Image source={{ uri: imageUri }} className="w-full h-full" resizeMode="cover" />
 
         {frame.width > 0 &&
           objects.map((obj, idx) => {
@@ -67,13 +64,14 @@ const ObjectPickerOverlay: React.FC<Props> = ({
             return (
               <Pressable
                 key={`${obj.name}-${idx}`}
-                style={[styles.box, { left, top, width, height }]}
+                className="absolute border-2 border-[#D4AF37] rounded-[6px]"
+                style={{ left, top, width, height }}
                 onPress={() => setSelected(obj)}
                 accessibilityRole="button"
                 accessibilityLabel={`Select ${obj.name}`}
               >
-                <View style={styles.labelChip}>
-                  <Text numberOfLines={1} style={styles.labelText}>
+                <View className="absolute -top-[22px] left-0 bg-[#D4AF37] px-2 py-[2px] rounded-[4px] max-w-[160px]">
+                  <Text numberOfLines={1} className="text-[#0A0A0A] text-[11px] font-montserrat-semibold">
                     {obj.name}
                   </Text>
                 </View>
@@ -83,7 +81,7 @@ const ObjectPickerOverlay: React.FC<Props> = ({
       </View>
 
       <Pressable
-        style={styles.closeButton}
+        className="absolute top-12 right-4 w-9 h-9 rounded-[18px] bg-[rgba(0,0,0,0.7)] border border-[rgba(255,255,255,0.15)] items-center justify-center"
         onPress={onCancel}
         accessibilityRole="button"
         accessibilityLabel="Close picker"
@@ -92,29 +90,35 @@ const ObjectPickerOverlay: React.FC<Props> = ({
       </Pressable>
 
       {objects.length === 0 && (
-        <View style={styles.emptyBanner}>
-          <Text style={styles.emptyText}>
+        <View className="absolute top-[100px] left-6 right-6 p-[14px] rounded-xl bg-[rgba(26,20,16,0.92)] border border-[rgba(212,175,55,0.3)]">
+          <Text className="text-parchment text-[13px] font-montserrat-medium text-center">
             Nothing recognised — try another angle or closer to a single object.
           </Text>
         </View>
       )}
 
       {selected && (
-        <Animated.View entering={FadeIn.duration(160)} style={styles.confirmCard}>
-          <Text style={styles.confirmTitle}>What we see</Text>
-          <Text style={styles.confirmName}>{selected.name}</Text>
-          <Text style={styles.confirmDesc}>{selected.description}</Text>
-          <View style={styles.confirmRow}>
+        <Animated.View entering={FadeIn.duration(160)} className="absolute left-4 right-4 bottom-10 p-[18px] rounded-2xl bg-[rgba(14,10,8,0.98)] border border-[rgba(212,175,55,0.4)]">
+          <Text className="text-[#B8AF9E] text-[11px] tracking-[1px] uppercase font-montserrat-semibold mb-[6px]">
+            What we see
+          </Text>
+          <Text className="text-parchment text-[18px] font-montserrat-bold mb-1">
+            {selected.name}
+          </Text>
+          <Text className="text-[#B8AF9E] text-[13px] font-montserrat mb-[14px]">
+            {selected.description}
+          </Text>
+          <View className="flex-row gap-[10px]">
             <Pressable
-              style={[styles.confirmBtn, styles.confirmBtnGhost]}
+              className="flex-1 py-3 rounded-[10px] items-center justify-center border border-[rgba(255,255,255,0.12)] bg-transparent"
               onPress={() => setSelected(null)}
               accessibilityRole="button"
               accessibilityLabel="Back to objects"
             >
-              <Text style={styles.confirmBtnGhostText}>Back</Text>
+              <Text className="text-[#B8AF9E] text-[14px] font-montserrat-semibold">Back</Text>
             </Pressable>
             <Pressable
-              style={[styles.confirmBtn, styles.confirmBtnPrimary]}
+              className="flex-1 py-3 rounded-[10px] items-center justify-center bg-[#D4AF37]"
               onPress={() => {
                 const chosen = selected;
                 setSelected(null);
@@ -123,7 +127,7 @@ const ObjectPickerOverlay: React.FC<Props> = ({
               accessibilityRole="button"
               accessibilityLabel="View in 3D"
             >
-              <Text style={styles.confirmBtnPrimaryText}>View in 3D</Text>
+              <Text className="text-[#0A0A0A] text-[14px] font-montserrat-bold">View in 3D</Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -131,123 +135,5 @@ const ObjectPickerOverlay: React.FC<Props> = ({
     </Animated.View>
   );
 };
-
-const styles = StyleSheet.create({
-  root: { ...StyleSheet.absoluteFillObject, zIndex: 50 },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.94)',
-  },
-  frame: { flex: 1, position: 'relative' },
-  image: { width: '100%', height: '100%' },
-  box: {
-    position: 'absolute',
-    borderWidth: 2,
-    borderColor: BOX_COLOR,
-    borderRadius: 6,
-  },
-  labelChip: {
-    position: 'absolute',
-    top: -22,
-    left: 0,
-    backgroundColor: BOX_COLOR,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    maxWidth: 160,
-  },
-  labelText: {
-    color: '#0A0A0A',
-    fontSize: 11,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 48,
-    right: 16,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyBanner: {
-    position: 'absolute',
-    top: 100,
-    left: 24,
-    right: 24,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(26,20,16,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(212,175,55,0.3)',
-  },
-  emptyText: {
-    color: '#F5F0E8',
-    fontSize: 13,
-    fontFamily: 'MontserratAlternates-Medium',
-    textAlign: 'center',
-  },
-  confirmCard: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 40,
-    padding: 18,
-    borderRadius: 16,
-    backgroundColor: 'rgba(14,10,8,0.98)',
-    borderWidth: 1,
-    borderColor: 'rgba(212,175,55,0.4)',
-  },
-  confirmTitle: {
-    color: '#B8AF9E',
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    fontFamily: 'MontserratAlternates-SemiBold',
-    marginBottom: 6,
-  },
-  confirmName: {
-    color: '#F5F0E8',
-    fontSize: 18,
-    fontFamily: 'MontserratAlternates-Bold',
-    marginBottom: 4,
-  },
-  confirmDesc: {
-    color: '#B8AF9E',
-    fontSize: 13,
-    fontFamily: 'MontserratAlternates-Regular',
-    marginBottom: 14,
-  },
-  confirmRow: { flexDirection: 'row', gap: 10 },
-  confirmBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmBtnGhost: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'transparent',
-  },
-  confirmBtnGhostText: {
-    color: '#B8AF9E',
-    fontSize: 14,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  confirmBtnPrimary: {
-    backgroundColor: BOX_COLOR,
-  },
-  confirmBtnPrimaryText: {
-    color: '#0A0A0A',
-    fontSize: 14,
-    fontFamily: 'MontserratAlternates-Bold',
-  },
-});
 
 export default ObjectPickerOverlay;

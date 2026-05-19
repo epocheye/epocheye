@@ -1,5 +1,5 @@
 import React, {useEffect, useRef} from 'react';
-import {View, Text, Image, StyleSheet, StatusBar, Dimensions} from 'react-native';
+import {View, Text, Image, StatusBar, Dimensions} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -11,7 +11,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import {FONTS, CDN_BASE} from '../../core/constants/theme';
-import {OB_COLORS, BACKEND_URL} from '../../constants/onboarding';
+import {BACKEND_URL} from '../../constants/onboarding';
 import {useOnboardingStore} from '../../stores/onboardingStore';
 import {useOnboardingComplete} from '../../context/OnboardingCallbackContext';
 import {track} from '../../services/analytics';
@@ -33,7 +33,6 @@ const OB12_Arrival: React.FC<Props> = () => {
   const confettiRef = useRef<ConfettiCannon | null>(null);
   const hasCompleted = useRef(false);
 
-  // Staggered text animations
   const h1O = useSharedValue(0);
   const h1Y = useSharedValue(20);
   const h2O = useSharedValue(0);
@@ -49,11 +48,9 @@ const OB12_Arrival: React.FC<Props> = () => {
     }
     hasCompleted.current = true;
 
-    // Complete onboarding in store + AsyncStorage
     completeOnboarding();
     track('onboarding_completed');
 
-    // Post onboarding data to backend if authenticated
     (async () => {
       try {
         const token = await getValidAccessToken();
@@ -71,24 +68,17 @@ const OB12_Arrival: React.FC<Props> = () => {
             }),
           });
         }
-      } catch {
-        // Silent failure — onboarding data upload is best-effort
-      }
+      } catch {}
     })();
 
-    // Start confetti immediately
     confettiRef.current?.start();
 
-    // Staggered reveals with springs
     h1O.value = withDelay(500, withTiming(1, {duration: 500}));
     h1Y.value = withDelay(500, withSpring(0, {damping: 18, stiffness: 120}));
-
     h2O.value = withDelay(1000, withTiming(1, {duration: 500}));
     h2Y.value = withDelay(1000, withSpring(0, {damping: 18, stiffness: 120}));
-
     cardO.value = withDelay(1600, withTiming(1, {duration: 500}));
     cardScale.value = withDelay(1600, withSpring(1, {damping: 14, stiffness: 100}));
-
     ctaO.value = withDelay(2200, withTiming(1, {duration: 500}));
     ctaY.value = withDelay(2200, withSpring(0, {damping: 16, stiffness: 120}));
   }, [completeOnboarding, h1O, h1Y, h2O, h2Y, cardO, cardScale, ctaO, ctaY]);
@@ -114,37 +104,48 @@ const OB12_Arrival: React.FC<Props> = () => {
   void region;
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-ob-bgDeep">
       <StatusBar
         barStyle="light-content"
         translucent
         backgroundColor="transparent"
       />
 
-      <View style={[styles.content, {paddingBottom: insets.bottom + 24}]}>
-        <View style={styles.centerArea}>
-          <Animated.Text style={[styles.heroText, s1]}>
+      <View
+        className="flex-1 justify-between"
+        style={{paddingBottom: insets.bottom + 24}}>
+        <View className="flex-1 items-center justify-center px-[28px]">
+          <Animated.Text
+            className="text-[30px] leading-[38px] font-montserrat-extrabold text-parchment text-center mb-4"
+            style={s1}>
             {firstName || 'Explorer'},{'\n'}your lineage is ready.
           </Animated.Text>
 
-          <Animated.Text style={[styles.subText, s2]}>
+          <Animated.Text
+            className="text-grey-muted text-[15px] text-center mx-5 font-montserrat leading-[23px]"
+            style={s2}>
             Head to any heritage site and your ancestor will be waiting.
           </Animated.Text>
 
-          {/* Monument destination card */}
-          <Animated.View style={[styles.destinationCard, sCard]}>
+          <Animated.View
+            className="h-[180px] rounded-[18px] overflow-hidden mt-8 bg-grey-subtle border border-[rgba(232,160,32,0.2)]"
+            style={[sCard, {width: SCREEN_WIDTH - 56}]}>
             <Image
               source={{uri: monumentImage}}
-              style={styles.cardImage}
+              className="absolute inset-0 w-full h-full"
               resizeMode="cover"
             />
             <LinearGradient
               colors={['transparent', 'rgba(0,0,0,0.7)']}
-              style={styles.cardGradient}
+              style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
             />
-            <View style={styles.cardContent}>
-              <Text style={styles.cardLabel}>YOUR FIRST DESTINATION</Text>
-              <Text style={styles.cardTitle}>
+            <View className="absolute bottom-4 left-[18px] right-[18px]">
+              <Text
+                className="text-[10px] tracking-[1px] text-accent-amber font-montserrat-semibold mb-1">
+                YOUR FIRST DESTINATION
+              </Text>
+              <Text
+                className="text-parchment text-[17px] font-montserrat-bold">
                 {'Explore nearby monuments'}
               </Text>
             </View>
@@ -153,7 +154,7 @@ const OB12_Arrival: React.FC<Props> = () => {
 
         <Animated.View style={sCta}>
           <OBPrimaryButton
-            label={"Explore nearby  →"}
+            label={'Explore nearby  →'}
             onPress={() => onOnboardingComplete()}
           />
           <OBSkipLink
@@ -174,75 +175,5 @@ const OB12_Arrival: React.FC<Props> = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: OB_COLORS.bg,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  centerArea: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-  },
-  heroText: {
-    fontSize: 30,
-    lineHeight: 38,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    fontFamily: FONTS.extraBold,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  subText: {
-    color: '#8C93A0',
-    fontSize: 15,
-    textAlign: 'center',
-    marginHorizontal: 20,
-    fontFamily: FONTS.regular,
-    lineHeight: 23,
-  },
-  destinationCard: {
-    width: SCREEN_WIDTH - 56,
-    height: 180,
-    borderRadius: 18,
-    overflow: 'hidden',
-    marginTop: 32,
-    backgroundColor: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: 'rgba(232, 160, 32, 0.2)',
-  },
-  cardImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-  },
-  cardGradient: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  cardContent: {
-    position: 'absolute',
-    bottom: 16,
-    left: 18,
-    right: 18,
-  },
-  cardLabel: {
-    fontSize: 10,
-    letterSpacing: 1,
-    color: '#E8A020',
-    fontFamily: FONTS.semiBold,
-    marginBottom: 4,
-  },
-  cardTitle: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontFamily: FONTS.bold,
-  },
-});
 
 export default OB12_Arrival;

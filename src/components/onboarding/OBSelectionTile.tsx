@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, View, Pressable, StyleSheet, Dimensions} from 'react-native';
+import {Text, View, Pressable, Dimensions} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -63,139 +63,76 @@ const OBSelectionTile: React.FC<Props> = ({
 
   return (
     <AnimatedPressable
-      style={[
-        isGrid ? styles.gridWrap : styles.stackWrap,
-        animatedStyle,
-      ]}
+      className={`${isGrid ? 'h-[116px]' : 'h-[76px] mx-6'} rounded-[14px] overflow-hidden`}
+      style={[isGrid ? {width: GRID_TILE_WIDTH} : undefined, animatedStyle]}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={handlePress}>
       <GlassCard
         variant={selected ? 'gold' : 'default'}
         radius={RADIUS.md}
-        style={StyleSheet.absoluteFill}>
+        style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}>
         <View />
       </GlassCard>
 
       {badge ? (
         <View
-          style={[
-            styles.badge,
-            {backgroundColor: selected ? GOLD.primary : 'rgba(255,255,255,0.10)'},
-          ]}>
+          className="absolute top-2 right-2 rounded-lg px-2 py-[3px] z-[2]"
+          style={{
+            backgroundColor: selected ? GOLD.primary : 'rgba(255,255,255,0.10)',
+          }}>
           <Text
-            style={[
-              styles.badgeText,
-              {color: selected ? TEXT.dark : TEXT.muted},
-            ]}>
+            className="text-[10px]"
+            style={{
+              fontFamily: TYPE.label.fontFamily,
+              color: selected ? TEXT.dark : TEXT.muted,
+            }}>
             {badge}
           </Text>
         </View>
       ) : null}
 
       {isGrid ? (
-        <View style={styles.gridContent}>
-          <View style={styles.iconPillWrap}>
-            {selected ? <View style={styles.iconPill} /> : null}
-            <View style={styles.iconInner}>{icon}</View>
+        <View className="flex-1 items-center justify-center px-3 gap-[10px]">
+          <View className="w-11 h-11 items-center justify-center">
+            {selected ? (
+              <View className="absolute w-10 h-10 rounded-full bg-ob-goldSoft" />
+            ) : null}
+            <View className="items-center justify-center">{icon}</View>
           </View>
-          <Text style={styles.gridLabel} numberOfLines={2}>
+          <Text
+            className="text-[13px] leading-[18px] text-center text-ob-warm"
+            style={{fontFamily: TYPE.uiMedium.fontFamily}}
+            numberOfLines={2}>
             {label}
           </Text>
         </View>
       ) : (
-        <View style={styles.stackContent}>
-          <View style={styles.iconPillWrap}>
-            {selected ? <View style={styles.iconPill} /> : null}
-            <View style={styles.iconInner}>{icon}</View>
+        <View className="flex-1 flex-row items-center px-4">
+          <View className="w-11 h-11 items-center justify-center">
+            {selected ? (
+              <View className="absolute w-10 h-10 rounded-full bg-ob-goldSoft" />
+            ) : null}
+            <View className="items-center justify-center">{icon}</View>
           </View>
-          <View style={styles.textWrap}>
-            <Text style={styles.stackLabel}>{label}</Text>
-            {sublabel ? <Text style={styles.sublabel}>{sublabel}</Text> : null}
+          <View className="flex-1 ml-4">
+            <Text
+              className="text-[15px] leading-[22px] text-ob-warm"
+              style={{fontFamily: TYPE.uiMedium.fontFamily}}>
+              {label}
+            </Text>
+            {sublabel ? (
+              <Text
+                className="text-[12px] leading-[18px] mt-0.5 text-ob-warmMuted"
+                style={{fontFamily: TYPE.uiSmall.fontFamily}}>
+                {sublabel}
+              </Text>
+            ) : null}
           </View>
         </View>
       )}
     </AnimatedPressable>
   );
 };
-
-const styles = StyleSheet.create({
-  stackWrap: {
-    height: 76,
-    marginHorizontal: SPACING.screen,
-    borderRadius: RADIUS.md,
-    overflow: 'hidden',
-  },
-  gridWrap: {
-    width: GRID_TILE_WIDTH,
-    height: 116,
-    borderRadius: RADIUS.md,
-    overflow: 'hidden',
-  },
-  stackContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-  },
-  gridContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.md,
-    gap: 10,
-  },
-  iconPillWrap: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconPill: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(201,168,76,0.15)',
-  },
-  iconInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textWrap: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  stackLabel: {
-    ...TYPE.uiMedium,
-    color: TEXT.primary,
-    fontSize: 15,
-  },
-  sublabel: {
-    ...TYPE.uiSmall,
-    color: TEXT.muted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  gridLabel: {
-    ...TYPE.uiMedium,
-    color: TEXT.primary,
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  badge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    zIndex: 2,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontFamily: TYPE.label.fontFamily,
-  },
-});
 
 export default OBSelectionTile;

@@ -9,7 +9,6 @@ import {
   Dimensions,
   Linking,
   Pressable,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -47,7 +46,6 @@ const REGION_LABELS: Record<string, string> = {
 } satisfies Record<UnescoRegion, string>;
 import { useLensPremium } from '../../shared/hooks/useLensPremium';
 import type { MainScreenProps } from '../../core/types/navigation.types';
-import { FONTS } from '../../core/constants/theme';
 import { ROUTES } from '../../core/constants';
 import {
   fileToBase64,
@@ -1156,43 +1154,47 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
 
   if (!hasPermission) {
     return (
-      <GestureHandlerRootView style={styles.root}>
-        <View style={styles.permissionScreen}>
-          <Text style={styles.permissionTitle}>Camera access needed</Text>
-          <Text style={styles.permissionBody}>
+      <GestureHandlerRootView className="flex-1 bg-grey-dark">
+        <View className="flex-1 bg-grey-dark justify-center px-6">
+          <Text className="text-parchment text-[22px] leading-[30px] text-center font-montserrat-bold">
+            Camera access needed
+          </Text>
+          <Text className="text-grey-muted text-[14px] leading-[22px] text-center mt-[10px] font-montserrat">
             Allow camera access to explore heritage sites and uncover your
             ancestor's story.
           </Text>
 
           <Pressable
-            style={styles.permissionPrimaryButton}
+            className="h-[50px] rounded-xl bg-accent-amber items-center justify-center mt-6"
             onPress={() => {
               requestPermission().catch(() => {
                 // Best-effort prompt.
               });
             }}
           >
-            <Text style={styles.permissionPrimaryText}>
+            <Text className="text-[#0D0D0D] text-[15px] font-montserrat-bold">
               Grant Camera Access
             </Text>
           </Pressable>
 
           <Pressable
-            style={styles.permissionSecondaryButton}
+            className="h-[50px] rounded-xl border-[1.5px] border-accent-amber items-center justify-center mt-3"
             onPress={() => {
               Linking.openSettings().catch(() => {
                 // Best-effort deep link.
               });
             }}
           >
-            <Text style={styles.permissionSecondaryText}>Open Settings</Text>
+            <Text className="text-accent-amber text-[15px] font-montserrat-semibold">
+              Open Settings
+            </Text>
           </Pressable>
 
           <Pressable
-            style={styles.closeLink}
+            className="mt-[14px] self-center px-[10px] py-[6px]"
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.closeLinkText}>Back</Text>
+            <Text className="text-grey-muted text-[13px] font-montserrat">Back</Text>
           </Pressable>
         </View>
       </GestureHandlerRootView>
@@ -1200,21 +1202,21 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <View style={styles.container}>
+    <GestureHandlerRootView className="flex-1 bg-grey-dark">
+      <View className="flex-1 bg-black">
         {device ? (
           <VisionCamera
             ref={cameraRef}
-            style={StyleSheet.absoluteFill}
+            style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
             device={device}
             isActive
             photo
             frameProcessor={isScanModeActive ? frameProcessor : undefined}
           />
         ) : (
-          <View style={styles.noDeviceWrap}>
+          <View className="absolute inset-0 items-center justify-center bg-grey-dark">
             <ScanEye size={38} color="#E8A020" />
-            <Text style={styles.noDeviceText}>
+            <Text className="mt-3 text-parchment text-[15px] font-montserrat-medium">
               Camera not available on this device
             </Text>
           </View>
@@ -1236,17 +1238,18 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           />
         )}
 
-        <View style={styles.cameraOverlay} />
+        <View className="absolute inset-0 bg-[rgba(0,0,0,0.08)]" />
 
         {/* Geofence banner */}
         {activeZone && (
           <Animated.View
             entering={FadeIn.duration(300)}
             exiting={FadeOut.duration(200)}
-            style={[styles.geofenceBanner, { top: insets.top + 52 }]}
+            className="absolute self-center flex-row items-center gap-x-[6px] bg-[rgba(13,13,13,0.82)] rounded-[20px] border border-[rgba(232,160,32,0.4)] px-[14px] py-2 z-[5]"
+            style={{top: insets.top + 52}}
           >
             <MapPin size={14} color="#E8A020" />
-            <Text style={styles.geofenceBannerText}>
+            <Text className="text-accent-amber text-[12px] font-montserrat-semibold">
               You are near {activeZone.name}
             </Text>
           </Animated.View>
@@ -1255,7 +1258,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         {/* Gemini identification — 3D AR on ARCore, 2D card fallback */}
         {arAvailable && geminiResult && !geminiLoading ? (
           <EpocheyeARView
-            style={StyleSheet.absoluteFill}
+            style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
             identification={geminiResult}
             arEnabled
             onCardTapped={handleExpandIdentification}
@@ -1275,21 +1278,18 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           />
         )}
 
-        <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
-          <Text style={styles.topBarTitle}>LENS</Text>
-          <View style={styles.topBarActions}>
+        <View
+          className="absolute left-0 right-0 top-0 z-[4] px-4 pb-3 bg-[rgba(0,0,0,0.35)] flex-row items-center justify-between"
+          style={{paddingTop: insets.top + 10}}
+        >
+          <Text className="text-parchment text-[13px] tracking-[3px] font-montserrat-bold">LENS</Text>
+          <View className="flex-row items-center gap-2">
             {__DEV__ && (
               <View
-                style={[
-                  styles.devProbeButton,
-                  devBypass ? styles.devBypassOn : styles.devBypassOff,
-                ]}
+                className={`px-[10px] py-[6px] rounded-full border ${devBypass ? 'bg-[rgba(72,187,120,0.18)] border-[rgba(72,187,120,0.7)]' : 'bg-[rgba(120,120,120,0.15)] border-[rgba(180,180,180,0.4)]'}`}
               >
                 <Text
-                  style={[
-                    styles.devProbeButtonText,
-                    devBypass && styles.devBypassOnText,
-                  ]}
+                  className={`text-[10px] tracking-[1.2px] font-montserrat-bold ${devBypass ? 'text-[#48BB78]' : 'text-accent-amber'}`}
                 >
                   BYPASS: {devBypass ? 'ON' : 'OFF'}
                 </Text>
@@ -1297,22 +1297,20 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
             )}
             {__DEV__ && (
               <Pressable
-                style={[
-                  styles.devProbeButton,
-                  describeAnythingLoading && styles.devProbeButtonLoading,
-                ]}
+                className="px-[10px] py-[6px] rounded-full bg-[rgba(232,160,32,0.18)] border border-[rgba(232,160,32,0.6)]"
+                style={describeAnythingLoading ? {opacity: 0.6} : undefined}
                 onPress={handleDescribeAnything}
                 disabled={describeAnythingLoading}
                 accessibilityRole="button"
                 accessibilityLabel="Describe anything (dev)"
               >
-                <Text style={styles.devProbeButtonText}>
+                <Text className="text-accent-amber text-[10px] tracking-[1.2px] font-montserrat-bold">
                   {describeAnythingLoading ? 'PROBING…' : 'DEV: DESCRIBE'}
                 </Text>
               </Pressable>
             )}
             <Pressable
-              style={styles.closeButton}
+              className="w-[34px] h-[34px] rounded-full items-center justify-center bg-[rgba(255,255,255,0.08)]"
               onPress={() => navigation.goBack()}
               accessibilityRole="button"
               accessibilityLabel="Close Lens"
@@ -1326,10 +1324,11 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(200)}
-            style={[styles.devProbeBanner, { top: insets.top + 56 }]}
+            className="absolute left-4 right-4 z-[5] flex-row items-center gap-[10px] px-3 py-[10px] rounded-xl bg-[rgba(10,10,10,0.92)] border border-[rgba(232,160,32,0.4)]"
+            style={{top: insets.top + 56}}
           >
-            <Text style={styles.devProbeBannerLabel}>DEV PROBE</Text>
-            <Text style={styles.devProbeBannerText}>
+            <Text className="text-accent-amber text-[9px] tracking-[1.4px] font-montserrat-bold">DEV PROBE</Text>
+            <Text className="flex-1 text-parchment text-[12px] font-montserrat leading-[16px]">
               {describeAnythingText}
             </Text>
             <Pressable
@@ -1363,11 +1362,12 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           reconstructionQuotaExceeded ||
           reconstructionGateError) && (
           <View
-            style={[styles.reconstructionBar, { bottom: insets.bottom + 180 }]}
+            className="absolute self-center flex-row items-center gap-x-[10px] bg-[rgba(13,13,13,0.88)] rounded-full border border-[rgba(232,160,32,0.3)] px-[10px] py-[6px] z-[6]"
+            style={{bottom: insets.bottom + 180}}
           >
             <ARQuotaPill compact />
             {reconstructionPending ? (
-              <Text style={styles.reconstructionText}>
+              <Text className="text-parchment text-[12px] font-montserrat-medium px-1">
                 {formatPendingLabel(
                   reconstructionPending.phase,
                   reconstructionPending.etaSeconds,
@@ -1375,31 +1375,31 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
               </Text>
             ) : (
               reconstructionLoading && (
-                <Text style={styles.reconstructionText}>
+                <Text className="text-parchment text-[12px] font-montserrat-medium px-1">
                   Building 3D model…
                 </Text>
               )
             )}
             {reconstructionReady && !reconstructionLoading && (
               <Pressable
-                style={styles.reconstructionCta}
+                className="px-3 py-[6px] bg-accent-amber rounded-full"
                 onPress={openReconstruction}
               >
-                <Text style={styles.reconstructionCtaText}>View in 3D</Text>
+                <Text className="text-[#0D0D0D] text-[12px] font-montserrat-bold">View in 3D</Text>
               </Pressable>
             )}
             {reconstructionQuotaExceeded && (
               <Pressable
-                style={styles.reconstructionCta}
+                className="px-3 py-[6px] bg-accent-amber rounded-full"
                 onPress={handleUpgradePremium}
               >
-                <Text style={styles.reconstructionCtaText}>
+                <Text className="text-[#0D0D0D] text-[12px] font-montserrat-bold">
                   Upgrade for more
                 </Text>
               </Pressable>
             )}
             {reconstructionGateError && !reconstructionLoading && (
-              <Text style={styles.reconstructionText}>
+              <Text className="text-parchment text-[12px] font-montserrat-medium px-1">
                 {reconstructionGateError}
               </Text>
             )}
@@ -1454,229 +1454,5 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     </GestureHandlerRootView>
   );
 };
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#0D0D0D',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  cameraOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-  },
-  topBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    zIndex: 4,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  topBarTitle: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    letterSpacing: 3,
-    fontFamily: FONTS.bold,
-  },
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  topBarActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  devProbeButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(232, 160, 32, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(232, 160, 32, 0.6)',
-  },
-  devProbeButtonLoading: {
-    opacity: 0.6,
-  },
-  devBypassOn: {
-    backgroundColor: 'rgba(72, 187, 120, 0.18)',
-    borderColor: 'rgba(72, 187, 120, 0.7)',
-  },
-  devBypassOff: {
-    backgroundColor: 'rgba(120, 120, 120, 0.15)',
-    borderColor: 'rgba(180, 180, 180, 0.4)',
-  },
-  devBypassOnText: {
-    color: '#48BB78',
-  },
-  devProbeButtonText: {
-    color: '#E8A020',
-    fontSize: 10,
-    letterSpacing: 1.2,
-    fontFamily: FONTS.bold,
-  },
-  devProbeBanner: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: 'rgba(10,10,10,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(232, 160, 32, 0.4)',
-  },
-  devProbeBannerLabel: {
-    color: '#E8A020',
-    fontSize: 9,
-    letterSpacing: 1.4,
-    fontFamily: FONTS.bold,
-  },
-  devProbeBannerText: {
-    flex: 1,
-    color: '#F5F0E8',
-    fontSize: 12,
-    fontFamily: FONTS.regular,
-    lineHeight: 16,
-  },
-  geofenceBanner: {
-    position: 'absolute',
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 6,
-    backgroundColor: 'rgba(13,13,13,0.82)',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.4)',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    zIndex: 5,
-  },
-  geofenceBannerText: {
-    color: '#E8A020',
-    fontSize: 12,
-    fontFamily: FONTS.semiBold,
-  },
-  noDeviceWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0D0D0D',
-  },
-  noDeviceText: {
-    marginTop: 12,
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontFamily: FONTS.medium,
-  },
-  permissionScreen: {
-    flex: 1,
-    backgroundColor: '#0D0D0D',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  permissionTitle: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    lineHeight: 30,
-    textAlign: 'center',
-    fontFamily: FONTS.bold,
-  },
-  permissionBody: {
-    color: '#8C93A0',
-    fontSize: 14,
-    lineHeight: 22,
-    textAlign: 'center',
-    marginTop: 10,
-    fontFamily: FONTS.regular,
-  },
-  permissionPrimaryButton: {
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: '#E8A020',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
-  permissionPrimaryText: {
-    color: '#0D0D0D',
-    fontSize: 15,
-    fontFamily: FONTS.bold,
-  },
-  permissionSecondaryButton: {
-    height: 50,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#E8A020',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  permissionSecondaryText: {
-    color: '#E8A020',
-    fontSize: 15,
-    fontFamily: FONTS.semiBold,
-  },
-  closeLink: {
-    marginTop: 14,
-    alignSelf: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  closeLinkText: {
-    color: '#8C93A0',
-    fontSize: 13,
-    fontFamily: FONTS.regular,
-  },
-  reconstructionBar: {
-    position: 'absolute',
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 10,
-    backgroundColor: 'rgba(13,13,13,0.88)',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.3)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    zIndex: 6,
-  },
-  reconstructionText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: FONTS.medium,
-    paddingHorizontal: 4,
-  },
-  reconstructionCta: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#E8A020',
-    borderRadius: 999,
-  },
-  reconstructionCtaText: {
-    color: '#0D0D0D',
-    fontSize: 12,
-    fontFamily: FONTS.bold,
-  },
-});
 
 export default LensScreen;

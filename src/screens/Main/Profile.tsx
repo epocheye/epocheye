@@ -5,7 +5,6 @@ import {
   RefreshControl,
   ScrollView,
   StatusBar,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -94,11 +93,11 @@ const Profile: React.FC<Props> = ({navigation}) => {
     (profile?.preferences?.location as string | undefined) ?? '';
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-surface-1">
       <StatusBar barStyle="light-content" />
-      <SafeAreaView edges={['top']} style={styles.safeTop} />
+      <SafeAreaView edges={['top']} className="bg-surface-1" />
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={{paddingBottom: 32, paddingHorizontal: 24}}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -109,12 +108,12 @@ const Profile: React.FC<Props> = ({navigation}) => {
           />
         }>
         {/* Header row */}
-        <View style={styles.header}>
-          <View style={styles.avatarOuter}>
+        <View className="pt-[14px] flex-row items-start gap-x-[14px]">
+          <View className="w-[76px] h-[76px] rounded-full bg-[rgba(212,134,10,0.18)] p-[3px]">
             {profile?.avatar_url ? (
               <Image
                 source={{uri: profile.avatar_url}}
-                style={styles.avatarImg}
+                className="w-full h-full rounded-[35px]"
                 resizeMode="cover"
               />
             ) : (
@@ -122,24 +121,28 @@ const Profile: React.FC<Props> = ({navigation}) => {
                 colors={[AMBER_LIGHT, AMBER, AMBER_DEEP]}
                 start={{x: 0, y: 0}}
                 end={{x: 1, y: 1}}
-                style={styles.avatarGradient}>
-                <Text style={styles.avatarInitial}>
+                style={{width: '100%', height: '100%', borderRadius: 35, alignItems: 'center', justifyContent: 'center'}}>
+                <Text style={{fontFamily: FONTS.sansBold, fontSize: 36, color: '#FFFFFF'}}>
                   {initialLetter(profile?.name)}
                 </Text>
               </LinearGradient>
             )}
           </View>
-          <View style={styles.headerText}>
-            <Text style={styles.name} numberOfLines={1}>
+          <View className="flex-1 pt-1">
+            <Text
+              style={{fontFamily: FONTS.serif, fontSize: 26, color: '#FFFFFF', lineHeight: 30}}
+              numberOfLines={1}>
               {name}
             </Text>
             {location ? (
-              <Text style={styles.location}>{location}</Text>
+              <Text style={{marginTop: 2, fontFamily: FONTS.sans, fontSize: 13, color: 'rgba(255,255,255,0.55)'}}>
+                {location}
+              </Text>
             ) : null}
             {isStreakActive ? (
-              <View style={styles.streakRow}>
-                <View style={styles.streakDot} />
-                <Text style={styles.streakLabel}>
+              <View className="mt-2 flex-row items-center">
+                <View className="w-2 h-2 rounded-full bg-[#3FB950] mr-2" />
+                <Text style={{fontFamily: FONTS.sansMedium, fontSize: 12, color: 'rgba(255,255,255,0.78)'}}>
                   {streakDays} day streak active
                 </Text>
               </View>
@@ -148,7 +151,7 @@ const Profile: React.FC<Props> = ({navigation}) => {
           <Pressable
             onPress={openSettings}
             hitSlop={10}
-            style={styles.menuButton}
+            className="w-9 h-9 rounded-full bg-[rgba(255,255,255,0.06)] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel="Open settings">
             <MoreHorizontal color="#FFFFFF" size={20} />
@@ -156,63 +159,81 @@ const Profile: React.FC<Props> = ({navigation}) => {
         </View>
 
         {/* Stat cards */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{sites}</Text>
-            <Text style={styles.statLabel}>SITES</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{dynasties}</Text>
-            <Text style={styles.statLabel}>DYNASTIES</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{streakDays}</Text>
-            <Text style={styles.statLabel}>STREAK</Text>
-          </View>
+        <View className="mt-5 flex-row gap-x-[10px]">
+          {([
+            {label: 'SITES', value: sites},
+            {label: 'DYNASTIES', value: dynasties},
+            {label: 'STREAK', value: streakDays},
+          ] as const).map(stat => (
+            <View
+              key={stat.label}
+              className="flex-1 py-[14px] px-[10px] rounded-[14px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] items-center">
+              <Text style={{fontFamily: FONTS.serif, fontSize: 32, color: '#FFFFFF', lineHeight: 36}}>
+                {stat.value}
+              </Text>
+              <Text style={{marginTop: 4, fontFamily: FONTS.sansSemiBold, fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.1}}>
+                {stat.label}
+              </Text>
+            </View>
+          ))}
         </View>
 
         {/* Digest card */}
-        <Text style={[styles.sectionKicker, {marginTop: 24}]}>THIS WEEK</Text>
+        <Text style={{marginTop: 24, fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.2}}>
+          THIS WEEK
+        </Text>
         <LinearGradient
           colors={[AMBER_LIGHT, AMBER, AMBER_DEEP]}
           start={{x: 0, y: 0}}
           end={{x: 1, y: 1}}
-          style={styles.digestCard}>
-          <Text style={styles.digestKicker}>YOUR DIGEST</Text>
+          style={{marginTop: 12, borderRadius: 14, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 16}}>
+          <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 10, color: 'rgba(255,255,255,0.78)', letterSpacing: 1.4}}>
+            YOUR DIGEST
+          </Text>
           {digest ? (
             <>
               {digest.headline ? (
-                <Text style={styles.digestHeadline}>{digest.headline}</Text>
+                <Text style={{marginTop: 6, fontFamily: FONTS.sans, fontSize: 15, color: 'rgba(255,255,255,0.92)'}}>
+                  {digest.headline}
+                </Text>
               ) : null}
               {digest.body ? (
-                <Text style={styles.digestBody}>{digest.body}</Text>
+                <Text style={{marginTop: 4, fontFamily: FONTS.serifItalic, fontSize: 28, color: '#FFFFFF', lineHeight: 34}}>
+                  {digest.body}
+                </Text>
               ) : null}
               {(digest.dynasty_tags?.length ?? 0) > 0 ? (
-                <View style={styles.dynastyRow}>
+                <View className="mt-3 flex-row flex-wrap gap-[6px]">
                   {(digest.dynasty_tags ?? []).map(tag => (
-                    <View key={tag} style={styles.dynastyChip}>
-                      <Text style={styles.dynastyChipText}>{tag}</Text>
+                    <View key={tag} className="px-[10px] py-[5px] rounded-full bg-[rgba(255,255,255,0.18)]">
+                      <Text style={{fontFamily: FONTS.sansMedium, fontSize: 11, color: '#FFFFFF'}}>
+                        {tag}
+                      </Text>
                     </View>
                   ))}
                 </View>
               ) : null}
             </>
           ) : (
-            <Text style={styles.digestPlaceholder}>
+            <Text style={{marginTop: 6, fontFamily: FONTS.sans, fontSize: 14, color: 'rgba(255,255,255,0.85)'}}>
               Visit a site this week to unlock your digest.
             </Text>
           )}
         </LinearGradient>
 
         {/* Recent journeys */}
-        <View style={styles.journeysHeader}>
-          <Text style={styles.sectionKicker}>RECENT JOURNEYS</Text>
+        <View className="mt-[22px] mb-[10px] flex-row justify-between items-center">
+          <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.2}}>
+            RECENT JOURNEYS
+          </Text>
           <Pressable
             onPress={openHistory}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="View all journeys">
-            <Text style={styles.viewAll}>View all</Text>
+            <Text style={{fontFamily: FONTS.sansMedium, fontSize: 13, color: AMBER}}>
+              View all
+            </Text>
           </Pressable>
         </View>
         {recentJourneys.length > 0 ? (
@@ -220,18 +241,20 @@ const Profile: React.FC<Props> = ({navigation}) => {
             <Pressable
               key={visit.id}
               onPress={() => goToSite(visit)}
-              style={({pressed}) => [
-                styles.journeyRow,
-                pressed && styles.journeyRowPressed,
-              ]}
+              style={({pressed}) => pressed ? {opacity: 0.85} : undefined}
+              className="flex-row items-center py-[10px] px-[10px] rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] mb-2"
               accessibilityRole="button"
               accessibilityLabel={`Visit: ${visit.place_name}`}>
-              <View style={styles.journeyThumb} />
-              <View style={styles.journeyBody}>
-                <Text style={styles.journeyName} numberOfLines={1}>
+              <View className="w-11 h-11 rounded-lg bg-[rgba(212,134,10,0.22)] mr-3" />
+              <View className="flex-1">
+                <Text
+                  style={{fontFamily: FONTS.sansSemiBold, fontSize: 14, color: '#FFFFFF'}}
+                  numberOfLines={1}>
                   {visit.place_name}
                 </Text>
-                <Text style={styles.journeyMeta} numberOfLines={1}>
+                <Text
+                  style={{marginTop: 2, fontFamily: FONTS.sans, fontSize: 11, color: 'rgba(255,255,255,0.55)'}}
+                  numberOfLines={1}>
                   {formatRelativeTime(visit.arrived_at)}
                 </Text>
               </View>
@@ -239,8 +262,8 @@ const Profile: React.FC<Props> = ({navigation}) => {
             </Pressable>
           ))
         ) : (
-          <View style={styles.journeysEmpty}>
-            <Text style={styles.journeysEmptyText}>
+          <View className="py-6 items-center">
+            <Text style={{fontFamily: FONTS.sans, fontSize: 13, color: 'rgba(255,255,255,0.55)', textAlign: 'center'}}>
               No journeys yet. Visit a heritage site to start your timeline.
             </Text>
           </View>
@@ -249,215 +272,5 @@ const Profile: React.FC<Props> = ({navigation}) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#0A0A0A'},
-  safeTop: {backgroundColor: '#0A0A0A'},
-  scroll: {paddingBottom: 32, paddingHorizontal: 24},
-  header: {
-    paddingTop: 14,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-  },
-  avatarOuter: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: 'rgba(212,134,10,0.18)',
-    padding: 3,
-  },
-  avatarImg: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 35,
-  },
-  avatarGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 35,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: {
-    fontFamily: FONTS.sansBold,
-    fontSize: 36,
-    color: '#FFFFFF',
-  },
-  headerText: {flex: 1, paddingTop: 4},
-  name: {
-    fontFamily: FONTS.serif,
-    fontSize: 26,
-    color: '#FFFFFF',
-    lineHeight: 30,
-  },
-  location: {
-    marginTop: 2,
-    fontFamily: FONTS.sans,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.55)',
-  },
-  streakRow: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  streakDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#3FB950',
-    marginRight: 8,
-  },
-  streakLabel: {
-    fontFamily: FONTS.sansMedium,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.78)',
-  },
-  menuButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statsRow: {
-    marginTop: 20,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  statCard: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontFamily: FONTS.serif,
-    fontSize: 32,
-    color: '#FFFFFF',
-    lineHeight: 36,
-  },
-  statLabel: {
-    marginTop: 4,
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: 1.1,
-  },
-  sectionKicker: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: 1.2,
-  },
-  digestCard: {
-    marginTop: 12,
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 16,
-  },
-  digestKicker: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.78)',
-    letterSpacing: 1.4,
-  },
-  digestHeadline: {
-    marginTop: 6,
-    fontFamily: FONTS.sans,
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.92)',
-  },
-  digestBody: {
-    marginTop: 4,
-    fontFamily: FONTS.serifItalic,
-    fontSize: 28,
-    color: '#FFFFFF',
-    lineHeight: 34,
-  },
-  digestPlaceholder: {
-    marginTop: 6,
-    fontFamily: FONTS.sans,
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
-  },
-  dynastyRow: {
-    marginTop: 12,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  dynastyChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  dynastyChipText: {
-    fontFamily: FONTS.sansMedium,
-    fontSize: 11,
-    color: '#FFFFFF',
-  },
-  journeysHeader: {
-    marginTop: 22,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  viewAll: {
-    fontFamily: FONTS.sansMedium,
-    fontSize: 13,
-    color: AMBER,
-  },
-  journeyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    marginBottom: 8,
-  },
-  journeyRowPressed: {opacity: 0.85},
-  journeyThumb: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: 'rgba(212,134,10,0.22)',
-    marginRight: 12,
-  },
-  journeyBody: {flex: 1},
-  journeyName: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 14,
-    color: '#FFFFFF',
-  },
-  journeyMeta: {
-    marginTop: 2,
-    fontFamily: FONTS.sans,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.55)',
-  },
-  journeysEmpty: {
-    paddingVertical: 24,
-    alignItems: 'center',
-  },
-  journeysEmptyText: {
-    fontFamily: FONTS.sans,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.55)',
-    textAlign: 'center',
-  },
-});
 
 export default Profile;

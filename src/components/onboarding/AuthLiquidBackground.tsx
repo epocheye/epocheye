@@ -1,61 +1,38 @@
-import React, { type PropsWithChildren } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, {type PropsWithChildren} from 'react';
+import {View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
-const AuthLiquidBackground: React.FC<PropsWithChildren> = ({ children }) => {
+const AuthLiquidBackground: React.FC<PropsWithChildren> = ({children}) => {
   return (
-    <View style={styles.root}>
+    <View className="flex-1 overflow-hidden bg-black">
       <LinearGradient
         colors={['#000000', '#070707', '#000000']}
         locations={[0, 0.52, 1]}
-        start={{ x: 0.12, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={StyleSheet.absoluteFill}
+        start={{x: 0.12, y: 0}}
+        end={{x: 0.9, y: 1}}
+        style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
       />
 
-      <View style={styles.accentPrimary} />
-      <View style={styles.accentSecondary} />
+      <View
+        className="absolute w-[220px] h-[220px] rounded-full bg-[rgba(255,255,255,0.05)]"
+        style={{top: -40, right: -30}}
+      />
+      <View
+        className="absolute w-[260px] h-[260px] rounded-full bg-[rgba(212,134,10,0.08)]"
+        style={{bottom: -60, left: -40}}
+      />
 
       <LinearGradient
         colors={['rgba(0,0,0,0.18)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.76)']}
         locations={[0, 0.58, 1]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
+        start={{x: 0.5, y: 0}}
+        end={{x: 0.5, y: 1}}
+        style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
       />
 
-      <View style={styles.content}>{children}</View>
+      <View className="flex-1">{children}</View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#000000',
-    overflow: 'hidden',
-  },
-  content: {
-    flex: 1,
-  },
-  accentPrimary: {
-    position: 'absolute',
-    top: -40,
-    right: -30,
-    width: 220,
-    height: 220,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  accentSecondary: {
-    position: 'absolute',
-    bottom: -60,
-    left: -40,
-    width: 260,
-    height: 260,
-    borderRadius: 999,
-    backgroundColor: 'rgba(212,134,10,0.08)',
-  },
-});
 
 export default AuthLiquidBackground;

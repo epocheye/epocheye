@@ -156,50 +156,50 @@ const Home: React.FC<Props> = ({navigation}) => {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-surface-1">
       <StatusBar barStyle="light-content" />
-      <SafeAreaView edges={['top']} style={styles.safeTop} />
+      <SafeAreaView edges={['top']} className="bg-surface-1" />
 
-      {/* Header (no search button — moved to control row) */}
-      <View style={styles.header}>
-        <Text style={styles.kicker}>Heritage Near You</Text>
-        <Text style={styles.title} numberOfLines={1}>
+      {/* Header */}
+      <View className="px-6 pt-2 pb-2">
+        <Text style={{fontFamily: FONTS.sans, fontSize: 12, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3}}>
+          Heritage Near You
+        </Text>
+        <Text
+          style={{marginTop: 2, fontFamily: FONTS.serif, fontSize: 28, color: '#FFFFFF', lineHeight: 32}}
+          numberOfLines={1}>
           {locationTitle}
         </Text>
       </View>
 
-      {/* Control row: segmented pill (left) + search icon (right) on one line */}
-      <View style={styles.controlRow}>
-        <View style={styles.segmentTrack}>
+      {/* Control row: segmented pill (left) + search icon (right) */}
+      <View className="px-6 pt-5 pb-3 flex-row items-center justify-between">
+        <View className="flex-row p-[3px] rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)]">
           <Pressable
             onPress={() => setViewMode('nearby')}
-            style={[
-              styles.segmentBtn,
-              viewMode === 'nearby' && styles.segmentBtnActive,
-            ]}
+            className={`px-[18px] py-[6px] rounded-full${viewMode === 'nearby' ? ' bg-[#61A6D3]' : ''}`}
             accessibilityRole="button"
             accessibilityState={{selected: viewMode === 'nearby'}}>
             <Text
-              style={[
-                styles.segmentLabel,
-                viewMode === 'nearby' && styles.segmentLabelActive,
-              ]}>
+              style={{
+                fontFamily: FONTS.sansMedium,
+                fontSize: 12,
+                color: viewMode === 'nearby' ? '#FFFFFF' : 'rgba(255,255,255,0.55)',
+              }}>
               Nearby
             </Text>
           </Pressable>
           <Pressable
             onPress={() => setViewMode('virtual')}
-            style={[
-              styles.segmentBtn,
-              viewMode === 'virtual' && styles.segmentBtnActive,
-            ]}
+            className={`px-[18px] py-[6px] rounded-full${viewMode === 'virtual' ? ' bg-[#61A6D3]' : ''}`}
             accessibilityRole="button"
             accessibilityState={{selected: viewMode === 'virtual'}}>
             <Text
-              style={[
-                styles.segmentLabel,
-                viewMode === 'virtual' && styles.segmentLabelActive,
-              ]}>
+              style={{
+                fontFamily: FONTS.sansMedium,
+                fontSize: 12,
+                color: viewMode === 'virtual' ? '#FFFFFF' : 'rgba(255,255,255,0.55)',
+              }}>
               Virtual
             </Text>
           </Pressable>
@@ -207,7 +207,7 @@ const Home: React.FC<Props> = ({navigation}) => {
         <Pressable
           onPress={() => setSearchOpen(prev => !prev)}
           hitSlop={10}
-          style={styles.searchButton}
+          className="w-9 h-9 rounded-full bg-[rgba(255,255,255,0.06)] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={searchOpen ? 'Close search' : 'Open search'}>
           {searchOpen ? (
@@ -218,16 +218,16 @@ const Home: React.FC<Props> = ({navigation}) => {
         </Pressable>
       </View>
 
-      {/* Optional search input — slides in below control row */}
+      {/* Optional search input */}
       {searchOpen ? (
-        <View style={styles.searchWrap}>
+        <View className="mx-6 mb-2 px-3 py-2 rounded-xl bg-[rgba(255,255,255,0.06)] flex-row items-center gap-x-2">
           <Search color="rgba(255,255,255,0.4)" size={16} />
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
             placeholder="Search heritage sites"
             placeholderTextColor="rgba(255,255,255,0.35)"
-            style={styles.searchInput}
+            style={{flex: 1, fontFamily: FONTS.sans, fontSize: 14, color: '#FFFFFF', padding: 0}}
             autoFocus
             autoCorrect={false}
             returnKeyType="search"
@@ -240,13 +240,13 @@ const Home: React.FC<Props> = ({navigation}) => {
         </View>
       ) : null}
 
-      {/* Map — wrapped in a padded, rounded container */}
-      <View style={styles.mapWrap}>
+      {/* Map — padded rounded container */}
+      <View className="flex-1 mx-4 mt-2 mb-2 rounded-[18px] overflow-hidden bg-surface-1">
         {viewMode === 'nearby' ? (
           <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
-            style={StyleSheet.absoluteFill}
+            style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
             initialRegion={initialRegion}
             customMapStyle={mapStyle}
             showsUserLocation
@@ -266,9 +266,11 @@ const Home: React.FC<Props> = ({navigation}) => {
             ))}
           </MapView>
         ) : (
-          <View style={styles.virtualEmpty}>
-            <Text style={styles.virtualEmptyTitle}>Virtual tours</Text>
-            <Text style={styles.virtualEmptyBody}>
+          <View className="flex-1 items-center justify-center px-8">
+            <Text style={{fontFamily: FONTS.serif, fontSize: 22, color: '#FFFFFF'}}>
+              Virtual tours
+            </Text>
+            <Text style={{marginTop: 6, fontFamily: FONTS.sans, fontSize: 13, color: 'rgba(255,255,255,0.55)', textAlign: 'center'}}>
               Browse heritage sites worldwide. Coming soon.
             </Text>
           </View>
@@ -278,57 +280,63 @@ const Home: React.FC<Props> = ({navigation}) => {
       {/* Bottom featured card */}
       {featuredPlace ? (
         <View
-          style={[
-            styles.featureCard,
-            {bottom: insets.bottom + 84}, // sits above tab bar
-          ]}
+          className="absolute left-4 right-4 flex-row bg-white rounded-[14px] overflow-hidden"
+          style={[styles.cardShadow, {bottom: insets.bottom + 84}]}
           accessibilityRole="summary">
-          <View style={styles.featureImageWrap}>
+          <View className="w-[132px] h-[132px] bg-[#222]">
             {featuredPlace.image_urls?.[0] ? (
               <Image
                 source={{uri: featuredPlace.image_urls[0]}}
-                style={styles.featureImage}
+                className="w-full h-full"
                 resizeMode="cover"
               />
             ) : (
-              <View style={styles.featureImagePlaceholder} />
+              <View className="flex-1 bg-[rgba(212,134,10,0.22)]" />
             )}
           </View>
-          <View style={styles.featureBody}>
-            <Text style={styles.featureDistance} numberOfLines={1}>
+          <View className="flex-1 py-[10px] px-3">
+            <Text
+              style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: '#D24A2C', letterSpacing: 0.4}}
+              numberOfLines={1}>
               {featuredPlace.distance_meters > 0
                 ? `Nearest · ${formatDistance(featuredPlace.distance_meters)}`
                 : 'Featured'}
             </Text>
-            <Text style={styles.featureName} numberOfLines={1}>
+            <Text
+              style={{marginTop: 2, fontFamily: FONTS.serif, fontSize: 22, color: '#111111', lineHeight: 26}}
+              numberOfLines={1}>
               {featuredPlace.name}
             </Text>
-            <Text style={styles.featureMeta} numberOfLines={1}>
+            <Text
+              style={{marginTop: 2, fontFamily: FONTS.sans, fontSize: 11, color: 'rgba(0,0,0,0.55)'}}
+              numberOfLines={1}>
               {lineCategory(featuredPlace)}
             </Text>
-            <Text style={styles.featureMeta} numberOfLines={1}>
+            <Text
+              style={{marginTop: 2, fontFamily: FONTS.sans, fontSize: 11, color: 'rgba(0,0,0,0.55)'}}
+              numberOfLines={1}>
               {lineEra(featuredPlace)}
             </Text>
-            <View style={styles.featureActions}>
+            <View className="mt-2 flex-row gap-x-[6px]">
               <Pressable
                 onPress={() => handleViewInAR(featuredPlace)}
-                style={({pressed}) => [
-                  styles.featurePrimary,
-                  pressed && styles.featureBtnPressed,
-                ]}
+                style={({pressed}) => pressed ? {opacity: 0.85} : undefined}
+                className="px-[14px] py-[6px] rounded-full bg-[#111111]"
                 accessibilityRole="button"
                 accessibilityLabel={`View ${featuredPlace.name} in AR`}>
-                <Text style={styles.featurePrimaryLabel}>View in AR</Text>
+                <Text style={{fontFamily: FONTS.sansMedium, fontSize: 12, color: '#FFFFFF'}}>
+                  View in AR
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => handleLearnMore(featuredPlace)}
-                style={({pressed}) => [
-                  styles.featureSecondary,
-                  pressed && styles.featureBtnPressed,
-                ]}
+                style={({pressed}) => pressed ? {opacity: 0.85} : undefined}
+                className="px-[14px] py-[6px] rounded-full bg-[#2A2A2A]"
                 accessibilityRole="button"
                 accessibilityLabel={`Learn more about ${featuredPlace.name}`}>
-                <Text style={styles.featureSecondaryLabel}>Learn More</Text>
+                <Text style={{fontFamily: FONTS.sansMedium, fontSize: 12, color: '#FFFFFF'}}>
+                  Learn More
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -339,188 +347,12 @@ const Home: React.FC<Props> = ({navigation}) => {
 };
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#0A0A0A'},
-  safeTop: {backgroundColor: '#0A0A0A'},
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-  kicker: {
-    fontFamily: FONTS.sans,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: 0.3,
-  },
-  title: {
-    marginTop: 2,
-    fontFamily: FONTS.serif,
-    fontSize: 28,
-    color: '#FFFFFF',
-    lineHeight: 32,
-  },
-  controlRow: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  searchButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentTrack: {
-    flexDirection: 'row',
-    padding: 3,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  segmentBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  segmentBtnActive: {
-    backgroundColor: COLORS.sky,
-  },
-  segmentLabel: {
-    fontFamily: FONTS.sansMedium,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.55)',
-  },
-  segmentLabelActive: {
-    color: '#FFFFFF',
-  },
-  searchWrap: {
-    marginHorizontal: 24,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontFamily: FONTS.sans,
-    fontSize: 14,
-    color: '#FFFFFF',
-    padding: 0,
-  },
-  mapWrap: {
-    flex: 1,
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
-    borderRadius: 18,
-    overflow: 'hidden',
-    backgroundColor: '#0A0A0A',
-  },
-  virtualEmpty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  virtualEmptyTitle: {
-    fontFamily: FONTS.serif,
-    fontSize: 22,
-    color: '#FFFFFF',
-  },
-  virtualEmptyBody: {
-    marginTop: 6,
-    fontFamily: FONTS.sans,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.55)',
-    textAlign: 'center',
-  },
-  featureCard: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    overflow: 'hidden',
+  cardShadow: {
     shadowColor: '#000',
     shadowOpacity: 0.35,
     shadowRadius: 16,
     shadowOffset: {width: 0, height: 8},
     elevation: 8,
-  },
-  featureImageWrap: {
-    width: 132,
-    height: 132,
-    backgroundColor: '#222',
-  },
-  featureImage: {width: '100%', height: '100%'},
-  featureImagePlaceholder: {
-    flex: 1,
-    backgroundColor: 'rgba(212,134,10,0.22)',
-  },
-  featureBody: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  featureDistance: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 11,
-    color: '#D24A2C',
-    letterSpacing: 0.4,
-  },
-  featureName: {
-    marginTop: 2,
-    fontFamily: FONTS.serif,
-    fontSize: 22,
-    color: '#111111',
-    lineHeight: 26,
-  },
-  featureMeta: {
-    marginTop: 2,
-    fontFamily: FONTS.sans,
-    fontSize: 11,
-    color: 'rgba(0,0,0,0.55)',
-  },
-  featureActions: {
-    marginTop: 8,
-    flexDirection: 'row',
-    gap: 6,
-  },
-  featurePrimary: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#111111',
-  },
-  featureSecondary: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#2A2A2A',
-  },
-  featureBtnPressed: {
-    opacity: 0.85,
-  },
-  featurePrimaryLabel: {
-    fontFamily: FONTS.sansMedium,
-    fontSize: 12,
-    color: '#FFFFFF',
-  },
-  featureSecondaryLabel: {
-    fontFamily: FONTS.sansMedium,
-    fontSize: 12,
-    color: '#FFFFFF',
   },
 });
 

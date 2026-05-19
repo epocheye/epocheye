@@ -1,10 +1,9 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import {
   Image,
   Pressable,
   ScrollView,
   StatusBar,
-  StyleSheet,
   Text,
   useWindowDimensions,
   View,
@@ -16,20 +15,24 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONTS } from '../../core/constants/theme';
-import { ROUTES } from '../../core/constants/routes';
-import { useOnboardingStore } from '../../stores/onboardingStore';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {COLORS, FONTS} from '../../core/constants/theme';
+import {ROUTES} from '../../core/constants/routes';
+import {useOnboardingStore} from '../../stores/onboardingStore';
 import {
   UNESCO_REGIONS,
   type UnescoRegion,
 } from '../../constants/onboarding/regions';
-import type { OnboardingScreenProps } from '../../core/types/navigation.types';
+import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB03_Region'>;
 
-const OB03_Region: React.FC<Props> = ({ navigation }) => {
-  const { width: screenWidth } = useWindowDimensions();
+const GRID_HORIZONTAL_PADDING = 24;
+const GRID_COLUMN_GAP = 12;
+const TILE_IMAGE_HEIGHT = 114;
+
+const OB03_Region: React.FC<Props> = ({navigation}) => {
+  const {width: screenWidth} = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const firstName = useOnboardingStore(s => s.firstName);
   const region = useOnboardingStore(s => s.region);
@@ -40,19 +43,19 @@ const OB03_Region: React.FC<Props> = ({ navigation }) => {
   const gridO = useSharedValue(0);
 
   useEffect(() => {
-    headO.value = withDelay(150, withTiming(1, { duration: 600 }));
+    headO.value = withDelay(150, withTiming(1, {duration: 600}));
     headY.value = withDelay(
       150,
-      withTiming(0, { duration: 600, easing: Easing.out(Easing.cubic) }),
+      withTiming(0, {duration: 600, easing: Easing.out(Easing.cubic)}),
     );
-    gridO.value = withDelay(500, withTiming(1, { duration: 600 }));
+    gridO.value = withDelay(500, withTiming(1, {duration: 600}));
   }, [headO, headY, gridO]);
 
   const sHead = useAnimatedStyle(() => ({
     opacity: headO.value,
-    transform: [{ translateY: headY.value }],
+    transform: [{translateY: headY.value}],
   }));
-  const sGrid = useAnimatedStyle(() => ({ opacity: gridO.value }));
+  const sGrid = useAnimatedStyle(() => ({opacity: gridO.value}));
 
   const onSelect = useCallback(
     (id: UnescoRegion) => {
@@ -77,7 +80,7 @@ const OB03_Region: React.FC<Props> = ({ navigation }) => {
   );
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-ink-warm">
       <StatusBar
         barStyle="light-content"
         translucent
@@ -85,61 +88,62 @@ const OB03_Region: React.FC<Props> = ({ navigation }) => {
       />
 
       <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          {
-            paddingTop: insets.top + 56,
-            paddingBottom: insets.bottom + 120,
-          },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
+        contentContainerStyle={{
+          paddingHorizontal: GRID_HORIZONTAL_PADDING,
+          paddingTop: insets.top + 56,
+          paddingBottom: insets.bottom + 120,
+        }}
+        showsVerticalScrollIndicator={false}>
         <Animated.View style={sHead}>
-          <Text style={styles.kicker}>
-            So, <Text style={styles.kickerName}>{greetingName}</Text> it is..
+          <Text
+            className="text-[22px] text-[rgba(255,255,255,0.78)] leading-[30px]"
+            style={{fontFamily: FONTS.serifItalic}}>
+            So,{' '}
+            <Text className="text-brand-lime" style={{fontFamily: FONTS.serifItalic}}>
+              {greetingName}
+            </Text>{' '}
+            it is..
           </Text>
-          <Text style={styles.question}>
+          <Text
+            className="text-[30px] text-parchment leading-[38px] mt-3"
+            style={{fontFamily: FONTS.serifItalic}}>
             Where does your{'\n'}Heritage belong to?
           </Text>
         </Animated.View>
 
-        <Animated.View style={[styles.grid, sGrid]}>
+        <Animated.View
+          className="mt-8 flex-row flex-wrap justify-start"
+          style={[sGrid, {columnGap: GRID_COLUMN_GAP, rowGap: 22}]}>
           {UNESCO_REGIONS.map(entry => {
             const selected = region === entry.id;
             return (
               <Pressable
                 key={entry.id}
                 onPress={() => onSelect(entry.id)}
-                style={({ pressed }) => [
-                  styles.tile,
-                  { width: tileWidth },
-                  pressed && styles.tilePressed,
+                className="items-start"
+                style={({pressed}) => [
+                  {width: tileWidth},
+                  pressed && {opacity: 0.85},
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={entry.label}
-                accessibilityState={{ selected }}
-              >
+                accessibilityState={{selected}}>
                 <View
-                  style={[
-                    styles.tileImageWrap,
-                    { width: tileWidth },
-                    selected && styles.tileImageWrapSelected,
-                  ]}
-                >
+                  className={`h-[114px] rounded-[10px] overflow-hidden border-2 ${selected ? 'border-brand-sky' : 'border-transparent'}`}
+                  style={{width: tileWidth}}>
                   <Image
                     source={entry.image}
-                    style={styles.tileImage}
+                    className="w-full h-full"
                     resizeMode="cover"
                   />
-                  {selected ? <View style={styles.tileTint} /> : null}
+                  {selected ? (
+                    <View className="absolute inset-0 bg-[rgba(97,166,211,0.18)]" />
+                  ) : null}
                 </View>
                 <Text
-                  style={[
-                    styles.tileLabel,
-                    selected && styles.tileLabelSelected,
-                  ]}
-                  numberOfLines={2}
-                >
+                  className={`mt-2 min-h-[36px] text-[14px] leading-[18px] ${selected ? 'text-parchment' : 'text-[rgba(255,255,255,0.82)]'}`}
+                  style={{fontFamily: FONTS.medium}}
+                  numberOfLines={2}>
                   {entry.label}
                 </Text>
               </Pressable>
@@ -148,122 +152,27 @@ const OB03_Region: React.FC<Props> = ({ navigation }) => {
         </Animated.View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
+      <View
+        className="absolute left-0 right-0 bottom-0 px-[28px] pt-3 bg-ink-warm"
+        style={{paddingBottom: insets.bottom + 20}}>
         <Pressable
           onPress={onContinue}
           disabled={!region}
-          style={({ pressed }) => [
-            styles.cta,
-            pressed && !!region && styles.ctaPressed,
-          ]}
+          className="w-full h-14 rounded-full bg-brand-sky items-center justify-center"
+          style={({pressed}) =>
+            pressed && !!region
+              ? {transform: [{scale: 0.98}], backgroundColor: COLORS.skyDark}
+              : undefined
+          }
           accessibilityRole="button"
-          accessibilityLabel="Continue"
-        >
-          <Text style={styles.ctaLabel}>Continue</Text>
+          accessibilityLabel="Continue">
+          <Text className="font-montserrat-medium text-[17px] text-parchment tracking-[0.3px]">
+            Continue
+          </Text>
         </Pressable>
       </View>
     </View>
   );
 };
-
-const GRID_HORIZONTAL_PADDING = 24;
-const GRID_COLUMN_GAP = 12;
-const TILE_IMAGE_HEIGHT = 114;
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#111111',
-  },
-  scroll: {
-    paddingHorizontal: GRID_HORIZONTAL_PADDING,
-  },
-  kicker: {
-    fontFamily: FONTS.serifItalic,
-    fontSize: 22,
-    color: 'rgba(255,255,255,0.78)',
-    lineHeight: 30,
-  },
-  kickerName: {
-    color: COLORS.lime,
-  },
-  question: {
-    fontFamily: FONTS.serifItalic,
-    fontSize: 30,
-    color: '#FFFFFF',
-    lineHeight: 38,
-    marginTop: 12,
-  },
-  grid: {
-    marginTop: 32,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-    columnGap: GRID_COLUMN_GAP,
-    rowGap: 22,
-  },
-  tile: {
-    alignItems: 'flex-start',
-  },
-  tilePressed: {
-    opacity: 0.85,
-  },
-  tileImageWrap: {
-    height: TILE_IMAGE_HEIGHT,
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  tileImageWrapSelected: {
-    borderColor: COLORS.sky,
-  },
-  tileImage: {
-    width: '100%',
-    height: '100%',
-  },
-  tileTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(97,166,211,0.18)',
-  },
-  tileLabel: {
-    marginTop: 8,
-    minHeight: 36,
-    fontFamily: FONTS.medium,
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.82)',
-    lineHeight: 18,
-  },
-  tileLabelSelected: {
-    color: '#FFFFFF',
-  },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 28,
-    paddingTop: 12,
-    backgroundColor: '#111111',
-  },
-  cta: {
-    width: '100%',
-    height: 56,
-    borderRadius: 999,
-    backgroundColor: COLORS.sky,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaPressed: {
-    backgroundColor: COLORS.skyDark,
-    transform: [{ scale: 0.98 }],
-  },
-  ctaLabel: {
-    fontFamily: FONTS.medium,
-    fontSize: 17,
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-  },
-});
 
 export default OB03_Region;

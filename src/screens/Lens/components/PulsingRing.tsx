@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, {useEffect, useRef, useState} from 'react';
+import {View} from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -49,14 +49,8 @@ const PulsingRing: React.FC<PulsingRingProps> = ({
 
     pulseOpacity.value = withRepeat(
       withSequence(
-        withTiming(0.2, {
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-        }),
-        withTiming(0.6, {
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-        }),
+        withTiming(0.2, {duration: 1200, easing: Easing.inOut(Easing.ease)}),
+        withTiming(0.6, {duration: 1200, easing: Easing.inOut(Easing.ease)}),
       ),
       -1,
       false,
@@ -77,11 +71,11 @@ const PulsingRing: React.FC<PulsingRingProps> = ({
     }
 
     cancelAnimation(pulseOpacity);
-    pulseOpacity.value = withTiming(0, { duration: 150 });
+    pulseOpacity.value = withTiming(0, {duration: 150});
 
     flashOpacity.value = withSequence(
-      withTiming(1, { duration: 120 }),
-      withTiming(0, { duration: 300 }),
+      withTiming(1, {duration: 120}),
+      withTiming(0, {duration: 300}),
     );
 
     setShowRipple(true);
@@ -94,10 +88,7 @@ const PulsingRing: React.FC<PulsingRingProps> = ({
     });
     rippleOpacity.value = withTiming(
       0,
-      {
-        duration: 600,
-        easing: Easing.out(Easing.cubic),
-      },
+      {duration: 600, easing: Easing.out(Easing.cubic)},
       finished => {
         if (finished) {
           runOnJS(setShowRipple)(false);
@@ -116,43 +107,23 @@ const PulsingRing: React.FC<PulsingRingProps> = ({
     rippleScale,
   ]);
 
-  const pulseStyle = useAnimatedStyle(() => ({
-    opacity: pulseOpacity.value,
-  }));
-
-  const flashStyle = useAnimatedStyle(() => ({
-    opacity: flashOpacity.value,
-  }));
-
+  const pulseStyle = useAnimatedStyle(() => ({opacity: pulseOpacity.value}));
+  const flashStyle = useAnimatedStyle(() => ({opacity: flashOpacity.value}));
   const rippleStyle = useAnimatedStyle(() => ({
     opacity: rippleOpacity.value,
-    transform: [{ scale: rippleScale.value }],
+    transform: [{scale: rippleScale.value}],
   }));
 
   return (
-    <View pointerEvents="none" style={styles.container}>
-      <Animated.View style={[styles.ring, pulseStyle]} />
-      <Animated.View style={[styles.ring, flashStyle]} />
-      {showRipple ? <Animated.View style={[styles.ring, rippleStyle]} /> : null}
+    <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
+      {/* Ring shape requires static dimensions + border — className + animated opacity */}
+      <Animated.View className="absolute w-[72px] h-[72px] rounded-full border-2 border-accent-amber bg-transparent" style={pulseStyle} />
+      <Animated.View className="absolute w-[72px] h-[72px] rounded-full border-2 border-accent-amber bg-transparent" style={flashStyle} />
+      {showRipple ? (
+        <Animated.View className="absolute w-[72px] h-[72px] rounded-full border-2 border-accent-amber bg-transparent" style={rippleStyle} />
+      ) : null}
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ring: {
-    position: 'absolute',
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 2,
-    borderColor: '#E8A020',
-    backgroundColor: 'transparent',
-  },
-});
 
 export default PulsingRing;

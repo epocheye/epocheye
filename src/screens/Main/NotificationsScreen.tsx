@@ -4,14 +4,12 @@ import {
   FlatList,
   RefreshControl,
   StatusBar,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, BellOff, Check, CheckCheck } from 'lucide-react-native';
-import { FONTS } from '../../core/constants/theme';
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -71,7 +69,6 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
   }, [load]);
 
   const handleMarkRead = useCallback(async (id: string) => {
-    // Optimistic update — roll back if the server rejects.
     setItems(prev =>
       prev.map(n => (n.id === id ? { ...n, is_read: true } : n)),
     );
@@ -106,23 +103,30 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => unread && void handleMarkRead(item.id)}
-          style={[styles.card, unread && styles.cardUnread]}
-        >
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle} numberOfLines={1}>
+          className="bg-[#121212] rounded-[14px] p-4"
+          style={{
+            borderWidth: 0.5,
+            borderColor: unread ? 'rgba(232,160,32,0.35)' : 'rgba(255,255,255,0.05)',
+          }}>
+          <View className="flex-row items-center gap-x-2 mb-[6px]">
+            <Text className="flex-1 text-parchment font-montserrat-semibold text-[15px]" numberOfLines={1}>
               {item.title}
             </Text>
-            {unread ? <View style={styles.unreadDot} /> : null}
+            {unread ? <View className="w-2 h-2 rounded-full bg-accent-amber" /> : null}
           </View>
-          <Text style={styles.cardBody} numberOfLines={3}>
+          <Text className="text-[#B8B0A0] font-montserrat text-[14px] leading-5" numberOfLines={3}>
             {item.message}
           </Text>
-          <View style={styles.cardFooter}>
-            <Text style={styles.cardMeta}>{formatRelative(item.created_at)}</Text>
+          <View className="mt-[10px] flex-row justify-between items-center">
+            <Text className="text-[#6E6A60] font-montserrat text-[12px]">
+              {formatRelative(item.created_at)}
+            </Text>
             {unread ? (
-              <View style={styles.markRow}>
+              <View className="flex-row items-center gap-x-1">
                 <Check size={12} color="#E8A020" />
-                <Text style={styles.markLabel}>Tap to mark read</Text>
+                <Text className="text-accent-amber font-montserrat-medium text-[11px]">
+                  Tap to mark read
+                </Text>
               </View>
             ) : null}
           </View>
@@ -133,27 +137,26 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView className="flex-1 bg-surface-1" edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
 
-      <View style={styles.header}>
+      <View
+        className="flex-row items-center px-4 pb-3 pt-2"
+        style={{borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)'}}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={12}
-          style={styles.headerBack}
-        >
+          className="p-[6px]">
           <ArrowLeft size={22} color="#F5F0E8" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <Text className="flex-1 text-parchment font-montserrat-semibold text-[18px] ml-2">
+          Notifications
+        </Text>
         <TouchableOpacity
           onPress={handleMarkAllRead}
           disabled={unreadCount === 0}
-          hitSlop={12}
-          style={[
-            styles.headerAction,
-            unreadCount === 0 && styles.headerActionDisabled,
-          ]}
-        >
+          className={`p-[6px]${unreadCount === 0 ? ' opacity-50' : ''}`}
+          hitSlop={12}>
           <CheckCheck
             size={18}
             color={unreadCount === 0 ? '#4A4A4A' : '#E8A020'}
@@ -162,18 +165,22 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       {loading ? (
-        <View style={styles.empty}>
+        <View className="flex-1 justify-center items-center px-8 gap-y-3">
           <ActivityIndicator color="#E8A020" />
         </View>
       ) : error ? (
-        <View style={styles.empty}>
-          <Text style={styles.errorText}>{error}</Text>
+        <View className="flex-1 justify-center items-center px-8 gap-y-3">
+          <Text className="text-[#FF6B6B] font-montserrat text-[14px] text-center">
+            {error}
+          </Text>
         </View>
       ) : items.length === 0 ? (
-        <View style={styles.empty}>
+        <View className="flex-1 justify-center items-center px-8 gap-y-3">
           <BellOff size={36} color="#4A4A4A" />
-          <Text style={styles.emptyTitle}>No notifications yet</Text>
-          <Text style={styles.emptySub}>
+          <Text className="text-parchment font-montserrat-semibold text-[16px]">
+            No notifications yet
+          </Text>
+          <Text className="text-[#8C8578] font-montserrat text-[14px] text-center">
             We'll let you know when history is near.
           </Text>
         </View>
@@ -182,7 +189,7 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
           data={items}
           keyExtractor={n => n.id}
           renderItem={renderItem}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={{paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, gap: 12}}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -195,122 +202,5 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0A0A0A',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-  },
-  headerBack: {
-    padding: 6,
-  },
-  headerTitle: {
-    flex: 1,
-    color: '#F5F0E8',
-    fontFamily: FONTS.semiBold,
-    fontSize: 18,
-    marginLeft: 8,
-  },
-  headerAction: {
-    padding: 6,
-  },
-  headerActionDisabled: {
-    opacity: 0.5,
-  },
-  list: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 32,
-    gap: 12,
-  },
-  card: {
-    backgroundColor: '#121212',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  cardUnread: {
-    borderColor: 'rgba(232,160,32,0.35)',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-  },
-  cardTitle: {
-    flex: 1,
-    color: '#F5F0E8',
-    fontFamily: FONTS.semiBold,
-    fontSize: 15,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#E8A020',
-  },
-  cardBody: {
-    color: '#B8B0A0',
-    fontFamily: FONTS.regular,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  cardFooter: {
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cardMeta: {
-    color: '#6E6A60',
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-  },
-  markRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  markLabel: {
-    color: '#E8A020',
-    fontFamily: FONTS.medium,
-    fontSize: 11,
-  },
-  empty: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    gap: 12,
-  },
-  emptyTitle: {
-    color: '#F5F0E8',
-    fontFamily: FONTS.semiBold,
-    fontSize: 16,
-  },
-  emptySub: {
-    color: '#8C8578',
-    fontFamily: FONTS.regular,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  errorText: {
-    color: '#FF6B6B',
-    fontFamily: FONTS.regular,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-});
 
 export default NotificationsScreen;

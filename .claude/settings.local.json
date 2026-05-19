@@ -61,7 +61,8 @@
       "Bash(javap -p io/github/sceneview/SceneView.class)",
       "Bash(javap -p io/github/sceneview/loaders/ModelLoader.class)",
       "Bash(./gradlew.bat :app:compileDebugKotlin --console=plain)",
-      "Bash(adb uninstall *)"
+      "Bash(adb uninstall *)",
+      "Bash(find *)"
     ]
   }
 }

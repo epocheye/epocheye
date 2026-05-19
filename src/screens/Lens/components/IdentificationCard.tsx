@@ -6,22 +6,18 @@
  * premium-gated content (significance + fact), and offline badge.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Pressable,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, {
-  FadeOut,
-  SlideInUp,
-} from 'react-native-reanimated';
-import { AlertTriangle, Lock, WifiOff, X } from 'lucide-react-native';
-import { FONTS } from '../../../core/constants/theme';
-import type { GeminiIdentification } from '../../../services/geminiVisionService';
+import Animated, {FadeOut, SlideInUp} from 'react-native-reanimated';
+import {AlertTriangle, Lock, WifiOff, X} from 'lucide-react-native';
+import {FONTS} from '../../../core/constants/theme';
+import type {GeminiIdentification} from '../../../services/geminiVisionService';
 import ReportIssueModal from '../../../components/ui/ReportIssueModal';
 
 const AUTO_DISMISS_MS = 8_000;
@@ -63,7 +59,6 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
     };
   }, [identification, isLoading, onDismiss]);
 
-  // Nothing to show
   if (!isLoading && !identification && !error) {
     return null;
   }
@@ -72,40 +67,45 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
     <Animated.View
       entering={SlideInUp.duration(300).springify()}
       exiting={FadeOut.duration(200)}
-      style={styles.container}
-    >
-      {/* Dismiss button */}
-      <Pressable style={styles.dismissButton} onPress={onDismiss} hitSlop={12}>
+      className="absolute top-[100px] left-4 right-4 bg-[rgba(13,13,13,0.9)] rounded-[20px] p-5 border border-[rgba(232,160,32,0.25)]">
+      <Pressable
+        className="absolute top-3 right-3 z-[1]"
+        onPress={onDismiss}
+        hitSlop={12}>
         <X size={16} color="#8C93A0" />
       </Pressable>
 
-      {/* Offline badge */}
       {isOffline && (
-        <View style={styles.offlineBadge}>
+        <View className="absolute top-3 left-4 flex-row items-center gap-x-1 bg-accent-amber rounded-lg px-2 py-[3px]">
           <WifiOff size={10} color="#0D0D0D" />
-          <Text style={styles.offlineBadgeText}>Saved offline</Text>
+          <Text className="text-[#0D0D0D] text-[10px] font-montserrat-bold">
+            Saved offline
+          </Text>
         </View>
       )}
 
-      {/* Loading state */}
       {isLoading && (
-        <View style={styles.loadingRow}>
+        <View className="flex-row items-center gap-x-[10px]">
           <ActivityIndicator color="#E8A020" size="small" />
-          <Text style={styles.loadingText}>Identifying this heritage site...</Text>
+          <Text className="text-grey-muted text-[14px] font-montserrat">
+            Identifying this heritage site...
+          </Text>
         </View>
       )}
 
-      {/* Error state */}
       {!isLoading && error && (
         <>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text className="text-grey-muted text-[14px] font-montserrat text-center">
+            {error}
+          </Text>
           <TouchableOpacity
             onPress={() => setReportOpen(true)}
-            style={styles.reportBtn}
-            hitSlop={6}
-          >
+            className="mt-[10px] self-center flex-row items-center gap-x-[6px] py-[6px] px-[10px] rounded-[10px] border border-[rgba(201,168,76,0.3)] bg-ob-goldSubtle"
+            hitSlop={6}>
             <AlertTriangle color="#C9A84C" size={12} />
-            <Text style={styles.reportBtnText}>Report issue</Text>
+            <Text className="text-ob-gold text-[11px] font-montserrat-medium">
+              Report issue
+            </Text>
           </TouchableOpacity>
           <ReportIssueModal
             visible={reportOpen}
@@ -114,169 +114,63 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
         </>
       )}
 
-      {/* Identification result */}
       {!isLoading && identification && (
         <Pressable onPress={onExpand}>
-          <Text style={styles.name}>{identification.name}</Text>
+          <Text className="text-parchment text-[20px] font-montserrat-bold mb-0.5">
+            {identification.name}
+          </Text>
 
           {locationContext ? (
-            <Text style={styles.locationContext} numberOfLines={2}>
+            <Text
+              className="text-[rgba(255,255,255,0.6)] text-[12px] leading-[17px] font-montserrat mb-2"
+              numberOfLines={2}>
               {locationContext}
             </Text>
           ) : null}
 
           {identification.period ? (
-            <Text style={styles.period}>{identification.period}</Text>
+            <Text className="text-accent-amber text-[13px] font-montserrat-medium mb-[10px]">
+              {identification.period}
+            </Text>
           ) : null}
 
-          {/* Significance — premium gated */}
           {isPremium ? (
-            <Text style={styles.significance} numberOfLines={2}>
+            <Text
+              className="text-[#C5C9D1] text-[13px] font-montserrat leading-5 mb-2"
+              numberOfLines={2}>
               {identification.significance}
             </Text>
           ) : identification.significance &&
-            identification.significance !== 'Not identified as a heritage structure or artifact.' ? (
-            <Pressable style={styles.lockedRow} onPress={onUpgrade}>
+            identification.significance !==
+              'Not identified as a heritage structure or artifact.' ? (
+            <Pressable
+              className="flex-row items-center gap-x-[6px] my-2"
+              onPress={onUpgrade}>
               <Lock size={12} color="#E8A020" />
-              <Text style={styles.lockedText}>
+              <Text className="text-accent-amber text-[12px] font-montserrat-semibold">
                 Unlock full details with Passport
               </Text>
             </Pressable>
           ) : null}
 
-          {/* Fun fact — premium only */}
           {isPremium && identification.fact ? (
-            <Text style={styles.fact}>{identification.fact}</Text>
+            <Text
+              className="text-accent-amber text-[13px] leading-5 mb-2"
+              style={{
+                fontFamily: FONTS.mediumItalic ?? FONTS.italic,
+                fontStyle: 'italic',
+              }}>
+              {identification.fact}
+            </Text>
           ) : null}
 
-          {/* Tap hint */}
-          <Text style={styles.tapHint}>Tap for more details</Text>
+          <Text className="text-[#5A5F6B] text-[11px] font-montserrat mt-1">
+            Tap for more details
+          </Text>
         </Pressable>
       )}
     </Animated.View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 100,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(13,13,13,0.9)',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.25)',
-  },
-  dismissButton: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    zIndex: 1,
-  },
-  offlineBadge: {
-    position: 'absolute',
-    top: 12,
-    left: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 4,
-    backgroundColor: '#E8A020',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  offlineBadgeText: {
-    color: '#0D0D0D',
-    fontSize: 10,
-    fontFamily: FONTS.bold,
-  },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 10,
-  },
-  loadingText: {
-    color: '#8C93A0',
-    fontSize: 14,
-    fontFamily: FONTS.regular,
-  },
-  errorText: {
-    color: '#8C93A0',
-    fontSize: 14,
-    fontFamily: FONTS.regular,
-    textAlign: 'center',
-  },
-  reportBtn: {
-    marginTop: 10,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.3)',
-    backgroundColor: 'rgba(201,168,76,0.08)',
-  },
-  reportBtnText: {
-    color: '#C9A84C',
-    fontSize: 11,
-    fontFamily: FONTS.medium,
-  },
-  name: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontFamily: FONTS.bold,
-    marginBottom: 2,
-  },
-  period: {
-    color: '#E8A020',
-    fontSize: 13,
-    fontFamily: FONTS.medium,
-    marginBottom: 10,
-  },
-  locationContext: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
-    lineHeight: 17,
-    fontFamily: FONTS.regular,
-    marginBottom: 8,
-  },
-  significance: {
-    color: '#C5C9D1',
-    fontSize: 13,
-    fontFamily: FONTS.regular,
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  fact: {
-    color: '#E8A020',
-    fontSize: 13,
-    fontFamily: FONTS.mediumItalic ?? FONTS.italic,
-    fontStyle: 'italic',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  lockedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 6,
-    marginVertical: 8,
-  },
-  lockedText: {
-    color: '#E8A020',
-    fontSize: 12,
-    fontFamily: FONTS.semiBold,
-  },
-  tapHint: {
-    color: '#5A5F6B',
-    fontSize: 11,
-    fontFamily: FONTS.regular,
-    marginTop: 4,
-  },
-});
 
 export default IdentificationCard;

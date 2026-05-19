@@ -1,5 +1,5 @@
 import React, {useEffect} from 'react';
-import {View, StyleSheet} from 'react-native';
+import {View} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -67,12 +67,13 @@ const ARViewfinder: React.FC<Props> = ({size = 220, children}) => {
   const inset = size * 0.08;
 
   return (
-    <View style={[styles.frame, {width: size, height: size}]}>
+    <View className="items-center justify-center" style={{width: size, height: size}}>
       {/* Outer ring */}
       <Animated.View
         style={[
-          styles.ring,
           {
+            position: 'absolute',
+            borderWidth: 1,
             width: size,
             height: size,
             borderRadius: size / 2,
@@ -83,16 +84,14 @@ const ARViewfinder: React.FC<Props> = ({size = 220, children}) => {
       />
       {/* Inner ring */}
       <View
-        style={[
-          styles.ring,
-          {
-            width: size * 0.72,
-            height: size * 0.72,
-            borderRadius: (size * 0.72) / 2,
-            borderColor: 'rgba(201,168,76,0.18)',
-            position: 'absolute',
-          },
-        ]}
+        style={{
+          position: 'absolute',
+          borderWidth: 1,
+          width: size * 0.72,
+          height: size * 0.72,
+          borderRadius: (size * 0.72) / 2,
+          borderColor: 'rgba(201,168,76,0.18)',
+        }}
       />
       {/* 4 L-brackets */}
       {([
@@ -103,22 +102,23 @@ const ARViewfinder: React.FC<Props> = ({size = 220, children}) => {
       ] as const).map((pos, i) => (
         <View
           key={i}
-          style={[
-            styles.bracket,
-            {
-              width: bracketSize,
-              height: bracketSize,
-              borderColor: GOLD.primary,
-              ...pos,
-            },
-          ]}
+          style={{
+            position: 'absolute',
+            borderRadius: 2,
+            width: bracketSize,
+            height: bracketSize,
+            borderColor: GOLD.primary,
+            ...pos,
+          }}
         />
       ))}
       {/* Vertical scan line */}
       <Animated.View
         style={[
-          styles.scan,
           {
+            position: 'absolute',
+            height: 1.5,
+            borderRadius: 1,
             width: size * 0.55,
             backgroundColor: ACCENT.indigo,
           },
@@ -128,46 +128,22 @@ const ARViewfinder: React.FC<Props> = ({size = 220, children}) => {
       {/* Center pulse */}
       <Animated.View
         style={[
-          styles.pulse,
-          {backgroundColor: GOLD.primary},
+          {
+            position: 'absolute',
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: GOLD.primary,
+          },
           pulseStyle,
         ]}
       />
       {/* Children slot (logo) */}
-      {children ? <View style={styles.center}>{children}</View> : null}
+      {children ? (
+        <View className="absolute items-center justify-center">{children}</View>
+      ) : null}
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  frame: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ring: {
-    position: 'absolute',
-    borderWidth: 1,
-  },
-  bracket: {
-    position: 'absolute',
-    borderRadius: 2,
-  },
-  scan: {
-    position: 'absolute',
-    height: 1.5,
-    borderRadius: 1,
-  },
-  pulse: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  center: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
 
 export default ARViewfinder;

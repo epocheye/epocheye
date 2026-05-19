@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleProp, StyleSheet, ViewStyle } from 'react-native';
+import { StyleProp, ViewStyle } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import ResolvedSubjectImage from '../ui/ResolvedSubjectImage';
 import { getOnboardingVisualFallback } from './visual-fallbacks';
@@ -11,6 +11,15 @@ interface OnboardingResolvedVisualProps {
   height?: number;
   style?: StyleProp<ViewStyle>;
 }
+
+const BASE_STYLE = {
+  width: '100%' as const,
+  borderRadius: 18,
+  overflow: 'hidden' as const,
+  backgroundColor: '#1A1A1A',
+};
+
+const IMAGE_STYLE = { borderRadius: 18 };
 
 const OnboardingResolvedVisual: React.FC<OnboardingResolvedVisualProps> = ({
   subject,
@@ -26,29 +35,17 @@ const OnboardingResolvedVisual: React.FC<OnboardingResolvedVisualProps> = ({
       fallbackUri={
         fallbackUri ?? getOnboardingVisualFallback(subject, context)
       }
-      style={[styles.base, { height }, style]}
-      imageStyle={styles.image}
+      style={[BASE_STYLE, { height }, style]}
+      imageStyle={IMAGE_STYLE}
       loadingLabel="Preparing your visual..."
       resizeMode="cover"
     >
       <LinearGradient
         colors={['rgba(13,13,13,0.06)', 'rgba(13,13,13,0.72)']}
-        style={StyleSheet.absoluteFill}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
       />
     </ResolvedSubjectImage>
   );
 };
-
-const styles = StyleSheet.create({
-  base: {
-    width: '100%',
-    borderRadius: 18,
-    overflow: 'hidden',
-    backgroundColor: '#1A1A1A',
-  },
-  image: {
-    borderRadius: 18,
-  },
-});
 
 export default OnboardingResolvedVisual;

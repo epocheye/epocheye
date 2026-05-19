@@ -53,19 +53,20 @@ const OBPrimaryButton: React.FC<Props> = ({
 
   return (
     <AnimatedPressable
-      style={[
-        styles.wrapper,
-        !disabled && styles.glow,
-        animatedStyle,
-      ]}
+      className="mx-6 rounded-full overflow-hidden"
+      style={[!disabled && styles.glow, animatedStyle]}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={handlePress}
       disabled={disabled}>
       {disabled ? (
-        <View style={styles.disabledBg}>
-          <Text style={[styles.label, styles.disabledLabel]}>{label}</Text>
-          {icon ? <View style={styles.icon}>{icon}</View> : null}
+        <View className="h-14 rounded-full flex-row items-center justify-center bg-ob-bgDisabled px-6">
+          <Text
+            className="text-base leading-5 text-[rgba(255,255,255,0.25)]"
+            style={{fontFamily: TYPE.button.fontFamily}}>
+            {label}
+          </Text>
+          {icon ? <View className="ml-2">{icon}</View> : null}
         </View>
       ) : (
         <LinearGradient
@@ -73,8 +74,12 @@ const OBPrimaryButton: React.FC<Props> = ({
           start={{x: 0, y: 0}}
           end={{x: 1, y: 1}}
           style={styles.gradient}>
-          <Text style={styles.label}>{label}</Text>
-          {icon ? <View style={styles.icon}>{icon}</View> : null}
+          <Text
+            className="text-base leading-5 text-parchment"
+            style={{fontFamily: TYPE.button.fontFamily}}>
+            {label}
+          </Text>
+          {icon ? <View className="ml-2">{icon}</View> : null}
         </LinearGradient>
       )}
     </AnimatedPressable>
@@ -82,11 +87,7 @@ const OBPrimaryButton: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginHorizontal: 24,
-    borderRadius: RADIUS.pill,
-    overflow: 'hidden',
-  },
+  // Shadow kept in StyleSheet — not expressible via NativeWind on RN
   glow: {
     shadowColor: GOLD.primary,
     shadowOffset: {width: 0, height: 0},
@@ -94,6 +95,7 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 12,
   },
+  // LinearGradient requires a style prop, not className
   gradient: {
     height: 56,
     borderRadius: RADIUS.pill,
@@ -101,25 +103,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
-  },
-  disabledBg: {
-    height: 56,
-    borderRadius: RADIUS.pill,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1E1C17',
-    paddingHorizontal: 24,
-  },
-  label: {
-    ...TYPE.button,
-    color: '#FFFFFF',
-  },
-  disabledLabel: {
-    color: 'rgba(255,255,255,0.25)',
-  },
-  icon: {
-    marginLeft: 8,
   },
 });
 

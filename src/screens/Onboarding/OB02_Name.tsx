@@ -4,7 +4,6 @@ import {
   Platform,
   Pressable,
   StatusBar,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -63,126 +62,76 @@ const OB02_Name: React.FC<Props> = ({navigation}) => {
   }, [canContinue, trimmed, setFirstName, navigation]);
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+    <View className="flex-1 bg-ink-warm">
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.kav}>
-        <View style={[styles.content, {paddingTop: insets.top + 80}]}>
-          <Animated.Text style={[styles.titleLine1, sTitle]}>
+        className="flex-1">
+        <View
+          className="flex-1 px-[28px]"
+          style={{paddingTop: insets.top + 80}}>
+          <Animated.Text
+            className="font-handwritten text-[44px] text-parchment leading-[52px]"
+            style={sTitle}>
             Welcoome to
           </Animated.Text>
-          <Animated.Text style={[styles.titleLine2, sTitle]}>
+          <Animated.Text
+            className="font-handwritten text-[56px] text-brand-lime leading-[64px] -mt-1"
+            style={sTitle}>
             Epocheye
           </Animated.Text>
 
-          <Animated.Text style={[styles.sub, sSub]}>
+          <Animated.Text
+            className="font-serif-italic text-[22px] text-[rgba(255,255,255,0.78)] leading-[30px] mt-9"
+            style={sSub}>
             Before we go further -{'\n'}What should we call you?
           </Animated.Text>
 
-          <Animated.View style={[styles.inputWrap, sInput]}>
+          <Animated.View className="mt-11" style={sInput}>
             <TextInput
               value={value}
               onChangeText={setValue}
               placeholder="Your name"
               placeholderTextColor="rgba(255,255,255,0.35)"
-              style={styles.input}
+              className="text-[22px] text-parchment py-2.5 px-0"
+              style={{fontFamily: FONTS.medium}}
               autoCapitalize="words"
               autoCorrect={false}
               returnKeyType="done"
               onSubmitEditing={onContinue}
               maxLength={40}
             />
-            <View style={styles.underline} />
+            <View className="h-px bg-[rgba(255,255,255,0.35)]" />
           </Animated.View>
         </View>
 
-        <View style={[styles.footer, {paddingBottom: insets.bottom + 20}]}>
+        <View
+          className="px-[28px]"
+          style={{paddingBottom: insets.bottom + 20}}>
           <Pressable
             onPress={onContinue}
             disabled={!canContinue}
-            style={({pressed}) => [
-              styles.cta,
-              pressed && canContinue && styles.ctaPressed,
-            ]}
+            className="w-full h-14 rounded-full bg-brand-sky items-center justify-center"
+            style={({pressed}) =>
+              pressed && canContinue
+                ? {transform: [{scale: 0.98}], backgroundColor: COLORS.skyDark}
+                : undefined
+            }
             accessibilityRole="button"
             accessibilityLabel="Continue">
-            <Text style={styles.ctaLabel}>Continue</Text>
+            <Text className="font-montserrat-medium text-[17px] text-parchment tracking-[0.3px]">
+              Continue
+            </Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#111111',
-  },
-  kav: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 28,
-  },
-  titleLine1: {
-    fontFamily: FONTS.handwritten,
-    fontSize: 44,
-    color: '#FFFFFF',
-    lineHeight: 52,
-  },
-  titleLine2: {
-    fontFamily: FONTS.handwritten,
-    fontSize: 56,
-    color: COLORS.lime,
-    lineHeight: 64,
-    marginTop: -4,
-  },
-  sub: {
-    fontFamily: FONTS.serifItalic,
-    fontSize: 22,
-    color: 'rgba(255,255,255,0.78)',
-    lineHeight: 30,
-    marginTop: 36,
-  },
-  inputWrap: {
-    marginTop: 44,
-  },
-  input: {
-    fontFamily: FONTS.medium,
-    fontSize: 22,
-    color: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 0,
-  },
-  underline: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
-  footer: {
-    paddingHorizontal: 28,
-  },
-  cta: {
-    width: '100%',
-    height: 56,
-    borderRadius: 999,
-    backgroundColor: COLORS.sky,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaPressed: {
-    backgroundColor: COLORS.skyDark,
-    transform: [{scale: 0.98}],
-  },
-  ctaLabel: {
-    fontFamily: FONTS.medium,
-    fontSize: 17,
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-  },
-});
 
 export default OB02_Name;

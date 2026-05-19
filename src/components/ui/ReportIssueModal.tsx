@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -71,12 +70,11 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
       visible={visible}
       animationType="fade"
       transparent
-      onRequestClose={handleClose}
-    >
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <Text style={styles.title}>
+      onRequestClose={handleClose}>
+      <View className="flex-1 bg-[rgba(0,0,0,0.7)] justify-center px-6">
+        <View className="bg-[#0E0E10] rounded-[20px] p-5 border border-[rgba(255,255,255,0.08)]">
+          <View className="flex-row justify-between items-center mb-[14px]">
+            <Text className="text-parchment text-[17px] font-montserrat-semibold">
               {submitted ? 'Reported' : 'Report this scan'}
             </Text>
             <Pressable onPress={handleClose} hitSlop={12}>
@@ -85,32 +83,42 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
           </View>
 
           {submitted ? (
-            <View style={styles.successBlock}>
-              <View style={styles.successBadge}>
+            <View className="items-center gap-y-[14px]">
+              <View className="w-12 h-12 rounded-full bg-[#C9A84C] items-center justify-center mt-1">
                 <Check color="#0A0A0A" size={22} />
               </View>
-              <Text style={styles.successMessage}>
+              <Text className="text-[#D8D2C4] text-center text-[13px] leading-[19px] font-montserrat mb-1">
                 Thanks — we'll review this and restore your scan if it was our mistake.
               </Text>
-              <TouchableOpacity onPress={handleClose} style={styles.primaryCta}>
-                <Text style={styles.primaryCtaText}>Close</Text>
+              <TouchableOpacity
+                onPress={handleClose}
+                className="bg-[#D4860A] rounded-[14px] py-[14px] items-center justify-center w-full">
+                <Text className="text-surface-1 text-[14px] font-montserrat-semibold">
+                  Close
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (
             <>
-              <Text style={styles.prompt}>What went wrong?</Text>
-              <View style={styles.reasonList}>
+              <Text className="text-[rgba(245,240,232,0.65)] text-[13px] font-montserrat mb-[10px]">
+                What went wrong?
+              </Text>
+              <View className="flex-row flex-wrap gap-2 mb-3">
                 {REASONS.map(reason => {
                   const active = selectedReason === reason;
                   return (
                     <TouchableOpacity
                       key={reason}
                       onPress={() => setSelectedReason(reason)}
-                      style={[styles.reasonPill, active && styles.reasonPillActive]}
-                    >
+                      className={`border rounded-xl px-3 py-2 ${
+                        active
+                          ? 'border-[#C9A84C] bg-[rgba(201,168,76,0.1)]'
+                          : 'border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)]'
+                      }`}>
                       <Text
-                        style={[styles.reasonText, active && styles.reasonTextActive]}
-                      >
+                        className={`text-[12px] font-montserrat-medium ${
+                          active ? 'text-[#C9A84C]' : 'text-[#D8D2C4]'
+                        }`}>
                         {reason}
                       </Text>
                     </TouchableOpacity>
@@ -125,21 +133,33 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
                 placeholderTextColor="rgba(245,240,232,0.35)"
                 multiline
                 numberOfLines={3}
-                style={styles.notes}
+                style={{
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.08)',
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  color: '#F5F0E8',
+                  fontFamily: 'MontserratAlternates-Regular',
+                  fontSize: 13,
+                  minHeight: 72,
+                  textAlignVertical: 'top',
+                  marginBottom: 14,
+                }}
               />
 
               <TouchableOpacity
                 disabled={!selectedReason || submitting}
                 onPress={handleSubmit}
-                style={[
-                  styles.primaryCta,
-                  (!selectedReason || submitting) && styles.primaryCtaDisabled,
-                ]}
-              >
+                className={`bg-[#D4860A] rounded-[14px] py-[14px] items-center justify-center${
+                  (!selectedReason || submitting) ? ' opacity-[0.45]' : ''
+                }`}>
                 {submitting ? (
                   <ActivityIndicator color="#0A0A0A" size="small" />
                 ) : (
-                  <Text style={styles.primaryCtaText}>Submit report</Text>
+                  <Text className="text-surface-1 text-[14px] font-montserrat-semibold">
+                    Submit report
+                  </Text>
                 )}
               </TouchableOpacity>
             </>
@@ -149,113 +169,5 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  card: {
-    backgroundColor: '#0E0E10',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  title: {
-    color: '#F5F0E8',
-    fontSize: 17,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  prompt: {
-    color: 'rgba(245,240,232,0.65)',
-    fontSize: 13,
-    fontFamily: 'MontserratAlternates-Regular',
-    marginBottom: 10,
-  },
-  reasonList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
-  reasonPill: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-  },
-  reasonPillActive: {
-    borderColor: '#C9A84C',
-    backgroundColor: 'rgba(201,168,76,0.1)',
-  },
-  reasonText: {
-    color: '#D8D2C4',
-    fontSize: 12,
-    fontFamily: 'MontserratAlternates-Medium',
-  },
-  reasonTextActive: {
-    color: '#C9A84C',
-  },
-  notes: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#F5F0E8',
-    fontFamily: 'MontserratAlternates-Regular',
-    fontSize: 13,
-    minHeight: 72,
-    textAlignVertical: 'top',
-    marginBottom: 14,
-  },
-  primaryCta: {
-    backgroundColor: '#D4860A',
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryCtaDisabled: {
-    opacity: 0.45,
-  },
-  primaryCtaText: {
-    color: '#0A0A0A',
-    fontSize: 14,
-    fontFamily: 'MontserratAlternates-SemiBold',
-  },
-  successBlock: {
-    alignItems: 'center',
-    gap: 14,
-  },
-  successBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#C9A84C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  successMessage: {
-    color: '#D8D2C4',
-    textAlign: 'center',
-    fontSize: 13,
-    lineHeight: 19,
-    fontFamily: 'MontserratAlternates-Regular',
-    marginBottom: 4,
-  },
-});
 
 export default ReportIssueModal;
