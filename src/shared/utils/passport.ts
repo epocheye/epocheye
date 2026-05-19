@@ -9,7 +9,8 @@
  */
 
 import type {VisitRow} from '../../utils/api/visits';
-import type {PassportStamp} from '../../utils/api/passport';
+import type {LockedSite, PassportStamp} from '../../utils/api/passport';
+import type {SavedPlace} from '../../utils/api/places/types';
 
 function localDateKey(iso: string): string | null {
   const t = Date.parse(iso);
@@ -95,4 +96,34 @@ export function deriveStamps(visits: VisitRow[]): PassportStamp[] {
     visited_at: v.arrived_at,
     image_url: null,
   }));
+}
+
+/**
+ * Build locked-stamp rows from the user's saved/planned places. A saved place
+ * counts as a *locked* stamp until they actually visit it (after which it
+ * graduates to an unlocked stamp via `deriveStamps`).
+ */
+export function deriveLockedFromSaved(
+  savedPlaces: SavedPlace[],
+  visits: VisitRow[],
+): LockedSite[] {
+  const visitedIds = new Set<string>();
+  for (const v of visits) {
+    if (v.place_id) visitedIds.add(v.place_id);
+  }
+
+  const seen = new Set<string>();
+  const out: LockedSite[] = [];
+  for (const s of savedPlaces) {
+    const pid = s?.place_id;
+    const pdata = s?.place_data;
+    if (!pid || !pdata?.name || visitedIds.has(pid) || seen.has(pid)) continue;
+    seen.add(pid);
+    out.push({
+      place_id: pid,
+      place_name: pdata.name,
+      hint: 'planned',
+    });
+  }
+  return out;
 }

@@ -160,30 +160,16 @@ const Home: React.FC<Props> = ({navigation}) => {
       <StatusBar barStyle="light-content" />
       <SafeAreaView edges={['top']} style={styles.safeTop} />
 
-      {/* Header */}
+      {/* Header (no search button — moved to control row) */}
       <View style={styles.header}>
-        <View style={styles.headerTextWrap}>
-          <Text style={styles.kicker}>Heritage Near You</Text>
-          <Text style={styles.title} numberOfLines={1}>
-            {locationTitle}
-          </Text>
-        </View>
-        <Pressable
-          onPress={() => setSearchOpen(prev => !prev)}
-          hitSlop={10}
-          style={styles.searchButton}
-          accessibilityRole="button"
-          accessibilityLabel={searchOpen ? 'Close search' : 'Open search'}>
-          {searchOpen ? (
-            <X color="#FFFFFF" size={20} />
-          ) : (
-            <Search color="#FFFFFF" size={20} />
-          )}
-        </Pressable>
+        <Text style={styles.kicker}>Heritage Near You</Text>
+        <Text style={styles.title} numberOfLines={1}>
+          {locationTitle}
+        </Text>
       </View>
 
-      {/* Segmented control */}
-      <View style={styles.segmentRow}>
+      {/* Control row: segmented pill (left) + search icon (right) on one line */}
+      <View style={styles.controlRow}>
         <View style={styles.segmentTrack}>
           <Pressable
             onPress={() => setViewMode('nearby')}
@@ -218,9 +204,21 @@ const Home: React.FC<Props> = ({navigation}) => {
             </Text>
           </Pressable>
         </View>
+        <Pressable
+          onPress={() => setSearchOpen(prev => !prev)}
+          hitSlop={10}
+          style={styles.searchButton}
+          accessibilityRole="button"
+          accessibilityLabel={searchOpen ? 'Close search' : 'Open search'}>
+          {searchOpen ? (
+            <X color="#FFFFFF" size={20} />
+          ) : (
+            <Search color="#FFFFFF" size={20} />
+          )}
+        </Pressable>
       </View>
 
-      {/* Optional search input */}
+      {/* Optional search input — slides in below control row */}
       {searchOpen ? (
         <View style={styles.searchWrap}>
           <Search color="rgba(255,255,255,0.4)" size={16} />
@@ -242,7 +240,7 @@ const Home: React.FC<Props> = ({navigation}) => {
         </View>
       ) : null}
 
-      {/* Map */}
+      {/* Map — wrapped in a padded, rounded container */}
       <View style={styles.mapWrap}>
         {viewMode === 'nearby' ? (
           <MapView
@@ -347,21 +345,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 8,
     paddingBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
   },
-  headerTextWrap: {flex: 1},
   kicker: {
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.sans,
     fontSize: 12,
     color: 'rgba(255,255,255,0.55)',
     letterSpacing: 0.3,
   },
   title: {
     marginTop: 2,
-    fontFamily: FONTS.bold,
-    fontSize: 22,
+    fontFamily: FONTS.serif,
+    fontSize: 28,
     color: '#FFFFFF',
+    lineHeight: 32,
+  },
+  controlRow: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   searchButton: {
     width: 36,
@@ -371,12 +375,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  segmentRow: {
-    paddingHorizontal: 24,
-    paddingBottom: 12,
-  },
   segmentTrack: {
-    alignSelf: 'flex-start',
     flexDirection: 'row',
     padding: 3,
     borderRadius: 999,
@@ -393,7 +392,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.sky,
   },
   segmentLabel: {
-    fontFamily: FONTS.medium,
+    fontFamily: FONTS.sansMedium,
     fontSize: 12,
     color: 'rgba(255,255,255,0.55)',
   },
@@ -413,13 +412,17 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.sans,
     fontSize: 14,
     color: '#FFFFFF',
     padding: 0,
   },
   mapWrap: {
     flex: 1,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: '#0A0A0A',
   },
@@ -430,13 +433,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   virtualEmptyTitle: {
-    fontFamily: FONTS.semiBold,
-    fontSize: 18,
+    fontFamily: FONTS.serif,
+    fontSize: 22,
     color: '#FFFFFF',
   },
   virtualEmptyBody: {
     marginTop: 6,
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.sans,
     fontSize: 13,
     color: 'rgba(255,255,255,0.55)',
     textAlign: 'center',
@@ -471,20 +474,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   featureDistance: {
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 11,
     color: '#D24A2C',
     letterSpacing: 0.4,
   },
   featureName: {
     marginTop: 2,
-    fontFamily: FONTS.bold,
-    fontSize: 18,
+    fontFamily: FONTS.serif,
+    fontSize: 22,
     color: '#111111',
+    lineHeight: 26,
   },
   featureMeta: {
     marginTop: 2,
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.sans,
     fontSize: 11,
     color: 'rgba(0,0,0,0.55)',
   },
@@ -509,12 +513,12 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   featurePrimaryLabel: {
-    fontFamily: FONTS.medium,
+    fontFamily: FONTS.sansMedium,
     fontSize: 12,
     color: '#FFFFFF',
   },
   featureSecondaryLabel: {
-    fontFamily: FONTS.medium,
+    fontFamily: FONTS.sansMedium,
     fontSize: 12,
     color: '#FFFFFF',
   },

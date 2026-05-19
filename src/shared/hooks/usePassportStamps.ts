@@ -15,7 +15,8 @@ import {
   type PassportStamp,
 } from '../../utils/api/passport';
 import {getVisitHistory} from '../../utils/api/visits';
-import {deriveStamps} from '../utils/passport';
+import {usePlacesStore} from '../../stores/placesStore';
+import {deriveLockedFromSaved, deriveStamps} from '../utils/passport';
 
 export interface UsePassportStampsOptions {
   dynasty?: string;
@@ -33,12 +34,15 @@ async function fetchDerivedStamps(): Promise<{
   lockedSites: LockedSite[];
 }> {
   const historyResult = await getVisitHistory();
-  if (!historyResult.success) {
-    return {stamps: [], lockedSites: []};
-  }
+  const visits = historyResult.success
+    ? historyResult.data.visits ?? []
+    : [];
+  // Lazy read of the saved-places store — we just need the current snapshot.
+  // Saved.tsx / PlanList separately keep this list fresh via ensureSavedPlacesLoaded.
+  const savedPlaces = usePlacesStore.getState().savedPlaces ?? [];
   return {
-    stamps: deriveStamps(historyResult.data.visits ?? []),
-    lockedSites: [],
+    stamps: deriveStamps(visits),
+    lockedSites: deriveLockedFromSaved(savedPlaces, visits),
   };
 }
 

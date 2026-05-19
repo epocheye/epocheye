@@ -15,6 +15,13 @@ export const FONTS = {
   mediumItalic: 'MontserratAlternates-MediumItalic',
   handwritten: 'NothingYouCouldDo-Regular',
   serifItalic: 'InstrumentSerif-Italic',
+
+  /** Instrument family — primary for Round 3 redesign screens. */
+  serif: 'InstrumentSerif-Regular',
+  sans: 'InstrumentSans-Regular',
+  sansMedium: 'InstrumentSans-Medium',
+  sansSemiBold: 'InstrumentSans-SemiBold',
+  sansBold: 'InstrumentSans-Bold',
 } as const;
 
 export const COLORS = {

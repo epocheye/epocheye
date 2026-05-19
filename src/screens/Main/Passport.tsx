@@ -24,7 +24,12 @@ import type {
   PassportStamp,
 } from '../../utils/api/passport';
 import type {ExplorerPass} from '../../utils/api/explorer-pass/types';
+import type {SavedPlace} from '../../utils/api/places/types';
+import {buildSiteDetailData} from '../../shared/utils';
 import type {TabScreenProps} from '../../core/types/navigation.types';
+import PlanList from './components/PlanList';
+
+type Mode = 'stamps' | 'plan';
 
 type Props = TabScreenProps<'Passport'>;
 
@@ -55,6 +60,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
     refresh: refreshStamps,
   } = usePassportStamps();
   const [refreshing, setRefreshing] = useState(false);
+  const [mode, setMode] = useState<Mode>('stamps');
 
   const tileWidth = useMemo(
     () =>
@@ -96,6 +102,15 @@ const Passport: React.FC<Props> = ({navigation}) => {
     navigation.navigate(ROUTES.MAIN.PURCHASE);
   }, [navigation]);
 
+  const onPlanPlacePress = useCallback(
+    (saved: SavedPlace) => {
+      navigation.navigate(ROUTES.MAIN.SITE_DETAIL, {
+        site: buildSiteDetailData(saved.place_data),
+      });
+    },
+    [navigation],
+  );
+
   const streakDays = summary?.streak_days ?? 0;
   const sitesVisited = summary?.sites_visited ?? 0;
   const sitesGoal = summary?.sites_goal ?? 50;
@@ -119,6 +134,41 @@ const Passport: React.FC<Props> = ({navigation}) => {
         </LinearGradient>
       </SafeAreaView>
 
+      {/* Stamps | Plan segmented control — pinned just below the banner */}
+      <View style={styles.modeRow}>
+        <View style={styles.modeTrack}>
+          <Pressable
+            onPress={() => setMode('stamps')}
+            style={[styles.modeBtn, mode === 'stamps' && styles.modeBtnActive]}
+            accessibilityRole="button"
+            accessibilityState={{selected: mode === 'stamps'}}>
+            <Text
+              style={[
+                styles.modeLabel,
+                mode === 'stamps' && styles.modeLabelActive,
+              ]}>
+              Stamps
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setMode('plan')}
+            style={[styles.modeBtn, mode === 'plan' && styles.modeBtnActive]}
+            accessibilityRole="button"
+            accessibilityState={{selected: mode === 'plan'}}>
+            <Text
+              style={[
+                styles.modeLabel,
+                mode === 'plan' && styles.modeLabelActive,
+              ]}>
+              Plan
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {mode === 'plan' ? (
+        <PlanList onPlacePress={onPlanPlacePress} />
+      ) : (
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -300,6 +350,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
           </View>
         ) : null}
       </ScrollView>
+      )}
     </View>
   );
 };
@@ -313,20 +364,51 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
   bannerKicker: {
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 11,
     color: 'rgba(255,255,255,0.85)',
     letterSpacing: 1.4,
   },
   bannerTitle: {
     marginTop: 8,
-    fontFamily: FONTS.bold,
-    fontSize: 30,
+    fontFamily: FONTS.serif,
+    fontSize: 34,
     color: '#FFFFFF',
     letterSpacing: 0.2,
+    lineHeight: 38,
   },
   scroll: {
     paddingBottom: 32,
+  },
+  modeRow: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    alignItems: 'center',
+  },
+  modeTrack: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  modeBtn: {
+    paddingHorizontal: 22,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  modeBtnActive: {
+    backgroundColor: AMBER,
+  },
+  modeLabel: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 0.3,
+  },
+  modeLabelActive: {
+    color: '#FFFFFF',
   },
   statsCard: {
     marginHorizontal: 18,
@@ -344,13 +426,13 @@ const styles = StyleSheet.create({
   statsRight: {flex: 1, alignItems: 'flex-start'},
   statsRow: {flexDirection: 'row', alignItems: 'flex-end'},
   statsBig: {
-    fontFamily: FONTS.bold,
-    fontSize: 38,
+    fontFamily: FONTS.serif,
+    fontSize: 44,
     color: '#FFFFFF',
-    lineHeight: 42,
+    lineHeight: 46,
   },
   statsTotal: {
-    fontFamily: FONTS.medium,
+    fontFamily: FONTS.sansMedium,
     fontSize: 18,
     color: 'rgba(255,255,255,0.55)',
     marginLeft: 8,
@@ -358,7 +440,7 @@ const styles = StyleSheet.create({
   },
   statsLabel: {
     marginTop: 4,
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 10,
     color: 'rgba(255,255,255,0.55)',
     letterSpacing: 1.1,
@@ -405,13 +487,14 @@ const styles = StyleSheet.create({
   },
   buyText: {flex: 1},
   buyTitle: {
-    fontFamily: FONTS.bold,
-    fontSize: 16,
+    fontFamily: FONTS.serif,
+    fontSize: 20,
     color: '#FFFFFF',
+    lineHeight: 24,
   },
   buyBody: {
     marginTop: 4,
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.sans,
     fontSize: 12.5,
     color: 'rgba(255,255,255,0.88)',
     lineHeight: 17,
@@ -428,7 +511,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   buyCtaLabel: {
-    fontFamily: FONTS.medium,
+    fontFamily: FONTS.sansMedium,
     fontSize: 12,
     color: '#FFFFFF',
   },
@@ -447,7 +530,7 @@ const styles = StyleSheet.create({
   },
   extendRowPressed: {opacity: 0.85},
   extendLabel: {
-    fontFamily: FONTS.medium,
+    fontFamily: FONTS.sansMedium,
     fontSize: 13,
     color: COLORS.sky,
   },
@@ -456,7 +539,7 @@ const styles = StyleSheet.create({
   },
   sectionKicker: {
     paddingHorizontal: 18,
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 11,
     color: 'rgba(255,255,255,0.55)',
     letterSpacing: 1.1,
@@ -477,13 +560,13 @@ const styles = StyleSheet.create({
   },
   passChipPressed: {opacity: 0.85},
   passChipName: {
-    fontFamily: FONTS.medium,
+    fontFamily: FONTS.sansMedium,
     fontSize: 13,
     color: '#FFFFFF',
   },
   passChipExpiry: {
     marginTop: 2,
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.sans,
     fontSize: 11,
     color: AMBER_LIGHT,
   },
@@ -496,13 +579,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   stampsHeaderTitle: {
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 12,
     color: '#FFFFFF',
     letterSpacing: 1.2,
   },
   stampsHeaderAction: {
-    fontFamily: FONTS.medium,
+    fontFamily: FONTS.sansMedium,
     fontSize: 13,
     color: AMBER,
   },
@@ -554,30 +637,30 @@ const styles = StyleSheet.create({
   stampCheckMark: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontFamily: FONTS.bold,
+    fontFamily: FONTS.sansBold,
     lineHeight: 13,
   },
   stampName: {
     marginTop: 8,
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 12,
     color: '#FFFFFF',
   },
   stampYear: {
     marginTop: 2,
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.sans,
     fontSize: 10,
     color: 'rgba(255,255,255,0.55)',
   },
   stampLockedName: {
     marginTop: 8,
-    fontFamily: FONTS.medium,
+    fontFamily: FONTS.sansMedium,
     fontSize: 12,
     color: 'rgba(255,255,255,0.55)',
   },
   stampLockedHint: {
     marginTop: 2,
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.sans,
     fontSize: 10,
     color: 'rgba(255,255,255,0.35)',
   },
@@ -587,14 +670,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyTitle: {
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 16,
     color: '#FFFFFF',
   },
   emptyBody: {
     marginTop: 8,
     textAlign: 'center',
-    fontFamily: FONTS.regular,
+    fontFamily: FONTS.sans,
     fontSize: 13,
     color: 'rgba(255,255,255,0.55)',
     lineHeight: 18,

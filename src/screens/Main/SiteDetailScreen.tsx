@@ -27,6 +27,7 @@ import {
   Navigation,
   Camera,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Sparkles,
   Bookmark,
@@ -40,6 +41,7 @@ import {
   elaboratePersonalizedFact,
 } from '../../utils/api/user';
 import type { PersonalizedFact } from '../../utils/api/user';
+import { ROUTES } from '../../core/constants';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 
 const HERO_HEIGHT = 180;
@@ -185,6 +187,12 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleStartARExperience = useCallback(() => {
     navigation.navigate('ARExperience', { site });
   }, [navigation, site]);
+
+  const handleGetPassport = useCallback(() => {
+    navigation.navigate(ROUTES.MAIN.PURCHASE, {
+      preSelectedPlaceId: site.id,
+    });
+  }, [navigation, site.id]);
 
   const handleShare = useCallback(() => {
     // Share handler intentionally blank — TBD.
@@ -406,6 +414,25 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
             </TouchableOpacity>
           </Animated.View>
+
+          {/* Get Passport for this site — secondary link, hidden when user already has access */}
+          {!hasAccess && (
+            <Animated.View entering={FadeInDown.delay(250).duration(400)}>
+              <TouchableOpacity
+                onPress={handleGetPassport}
+                className="flex-row items-center justify-center gap-1.5 py-2"
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Get Passport for this site"
+              >
+                <Sparkles color="#C9A84C" size={14} />
+                <Text className="text-brand-gold text-[13px] font-['MontserratAlternates-SemiBold']">
+                  Get Passport for this site
+                </Text>
+                <ChevronRight color="#C9A84C" size={14} />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
 
           {/* Historical Overview */}
           <Animated.View
