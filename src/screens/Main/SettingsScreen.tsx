@@ -35,7 +35,11 @@ import { APP_CONFIG } from '../../core/config';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import type { TabScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
-import { useExplorerPass, usePassportSummary, useProfileDigest } from '../../shared/hooks';
+import {
+  useExplorerPass,
+  usePassportSummary,
+  useProfileDigest,
+} from '../../shared/hooks';
 import { useDevSettingsStore } from '../../stores/devSettingsStore';
 import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 import { getVisitHistory, type VisitRow } from '../../utils/api/visits';
@@ -136,7 +140,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refreshSummary(), refreshDigest(), fetchVisits(), refreshUserData()]);
+    await Promise.all([
+      refreshSummary(),
+      refreshDigest(),
+      fetchVisits(),
+      refreshUserData(),
+    ]);
     setRefreshing(false);
   }, [refreshSummary, refreshDigest, fetchVisits, refreshUserData]);
 
@@ -244,8 +253,16 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   }, [clearUserData, onLogout]);
 
   const permissionRows = [
-    { key: 'camera' as const, label: 'Camera', granted: permissionStatus.camera },
-    { key: 'location' as const, label: 'Location', granted: permissionStatus.location },
+    {
+      key: 'camera' as const,
+      label: 'Camera',
+      granted: permissionStatus.camera,
+    },
+    {
+      key: 'location' as const,
+      label: 'Location',
+      granted: permissionStatus.location,
+    },
   ];
 
   return (
@@ -269,88 +286,42 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           }
         >
           {/* ── Profile hero header ── */}
-          <Animated.View
-            entering={FadeInDown.duration(350)}
-            className="px-6 pt-[14px] pb-2 flex-row items-start gap-x-[14px]"
-          >
-            <View className="w-[76px] h-[76px] rounded-full bg-[rgba(212,134,10,0.18)] p-[3px]">
-              {profile?.avatar_url ? (
-                <Image
-                  source={{ uri: profile.avatar_url }}
-                  className="w-full h-full rounded-[35px]"
-                  resizeMode="cover"
-                />
-              ) : (
-                <LinearGradient
-                  colors={[AMBER_LIGHT, AMBER, AMBER_DEEP]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: 35,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ fontFamily: FONTS.sansBold, fontSize: 36, color: '#FFFFFF' }}>
-                    {initialLetter(profile?.name)}
-                  </Text>
-                </LinearGradient>
-              )}
-            </View>
-            <View className="flex-1 pt-1">
-              <Text
-                style={{ fontFamily: FONTS.sansBold, fontSize: 22, color: '#FFFFFF', lineHeight: 28 }}
-                numberOfLines={1}
-              >
-                {displayName}
-              </Text>
-              {location ? (
-                <Text style={{ marginTop: 2, fontFamily: FONTS.sans, fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>
-                  {location}
-                </Text>
-              ) : null}
-              {isStreakActive ? (
-                <View className="mt-2 flex-row items-center">
-                  <View className="w-2 h-2 rounded-full bg-[#3FB950] mr-2" />
-                  <Text style={{ fontFamily: FONTS.sansMedium, fontSize: 12, color: 'rgba(255,255,255,0.78)' }}>
-                    {streakDays} day streak active
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            <TouchableOpacity
-              className="flex-row items-center rounded-full border border-white/10 bg-surface-1 px-3.5 py-2"
-              onPress={() => Linking.openURL('mailto:support@epocheye.app')}
-              accessibilityRole="button"
-              accessibilityLabel="Contact support"
-            >
-              <MessageCircle size={14} color="#B8AF9E" />
-              <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Medium'] ml-1.5">
-                Support
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
 
           {/* ── Stat cards ── */}
           <Animated.View
             entering={FadeInDown.delay(60).duration(350)}
             className="mt-4 px-6 flex-row gap-x-[10px]"
           >
-            {([
-              { label: 'SITES', value: sites },
-              { label: 'DYNASTIES', value: dynasties },
-              { label: 'STREAK', value: streakDays },
-            ] as const).map(stat => (
+            {(
+              [
+                { label: 'SITES', value: sites },
+                { label: 'DYNASTIES', value: dynasties },
+                { label: 'STREAK', value: streakDays },
+              ] as const
+            ).map(stat => (
               <View
                 key={stat.label}
                 className="flex-1 py-[14px] px-[10px] rounded-[14px] bg-white/[0.04] border border-white/[0.06] items-center"
               >
-                <Text style={{ fontFamily: FONTS.serif, fontSize: 32, color: '#FFFFFF', lineHeight: 36 }}>
+                <Text
+                  style={{
+                    fontFamily: FONTS.serif,
+                    fontSize: 32,
+                    color: '#FFFFFF',
+                    lineHeight: 36,
+                  }}
+                >
                   {stat.value}
                 </Text>
-                <Text style={{ marginTop: 4, fontFamily: FONTS.sansSemiBold, fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.1 }}>
+                <Text
+                  style={{
+                    marginTop: 4,
+                    fontFamily: FONTS.sansSemiBold,
+                    fontSize: 10,
+                    color: 'rgba(255,255,255,0.55)',
+                    letterSpacing: 1.1,
+                  }}
+                >
                   {stat.label}
                 </Text>
               </View>
@@ -362,35 +333,80 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             entering={FadeInDown.delay(100).duration(350)}
             className="px-6"
           >
-            <Text style={{ marginTop: 24, fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.2 }}>
+            <Text
+              style={{
+                marginTop: 24,
+                fontFamily: FONTS.sansSemiBold,
+                fontSize: 11,
+                color: 'rgba(255,255,255,0.55)',
+                letterSpacing: 1.2,
+              }}
+            >
               THIS WEEK
             </Text>
             <LinearGradient
               colors={[AMBER_LIGHT, AMBER, AMBER_DEEP]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={{ marginTop: 12, borderRadius: 14, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 16 }}
+              style={{
+                marginTop: 12,
+                borderRadius: 14,
+                paddingHorizontal: 18,
+                paddingTop: 14,
+                paddingBottom: 16,
+              }}
             >
-              <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 10, color: 'rgba(255,255,255,0.78)', letterSpacing: 1.4 }}>
+              <Text
+                style={{
+                  fontFamily: FONTS.sansSemiBold,
+                  fontSize: 10,
+                  color: 'rgba(255,255,255,0.78)',
+                  letterSpacing: 1.4,
+                }}
+              >
                 YOUR DIGEST
               </Text>
               {digest ? (
                 <>
                   {digest.headline ? (
-                    <Text style={{ marginTop: 6, fontFamily: FONTS.sans, fontSize: 15, color: 'rgba(255,255,255,0.92)' }}>
+                    <Text
+                      style={{
+                        marginTop: 6,
+                        fontFamily: FONTS.sans,
+                        fontSize: 15,
+                        color: 'rgba(255,255,255,0.92)',
+                      }}
+                    >
                       {digest.headline}
                     </Text>
                   ) : null}
                   {digest.body ? (
-                    <Text style={{ marginTop: 4, fontFamily: FONTS.serifItalic, fontSize: 28, color: '#FFFFFF', lineHeight: 34 }}>
+                    <Text
+                      style={{
+                        marginTop: 4,
+                        fontFamily: FONTS.serifItalic,
+                        fontSize: 28,
+                        color: '#FFFFFF',
+                        lineHeight: 34,
+                      }}
+                    >
                       {digest.body}
                     </Text>
                   ) : null}
                   {(digest.dynasty_tags?.length ?? 0) > 0 ? (
                     <View className="mt-3 flex-row flex-wrap gap-[6px]">
                       {(digest.dynasty_tags ?? []).map(tag => (
-                        <View key={tag} className="px-[10px] py-[5px] rounded-full bg-white/[0.18]">
-                          <Text style={{ fontFamily: FONTS.sansMedium, fontSize: 11, color: '#FFFFFF' }}>
+                        <View
+                          key={tag}
+                          className="px-[10px] py-[5px] rounded-full bg-white/[0.18]"
+                        >
+                          <Text
+                            style={{
+                              fontFamily: FONTS.sansMedium,
+                              fontSize: 11,
+                              color: '#FFFFFF',
+                            }}
+                          >
                             {tag}
                           </Text>
                         </View>
@@ -399,7 +415,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   ) : null}
                 </>
               ) : (
-                <Text style={{ marginTop: 6, fontFamily: FONTS.sans, fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>
+                <Text
+                  style={{
+                    marginTop: 6,
+                    fontFamily: FONTS.sans,
+                    fontSize: 14,
+                    color: 'rgba(255,255,255,0.85)',
+                  }}
+                >
                   Visit a site this week to unlock your digest.
                 </Text>
               )}
@@ -412,7 +435,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             className="px-6 mt-[22px]"
           >
             <View className="mb-[10px] flex-row justify-between items-center">
-              <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.2 }}>
+              <Text
+                style={{
+                  fontFamily: FONTS.sansSemiBold,
+                  fontSize: 11,
+                  color: 'rgba(255,255,255,0.55)',
+                  letterSpacing: 1.2,
+                }}
+              >
                 RECENT JOURNEYS
               </Text>
               <Pressable
@@ -421,7 +451,13 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 accessibilityRole="button"
                 accessibilityLabel="View all journeys"
               >
-                <Text style={{ fontFamily: FONTS.sansMedium, fontSize: 13, color: AMBER }}>
+                <Text
+                  style={{
+                    fontFamily: FONTS.sansMedium,
+                    fontSize: 13,
+                    color: AMBER,
+                  }}
+                >
                   View all
                 </Text>
               </Pressable>
@@ -431,7 +467,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 <Pressable
                   key={visit.id}
                   onPress={() => goToSite(visit)}
-                  style={({ pressed }) => pressed ? { opacity: 0.85 } : undefined}
+                  style={({ pressed }) =>
+                    pressed ? { opacity: 0.85 } : undefined
+                  }
                   className="flex-row items-center py-[10px] px-[10px] rounded-xl bg-white/[0.04] border border-white/[0.06] mb-2"
                   accessibilityRole="button"
                   accessibilityLabel={`Visit: ${visit.place_name}`}
@@ -439,13 +477,22 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   <View className="w-11 h-11 rounded-lg bg-[rgba(212,134,10,0.22)] mr-3" />
                   <View className="flex-1">
                     <Text
-                      style={{ fontFamily: FONTS.sansSemiBold, fontSize: 14, color: '#FFFFFF' }}
+                      style={{
+                        fontFamily: FONTS.sansSemiBold,
+                        fontSize: 14,
+                        color: '#FFFFFF',
+                      }}
                       numberOfLines={1}
                     >
                       {visit.place_name}
                     </Text>
                     <Text
-                      style={{ marginTop: 2, fontFamily: FONTS.sans, fontSize: 11, color: 'rgba(255,255,255,0.55)' }}
+                      style={{
+                        marginTop: 2,
+                        fontFamily: FONTS.sans,
+                        fontSize: 11,
+                        color: 'rgba(255,255,255,0.55)',
+                      }}
                       numberOfLines={1}
                     >
                       {formatRelativeTime(visit.arrived_at)}
@@ -456,7 +503,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               ))
             ) : (
               <View className="py-6 items-center">
-                <Text style={{ fontFamily: FONTS.sans, fontSize: 13, color: 'rgba(255,255,255,0.55)', textAlign: 'center' }}>
+                <Text
+                  style={{
+                    fontFamily: FONTS.sans,
+                    fontSize: 13,
+                    color: 'rgba(255,255,255,0.55)',
+                    textAlign: 'center',
+                  }}
+                >
                   No journeys yet. Visit a heritage site to start your timeline.
                 </Text>
               </View>
@@ -700,6 +754,17 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               <Shield size={14} color="#6B6357" />
               <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Medium'] ml-1.5">
                 Open Device Settings
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="mt-3 flex-row items-center justify-center rounded-xl border border-white/[0.08] bg-surface-2 py-2.5"
+              onPress={() => Linking.openURL('mailto:support@epocheye.app')}
+              accessibilityRole="button"
+              accessibilityLabel="Open device settings"
+            >
+              <MessageCircle size={14} color="#B8AF9E" />
+              <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Medium'] ml-1.5">
+                Get Support
               </Text>
             </TouchableOpacity>
           </Animated.View>
