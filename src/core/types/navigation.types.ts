@@ -74,19 +74,17 @@ export type MainStackParamList = {
     thumbnailUrl?: string;
     knowledgeText?: string;
   };
-  /** Settings — pushed route, reached from Profile tab's ⋯ menu. */
-  Settings: undefined;
 };
 
 /**
  * Tab Navigator Parameter List
- * 4-tab Figma layout: Home · Passport · Daily · Profile.
+ * 4-tab layout: Home · Passport · Daily · Account.
  */
 export type TabParamList = {
   Home: undefined;
   Passport: undefined;
   Daily: undefined;
-  Profile: undefined;
+  Account: undefined;
 };
 
 /**

@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Alert,
   Image,
   Linking,
+  Pressable,
+  RefreshControl,
   ScrollView,
   StatusBar,
   Text,
@@ -15,10 +17,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-  BookOpen,
   Camera,
   ChevronRight,
-  Clock,
   LogOut,
   MapPin,
   MessageCircle,
@@ -33,16 +33,27 @@ import { useUser } from '../../context';
 import { PermissionService } from '../../shared/services/permission.service';
 import { APP_CONFIG } from '../../core/config';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
-import type { MainScreenProps } from '../../core/types/navigation.types';
+import type { TabScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
-import { useExplorerPass } from '../../shared/hooks';
+import { useExplorerPass, usePassportSummary, useProfileDigest } from '../../shared/hooks';
 import { useDevSettingsStore } from '../../stores/devSettingsStore';
 import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
+import { getVisitHistory, type VisitRow } from '../../utils/api/visits';
+import { formatRelativeTime } from '../../shared/utils';
+import { FONTS } from '../../core/constants/theme';
 
-// React Native's FormData.append accepts a file object with this shape.
 type RNFile = { uri: string; type: string; name: string };
 
-type Props = MainScreenProps<'Settings'> & { onLogout?: () => void };
+type Props = TabScreenProps<'Account'> & { onLogout?: () => void };
+
+const AMBER = '#D4860A';
+const AMBER_DEEP = '#7A4A0A';
+const AMBER_LIGHT = '#E8A020';
+
+function initialLetter(name: string | undefined | null): string {
+  const trimmed = (name ?? '').trim();
+  return trimmed.length > 0 ? trimmed[0]!.toUpperCase() : '?';
+}
 
 const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   const { hasAnyActivePass, loading: explorerPassLoading } = useExplorerPass();
@@ -55,6 +66,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   const refreshUserData = useUser(state => state.refreshUserData);
   const ensureUserDataLoaded = useUser(state => state.ensureUserDataLoaded);
 
+  const { summary, refresh: refreshSummary } = usePassportSummary();
+  const { digest, refresh: refreshDigest } = useProfileDigest();
+
   // Profile form state
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -62,11 +76,24 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
+  // Visit history
+  const [visits, setVisits] = useState<VisitRow[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
   // Permission status
   const [permissionStatus, setPermissionStatus] = useState({
     camera: false,
     location: false,
   });
+
+  // Derived profile overview values
+  const sites = summary?.sites_visited ?? 0;
+  const dynasties = summary?.dynasties_count ?? 0;
+  const streakDays = summary?.streak_days ?? 0;
+  const isStreakActive = streakDays > 0;
+  const location = (profile?.preferences?.location as string | undefined) ?? '';
+  const displayName = profile?.name?.trim() || 'Your name';
+  const recentJourneys = useMemo(() => visits.slice(0, 3), [visits]);
 
   useEffect(() => {
     if (profile) {
@@ -86,18 +113,40 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
     }
   }, [fullName, email, phone, profile]);
 
-  // Refresh permissions on focus
+  const fetchVisits = useCallback(async () => {
+    const result = await getVisitHistory();
+    if (result.success) {
+      setVisits(result.data.visits ?? []);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       void ensureUserDataLoaded();
       void refreshUserData();
+      void fetchVisits();
       PermissionService.checkAll().then(result => {
         setPermissionStatus({
           camera: result.camera,
           location: result.location,
         });
       });
-    }, [ensureUserDataLoaded, refreshUserData]),
+    }, [ensureUserDataLoaded, refreshUserData, fetchVisits]),
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([refreshSummary(), refreshDigest(), fetchVisits(), refreshUserData()]);
+    setRefreshing(false);
+  }, [refreshSummary, refreshDigest, fetchVisits, refreshUserData]);
+
+  const goToSite = useCallback(
+    (visit: VisitRow) => {
+      navigation.navigate(ROUTES.MAIN.SITE_DETAIL, {
+        site: { id: visit.place_id, name: visit.place_name },
+      });
+    },
+    [navigation],
   );
 
   const handleSaveChanges = useCallback(async () => {
@@ -210,19 +259,66 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 64 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={AMBER}
+              colors={[AMBER]}
+            />
+          }
         >
-          {/* Header */}
+          {/* ── Profile hero header ── */}
           <Animated.View
             entering={FadeInDown.duration(350)}
-            className="px-5 pt-5 pb-4 flex-row items-end justify-between"
+            className="px-6 pt-[14px] pb-2 flex-row items-start gap-x-[14px]"
           >
-            <View>
-              <Text className="text-xs uppercase tracking-[1px] text-brand-gold font-['MontserratAlternates-SemiBold']">
-                ACCOUNT
+            <View className="w-[76px] h-[76px] rounded-full bg-[rgba(212,134,10,0.18)] p-[3px]">
+              {profile?.avatar_url ? (
+                <Image
+                  source={{ uri: profile.avatar_url }}
+                  className="w-full h-full rounded-[35px]"
+                  resizeMode="cover"
+                />
+              ) : (
+                <LinearGradient
+                  colors={[AMBER_LIGHT, AMBER, AMBER_DEEP]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: 35,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontFamily: FONTS.sansBold, fontSize: 36, color: '#FFFFFF' }}>
+                    {initialLetter(profile?.name)}
+                  </Text>
+                </LinearGradient>
+              )}
+            </View>
+            <View className="flex-1 pt-1">
+              <Text
+                style={{ fontFamily: FONTS.sansBold, fontSize: 22, color: '#FFFFFF', lineHeight: 28 }}
+                numberOfLines={1}
+              >
+                {displayName}
               </Text>
-              <Text className="mt-1 text-parchment text-[26px] leading-9 font-['MontserratAlternates-Bold']">
-                Settings
-              </Text>
+              {location ? (
+                <Text style={{ marginTop: 2, fontFamily: FONTS.sans, fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>
+                  {location}
+                </Text>
+              ) : null}
+              {isStreakActive ? (
+                <View className="mt-2 flex-row items-center">
+                  <View className="w-2 h-2 rounded-full bg-[#3FB950] mr-2" />
+                  <Text style={{ fontFamily: FONTS.sansMedium, fontSize: 12, color: 'rgba(255,255,255,0.78)' }}>
+                    {streakDays} day streak active
+                  </Text>
+                </View>
+              ) : null}
             </View>
             <TouchableOpacity
               className="flex-row items-center rounded-full border border-white/10 bg-surface-1 px-3.5 py-2"
@@ -237,11 +333,141 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </TouchableOpacity>
           </Animated.View>
 
-          {/* Profile card */}
+          {/* ── Stat cards ── */}
+          <Animated.View
+            entering={FadeInDown.delay(60).duration(350)}
+            className="mt-4 px-6 flex-row gap-x-[10px]"
+          >
+            {([
+              { label: 'SITES', value: sites },
+              { label: 'DYNASTIES', value: dynasties },
+              { label: 'STREAK', value: streakDays },
+            ] as const).map(stat => (
+              <View
+                key={stat.label}
+                className="flex-1 py-[14px] px-[10px] rounded-[14px] bg-white/[0.04] border border-white/[0.06] items-center"
+              >
+                <Text style={{ fontFamily: FONTS.serif, fontSize: 32, color: '#FFFFFF', lineHeight: 36 }}>
+                  {stat.value}
+                </Text>
+                <Text style={{ marginTop: 4, fontFamily: FONTS.sansSemiBold, fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.1 }}>
+                  {stat.label}
+                </Text>
+              </View>
+            ))}
+          </Animated.View>
+
+          {/* ── Weekly digest ── */}
+          <Animated.View
+            entering={FadeInDown.delay(100).duration(350)}
+            className="px-6"
+          >
+            <Text style={{ marginTop: 24, fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.2 }}>
+              THIS WEEK
+            </Text>
+            <LinearGradient
+              colors={[AMBER_LIGHT, AMBER, AMBER_DEEP]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ marginTop: 12, borderRadius: 14, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 16 }}
+            >
+              <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 10, color: 'rgba(255,255,255,0.78)', letterSpacing: 1.4 }}>
+                YOUR DIGEST
+              </Text>
+              {digest ? (
+                <>
+                  {digest.headline ? (
+                    <Text style={{ marginTop: 6, fontFamily: FONTS.sans, fontSize: 15, color: 'rgba(255,255,255,0.92)' }}>
+                      {digest.headline}
+                    </Text>
+                  ) : null}
+                  {digest.body ? (
+                    <Text style={{ marginTop: 4, fontFamily: FONTS.serifItalic, fontSize: 28, color: '#FFFFFF', lineHeight: 34 }}>
+                      {digest.body}
+                    </Text>
+                  ) : null}
+                  {(digest.dynasty_tags?.length ?? 0) > 0 ? (
+                    <View className="mt-3 flex-row flex-wrap gap-[6px]">
+                      {(digest.dynasty_tags ?? []).map(tag => (
+                        <View key={tag} className="px-[10px] py-[5px] rounded-full bg-white/[0.18]">
+                          <Text style={{ fontFamily: FONTS.sansMedium, fontSize: 11, color: '#FFFFFF' }}>
+                            {tag}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </>
+              ) : (
+                <Text style={{ marginTop: 6, fontFamily: FONTS.sans, fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>
+                  Visit a site this week to unlock your digest.
+                </Text>
+              )}
+            </LinearGradient>
+          </Animated.View>
+
+          {/* ── Recent journeys ── */}
+          <Animated.View
+            entering={FadeInDown.delay(140).duration(350)}
+            className="px-6 mt-[22px]"
+          >
+            <View className="mb-[10px] flex-row justify-between items-center">
+              <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.2 }}>
+                RECENT JOURNEYS
+              </Text>
+              <Pressable
+                onPress={() => navigation.navigate(ROUTES.MAIN.HISTORY)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="View all journeys"
+              >
+                <Text style={{ fontFamily: FONTS.sansMedium, fontSize: 13, color: AMBER }}>
+                  View all
+                </Text>
+              </Pressable>
+            </View>
+            {recentJourneys.length > 0 ? (
+              recentJourneys.map(visit => (
+                <Pressable
+                  key={visit.id}
+                  onPress={() => goToSite(visit)}
+                  style={({ pressed }) => pressed ? { opacity: 0.85 } : undefined}
+                  className="flex-row items-center py-[10px] px-[10px] rounded-xl bg-white/[0.04] border border-white/[0.06] mb-2"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Visit: ${visit.place_name}`}
+                >
+                  <View className="w-11 h-11 rounded-lg bg-[rgba(212,134,10,0.22)] mr-3" />
+                  <View className="flex-1">
+                    <Text
+                      style={{ fontFamily: FONTS.sansSemiBold, fontSize: 14, color: '#FFFFFF' }}
+                      numberOfLines={1}
+                    >
+                      {visit.place_name}
+                    </Text>
+                    <Text
+                      style={{ marginTop: 2, fontFamily: FONTS.sans, fontSize: 11, color: 'rgba(255,255,255,0.55)' }}
+                      numberOfLines={1}
+                    >
+                      {formatRelativeTime(visit.arrived_at)}
+                    </Text>
+                  </View>
+                  <ChevronRight color="rgba(255,255,255,0.45)" size={18} />
+                </Pressable>
+              ))
+            ) : (
+              <View className="py-6 items-center">
+                <Text style={{ fontFamily: FONTS.sans, fontSize: 13, color: 'rgba(255,255,255,0.55)', textAlign: 'center' }}>
+                  No journeys yet. Visit a heritage site to start your timeline.
+                </Text>
+              </View>
+            )}
+          </Animated.View>
+
+          {/* ── Edit profile card ── */}
           {isLoading ? (
             <View
-              className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-5 items-center justify-center"
-              style={{ height: 260 }}
+              className="mx-5 mt-6 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-5 items-center justify-center"
+              style={{ height: 180 }}
             >
               <AnimatedLogo size={48} variant="white" motion="orbit" />
               <Text className="text-parchment-dim text-sm font-['MontserratAlternates-Regular'] mt-3">
@@ -250,9 +476,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </View>
           ) : (
             <Animated.View
-              entering={FadeInDown.delay(80).duration(350)}
-              className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-5"
+              entering={FadeInDown.delay(180).duration(350)}
+              className="mx-5 mt-6 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-5"
             >
+              <Text className="text-xs uppercase tracking-[1px] text-brand-gold font-['MontserratAlternates-SemiBold'] mb-4">
+                EDIT PROFILE
+              </Text>
               <View className="flex-row items-center mb-5">
                 <View className="w-16 h-16 rounded-full bg-surface-2 items-center justify-center mr-4 relative">
                   {profile?.avatar_url ? (
@@ -287,7 +516,6 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 </View>
               </View>
 
-              {/* Form fields */}
               <View className="mb-3">
                 <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['MontserratAlternates-SemiBold'] mb-2">
                   Full name
@@ -360,9 +588,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </Animated.View>
           )}
 
-          {/* Passport CTA */}
+          {/* ── Passport CTA ── */}
           {!explorerPassLoading && !hasAnyActivePass && (
-            <Animated.View entering={FadeInDown.delay(140).duration(350)}>
+            <Animated.View entering={FadeInDown.delay(220).duration(350)}>
               <TouchableOpacity
                 className="mx-5 mb-5 flex-row items-center rounded-2xl border border-[rgba(212,134,10,0.25)] bg-[rgba(26,18,10,0.8)] p-4"
                 onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
@@ -386,9 +614,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </Animated.View>
           )}
 
-          {/* Admin: Anchor capture (only when is_admin claim on JWT) */}
+          {/* ── Admin: Anchor capture ── */}
           {isAdmin && (
-            <Animated.View entering={FadeInDown.delay(180).duration(350)}>
+            <Animated.View entering={FadeInDown.delay(260).duration(350)}>
               <TouchableOpacity
                 className="mx-5 mb-5 flex-row items-center rounded-2xl border border-[rgba(72,187,120,0.3)] bg-[rgba(72,187,120,0.06)] p-4"
                 onPress={() => navigation.navigate(ROUTES.MAIN.ANCHOR_CAPTURE)}
@@ -412,33 +640,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </Animated.View>
           )}
 
-          {/* Your journey (visit history) */}
-          <Animated.View entering={FadeInDown.delay(200).duration(350)}>
-            <TouchableOpacity
-              className="mx-5 mb-5 flex-row items-center rounded-2xl border border-white/[0.08] bg-surface-1 p-4"
-              onPress={() => navigation.navigate(ROUTES.MAIN.HISTORY)}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="View your journey"
-            >
-              <View className="w-10 h-10 rounded-full bg-[rgba(201,168,76,0.15)] items-center justify-center mr-3">
-                <Clock size={18} color="#C9A84C" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
-                  Your Journey
-                </Text>
-                <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] mt-0.5">
-                  Revisit the places you've explored
-                </Text>
-              </View>
-              <ChevronRight size={18} color="#C9A84C" />
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Permissions section */}
+          {/* ── Permissions ── */}
           <Animated.View
-            entering={FadeInDown.delay(260).duration(350)}
+            entering={FadeInDown.delay(300).duration(350)}
             className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-4"
           >
             <View className="flex-row items-center gap-2.5 mb-4">
@@ -500,9 +704,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </TouchableOpacity>
           </Animated.View>
 
-          {/* App version */}
+          {/* ── App version ── */}
           <Animated.View
-            entering={FadeInDown.delay(320).duration(350)}
+            entering={FadeInDown.delay(360).duration(350)}
             className="items-center py-6"
           >
             <TouchableOpacity
@@ -530,9 +734,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </Text>
           </Animated.View>
 
-          {/* Account actions */}
+          {/* ── Account actions ── */}
           <Animated.View
-            entering={FadeInDown.delay(380).duration(350)}
+            entering={FadeInDown.delay(420).duration(350)}
             className="flex-row px-5 gap-3 mb-12"
           >
             <TouchableOpacity

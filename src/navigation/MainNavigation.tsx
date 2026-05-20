@@ -10,21 +10,16 @@ import NotificationsScreen from '../screens/Main/NotificationsScreen';
 import HistoryScreen from '../screens/History/HistoryScreen';
 import AnchorCaptureScreen from '../screens/Admin/AnchorCaptureScreen';
 import Ar3dViewerScreen from '../screens/Main/Ar3dViewerScreen';
-import SettingsScreen from '../screens/Main/SettingsScreen';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
+
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 interface MainNavigationProps {
   onLogout: () => void;
 }
 
-/**
- * Main navigation stack for authenticated users
- * Contains the tab navigator and modal screens
- */
 const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
-
   return (
     <Stack.Navigator
       initialRouteName={ROUTES.MAIN.TABS}
@@ -33,12 +28,8 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         freezeOnBlur: true,
       }}
     >
-      <Stack.Screen name={ROUTES.MAIN.TABS} component={TabNavigation} />
-      <Stack.Screen
-        name={ROUTES.MAIN.SETTINGS}
-        options={{ animation: 'slide_from_right' }}
-      >
-        {props => <SettingsScreen {...props} onLogout={onLogout} />}
+      <Stack.Screen name={ROUTES.MAIN.TABS}>
+        {props => <TabNavigation {...props} onLogout={onLogout} />}
       </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.SITE_DETAIL}

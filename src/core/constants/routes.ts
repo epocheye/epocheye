@@ -38,17 +38,16 @@ export const ROUTES = {
     HISTORY: 'History',
     ANCHOR_CAPTURE: 'AnchorCapture',
     AR_3D_VIEWER: 'Ar3dViewer',
-    SETTINGS: 'Settings',
   },
 
   /**
-   * Tab Navigator Routes (4-tab Figma layout: Home · Passport · Daily · Profile)
+   * Tab Navigator Routes (4-tab layout: Home · Passport · Daily · Account)
    */
   TABS: {
     HOME: 'Home',
     PASSPORT: 'Passport',
     DAILY: 'Daily',
-    PROFILE: 'Profile',
+    ACCOUNT: 'Account',
   },
 } as const;
 

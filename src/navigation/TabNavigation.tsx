@@ -5,7 +5,7 @@ import { PlatformPressable } from '@react-navigation/elements';
 import Home from '../screens/Main/Home';
 import Passport from '../screens/Main/Passport';
 import Daily from '../screens/Main/Daily';
-import Profile from '../screens/Main/Profile';
+import SettingsScreen from '../screens/Main/SettingsScreen';
 import { Map as MapIcon, Ticket, Clock, UserRound } from 'lucide-react-native';
 import { ROUTES } from '../core/constants';
 import type { TabParamList } from '../core/types';
@@ -51,7 +51,7 @@ const getTabIcon = (
       return <Ticket color={color} size={iconSize} />;
     case ROUTES.TABS.DAILY:
       return <Clock color={color} size={iconSize} />;
-    case ROUTES.TABS.PROFILE:
+    case ROUTES.TABS.ACCOUNT:
     default:
       return <UserRound color={color} size={iconSize} />;
   }
@@ -61,7 +61,11 @@ const DefaultTabButton: React.FC<BottomTabBarButtonProps> = props => (
   <PlatformPressable {...props} />
 );
 
-const TabNavigation: React.FC = () => {
+interface TabNavigationProps {
+  onLogout: () => void;
+}
+
+const TabNavigation: React.FC<TabNavigationProps> = ({ onLogout }) => {
   return (
     <Tab.Navigator
       initialRouteName={ROUTES.TABS.HOME}
@@ -85,7 +89,9 @@ const TabNavigation: React.FC = () => {
       <Tab.Screen name={ROUTES.TABS.HOME} component={Home} />
       <Tab.Screen name={ROUTES.TABS.PASSPORT} component={Passport} />
       <Tab.Screen name={ROUTES.TABS.DAILY} component={Daily} />
-      <Tab.Screen name={ROUTES.TABS.PROFILE} component={Profile} />
+      <Tab.Screen name={ROUTES.TABS.ACCOUNT}>
+        {tabProps => <SettingsScreen {...tabProps} onLogout={onLogout} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 };

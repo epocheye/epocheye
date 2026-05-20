@@ -62,7 +62,10 @@
       "Bash(javap -p io/github/sceneview/loaders/ModelLoader.class)",
       "Bash(./gradlew.bat :app:compileDebugKotlin --console=plain)",
       "Bash(adb uninstall *)",
-      "Bash(find *)"
+      "Bash(find *)",
+      "Bash(cd E:\\\\epocheye *)",
+      "Bash(grep -E \"\\\\.tsx$\")",
+      "Bash(Remove-Item *)"
     ]
   }
 }
