@@ -1,31 +1,52 @@
 /**
- * Ar3dViewerScreen — non-AR fallback for phones without ARCore Geospatial.
+ * Ar3dViewerScreen — the AR experience shell.
  *
- * Renders the matched asset in a Three.js orbit/zoom viewer (no world-lock,
- * no camera feed) and shows the knowledge-text card below. The "AR not
- * supported" banner explains why the user isn't getting the full AR view.
+ * Renders a full-bleed 3D viewer with:
+ *   - Top overlay: site name + era subtitle, close button, optional info icon
+ *   - Bottom overlay: "VIEWING / {era} / as it stood" caption + era slider
+ *   - Subtle vignette gradients for overlay readability
  *
- * Mobile branches into this screen when:
- *   - useArcoreAvailability().available === false
- *   - OR the recognise response includes place_strategy='viewer_only'
+ * Era-aware behavior is gated by `monumentId`:
+ *   - KONARK_SLUG → use KONARK_ERAS; null slots show "Reconstruction coming soon"
+ *   - DEV_MONUMENT_ID → all era stops point at route.params.glbUrl
+ *   - everything else (catalog viewer_only) → era slider hidden, single asset
  *
- * The actual GLB rendering reuses the existing GLBViewer component which
- * is already wired to @react-three/fiber/native + expo-gl. We just compose
- * it with the screen chrome / knowledge text / dismiss button.
+ * URL flips are debounced 300 ms and the underlying GLBViewer is remounted
+ * via `key={resolvedUrl}` so the loading indicator and first-frame logs
+ * fire cleanly on every change.
  */
 
-import React, { Component, Suspense, lazy, useCallback, useState } from 'react';
+import React, {
+  Component,
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
+  Modal,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
+import {Info, X} from 'lucide-react-native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useNavigation, useRoute} from '@react-navigation/native';
 
-import type { MainStackParamList } from '../../core/types/navigation.types';
+import type {MainStackParamList} from '../../core/types/navigation.types';
+import {
+  DEV_MONUMENT_ID,
+  KONARK_ERAS,
+  KONARK_SLUG,
+  type EraModel,
+} from './components/eraModels';
+import EraSlider from './components/EraSlider';
 
 // Lazy-loaded so @react-three/fiber + expo-gl are NOT evaluated at app startup.
 // r3f v8 is incompatible with React 19 and throws at module-evaluation time,
@@ -36,12 +57,18 @@ interface GLBErrorBoundaryProps {
   onError: () => void;
   children: React.ReactNode;
 }
-interface GLBErrorBoundaryState { crashed: boolean }
+interface GLBErrorBoundaryState {
+  crashed: boolean;
+}
 
 class GLBErrorBoundary extends Component<GLBErrorBoundaryProps, GLBErrorBoundaryState> {
-  state: GLBErrorBoundaryState = { crashed: false };
-  static getDerivedStateFromError() { return { crashed: true }; }
-  componentDidCatch() { this.props.onError(); }
+  state: GLBErrorBoundaryState = {crashed: false};
+  static getDerivedStateFromError() {
+    return {crashed: true};
+  }
+  componentDidCatch() {
+    this.props.onError();
+  }
   render() {
     return this.state.crashed ? null : this.props.children;
   }
@@ -56,83 +83,378 @@ type RouteProp = {
 const Ar3dViewerScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute() as unknown as RouteProp;
-  const { objectLabel, glbUrl, knowledgeText } = route.params;
+  const {
+    objectLabel,
+    glbUrl,
+    knowledgeText,
+    monumentId,
+    siteName,
+    defaultEraLabel,
+  } = route.params;
 
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [showInfo, setShowInfo] = useState(false);
+
+  // Selector — which era table applies for this monumentId.
+  const eras = useMemo<EraModel[] | null>(() => {
+    if (monumentId === KONARK_SLUG) return KONARK_ERAS;
+    if (monumentId === DEV_MONUMENT_ID) {
+      return KONARK_ERAS.map(e => ({...e, glbUrl}));
+    }
+    return null;
+  }, [monumentId, glbUrl]);
+
+  // Dev-only opt-in to drei OrbitControls (drag-rotate, pinch-zoom).
+  const interactive = __DEV__ && monumentId === DEV_MONUMENT_ID;
+
+  // Target URL = whatever the current era points at, or the raw glbUrl when no era table applies.
+  const targetUrl: string | null = eras ? eras[activeIndex]?.glbUrl ?? null : glbUrl || null;
+
+  // Debounce URL flips so rapid slider scrubs don't churn the GL context.
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(targetUrl);
+  useEffect(() => {
+    const t = setTimeout(() => setResolvedUrl(targetUrl), 300);
+    return () => clearTimeout(t);
+  }, [targetUrl]);
+
+  // When URL changes, clear any previous load error so the new mount can try fresh.
+  useEffect(() => {
+    setLoadError(null);
+  }, [resolvedUrl]);
 
   const handleClose = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
 
+  const title =
+    siteName ??
+    (monumentId === KONARK_SLUG
+      ? 'Konark Sun Temple'
+      : monumentId === DEV_MONUMENT_ID
+      ? 'Test Model'
+      : prettyLabel(objectLabel));
+
+  const eraLabel = eras
+    ? eras[activeIndex]?.label ?? ''
+    : defaultEraLabel ?? 'reconstruction';
+  const subtitle = `reconstruction · ${eraLabel}`;
+
+  const hasInfo = !!(knowledgeText && knowledgeText.trim().length > 0);
+
   return (
-    <SafeAreaView className="flex-1 bg-surface-1" edges={['top', 'bottom']}>
-      <View className="flex-row items-center px-5 py-4 border-b border-[rgba(255,255,255,0.06)]">
-        <View className="flex-1">
-          <Text className="text-parchment font-montserrat text-[18px]" numberOfLines={1}>
-            {prettyLabel(objectLabel)}
-          </Text>
-          <Text className="text-[rgba(255,255,255,0.5)] font-montserrat text-[12px] mt-0.5">
-            3D preview · drag to rotate · pinch to zoom
-          </Text>
-        </View>
-        <Pressable
-          onPress={handleClose}
-          hitSlop={8}
-          className="px-3 py-[6px] rounded-[8px] bg-[rgba(255,255,255,0.06)]"
-        >
-          <Text className="text-parchment font-montserrat-medium text-[12px]">Done</Text>
-        </Pressable>
-      </View>
-
-      <View className="mx-5 mt-3 px-3 py-2 bg-[rgba(232,160,32,0.08)] rounded-[8px] border border-[rgba(232,160,32,0.18)]">
-        <Text className="text-accent-amber font-montserrat text-[12px]">
-          AR not supported on this device — showing the 3D preview instead.
-        </Text>
-      </View>
-
-      <View className="flex-1 m-5 rounded-2xl overflow-hidden bg-[rgba(255,255,255,0.02)]">
-        {loadError ? (
-          <View className="flex-1 items-center justify-center">
-            <Text className="text-[rgba(255,255,255,0.6)] font-montserrat text-[14px] text-center px-10">
-              {loadError}
-            </Text>
+    <View style={styles.root}>
+      {/* Body: GLB viewer OR "coming soon" empty state */}
+      <View style={styles.body}>
+        {resolvedUrl == null ? (
+          <ComingSoonState eraLabel={eraLabel} />
+        ) : loadError ? (
+          <View style={styles.centerFill}>
+            <Text style={styles.errorText}>{loadError}</Text>
           </View>
         ) : (
-          <GLBErrorBoundary onError={() => setLoadError('3D preview unavailable on this device.')}>
-            <Suspense fallback={<View className="flex-1" />}>
+          <GLBErrorBoundary
+            onError={() => setLoadError('3D preview unavailable on this device.')}>
+            <Suspense fallback={<View style={styles.centerFill} />}>
               <GLBViewer
-                url={glbUrl}
+                key={resolvedUrl}
+                url={resolvedUrl}
                 autoRotate
-                onError={(e) => setLoadError(e?.message || 'Failed to load 3D model')}
+                interactive={interactive}
+                onError={e =>
+                  setLoadError(e?.message || 'Failed to load 3D model')
+                }
               />
             </Suspense>
           </GLBErrorBoundary>
         )}
       </View>
 
-      {knowledgeText ? (
-        <ScrollView
-          className="max-h-[220px] border-t border-[rgba(255,255,255,0.06)]"
-          contentContainerStyle={{paddingHorizontal: 20, paddingVertical: 16}}
-        >
-          <Text className="text-[rgba(255,255,255,0.5)] font-montserrat text-[11px] tracking-[1.6px] uppercase mb-2">
-            About this
-          </Text>
-          <Text className="text-parchment font-montserrat text-[14px] leading-[22px]">
-            {knowledgeText}
-          </Text>
-        </ScrollView>
-      ) : null}
-    </SafeAreaView>
+      {/* Vignette gradients for overlay readability */}
+      <LinearGradient
+        colors={['rgba(5,5,5,0.85)', 'rgba(5,5,5,0)']}
+        style={styles.topVignette}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['rgba(5,5,5,0)', 'rgba(5,5,5,0.92)']}
+        style={styles.bottomVignette}
+        pointerEvents="none"
+      />
+
+      {/* Top overlay */}
+      <SafeAreaView style={styles.topOverlay} edges={['top']}>
+        <View style={styles.topRow}>
+          <Pressable
+            onPress={handleClose}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Close 3D viewer"
+            style={styles.iconButton}>
+            <X size={18} color="#FFFFFF" />
+          </Pressable>
+
+          <View style={styles.titleBlock}>
+            <Text style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          </View>
+
+          {hasInfo ? (
+            <Pressable
+              onPress={() => setShowInfo(true)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="About this"
+              style={styles.iconButton}>
+              <Info size={18} color="#FFFFFF" />
+            </Pressable>
+          ) : (
+            <View style={styles.iconButtonPlaceholder} />
+          )}
+        </View>
+      </SafeAreaView>
+
+      {/* Bottom overlay */}
+      <SafeAreaView style={styles.bottomOverlay} edges={['bottom']}>
+        {eras ? (
+          <View>
+            <View style={styles.viewingCaption}>
+              <Text style={styles.viewingLabel}>VIEWING</Text>
+              <Text style={styles.viewingEra}>{eraLabel}</Text>
+              <Text style={styles.viewingSubLabel}>as it stood</Text>
+            </View>
+
+            <EraSlider
+              eras={eras}
+              activeIndex={activeIndex}
+              onChangeIndex={setActiveIndex}
+            />
+          </View>
+        ) : null}
+      </SafeAreaView>
+
+      {/* Knowledge-text sheet */}
+      <Modal
+        visible={showInfo}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowInfo(false)}>
+        <View style={styles.sheetBackdrop}>
+          <Pressable
+            style={styles.sheetDismissArea}
+            onPress={() => setShowInfo(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+          />
+          <SafeAreaView style={styles.sheet} edges={['bottom']}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>About this</Text>
+              <Pressable
+                onPress={() => setShowInfo(false)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Close info">
+                <X size={18} color="#FFFFFF" />
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.sheetContent}>
+              <Text style={styles.sheetBody}>{knowledgeText}</Text>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
+    </View>
   );
 };
+
+const ComingSoonState: React.FC<{eraLabel: string}> = ({eraLabel}) => (
+  <View style={styles.centerFill}>
+    <Text style={styles.comingSoonEra}>{eraLabel}</Text>
+    <Text style={styles.comingSoonBody}>Reconstruction coming soon</Text>
+  </View>
+);
 
 function prettyLabel(label: string): string {
   return label
     .split(/[_\s]+/)
     .filter(Boolean)
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
     .join(' ');
 }
+
+const VIGNETTE_HEIGHT = 200;
+const AMBER = '#E8A020';
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#020202',
+  },
+  body: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  topVignette: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: VIGNETTE_HEIGHT,
+  },
+  bottomVignette: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: VIGNETTE_HEIGHT + 60,
+  },
+  topOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    gap: 12,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  iconButtonPlaceholder: {
+    width: 36,
+    height: 36,
+  },
+  titleBlock: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  title: {
+    fontFamily: 'MontserratAlternates-SemiBold',
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  subtitle: {
+    marginTop: 2,
+    fontFamily: 'MontserratAlternates-Regular',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 0.6,
+  },
+  bottomOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+  },
+  viewingCaption: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  viewingLabel: {
+    fontFamily: 'MontserratAlternates-Medium',
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 2.4,
+  },
+  viewingEra: {
+    marginTop: 4,
+    fontFamily: 'MontserratAlternates-SemiBold',
+    fontSize: 24,
+    color: AMBER,
+    letterSpacing: 1.2,
+  },
+  viewingSubLabel: {
+    marginTop: 2,
+    fontFamily: 'MontserratAlternates-Italic',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  centerFill: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  errorText: {
+    fontFamily: 'MontserratAlternates-Regular',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+  },
+  comingSoonEra: {
+    fontFamily: 'MontserratAlternates-SemiBold',
+    fontSize: 22,
+    color: AMBER,
+    letterSpacing: 1.2,
+  },
+  comingSoonBody: {
+    marginTop: 8,
+    fontFamily: 'MontserratAlternates-Regular',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 0.4,
+  },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  sheetDismissArea: {
+    flex: 1,
+  },
+  sheet: {
+    maxHeight: '60%',
+    backgroundColor: '#141414',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  sheetTitle: {
+    fontFamily: 'MontserratAlternates-SemiBold',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 1.6,
+  },
+  sheetContent: {
+    paddingVertical: 4,
+    paddingBottom: 20,
+  },
+  sheetBody: {
+    fontFamily: 'MontserratAlternates-Regular',
+    fontSize: 14,
+    color: '#FFFFFF',
+    lineHeight: 22,
+  },
+});
 
 export default Ar3dViewerScreen;

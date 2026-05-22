@@ -38,6 +38,7 @@ export const ROUTES = {
     HISTORY: 'History',
     ANCHOR_CAPTURE: 'AnchorCapture',
     AR_3D_VIEWER: 'Ar3dViewer',
+    AI_GUIDE: 'AiGuide',
   },
 
   /**

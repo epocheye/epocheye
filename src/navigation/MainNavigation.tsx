@@ -10,6 +10,7 @@ import NotificationsScreen from '../screens/Main/NotificationsScreen';
 import HistoryScreen from '../screens/History/HistoryScreen';
 import AnchorCaptureScreen from '../screens/Admin/AnchorCaptureScreen';
 import Ar3dViewerScreen from '../screens/Main/Ar3dViewerScreen';
+import AiGuideScreen from '../screens/Main/AiGuideScreen';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
 
@@ -89,6 +90,11 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         name={ROUTES.MAIN.AR_3D_VIEWER}
         component={Ar3dViewerScreen}
         options={{ animation: 'fade', presentation: 'fullScreenModal' }}
+      />
+      <Stack.Screen
+        name={ROUTES.MAIN.AI_GUIDE}
+        component={AiGuideScreen}
+        options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
       />
     </Stack.Navigator>
   );

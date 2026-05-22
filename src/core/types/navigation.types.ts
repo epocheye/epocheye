@@ -66,6 +66,12 @@ export type MainStackParamList = {
   History: undefined;
   /** Admin-only: capture geo-anchors for the curated AR catalog. */
   AnchorCapture: undefined;
+  /** Site-grounded AI Guide chat. */
+  AiGuide: {
+    slug: string;
+    siteName: string;
+    heroImageUrl?: string;
+  };
   /** No-ARCore fallback — render an asset in a 3D orbit/zoom viewer. */
   Ar3dViewer: {
     monumentId: string;
@@ -73,6 +79,10 @@ export type MainStackParamList = {
     glbUrl: string;
     thumbnailUrl?: string;
     knowledgeText?: string;
+    /** Human-readable site name shown in the top overlay. Falls back to a slug-derived label. */
+    siteName?: string;
+    /** Default era subtitle when no era slider applies (e.g. catalog viewer_only callers). */
+    defaultEraLabel?: string;
   };
 };
 

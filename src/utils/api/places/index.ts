@@ -4,7 +4,13 @@
  */
 
 // API functions
-export { findPlaces, savePlace, unsavePlace, getSavedPlaces } from './Places';
+export {
+  findPlaces,
+  savePlace,
+  unsavePlace,
+  getSavedPlaces,
+  getSite,
+} from './Places';
 
 // Types
 export type {
@@ -13,6 +19,7 @@ export type {
   FindPlacesResponse,
   SavePlaceRequest,
   SavedPlace,
+  SiteDetail,
   PlacesError,
   PlacesResult,
 } from './types';

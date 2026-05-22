@@ -52,6 +52,46 @@ export interface SavedPlace {
   saved_at: string;
 }
 
+/**
+ * SiteDetail is the curated heritage record served by GET /api/v1/sites/:id.
+ * Snake-case keys match the backend `Site` struct in apis/sites/models.go.
+ * Optional fields correspond to nullable columns; absent fields are dropped
+ * by the server's `omitempty` tags.
+ */
+export interface SiteDetail {
+  id: string;
+  name: string;
+  normalized_name: string;
+  slug?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  era?: string;
+  century?: string;
+  dynasty?: string;
+  founder?: string;
+  deity?: string;
+  architectural_style?: string;
+  unesco_status?: string;
+  one_line_description?: string;
+  short_description?: string;
+  hero_image_url?: string;
+  status: 'draft' | 'active' | 'published' | 'archived';
+  ar_ready: boolean;
+  google_place_id?: string;
+  /**
+   * Structured curated content (summary, timeline, architecture, narratives,
+   * faq, ai_runtime_config, ...). Populated only for sites that have been
+   * fully authored. Kept loosely typed for now — see plan #5.
+   */
+  content?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PlacesError {
   message: string;
   statusCode: number;

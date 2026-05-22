@@ -10,6 +10,7 @@ import {
   Place,
   SavePlaceRequest,
   SavedPlace,
+  SiteDetail,
   PlacesResult,
 } from './types';
 import { createErrorResult } from '../helpers';
@@ -113,6 +114,28 @@ export async function getSavedPlaces(): Promise<PlacesResult<SavedPlace[]>> {
     });
 
     return { success: true, data: normalized };
+  } catch (error) {
+    return createErrorResult(error);
+  }
+}
+
+/**
+ * Fetch the curated heritage record for a single site.
+ *
+ * `idOrSlug` may be either the monument UUID (preferred when known) or the
+ * URL slug — the backend accepts both. Returns `success: false` with a 404
+ * statusCode for places that exist in /findplaces but not in the curated DB,
+ * which callers should treat as "no rich metadata available, render bare".
+ */
+export async function getSite(
+  idOrSlug: string,
+): Promise<PlacesResult<SiteDetail>> {
+  try {
+    const client = createAuthenticatedClient();
+    const response = await client.get<SiteDetail>(
+      `/api/v1/sites/${encodeURIComponent(idOrSlug)}`,
+    );
+    return { success: true, data: response.data };
   } catch (error) {
     return createErrorResult(error);
   }

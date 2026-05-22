@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  Image,
 } from 'react-native';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import ThinkingDots from '../../components/ui/ThinkingDots';
@@ -24,6 +25,7 @@ import {
   Heart,
   Share2,
   MapPin,
+  MessageSquare,
   Navigation,
   Camera,
   ChevronDown,
@@ -41,6 +43,8 @@ import {
   elaboratePersonalizedFact,
 } from '../../utils/api/user';
 import type { PersonalizedFact } from '../../utils/api/user';
+import { getSite } from '../../utils/api/places';
+import type { SiteDetail } from '../../utils/api/places';
 import { ROUTES } from '../../core/constants';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 
@@ -73,6 +77,8 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     null,
   );
 
+  const [siteDetail, setSiteDetail] = useState<SiteDetail | null>(null);
+
   const scrollY = useSharedValue(0);
   const isSaved = isPlaceSaved(site.id);
 
@@ -82,12 +88,22 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [site]);
 
   const location = useMemo(() => {
+    if (siteDetail) {
+      const parts = [
+        siteDetail.district,
+        siteDetail.state,
+        siteDetail.country,
+      ].filter(Boolean);
+      if (parts.length > 0) {
+        return parts.join(', ');
+      }
+    }
     const formatted = (site as any).formatted;
     if (typeof formatted === 'string' && formatted.length > 0) {
       return formatted;
     }
     return [site.city, site.country].filter(Boolean).join(', ') || 'India';
-  }, [site]);
+  }, [site, siteDetail]);
 
   const categories = useMemo(() => {
     const cats = (site as any).categories;
@@ -95,6 +111,9 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [site]);
 
   const description = useMemo(() => {
+    if (siteDetail?.short_description) {
+      return siteDetail.short_description;
+    }
     const desc = (site as any).description;
     const sig = (site as any).significance;
     return (
@@ -102,7 +121,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       sig ||
       `Explore ${site.name}, a historic heritage site located at ${location}.`
     );
-  }, [site, location]);
+  }, [site, siteDetail, location]);
 
   const distance = useMemo(() => {
     const meters = (site as any).distance_meters;
@@ -119,6 +138,30 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       }
     });
   }, [checkAccess, site.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDetail() {
+      const result = await getSite(site.id);
+      if (cancelled) {
+        return;
+      }
+      if (result.success) {
+        setSiteDetail(result.data);
+      } else {
+        // 404 is expected for places that exist in /findplaces (Geoapify) but
+        // haven't been curated into the monuments table yet. Leave siteDetail
+        // null and fall back to route-param data.
+        setSiteDetail(null);
+      }
+    }
+
+    loadDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [site.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -194,6 +237,20 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   }, [navigation, site.id]);
 
+  // "Ask about this site" — open the AI Guide chat for this monument.
+  // The slug must match the backend's monuments.slug; only sites curated
+  // into the monuments table (with content.faq) will have a meaningful
+  // experience. For uncurated /findplaces results, the welcome bubble
+  // falls back to a generic line and there are no suggestion chips.
+  const handleAskGuide = useCallback(() => {
+    const guideSlug = siteDetail?.slug ?? site.id;
+    navigation.navigate(ROUTES.MAIN.AI_GUIDE, {
+      slug: guideSlug,
+      siteName: siteDetail?.name ?? site.name,
+      heroImageUrl: siteDetail?.hero_image_url,
+    });
+  }, [navigation, siteDetail, site.id, site.name]);
+
   const handleShare = useCallback(() => {
     // Share handler intentionally blank — TBD.
   }, []);
@@ -259,10 +316,21 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         bounces={false}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        {/* Compact banner — no images */}
+        {/* Compact banner — hero image when available, gradient overlay always */}
         <View style={{ height: HERO_HEIGHT }}>
+          {siteDetail?.hero_image_url ? (
+            <Image
+              source={{ uri: siteDetail.hero_image_url }}
+              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+              resizeMode="cover"
+            />
+          ) : null}
           <LinearGradient
-            colors={['#0A0A0A', '#1A1410']}
+            colors={
+              siteDetail?.hero_image_url
+                ? ['rgba(10,10,10,0.25)', 'rgba(10,10,10,0.92)']
+                : ['#0A0A0A', '#1A1410']
+            }
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
@@ -388,6 +456,51 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             )}
           </Animated.View>
 
+          {/* Heritage Details — curated DB record (era / dynasty / founder / etc.) */}
+          {siteDetail && (
+            <Animated.View
+              entering={FadeInDown.delay(150).duration(400)}
+              className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4 gap-3"
+            >
+              {siteDetail.one_line_description && (
+                <Text className="text-parchment-muted text-[13px] leading-[20px] italic font-['MontserratAlternates-Regular']">
+                  {siteDetail.one_line_description}
+                </Text>
+              )}
+
+              {siteDetail.unesco_status && (
+                <View className="self-start rounded-full bg-[rgba(201,168,76,0.18)] px-2.5 py-1">
+                  <Text className="text-brand-gold text-[11px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold']">
+                    {siteDetail.unesco_status}
+                  </Text>
+                </View>
+              )}
+
+              <View className="flex-row flex-wrap">
+                {(
+                  [
+                    ['Era', siteDetail.era],
+                    ['Dynasty', siteDetail.dynasty],
+                    ['Founder', siteDetail.founder],
+                    ['Deity', siteDetail.deity],
+                    ['Style', siteDetail.architectural_style],
+                  ] as Array<[string, string | undefined]>
+                )
+                  .filter(([, value]) => Boolean(value))
+                  .map(([label, value]) => (
+                    <View key={label} className="w-1/2 pr-2 mb-3">
+                      <Text className="text-parchment-dim text-[10px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+                        {label}
+                      </Text>
+                      <Text className="text-parchment text-[13px] leading-[18px] mt-0.5 font-['MontserratAlternates-Medium']">
+                        {value}
+                      </Text>
+                    </View>
+                  ))}
+              </View>
+            </Animated.View>
+          )}
+
           {/* Passport badge */}
           {hasAccess && (
             <Animated.View
@@ -411,6 +524,22 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               <Camera color="#0A0A0A" size={18} />
               <Text className="text-ink text-[15px] uppercase tracking-[0.8px] font-['MontserratAlternates-Bold']">
                 Begin Your Journey
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* CTA: Ask about this site (AI Guide) */}
+          <Animated.View entering={FadeInDown.delay(220).duration(400)}>
+            <TouchableOpacity
+              onPress={handleAskGuide}
+              className="rounded-xl bg-surface-1 border border-[rgba(232,160,32,0.35)] py-3 items-center justify-center flex-row gap-2"
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Ask about this site"
+            >
+              <MessageSquare color="#E8A020" size={16} />
+              <Text className="text-accent-amber text-[14px] tracking-[0.4px] font-['MontserratAlternates-SemiBold']">
+                Ask about this site
               </Text>
             </TouchableOpacity>
           </Animated.View>

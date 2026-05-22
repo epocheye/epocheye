@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  AppState,
   Image,
   Pressable,
   StatusBar,
@@ -16,9 +17,19 @@ import mapStyle from '../../content/mapstyle.json';
 import {COLORS, FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
 import {usePlaces} from '../../context';
+import {PermissionService} from '../../shared/services/permission.service';
 import {buildSiteDetailData} from '../../shared/utils';
+import {getSite, type SiteDetail} from '../../utils/api/places';
 import type {Place} from '../../utils/api/places/types';
 import type {TabScreenProps} from '../../core/types/navigation.types';
+import {useDistanceToSite} from '../../shared/hooks/useDistanceToSite';
+import {useExplorerPass} from '../../shared/hooks/useExplorerPass';
+import {useCurrentZoneStore} from '../../stores/currentZoneStore';
+import PreArrivalCard from './components/PreArrivalCard';
+import ApproachCard from './components/ApproachCard';
+import ArrivalBanner from './components/ArrivalBanner';
+
+const KONARK_SLUG = 'konark-sun-temple';
 
 type Props = TabScreenProps<'Home'>;
 
@@ -75,11 +86,95 @@ const Home: React.FC<Props> = ({navigation}) => {
   const [viewMode, setViewMode] = useState<ViewMode>('nearby');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
+  // TODO: this site reference should later come from a planned-trips / wishlist concept.
+  const [konarkSite, setKonarkSite] = useState<SiteDetail | null>(null);
+  const [locationDenied, setLocationDenied] = useState(false);
+  const [arrivalDismissed, setArrivalDismissed] = useState(false);
   const mapRef = useRef<MapView>(null);
+
+  const currentZone = useCurrentZoneStore(s => s.zone);
+  const {passes: explorerPasses} = useExplorerPass();
 
   useEffect(() => {
     void ensureLocationTracking();
   }, [ensureLocationTracking]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const result = await getSite('konark-sun-temple');
+      if (cancelled) return;
+      if (result.success) setKonarkSite(result.data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      const granted = await PermissionService.check('location');
+      if (!cancelled) setLocationDenied(!granted);
+    };
+    void refresh();
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') void refresh();
+    });
+    return () => {
+      cancelled = true;
+      sub.remove();
+    };
+  }, []);
+
+  const userLatLng = useMemo(
+    () =>
+      currentLocation
+        ? {lat: currentLocation.latitude, lng: currentLocation.longitude}
+        : null,
+    [currentLocation],
+  );
+
+  const konarkCoords = useMemo(
+    () =>
+      konarkSite &&
+      typeof konarkSite.latitude === 'number' &&
+      typeof konarkSite.longitude === 'number'
+        ? {lat: konarkSite.latitude, lng: konarkSite.longitude}
+        : {lat: 0, lng: 0},
+    [konarkSite],
+  );
+
+  const {distanceKm, etaMinutes} = useDistanceToSite(userLatLng, konarkCoords);
+
+  const isAtKonark = currentZone?.monument_id === KONARK_SLUG;
+  const isPreArrival =
+    !isAtKonark && distanceKm !== null && distanceKm >= 1;
+  const isApproaching =
+    !isAtKonark && distanceKm !== null && distanceKm < 1;
+
+  const visiblePreArrival =
+    !isAtKonark && (locationDenied || isPreArrival);
+  const visibleApproach =
+    !isAtKonark && isApproaching && !locationDenied;
+  const visibleArrival = isAtKonark && !arrivalDismissed;
+
+  const hasKonarkAccess = useMemo(
+    () =>
+      explorerPasses.some(
+        p => p.is_active && p.place_ids.includes(KONARK_SLUG),
+      ),
+    [explorerPasses],
+  );
+
+  useEffect(() => {
+    if (!isAtKonark && arrivalDismissed) setArrivalDismissed(false);
+  }, [isAtKonark, arrivalDismissed]);
+
+  const handleArrivalDismiss = useCallback(
+    () => setArrivalDismissed(true),
+    [],
+  );
 
   const allPlaces = useMemo(
     () => (Array.isArray(nearbyPlaces) ? nearbyPlaces : []),
@@ -275,6 +370,33 @@ const Home: React.FC<Props> = ({navigation}) => {
             </Text>
           </View>
         )}
+        {viewMode === 'nearby' && konarkSite ? (
+          <View
+            pointerEvents="box-none"
+            style={styles.preArrivalOverlay}>
+            <PreArrivalCard
+              site={konarkSite}
+              userLocation={userLatLng}
+              distanceKm={distanceKm}
+              etaMinutes={etaMinutes}
+              locationPermissionDenied={locationDenied}
+              visible={visiblePreArrival}
+            />
+            <ApproachCard
+              site={konarkSite}
+              userLocation={userLatLng}
+              distanceKm={distanceKm ?? 0}
+              hasKonarkAccess={hasKonarkAccess}
+              visible={visibleApproach}
+            />
+            <ArrivalBanner
+              site={konarkSite}
+              hasKonarkAccess={hasKonarkAccess}
+              visible={visibleArrival}
+              onDismiss={handleArrivalDismiss}
+            />
+          </View>
+        ) : null}
       </View>
 
       {/* Bottom featured card */}
@@ -353,6 +475,14 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: {width: 0, height: 8},
     elevation: 8,
+  },
+  preArrivalOverlay: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    zIndex: 10,
+    elevation: 10,
   },
 });
 

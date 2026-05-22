@@ -41,6 +41,7 @@ import {
   useProfileDigest,
 } from '../../shared/hooks';
 import { useDevSettingsStore } from '../../stores/devSettingsStore';
+import DevLoadTestArModelButton from './components/DevLoadTestArModelButton';
 import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 import { getVisitHistory, type VisitRow } from '../../utils/api/visits';
 import { formatRelativeTime } from '../../shared/utils';
@@ -768,6 +769,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               </Text>
             </TouchableOpacity>
           </Animated.View>
+
+          <DevLoadTestArModelButton />
 
           {/* ── App version ── */}
           <Animated.View
