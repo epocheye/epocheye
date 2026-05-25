@@ -140,3 +140,23 @@ export async function getSite(
     return createErrorResult(error);
   }
 }
+
+/**
+ * List all curated heritage sites visible to end users (status active or
+ * published). Backed by GET /api/v1/sites and authenticated like the rest of
+ * this module.
+ */
+export async function getSites(): Promise<PlacesResult<SiteDetail[]>> {
+  try {
+    const client = createAuthenticatedClient();
+    const response = await client.get<{ sites?: SiteDetail[] }>(
+      '/api/v1/sites',
+    );
+    const sites = Array.isArray(response.data?.sites)
+      ? response.data.sites
+      : [];
+    return { success: true, data: sites };
+  } catch (error) {
+    return createErrorResult(error);
+  }
+}

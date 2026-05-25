@@ -67,5 +67,8 @@
       "Bash(grep -E \"\\\\.tsx$\")",
       "Bash(Remove-Item *)"
     ]
+  },
+  "worktree": {
+    "bgIsolation": "none"
   }
 }

@@ -23,6 +23,7 @@ class ARCorePackage : ReactPackage {
         return listOf(
             EpocheyeARViewManager(reactContext),
             EpocheyeGeospatialARViewManager(reactContext),
+            EpocheyePlaneARViewManager(reactContext),
         )
     }
 }

@@ -228,8 +228,15 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [isSaving, site, toggleSavePlace, location, categories]);
 
   const handleStartARExperience = useCallback(() => {
-    navigation.navigate('ARExperience', { site });
-  }, [navigation, site]);
+    const monumentId = siteDetail?.slug ?? site.id;
+    const siteName = siteDetail?.name ?? site.name;
+    navigation.navigate(ROUTES.MAIN.AR_3D_VIEWER, {
+      monumentId,
+      objectLabel: siteName,
+      glbUrl: '',
+      siteName,
+    });
+  }, [navigation, siteDetail, site]);
 
   const handleGetPassport = useCallback(() => {
     navigation.navigate(ROUTES.MAIN.PURCHASE, {

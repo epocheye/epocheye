@@ -72,6 +72,11 @@ export type MainStackParamList = {
     siteName: string;
     heroImageUrl?: string;
   };
+  /** Dev-only plane-detection AR sanity check. */
+  PlaneArTest: {
+    glbUrl: string;
+    label: string;
+  };
   /** No-ARCore fallback — render an asset in a 3D orbit/zoom viewer. */
   Ar3dViewer: {
     monumentId: string;

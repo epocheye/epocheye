@@ -39,6 +39,7 @@ export const ROUTES = {
     ANCHOR_CAPTURE: 'AnchorCapture',
     AR_3D_VIEWER: 'Ar3dViewer',
     AI_GUIDE: 'AiGuide',
+    PLANE_AR_TEST: 'PlaneArTest',
   },
 
   /**

@@ -23,8 +23,7 @@ import type {
   PassportStamp,
 } from '../../utils/api/passport';
 import type {ExplorerPass} from '../../utils/api/explorer-pass/types';
-import type {SavedPlace} from '../../utils/api/places/types';
-import {buildSiteDetailData} from '../../shared/utils';
+import type {SiteDetail} from '../../utils/api/places/types';
 import type {TabScreenProps} from '../../core/types/navigation.types';
 import PlanList from './components/PlanList';
 
@@ -102,9 +101,18 @@ const Passport: React.FC<Props> = ({navigation}) => {
   }, [navigation]);
 
   const onPlanPlacePress = useCallback(
-    (saved: SavedPlace) => {
+    (site: SiteDetail) => {
       navigation.navigate(ROUTES.MAIN.SITE_DETAIL, {
-        site: buildSiteDetailData(saved.place_data),
+        site: {
+          id: site.slug ?? site.id,
+          name: site.name,
+          lat: site.latitude,
+          lon: site.longitude,
+          city: site.city,
+          country: site.country,
+          formatted: site.short_description,
+          heroImages: site.hero_image_url ? [site.hero_image_url] : undefined,
+        },
       });
     },
     [navigation],

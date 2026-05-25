@@ -10,6 +10,7 @@ export {
   unsavePlace,
   getSavedPlaces,
   getSite,
+  getSites,
 } from './Places';
 
 // Types

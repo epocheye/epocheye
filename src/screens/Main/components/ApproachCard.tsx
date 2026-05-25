@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect} from 'react';
-import {Image, Linking, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Image, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import Animated, {
   useAnimatedStyle,
@@ -19,6 +19,7 @@ interface ApproachCardProps {
   distanceKm: number;
   hasKonarkAccess: boolean;
   visible: boolean;
+  onShowDirections: () => void;
 }
 
 function formatSubKmDistance(km: number): string {
@@ -40,6 +41,7 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
   distanceKm,
   hasKonarkAccess,
   visible,
+  onShowDirections,
 }) => {
   const navigation = useNavigation<TabMainNavigationProp>();
   const opacity = useSharedValue(visible ? 1 : 0);
@@ -55,9 +57,8 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
 
   const handleDirections = useCallback(() => {
     if (!hasCoords) return;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${site.latitude},${site.longitude}`;
-    void Linking.openURL(url);
-  }, [hasCoords, site.latitude, site.longitude]);
+    onShowDirections();
+  }, [hasCoords, onShowDirections]);
 
   const handleActivate = useCallback(() => {
     navigation.navigate(ROUTES.MAIN.PURCHASE, {

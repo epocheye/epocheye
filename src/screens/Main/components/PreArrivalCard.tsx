@@ -1,7 +1,6 @@
 import React, {useCallback, useEffect} from 'react';
 import {
   Image,
-  Linking,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -30,6 +29,7 @@ interface PreArrivalCardProps {
   etaMinutes: number | null;
   locationPermissionDenied: boolean;
   visible: boolean;
+  onShowDirections: () => void;
 }
 
 function formatLongDistance(km: number): string {
@@ -64,6 +64,7 @@ const PreArrivalCard: React.FC<PreArrivalCardProps> = ({
   etaMinutes,
   locationPermissionDenied,
   visible,
+  onShowDirections,
 }) => {
   const navigation = useNavigation<TabMainNavigationProp>();
   const opacity = useSharedValue(visible ? 1 : 0);
@@ -79,9 +80,8 @@ const PreArrivalCard: React.FC<PreArrivalCardProps> = ({
 
   const handleDirections = useCallback(() => {
     if (!hasCoords) return;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${site.latitude},${site.longitude}`;
-    void Linking.openURL(url);
-  }, [hasCoords, site.latitude, site.longitude]);
+    onShowDirections();
+  }, [hasCoords, onShowDirections]);
 
   const handleViewDetails = useCallback(() => {
     navigation.navigate(ROUTES.MAIN.SITE_DETAIL, {

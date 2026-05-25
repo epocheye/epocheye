@@ -1,25 +1,19 @@
 /**
- * PlanList — embeddable list of the user's saved/planned places.
+ * PlanList — embeddable list of curated heritage sites from our DB.
  * Rendered inside the Passport tab's "Plan" mode (see Passport.tsx).
  *
- * Extracted from the original Saved.tsx screen but stripped of screen-level
- * chrome (SafeAreaView, header) so it can live inside a host screen.
+ * Sourced from GET /api/v1/sites (status active|published) so this is the
+ * catalogue of monuments we have AR/curated content for — not the user's
+ * Geoapify "saved places" (those still live in the Zustand savedPlaces slice
+ * and are surfaced elsewhere).
  */
 
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {
-  Alert,
-  FlatList,
-  RefreshControl,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {FlatList, RefreshControl, Text, TouchableOpacity, View} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   Easing,
   FadeInDown,
-  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -27,27 +21,38 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import {
-  ArrowUpDown,
-  Bookmark,
-  MapPin,
-  Trash2,
-} from 'lucide-react-native';
-import AnimatedLogo from '../../../components/ui/AnimatedLogo';
+import {ArrowUpDown, Bookmark, MapPin} from 'lucide-react-native';
 import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
-import {usePlaces} from '../../../context';
-import type {SavedPlace} from '../../../utils/api/places/types';
-import {getPlaceImage} from '../../../shared/utils';
+import {getSites} from '../../../utils/api/places/Places';
+import type {SiteDetail} from '../../../utils/api/places/types';
+import {usePlacesStore} from '../../../stores/placesStore';
 
-type SortMode = 'date' | 'name' | 'distance';
+type SortMode = 'name' | 'distance';
 
 const SORT_LABELS: Record<SortMode, string> = {
-  date: 'Recent',
   name: 'A–Z',
   distance: 'Nearest',
 };
 
-const SORT_CYCLE: SortMode[] = ['date', 'name', 'distance'];
+const SORT_CYCLE: SortMode[] = ['name', 'distance'];
+
+const FALLBACK_SITE_IMAGE =
+  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80';
+
+function haversineKm(
+  a: {lat: number; lng: number},
+  b: {lat: number; lng: number},
+): number {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLon = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
 
 const SkeletonCard: React.FC = () => {
   const pulse = useSharedValue(0.55);
@@ -76,62 +81,37 @@ const SkeletonCard: React.FC = () => {
   );
 };
 
-interface FilterChipProps {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}
-
-const FilterChip: React.FC<FilterChipProps> = ({label, active, onPress}) => (
-  <TouchableOpacity
-    onPress={onPress}
-    className={`mr-2 px-3 py-1.5 rounded-full border ${
-      active
-        ? 'bg-brand-gold border-brand-gold'
-        : 'bg-transparent border-[rgba(201,168,76,0.3)]'
-    }`}
-    accessibilityRole="button"
-    accessibilityState={{selected: active}}>
-    <Text
-      className={`text-xs font-['InstrumentSans-SemiBold'] ${
-        active ? 'text-ink' : 'text-parchment-muted'
-      }`}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
-
-interface PlaceCardProps {
-  saved: SavedPlace;
+interface SiteCardProps {
+  site: SiteDetail;
   index: number;
-  onPress: (saved: SavedPlace) => void;
-  onRemove: (placeId: string, name: string) => void;
-  isRemoving: boolean;
+  onPress: (site: SiteDetail) => void;
+  distanceKmFromUser: number | null;
 }
 
-const PlaceCard: React.FC<PlaceCardProps> = React.memo(
-  ({saved, index, onPress, onRemove, isRemoving}) => {
-    const place = saved.place_data;
-    const imageUri = getPlaceImage(place.categories);
+const SiteCard: React.FC<SiteCardProps> = React.memo(
+  ({site, index, onPress, distanceKmFromUser}) => {
     const scale = useSharedValue(1);
 
     const animatedStyle = useAnimatedStyle(() => ({
       transform: [{scale: scale.value}],
     }));
 
-    const distanceKm =
-      place.distance_meters > 0
-        ? `${(place.distance_meters / 1000).toFixed(1)} km`
+    const tag = site.era || site.dynasty || site.architectural_style || 'Heritage';
+    const subtitleParts = [site.city, site.state].filter(
+      (s): s is string => typeof s === 'string' && s.length > 0,
+    );
+    const subtitle = subtitleParts.join(' · ');
+    const distanceLabel =
+      distanceKmFromUser !== null
+        ? `${distanceKmFromUser.toFixed(1)} km`
         : null;
 
     return (
       <Animated.View
         entering={FadeInDown.delay(index * 60).duration(350)}
-        exiting={FadeOut.duration(250)}
         style={[{flex: 1}, animatedStyle]}>
         <TouchableOpacity
-          onPress={() => onPress(saved)}
-          onLongPress={() => onRemove(place.id, place.name)}
+          onPress={() => onPress(site)}
           onPressIn={() => {
             scale.value = withSpring(0.97, {damping: 15, stiffness: 300});
           }}
@@ -139,14 +119,13 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(
             scale.value = withSpring(1, {damping: 15, stiffness: 300});
           }}
           activeOpacity={0.9}
-          disabled={isRemoving}
           accessibilityRole="button"
-          accessibilityLabel={`Planned place: ${place.name}`}
-          accessibilityHint="Tap to view details, long press to remove">
+          accessibilityLabel={`Plan ${site.name}`}
+          accessibilityHint="Tap to view site details">
           <ResolvedSubjectImage
-            subject={place.name}
-            context={`${place.city} ${place.country} ${place.categories.join(', ')}`}
-            fallbackUri={imageUri}
+            subject={site.name}
+            context={`${site.city ?? ''} ${site.country ?? ''} ${tag}`.trim()}
+            fallbackUri={site.hero_image_url || FALLBACK_SITE_IMAGE}
             style={{height: 200, borderRadius: 16}}
             imageStyle={{borderRadius: 16}}
             loadingLabel="Loading...">
@@ -159,44 +138,29 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(
                   <Text
                     className="text-parchment text-[10px] font-['InstrumentSans-SemiBold']"
                     numberOfLines={1}>
-                    {place.categories[0] || 'Historic'}
+                    {tag}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => onRemove(place.id, place.name)}
-                  disabled={isRemoving}
-                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
-                  className="w-7 h-7 rounded-full bg-[rgba(10,10,10,0.7)] border border-red-500/30 items-center justify-center"
-                  accessibilityRole="button"
-                  accessibilityLabel={`Remove ${place.name}`}>
-                  {isRemoving ? (
-                    <AnimatedLogo
-                      size={12}
-                      variant="white"
-                      motion="pulse"
-                      showRing={false}
-                    />
-                  ) : (
-                    <Trash2 color="#EF4444" size={13} />
-                  )}
-                </TouchableOpacity>
               </View>
 
               <View>
                 <Text
                   className="text-parchment text-[18px] font-['InstrumentSerif-Regular'] leading-6"
                   numberOfLines={2}>
-                  {place.name}
+                  {site.name}
                 </Text>
-                <View className="flex-row items-center gap-1 mt-1">
-                  <MapPin color="#B8AF9E" size={11} />
-                  <Text
-                    className="text-parchment-muted text-[11px] font-['InstrumentSans-Medium'] flex-shrink"
-                    numberOfLines={1}>
-                    {place.city}
-                    {distanceKm ? ` · ${distanceKm}` : ''}
-                  </Text>
-                </View>
+                {(subtitle.length > 0 || distanceLabel) && (
+                  <View className="flex-row items-center gap-1 mt-1">
+                    <MapPin color="#B8AF9E" size={11} />
+                    <Text
+                      className="text-parchment-muted text-[11px] font-['InstrumentSans-Medium'] flex-shrink"
+                      numberOfLines={1}>
+                      {subtitle}
+                      {subtitle.length > 0 && distanceLabel ? ' · ' : ''}
+                      {distanceLabel ?? ''}
+                    </Text>
+                  </View>
+                )}
               </View>
             </LinearGradient>
           </ResolvedSubjectImage>
@@ -205,97 +169,79 @@ const PlaceCard: React.FC<PlaceCardProps> = React.memo(
     );
   },
 );
-PlaceCard.displayName = 'PlanListPlaceCard';
+SiteCard.displayName = 'PlanListSiteCard';
 
 export interface PlanListProps {
-  onPlacePress: (saved: SavedPlace) => void;
+  onPlacePress: (site: SiteDetail) => void;
 }
 
 const PlanList: React.FC<PlanListProps> = ({onPlacePress}) => {
-  const savedPlaces = usePlaces(state => state.savedPlaces);
-  const isLoadingSaved = usePlaces(state => state.isLoadingSaved);
-  const savedError = usePlaces(state => state.savedError);
-  const refreshSavedPlaces = usePlaces(state => state.refreshSavedPlaces);
-  const ensureSavedPlacesLoaded = usePlaces(
-    state => state.ensureSavedPlacesLoaded,
-  );
-  const toggleSavePlace = usePlaces(state => state.toggleSavePlace);
+  const userLocation = usePlacesStore(state => state.currentLocation);
 
-  const [activeFilter, setActiveFilter] = useState('All');
-  const [sortMode, setSortMode] = useState<SortMode>('date');
+  const [sites, setSites] = useState<SiteDetail[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>('name');
   const [refreshing, setRefreshing] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const loadSites = useCallback(async () => {
+    const result = await getSites();
+    if (result.success) {
+      setSites(result.data);
+      setError(null);
+    } else {
+      setError(result.error.message);
+    }
+  }, []);
 
   useEffect(() => {
-    void ensureSavedPlacesLoaded();
-  }, [ensureSavedPlacesLoaded]);
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      await loadSites();
+      if (!cancelled) setIsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadSites]);
 
-  const safeSavedPlaces = useMemo(
-    () =>
-      (savedPlaces || []).filter(
-        saved =>
-          !!saved?.place_data && Array.isArray(saved.place_data.categories),
-      ),
-    [savedPlaces],
-  );
+  const sortedSites = useMemo(() => {
+    const userCoord =
+      userLocation &&
+      typeof userLocation.latitude === 'number' &&
+      typeof userLocation.longitude === 'number'
+        ? {lat: userLocation.latitude, lng: userLocation.longitude}
+        : null;
 
-  const categories = useMemo(() => {
-    const cats = new Set<string>();
-    safeSavedPlaces.forEach(saved => {
-      saved.place_data.categories.forEach(cat => cats.add(cat));
+    const withDistance = sites.map(site => {
+      const lat = site.latitude;
+      const lng = site.longitude;
+      const distanceKm =
+        userCoord && typeof lat === 'number' && typeof lng === 'number'
+          ? haversineKm(userCoord, {lat, lng})
+          : null;
+      return {site, distanceKm};
     });
-    return Array.from(cats).slice(0, 8);
-  }, [safeSavedPlaces]);
 
-  const filteredPlaces = useMemo(() => {
-    let list =
-      activeFilter === 'All'
-        ? safeSavedPlaces
-        : safeSavedPlaces.filter(saved =>
-            saved.place_data.categories.includes(activeFilter),
-          );
-
-    if (sortMode === 'name') {
-      list = [...list].sort((a, b) =>
-        a.place_data.name.localeCompare(b.place_data.name),
-      );
-    } else if (sortMode === 'distance') {
-      list = [...list].sort(
-        (a, b) =>
-          (a.place_data.distance_meters || 0) -
-          (b.place_data.distance_meters || 0),
-      );
+    if (sortMode === 'distance') {
+      return [...withDistance].sort((a, b) => {
+        if (a.distanceKm === null && b.distanceKm === null) return 0;
+        if (a.distanceKm === null) return 1;
+        if (b.distanceKm === null) return -1;
+        return a.distanceKm - b.distanceKm;
+      });
     }
-    return list;
-  }, [activeFilter, safeSavedPlaces, sortMode]);
+    return [...withDistance].sort((a, b) =>
+      a.site.name.localeCompare(b.site.name),
+    );
+  }, [sites, sortMode, userLocation]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refreshSavedPlaces();
+    await loadSites();
     setRefreshing(false);
-  }, [refreshSavedPlaces]);
-
-  const handleRemove = useCallback(
-    (placeId: string, placeName: string) => {
-      Alert.alert(
-        'Remove from plan',
-        `Remove "${placeName}" from your plan?`,
-        [
-          {text: 'Cancel', style: 'cancel'},
-          {
-            text: 'Remove',
-            style: 'destructive',
-            onPress: async () => {
-              setRemovingId(placeId);
-              await toggleSavePlace(placeId);
-              setRemovingId(null);
-            },
-          },
-        ],
-      );
-    },
-    [toggleSavePlace],
-  );
+  }, [loadSites]);
 
   const cycleSort = useCallback(() => {
     setSortMode(prev => {
@@ -305,26 +251,34 @@ const PlanList: React.FC<PlanListProps> = ({onPlacePress}) => {
   }, []);
 
   const renderItem = useCallback(
-    ({item, index}: {item: SavedPlace; index: number}) => (
-      <PlaceCard
-        saved={item}
+    ({
+      item,
+      index,
+    }: {
+      item: {site: SiteDetail; distanceKm: number | null};
+      index: number;
+    }) => (
+      <SiteCard
+        site={item.site}
         index={index}
         onPress={onPlacePress}
-        onRemove={handleRemove}
-        isRemoving={removingId === item.place_id}
+        distanceKmFromUser={item.distanceKm}
       />
     ),
-    [onPlacePress, handleRemove, removingId],
+    [onPlacePress],
   );
 
-  const keyExtractor = useCallback((item: SavedPlace) => item.id, []);
+  const keyExtractor = useCallback(
+    (item: {site: SiteDetail}) => item.site.slug ?? item.site.id,
+    [],
+  );
 
   return (
     <View className="flex-1">
       <View className="px-5 pt-2 pb-3 flex-row items-center justify-between">
         <Text className="text-parchment-dim text-xs font-['InstrumentSans-Regular']">
-          {safeSavedPlaces.length}{' '}
-          {safeSavedPlaces.length === 1 ? 'place planned' : 'places planned'}
+          {sortedSites.length}{' '}
+          {sortedSites.length === 1 ? 'site' : 'sites'} available
         </Text>
         <TouchableOpacity
           onPress={cycleSort}
@@ -332,7 +286,7 @@ const PlanList: React.FC<PlanListProps> = ({onPlacePress}) => {
           accessibilityRole="button"
           accessibilityLabel={`Sort by ${SORT_LABELS[sortMode]}`}>
           <ArrowUpDown
-            color={sortMode !== 'date' ? '#C9A84C' : '#6B6357'}
+            color={sortMode === 'distance' ? '#C9A84C' : '#6B6357'}
             size={13}
           />
           <Text className="text-parchment-muted text-[11px] font-['InstrumentSans-Medium']">
@@ -341,59 +295,36 @@ const PlanList: React.FC<PlanListProps> = ({onPlacePress}) => {
         </TouchableOpacity>
       </View>
 
-      {savedError && (
+      {error && (
         <View className="mx-5 mb-3 bg-red-500/10 border border-red-500/20 rounded-2xl p-3">
           <Text className="text-red-400 text-xs font-['InstrumentSans-Medium']">
-            {savedError}
+            {error}
           </Text>
         </View>
       )}
 
-      {categories.length > 0 && (
-        <View className="mb-3">
-          <FlatList
-            horizontal
-            data={['All', ...categories]}
-            keyExtractor={item => `filter-${item}`}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{paddingHorizontal: 20, paddingVertical: 4}}
-            renderItem={({item}) => (
-              <FilterChip
-                label={item}
-                active={activeFilter === item}
-                onPress={() => setActiveFilter(item)}
-              />
-            )}
-          />
-        </View>
-      )}
-
-      {isLoadingSaved ? (
+      {isLoading ? (
         <View className="flex-row flex-wrap px-5 gap-3">
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
         </View>
-      ) : filteredPlaces.length === 0 ? (
+      ) : sortedSites.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8 pb-12">
           <View className="w-20 h-20 rounded-full bg-surface-1 border border-[rgba(201,168,76,0.2)] items-center justify-center mb-5">
             <Bookmark color="#D4860A" size={32} />
           </View>
           <Text className="text-parchment text-lg text-center font-['InstrumentSerif-Regular']">
-            {activeFilter !== 'All'
-              ? 'No places in this category'
-              : 'No planned places yet'}
+            No sites available yet
           </Text>
           <Text className="mt-2 text-parchment-muted text-sm text-center font-['InstrumentSans-Regular'] leading-5">
-            {activeFilter !== 'All'
-              ? 'Try a different filter or add more places to your plan.'
-              : 'Open a site detail and tap the bookmark icon to add it to your plan.'}
+            New heritage sites are being added. Pull down to refresh.
           </Text>
         </View>
       ) : (
         <FlatList
-          data={filteredPlaces}
+          data={sortedSites}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           numColumns={2}

@@ -250,6 +250,36 @@ const Home: React.FC<Props> = ({navigation}) => {
     );
   }, []);
 
+  // Future: swap fitToCoordinates for a route polyline via react-native-maps-directions
+  // once GOOGLE_MAPS_API_KEY has Directions API enabled.
+  const handleShowDirections = useCallback(() => {
+    if (!konarkSite) return;
+    const destLat = konarkSite.latitude;
+    const destLng = konarkSite.longitude;
+    if (typeof destLat !== 'number' || typeof destLng !== 'number') return;
+    const destCoord = {latitude: destLat, longitude: destLng};
+
+    if (userLatLng) {
+      mapRef.current?.fitToCoordinates(
+        [{latitude: userLatLng.lat, longitude: userLatLng.lng}, destCoord],
+        {
+          edgePadding: {top: 220, bottom: 240, left: 60, right: 60},
+          animated: true,
+        },
+      );
+    } else {
+      mapRef.current?.animateToRegion(
+        {
+          latitude: destLat,
+          longitude: destLng,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        },
+        500,
+      );
+    }
+  }, [konarkSite, userLatLng]);
+
   return (
     <View className="flex-1 bg-surface-1">
       <StatusBar barStyle="light-content" />
@@ -381,6 +411,7 @@ const Home: React.FC<Props> = ({navigation}) => {
               etaMinutes={etaMinutes}
               locationPermissionDenied={locationDenied}
               visible={visiblePreArrival}
+              onShowDirections={handleShowDirections}
             />
             <ApproachCard
               site={konarkSite}
@@ -388,6 +419,7 @@ const Home: React.FC<Props> = ({navigation}) => {
               distanceKm={distanceKm ?? 0}
               hasKonarkAccess={hasKonarkAccess}
               visible={visibleApproach}
+              onShowDirections={handleShowDirections}
             />
             <ArrivalBanner
               site={konarkSite}
