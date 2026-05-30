@@ -19,6 +19,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   Camera,
   ChevronRight,
+  Languages,
   LogOut,
   MapPin,
   MessageCircle,
@@ -41,6 +42,10 @@ import {
   useProfileDigest,
 } from '../../shared/hooks';
 import { useDevSettingsStore } from '../../stores/devSettingsStore';
+import {
+  useMuseumPrefsStore,
+  NARRATION_LANGS,
+} from '../../stores/museumPrefsStore';
 import DevLoadTestArModelButton from './components/DevLoadTestArModelButton';
 import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 import { getVisitHistory, type VisitRow } from '../../utils/api/visits';
@@ -55,14 +60,11 @@ const AMBER = '#D4860A';
 const AMBER_DEEP = '#7A4A0A';
 const AMBER_LIGHT = '#E8A020';
 
-function initialLetter(name: string | undefined | null): string {
-  const trimmed = (name ?? '').trim();
-  return trimmed.length > 0 ? trimmed[0]!.toUpperCase() : '?';
-}
-
 const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   const { hasAnyActivePass, loading: explorerPassLoading } = useExplorerPass();
   const profile = useUser(state => state.profile);
+  const narrationLang = useMuseumPrefsStore(s => s.narrationLang);
+  const setNarrationLang = useMuseumPrefsStore(s => s.setNarrationLang);
   const isLoading = useUser(state => state.isLoading);
   const updateProfile = useUser(state => state.updateProfile);
   const isAdmin = useIsAdmin();
@@ -95,9 +97,6 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   const sites = summary?.sites_visited ?? 0;
   const dynasties = summary?.dynasties_count ?? 0;
   const streakDays = summary?.streak_days ?? 0;
-  const isStreakActive = streakDays > 0;
-  const location = (profile?.preferences?.location as string | undefined) ?? '';
-  const displayName = profile?.name?.trim() || 'Your name';
   const recentJourneys = useMemo(() => visits.slice(0, 3), [visits]);
 
   useEffect(() => {
@@ -525,7 +524,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               style={{ height: 180 }}
             >
               <AnimatedLogo size={48} variant="white" motion="orbit" />
-              <Text className="text-parchment-dim text-sm font-['MontserratAlternates-Regular'] mt-3">
+              <Text className="text-parchment-dim text-sm font-['InstrumentSans-Regular'] mt-3">
                 Loading profile...
               </Text>
             </View>
@@ -534,7 +533,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               entering={FadeInDown.delay(180).duration(350)}
               className="mx-5 mt-6 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-5"
             >
-              <Text className="text-xs uppercase tracking-[1px] text-brand-gold font-['MontserratAlternates-SemiBold'] mb-4">
+              <Text className="text-xs uppercase tracking-[1px] text-brand-gold font-['InstrumentSans-SemiBold'] mb-4">
                 EDIT PROFILE
               </Text>
               <View className="flex-row items-center mb-5">
@@ -562,17 +561,17 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   </TouchableOpacity>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-parchment text-xl font-['MontserratAlternates-Bold']">
+                  <Text className="text-parchment text-xl font-['InstrumentSerif-Regular']">
                     {fullName || 'User'}
                   </Text>
-                  <Text className="text-parchment-dim text-sm font-['MontserratAlternates-Regular'] mt-0.5">
+                  <Text className="text-parchment-dim text-sm font-['InstrumentSans-Regular'] mt-0.5">
                     {email || 'No email'}
                   </Text>
                 </View>
               </View>
 
               <View className="mb-3">
-                <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['MontserratAlternates-SemiBold'] mb-2">
+                <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['InstrumentSans-SemiBold'] mb-2">
                   Full name
                 </Text>
                 <TextInput
@@ -580,13 +579,13 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   onChangeText={setFullName}
                   placeholder="Full name"
                   placeholderTextColor="rgba(245,240,232,0.25)"
-                  className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['MontserratAlternates-Medium'] px-4 py-3 text-sm"
+                  className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['InstrumentSans-Medium'] px-4 py-3 text-sm"
                   accessibilityLabel="Full name"
                 />
               </View>
               <View className="flex-row gap-3">
                 <View className="flex-1">
-                  <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['MontserratAlternates-SemiBold'] mb-2">
+                  <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['InstrumentSans-SemiBold'] mb-2">
                     Email
                   </Text>
                   <TextInput
@@ -595,12 +594,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     keyboardType="email-address"
                     placeholder="Email"
                     placeholderTextColor="rgba(245,240,232,0.25)"
-                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['MontserratAlternates-Medium'] px-4 py-3 text-sm"
+                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['InstrumentSans-Medium'] px-4 py-3 text-sm"
                     accessibilityLabel="Email address"
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['MontserratAlternates-SemiBold'] mb-2">
+                  <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['InstrumentSans-SemiBold'] mb-2">
                     Phone
                   </Text>
                   <TextInput
@@ -609,7 +608,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     keyboardType="phone-pad"
                     placeholder="Phone"
                     placeholderTextColor="rgba(245,240,232,0.25)"
-                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['MontserratAlternates-Medium'] px-4 py-3 text-sm"
+                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['InstrumentSans-Medium'] px-4 py-3 text-sm"
                     accessibilityLabel="Phone number"
                   />
                 </View>
@@ -633,7 +632,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   ) : (
                     <>
                       <Save size={16} color="#0A0A0A" />
-                      <Text className="text-ink text-sm font-['MontserratAlternates-Bold'] ml-2">
+                      <Text className="text-ink text-sm font-['InstrumentSerif-Regular'] ml-2">
                         Save Changes
                       </Text>
                     </>
@@ -657,10 +656,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   <Sparkles size={18} color="#D4860A" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
+                  <Text className="text-parchment text-base font-['InstrumentSans-SemiBold']">
                     Get Passport
                   </Text>
-                  <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] mt-0.5">
+                  <Text className="text-parchment-dim text-xs font-['InstrumentSans-Regular'] mt-0.5">
                     Unlock heritage sites near you
                   </Text>
                 </View>
@@ -683,10 +682,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   <MapPin size={18} color="#48BB78" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
+                  <Text className="text-parchment text-base font-['InstrumentSans-SemiBold']">
                     Capture Anchor
                   </Text>
-                  <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular'] mt-0.5">
+                  <Text className="text-parchment-dim text-xs font-['InstrumentSans-Regular'] mt-0.5">
                     Admin only · Record an object's geo position on-site
                   </Text>
                 </View>
@@ -694,6 +693,53 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               </TouchableOpacity>
             </Animated.View>
           )}
+
+          {/* ── Museum narration language ── */}
+          <Animated.View
+            entering={FadeInDown.delay(280).duration(350)}
+            className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-4"
+          >
+            <View className="flex-row items-center gap-2.5 mb-3">
+              <View className="w-9 h-9 rounded-full bg-surface-2 items-center justify-center">
+                <Languages size={16} color="#C9A84C" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-parchment text-base font-['InstrumentSans-SemiBold']">
+                  Narration language
+                </Text>
+                <Text className="text-parchment-dim text-xs font-['InstrumentSans-Regular'] mt-0.5">
+                  Language for AI narration when you explore objects
+                </Text>
+              </View>
+            </View>
+            <View className="flex-row gap-2">
+              {NARRATION_LANGS.map(({ code, label }) => {
+                const active = narrationLang === code;
+                return (
+                  <Pressable
+                    key={code}
+                    onPress={() => setNarrationLang(code)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Set narration language ${label}`}
+                    accessibilityState={{ selected: active }}
+                    className={`flex-1 items-center py-2.5 rounded-xl border ${
+                      active
+                        ? 'bg-brand-amber border-brand-amber'
+                        : 'bg-surface-2 border-white/[0.08]'
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm font-['InstrumentSans-SemiBold'] ${
+                        active ? 'text-[#0D0D0D]' : 'text-parchment'
+                      }`}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Animated.View>
 
           {/* ── Permissions ── */}
           <Animated.View
@@ -704,7 +750,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               <View className="w-9 h-9 rounded-full bg-surface-2 items-center justify-center">
                 <Shield size={16} color="#C9A84C" />
               </View>
-              <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
+              <Text className="text-parchment text-base font-['InstrumentSans-SemiBold']">
                 Permissions
               </Text>
             </View>
@@ -720,14 +766,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   ) : (
                     <MapPin size={16} color="#6B6357" />
                   )}
-                  <Text className="text-parchment text-sm font-['MontserratAlternates-Medium']">
+                  <Text className="text-parchment text-sm font-['InstrumentSans-Medium']">
                     {item.label}
                   </Text>
                 </View>
 
                 {item.granted ? (
                   <View className="bg-status-success/15 border border-status-success/30 rounded-full px-2.5 py-1">
-                    <Text className="text-status-success text-[10px] font-['MontserratAlternates-SemiBold']">
+                    <Text className="text-status-success text-[10px] font-['InstrumentSans-SemiBold']">
                       Granted
                     </Text>
                   </View>
@@ -738,7 +784,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     accessibilityRole="button"
                     accessibilityLabel={`Grant ${item.label} permission`}
                   >
-                    <Text className="text-brand-amber text-[10px] font-['MontserratAlternates-SemiBold']">
+                    <Text className="text-brand-amber text-[10px] font-['InstrumentSans-SemiBold']">
                       Grant
                     </Text>
                   </TouchableOpacity>
@@ -753,7 +799,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessibilityLabel="Open device settings"
             >
               <Shield size={14} color="#6B6357" />
-              <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Medium'] ml-1.5">
+              <Text className="text-parchment-muted text-xs font-['InstrumentSans-Medium'] ml-1.5">
                 Open Device Settings
               </Text>
             </TouchableOpacity>
@@ -764,7 +810,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessibilityLabel="Open device settings"
             >
               <MessageCircle size={14} color="#B8AF9E" />
-              <Text className="text-parchment-muted text-xs font-['MontserratAlternates-Medium'] ml-1.5">
+              <Text className="text-parchment-muted text-xs font-['InstrumentSans-Medium'] ml-1.5">
                 Get Support
               </Text>
             </TouchableOpacity>
@@ -792,12 +838,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessibilityRole="none"
               accessible={false}
             >
-              <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Medium']">
+              <Text className="text-parchment-dim text-xs font-['InstrumentSans-Medium']">
                 Version {APP_CONFIG.APP.VERSION}
                 {useDevSettingsStore(s => s.devBypass) ? ' · dev' : ''}
               </Text>
             </TouchableOpacity>
-            <Text className="text-parchment-dim/60 text-[10px] font-['MontserratAlternates-Regular'] mt-1">
+            <Text className="text-parchment-dim/60 text-[10px] font-['InstrumentSans-Regular'] mt-1">
               Made with care for India's heritage
             </Text>
           </Animated.View>
@@ -814,7 +860,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessibilityLabel="Log out"
             >
               <LogOut size={16} color="#B8AF9E" />
-              <Text className="text-parchment-muted text-sm font-['MontserratAlternates-SemiBold'] ml-2">
+              <Text className="text-parchment-muted text-sm font-['InstrumentSans-SemiBold'] ml-2">
                 Log Out
               </Text>
             </TouchableOpacity>
@@ -830,7 +876,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessibilityLabel="Delete account"
             >
               <Trash2 size={16} color="#EF4444" />
-              <Text className="text-status-danger text-sm font-['MontserratAlternates-SemiBold'] ml-2">
+              <Text className="text-status-danger text-sm font-['InstrumentSans-SemiBold'] ml-2">
                 Delete Account
               </Text>
             </TouchableOpacity>

@@ -52,6 +52,17 @@ npm install --legacy-peer-deps
 | `src/services`   | SSE streaming and other stateful services                 |
 | `src/context`    | Compatibility no-op wrappers (don't add new context here) |
 
+### Onboarding teaser pack boundary
+
+`src/constants/onboarding/**`, `src/components/onboarding/**`, and `src/screens/Onboarding/**` form a **curated, region-keyed teaser pack** used **only** by the pre-auth onboarding flow. Region-keyed monument names, hero images, and ancestor-story text live here as static content because they must render before the user has a JWT and the DB is reachable.
+
+**Hard rule:** post-auth code must NEVER import from `src/constants/onboarding/**` or `src/components/onboarding/**`. The following directories are post-auth and must obtain monument data from `useActiveMonument()` (`src/shared/hooks/useActiveMonument.ts`) instead:
+
+- `src/screens/Main/**`, `src/screens/Lens/**`, `src/screens/History/**`, `src/screens/Plan/**`, `src/screens/Admin/**`
+- `src/services/**`, `src/stores/**`, `src/shared/**`
+
+The single permitted monument-slug literal in the entire post-auth codebase lives in `src/config/monuments.ts` as `DEFAULT_MONUMENT_SLUG` (last-resort fallback) and `NEAREST_SITE_FALLBACK_KM`. Adding a real monument to the live app is a pure DB operation (one `monuments` row + one `heritage_zones` row); no code change required.
+
 ---
 
 ## Architecture Overview
@@ -97,24 +108,22 @@ The `useUser()` and `usePlaces()` hooks in `src/context/index.ts` delegate direc
 
 ### Onboarding Flow (`src/navigation/OnboardingNavigator.tsx`)
 
-13-screen Duolingo-style flow, no headers:
+8-screen flow, no headers:
 
 ```
-OB00_Splash → OB01_Welcome → OB02_Motivation → OB03_Frequency → OB04_Goal
-→ OB05_Region → OB06_Name → OB07_Promise → OB08_DemoStory → OB09_Reaction
+OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region → OB04_Pull
 → OB10_SignUp (or OB10_Login branch) → OB11_Notifications → OB12_Arrival
 ```
 
-- OB08 uses `animation: 'fade'`; OB12 has `gestureEnabled: false`
-- OB07 fires the SSE ancestor-story stream; OB08 displays it with a typewriter effect
+- OB12 has `gestureEnabled: false`
 - OB10 has two variants: `SignupScreen` (default, `fromOnboarding: true`) and `OB10_Login`
 - `OB12_Arrival` calls `completeOnboarding()` on the Zustand store and `onOnboardingComplete()` from `OnboardingCallbackContext` to transition to `main`
 
-**Onboarding store** tracks: `firstName`, `motivation`, `visitFrequency`, `goal`, `regions`, `demoStory`, `demoMonument`, `reactionEmoji`, `onboardingComplete`, `guestMode`. `completeOnboarding()` also writes `STORAGE_KEYS.ONBOARDING.COMPLETED = 'true'` to AsyncStorage.
+**Onboarding store** tracks: `firstName`, `region`, `pulls`, `onboardingComplete`. `completeOnboarding()` also writes `STORAGE_KEYS.ONBOARDING.COMPLETED = 'true'` to AsyncStorage.
 
 ### Main Navigation (`src/navigation/MainNavigation.tsx`)
 
-A native stack containing `TabNavigation` (5 tabs) plus full-screen-modal and push screens:
+A native stack containing `TabNavigation` (4 tabs) plus full-screen-modal and push screens:
 
 | Screen               | Route key                   | Presentation          |
 | -------------------- | --------------------------- | --------------------- |
@@ -124,7 +133,7 @@ A native stack containing `TabNavigation` (5 tabs) plus full-screen-modal and pu
 | `ARExperienceScreen` | `ROUTES.MAIN.AR_EXPERIENCE` | fullScreenModal, fade |
 | `PermissionsScreen`  | `ROUTES.MAIN.PERMISSIONS`   | fullScreenModal       |
 
-**Tabs** (Home, Explore, Challenges, Saved, Settings). **Explore is live.** Only Challenges is disabled with a "Coming Soon" overlay (`ComingSoonTabButton`) — its `tabPress` event is prevented and navigation is blocked.
+**Tabs** (Home, Passport, Daily, Account). `Saved.tsx` and `Explore.tsx` exist under `src/screens/Main/` but are **orphaned — not mounted** in `TabNavigation`.
 
 ---
 
@@ -296,7 +305,7 @@ type Props = TabScreenProps<'Home'>;
 
 - **Jest + CSS**: `App.tsx` imports `global.css` — Jest needs CSS mocking/transform support or tests on `App.tsx` will fail.
 - **Android NDK**: Build expects a pinned NDK version in `android/build.gradle`. Missing NDK causes native build failures.
-- **Disabled tabs**: Only the Challenges tab is blocked with `ComingSoonTabButton` — don't remove that guard. Explore is live.
+- **Orphaned screens**: `Saved.tsx` and `Explore.tsx` are kept under `src/screens/Main/` for possible re-introduction but are not mounted in `TabNavigation`. Don't link to them from new code.
 - **SSE cleanup**: Lens and onboarding story streams use XHR-based SSE. Always call the abort function on component unmount.
 - **Peer deps**: If `npm install` fails on `@gorhom/bottom-sheet` constraints, use `--legacy-peer-deps`.
 

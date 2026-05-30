@@ -109,22 +109,22 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
             borderColor: unread ? 'rgba(232,160,32,0.35)' : 'rgba(255,255,255,0.05)',
           }}>
           <View className="flex-row items-center gap-x-2 mb-[6px]">
-            <Text className="flex-1 text-parchment font-montserrat-semibold text-[15px]" numberOfLines={1}>
+            <Text className="flex-1 text-parchment font-instrument-semibold text-[15px]" numberOfLines={1}>
               {item.title}
             </Text>
             {unread ? <View className="w-2 h-2 rounded-full bg-accent-amber" /> : null}
           </View>
-          <Text className="text-[#B8B0A0] font-montserrat text-[14px] leading-5" numberOfLines={3}>
+          <Text className="text-[#B8B0A0] font-instrument text-[14px] leading-5" numberOfLines={3}>
             {item.message}
           </Text>
           <View className="mt-[10px] flex-row justify-between items-center">
-            <Text className="text-[#6E6A60] font-montserrat text-[12px]">
+            <Text className="text-[#6E6A60] font-instrument text-[12px]">
               {formatRelative(item.created_at)}
             </Text>
             {unread ? (
               <View className="flex-row items-center gap-x-1">
                 <Check size={12} color="#E8A020" />
-                <Text className="text-accent-amber font-montserrat-medium text-[11px]">
+                <Text className="text-accent-amber font-instrument-medium text-[11px]">
                   Tap to mark read
                 </Text>
               </View>
@@ -149,7 +149,7 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
           className="p-[6px]">
           <ArrowLeft size={22} color="#F5F0E8" />
         </TouchableOpacity>
-        <Text className="flex-1 text-parchment font-montserrat-semibold text-[18px] ml-2">
+        <Text className="flex-1 text-parchment font-instrument-semibold text-[18px] ml-2">
           Notifications
         </Text>
         <TouchableOpacity
@@ -170,17 +170,17 @@ const NotificationsScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       ) : error ? (
         <View className="flex-1 justify-center items-center px-8 gap-y-3">
-          <Text className="text-[#FF6B6B] font-montserrat text-[14px] text-center">
+          <Text className="text-[#FF6B6B] font-instrument text-[14px] text-center">
             {error}
           </Text>
         </View>
       ) : items.length === 0 ? (
         <View className="flex-1 justify-center items-center px-8 gap-y-3">
           <BellOff size={36} color="#4A4A4A" />
-          <Text className="text-parchment font-montserrat-semibold text-[16px]">
+          <Text className="text-parchment font-instrument-semibold text-[16px]">
             No notifications yet
           </Text>
-          <Text className="text-[#8C8578] font-montserrat text-[14px] text-center">
+          <Text className="text-[#8C8578] font-instrument text-[14px] text-center">
             We'll let you know when history is near.
           </Text>
         </View>

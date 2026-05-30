@@ -10,6 +10,7 @@ import Button from '../../../components/ui/Button';
 import {FONTS} from '../../../core/constants/theme';
 import {ROUTES} from '../../../core/constants/routes';
 import {WALKING_SPEED_KMH} from '../../../core/constants/distance';
+import {resolveSiteImageSource} from '../../../shared/utils/localSiteImages';
 import type {SiteDetail} from '../../../utils/api/places';
 import type {TabMainNavigationProp} from '../../../core/types/navigation.types';
 
@@ -17,7 +18,8 @@ interface ApproachCardProps {
   site: SiteDetail;
   userLocation: {lat: number; lng: number} | null;
   distanceKm: number;
-  hasKonarkAccess: boolean;
+  hasAccess: boolean;
+  placeId: string;
   visible: boolean;
   onShowDirections: () => void;
 }
@@ -39,7 +41,8 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
   site,
   userLocation,
   distanceKm,
-  hasKonarkAccess,
+  hasAccess,
+  placeId,
   visible,
   onShowDirections,
 }) => {
@@ -62,14 +65,15 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
 
   const handleActivate = useCallback(() => {
     navigation.navigate(ROUTES.MAIN.PURCHASE, {
-      preSelectedPlaceId: 'konark-sun-temple',
+      preSelectedPlaceId: placeId,
     });
-  }, [navigation]);
+  }, [navigation, placeId]);
 
   const distanceLine =
     distanceKm >= 0.1
       ? `${formatSubKmDistance(distanceKm)} · ${formatWalkingEta(distanceKm)}`
       : formatSubKmDistance(distanceKm);
+  const heroSource = resolveSiteImageSource(site);
 
   if (!userLocation) {
     return null;
@@ -84,9 +88,9 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
         style={styles.cardShadow}
         accessibilityRole="summary">
         <View className="flex-row gap-3">
-          {site.hero_image_url ? (
+          {heroSource ? (
             <Image
-              source={{uri: site.hero_image_url}}
+              source={heroSource}
               style={styles.thumbnail}
               resizeMode="cover"
             />
@@ -99,7 +103,7 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
                 fontSize: 16,
                 color: '#FFFFFF',
               }}>
-              You're approaching Konark
+              {`You're approaching ${site.name}`}
             </Text>
             <Text
               numberOfLines={1}
@@ -111,7 +115,7 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
               }}>
               {distanceLine}
             </Text>
-            {hasKonarkAccess ? (
+            {hasAccess ? (
               <View className="mt-2 flex-row items-center">
                 <View style={styles.readyDot} />
                 <Text
@@ -137,7 +141,7 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
                 <TouchableOpacity
                   onPress={handleActivate}
                   accessibilityRole="button"
-                  accessibilityLabel="Activate Epocheye for Konark"
+                  accessibilityLabel={`Activate Epocheye for ${site.name}`}
                   hitSlop={6}>
                   <Text
                     style={{

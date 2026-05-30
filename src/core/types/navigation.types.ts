@@ -45,7 +45,8 @@ export type OnboardingStackParamList = {
  */
 export type MainStackParamList = {
   MainTabs: undefined;
-  Lens: undefined;
+  /** `mode: 'museum'` opens Lens straight into seed-free tap-to-identify. */
+  Lens: { mode?: 'museum' } | undefined;
   SiteDetail: { site: PlaceNavParam };
   ARExperience: { site: PlaceNavParam };
   ARComposer: {

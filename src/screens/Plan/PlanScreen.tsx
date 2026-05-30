@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -20,16 +20,29 @@ import {
 } from 'lucide-react-native';
 import { useChatStore } from '../../stores/chatStore';
 import type { ChatMessage } from '../../utils/api/chat';
+import { useActiveMonument } from '../../shared/hooks/useActiveMonument';
 import ThinkingIndicator from './components/ThinkingIndicator';
 
-const SUGGESTIONS = [
-  'Plan a 3-day Konark itinerary under ₹5000',
-  'Iconography of the Sun Temple wheel',
-  'Best heritage sites near Bhubaneswar',
-  'Weekend trip: monuments + food in Hampi',
-];
-
 const PlanScreen: React.FC = () => {
+  const active = useActiveMonument();
+  const suggestions = useMemo(() => {
+    const name = active.site?.name;
+    if (name) {
+      return [
+        `Plan a journey to ${name}`,
+        `Iconography and significance of ${name}`,
+        `Heritage sites near ${name}`,
+        `Weekend itinerary featuring ${name}`,
+      ];
+    }
+    return [
+      'Plan your heritage journey',
+      'Explore heritage architecture',
+      'Find heritage sites near you',
+      'Weekend heritage itinerary',
+    ];
+  }, [active.site?.name]);
+
   const {
     sessions,
     messages,
@@ -174,7 +187,7 @@ const PlanScreen: React.FC = () => {
               Ask about monuments, build a custom tour, or trace an era.
             </Text>
             <View className="w-full gap-y-2 mt-1">
-              {SUGGESTIONS.map(s => (
+              {suggestions.map(s => (
                 <TouchableOpacity
                   key={s}
                   className="px-[14px] py-3 bg-[#121212] rounded-[14px]"

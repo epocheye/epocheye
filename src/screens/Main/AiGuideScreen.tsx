@@ -311,7 +311,7 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
             <TextInput
               value={input}
               onChangeText={setInput}
-              placeholder="Ask about Konark…"
+              placeholder={`Ask about ${siteName?.trim() || 'this place'}…`}
               placeholderTextColor="rgba(255,255,255,0.4)"
               style={styles.textInput}
               editable={!isStreaming}
@@ -472,13 +472,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontFamily: 'MontserratAlternates-SemiBold',
+    fontFamily: 'InstrumentSans-SemiBold',
     fontSize: 15,
     color: '#FFFFFF',
   },
   status: {
     marginTop: 2,
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'InstrumentSans-Regular',
     fontSize: 11,
     color: 'rgba(255,255,255,0.5)',
   },
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   assistantLabel: {
-    fontFamily: 'MontserratAlternates-Bold',
+    fontFamily: 'InstrumentSerif-Regular',
     fontSize: 10,
     color: AMBER,
     letterSpacing: 1.4,
@@ -514,7 +514,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   assistantText: {
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'InstrumentSans-Regular',
     fontSize: 14,
     color: '#FFFFFF',
     lineHeight: 22,
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
     maxWidth: '92%',
   },
   userText: {
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'InstrumentSans-Regular',
     fontSize: 14,
     color: 'rgba(255,255,255,0.92)',
     lineHeight: 20,
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
     maxWidth: '92%',
   },
   errorText: {
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'InstrumentSans-Regular',
     fontSize: 13,
     color: '#FCA5A5',
     lineHeight: 20,
@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(232,160,32,0.4)',
   },
   retryText: {
-    fontFamily: 'MontserratAlternates-SemiBold',
+    fontFamily: 'InstrumentSans-SemiBold',
     fontSize: 12,
     color: AMBER,
   },
@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   chipText: {
-    fontFamily: 'MontserratAlternates-Medium',
+    fontFamily: 'InstrumentSans-Medium',
     fontSize: 12,
     color: '#FFE4B5',
   },
@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 10,
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'InstrumentSans-Regular',
     fontSize: 14,
     color: '#FFFFFF',
   },

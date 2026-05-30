@@ -59,10 +59,11 @@ export const useArQuotaStore = create<ArQuotaState>((set, get) => ({
     if (result.success) {
       get().applyServerSnapshot(result.data);
       set({ syncing: false, lastSyncedAt: Date.now() });
-    } else if ('quotaExceeded' in result) {
-      set({ syncing: false });
-    } else {
+    } else if ('error' in result) {
       set({ syncing: false, error: result.error.message });
+    } else {
+      // quotaExceeded / sitePaywall variants can't arise from getArConfig.
+      set({ syncing: false });
     }
   },
 

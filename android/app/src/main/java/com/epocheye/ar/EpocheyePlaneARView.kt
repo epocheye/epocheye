@@ -1,6 +1,9 @@
 package com.epocheye.ar
 
 import android.content.Context
+import android.graphics.ImageFormat
+import android.graphics.Rect
+import android.graphics.YuvImage
 import android.net.Uri
 import android.util.Log
 import android.view.ViewGroup
@@ -13,6 +16,8 @@ import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.node.AnchorNode
 import io.github.sceneview.node.ModelNode
+import java.io.ByteArrayOutputStream
+import java.io.File
 
 /**
  * Plane-detection AR view for lab/indoor testing.
@@ -44,11 +49,17 @@ class EpocheyePlaneARView(context: Context) : FrameLayout(context) {
     var onPlaneDetected: (() -> Unit)? = null
     var onAnchorPlaced: ((String) -> Unit)? = null
     var onARError: ((String) -> Unit)? = null
+    // Museum mode: a captured camera frame (file:// uri) for Gemini identify.
+    var onFrameCaptured: ((String) -> Unit)? = null
+    // Museum mode: the current anchor's projected screen position (dp) each frame.
+    var onAnchorScreenPos: ((Float, Float, Boolean) -> Unit)? = null
 
     private var arSceneView: ARSceneView? = null
     private var currentAnchorNode: AnchorNode? = null
     private var readyReported = false
     private var planeReported = false
+    // Throttle the per-frame screen-position emit so we don't flood the bridge.
+    private var frameTick = 0
 
     init {
         setupAR()
@@ -76,7 +87,7 @@ class EpocheyePlaneARView(context: Context) : FrameLayout(context) {
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                 }
 
-                onSessionUpdated = { session, _ ->
+                onSessionUpdated = { session, frame ->
                     if (!readyReported) {
                         readyReported = true
                         post { onARReady?.invoke() }
@@ -84,6 +95,14 @@ class EpocheyePlaneARView(context: Context) : FrameLayout(context) {
                     if (!planeReported && hasTrackedPlane(session)) {
                         planeReported = true
                         post { onPlaneDetected?.invoke() }
+                    }
+                    // Museum mode: project the placed anchor to screen so the RN
+                    // card can follow it. Throttled to every 3rd frame.
+                    if (onAnchorScreenPos != null && currentAnchorNode != null) {
+                        frameTick += 1
+                        if (frameTick % 3 == 0) {
+                            emitAnchorScreenPos(frame)
+                        }
                     }
                 }
 
@@ -252,6 +271,218 @@ class EpocheyePlaneARView(context: Context) : FrameLayout(context) {
             Log.e(TAG, "model load dispatch failed for $label", t)
             post { onARError?.invoke("model load dispatch failed: $label") }
         }
+    }
+
+    /**
+     * Museum mode: anchor a tracking point at the tapped screen location WITHOUT
+     * loading any model. Prefers a plane hit but falls back to any hit (feature
+     * point / depth) so it still works pointing at a statue or wall where ARCore
+     * hasn't fitted a plane. The RN card then follows [onAnchorScreenPos].
+     */
+    fun placeAnchor(screenX: Float, screenY: Float) {
+        val sceneView = arSceneView
+        val frame = try {
+            sceneView?.frame
+        } catch (t: Throwable) {
+            null
+        }
+        if (sceneView == null || frame == null) {
+            post { onARError?.invoke("AR session not ready") }
+            return
+        }
+
+        val hits = try {
+            frame.hitTest(screenX, screenY)
+        } catch (t: Throwable) {
+            Log.w(TAG, "hitTest failed: ${t.message}")
+            null
+        }
+        val planeHit = hits?.firstOrNull { result ->
+            val tr = result.trackable
+            tr is Plane &&
+                tr.trackingState == TrackingState.TRACKING &&
+                tr.isPoseInPolygon(result.hitPose)
+        }
+        // Fall back to any hit so museum objects without a fitted plane still anchor.
+        val hit = planeHit ?: hits?.firstOrNull()
+        if (hit == null) {
+            post { onARError?.invoke("couldn't lock on — move slightly and tap again") }
+            return
+        }
+
+        val anchor = try {
+            hit.createAnchor()
+        } catch (t: Throwable) {
+            Log.w(TAG, "createAnchor failed", t)
+            post { onARError?.invoke("anchor creation failed") }
+            return
+        }
+
+        clearCurrentAnchor()
+        val anchorNode = try {
+            AnchorNode(sceneView.engine, anchor).also { sceneView.addChildNode(it) }
+        } catch (t: Throwable) {
+            Log.e(TAG, "anchor node create failed", t)
+            post { onARError?.invoke("anchor node create failed") }
+            return
+        }
+        currentAnchorNode = anchorNode
+        frameTick = 0
+        post { onAnchorPlaced?.invoke("museum_anchor") }
+        // Emit one position immediately so the card appears without waiting a frame.
+        try {
+            sceneView.frame?.let { emitAnchorScreenPos(it) }
+        } catch (_: Throwable) {
+        }
+    }
+
+    /**
+     * Museum mode: grab the current ARCore camera image, JPEG-encode it, write to
+     * cache, and hand the file:// uri to RN (for the Gemini identify call). This
+     * replaces vision-camera's takePhoto() on AR devices, since ARCore owns the
+     * camera here.
+     *
+     * NOTE: the image is in the sensor's native (usually landscape) orientation —
+     * no rotation is applied. Gemini object identification is robust to rotation;
+     * if labels suffer on portrait holds, rotate by display orientation here.
+     */
+    fun captureFrame() {
+        val frame = try {
+            arSceneView?.frame
+        } catch (t: Throwable) {
+            null
+        }
+        if (frame == null) {
+            post { onARError?.invoke("AR session not ready") }
+            return
+        }
+        var image: android.media.Image? = null
+        try {
+            image = frame.acquireCameraImage()
+            if (image.format != ImageFormat.YUV_420_888) {
+                post { onARError?.invoke("unexpected camera image format") }
+                return
+            }
+            val w = image.width
+            val h = image.height
+            val nv21 = yuv420ToNv21(image)
+            val yuv = YuvImage(nv21, ImageFormat.NV21, w, h, null)
+            val out = ByteArrayOutputStream()
+            yuv.compressToJpeg(Rect(0, 0, w, h), 85, out)
+            val file = File(context.cacheDir, "museum_frame_${System.currentTimeMillis()}.jpg")
+            file.writeBytes(out.toByteArray())
+            val uri = Uri.fromFile(file).toString()
+            post { onFrameCaptured?.invoke(uri) }
+        } catch (t: Throwable) {
+            Log.w(TAG, "captureFrame failed", t)
+            post { onARError?.invoke("frame capture failed") }
+        } finally {
+            try {
+                image?.close()
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    /** Project the current anchor's world pose to screen (dp) and emit it. */
+    private fun emitAnchorScreenPos(frame: com.google.ar.core.Frame) {
+        val node = currentAnchorNode ?: return
+        val anchor = try {
+            node.anchor
+        } catch (t: Throwable) {
+            return
+        }
+        val camera = frame.camera
+        if (camera.trackingState != TrackingState.TRACKING) {
+            post { onAnchorScreenPos?.invoke(0f, 0f, false) }
+            return
+        }
+        val vw = width
+        val vh = height
+        if (vw <= 0 || vh <= 0) return
+
+        val viewMat = FloatArray(16)
+        val projMat = FloatArray(16)
+        try {
+            camera.getViewMatrix(viewMat, 0)
+            camera.getProjectionMatrix(projMat, 0, 0.1f, 100f)
+        } catch (t: Throwable) {
+            return
+        }
+
+        val pose = anchor.pose
+        val world = floatArrayOf(pose.tx(), pose.ty(), pose.tz(), 1f)
+        val eye = multiplyMatVec(viewMat, world)
+        val clip = multiplyMatVec(projMat, eye)
+        val w = clip[3]
+        if (w <= 0f) {
+            // Behind the camera.
+            post { onAnchorScreenPos?.invoke(0f, 0f, false) }
+            return
+        }
+        val ndcX = clip[0] / w
+        val ndcY = clip[1] / w
+        val density = resources.displayMetrics.density.takeIf { it > 0f } ?: 1f
+        val xDp = ((ndcX * 0.5f + 0.5f) * vw) / density
+        val yDp = ((1f - (ndcY * 0.5f + 0.5f)) * vh) / density
+        val onScreen = ndcX in -1.2f..1.2f && ndcY in -1.2f..1.2f
+        post { onAnchorScreenPos?.invoke(xDp, yDp, onScreen) }
+    }
+
+    /** Column-major (OpenGL/ARCore) 4x4 * vec4. element(row,col) = m[col*4+row]. */
+    private fun multiplyMatVec(m: FloatArray, v: FloatArray): FloatArray {
+        val r = FloatArray(4)
+        for (row in 0 until 4) {
+            r[row] =
+                m[row] * v[0] +
+                m[4 + row] * v[1] +
+                m[8 + row] * v[2] +
+                m[12 + row] * v[3]
+        }
+        return r
+    }
+
+    private fun yuv420ToNv21(image: android.media.Image): ByteArray {
+        val width = image.width
+        val height = image.height
+        val ySize = width * height
+        val nv21 = ByteArray(ySize + ySize / 2)
+
+        val yPlane = image.planes[0]
+        val uPlane = image.planes[1]
+        val vPlane = image.planes[2]
+
+        // Y plane → copy row by row, honoring rowStride padding.
+        val yBuffer = yPlane.buffer.duplicate()
+        val yRowStride = yPlane.rowStride
+        var pos = 0
+        val rowBuf = ByteArray(yRowStride)
+        for (row in 0 until height) {
+            yBuffer.position(row * yRowStride)
+            val toRead = minOf(yRowStride, yBuffer.remaining())
+            yBuffer.get(rowBuf, 0, toRead)
+            System.arraycopy(rowBuf, 0, nv21, pos, width)
+            pos += width
+        }
+
+        // Chroma → NV21 expects interleaved V,U starting after Y.
+        val uBuffer = uPlane.buffer.duplicate()
+        val vBuffer = vPlane.buffer.duplicate()
+        val uvRowStride = uPlane.rowStride
+        val uvPixelStride = uPlane.pixelStride
+        val chromaHeight = height / 2
+        val chromaWidth = width / 2
+        var offset = ySize
+        for (row in 0 until chromaHeight) {
+            for (col in 0 until chromaWidth) {
+                val uvIndex = row * uvRowStride + col * uvPixelStride
+                nv21[offset++] =
+                    if (uvIndex < vBuffer.limit()) vBuffer.get(uvIndex) else 0
+                nv21[offset++] =
+                    if (uvIndex < uBuffer.limit()) uBuffer.get(uvIndex) else 0
+            }
+        }
+        return nv21
     }
 
     fun cleanup() {

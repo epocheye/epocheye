@@ -13,6 +13,7 @@ import type {
   ReconstructPendingResponse,
   ReconstructResponse,
 } from '../utils/api/ar';
+import type { SitePaywallResponse } from '../utils/api/ar/types';
 import { useArQuotaStore } from '../stores/arQuotaStore';
 import { cacheGlbUrl, getCachedGlbUri } from './glbCache';
 
@@ -30,6 +31,10 @@ export type ArReconstructionResult =
   | {
       kind: 'quota_exceeded';
       info: QuotaExceededResponse;
+    }
+  | {
+      kind: 'site_paywall';
+      info: SitePaywallResponse;
     }
   | {
       kind: 'pending';
@@ -122,6 +127,10 @@ export async function reconstructForLens(
       quality: payload.reconstruction_quality ?? 'none',
       isImproving: payload.is_improving ?? false,
     };
+  }
+
+  if ('sitePaywall' in result && result.sitePaywall) {
+    return { kind: 'site_paywall', info: result.data };
   }
 
   if ('quotaExceeded' in result && result.quotaExceeded) {

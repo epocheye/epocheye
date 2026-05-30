@@ -51,6 +51,21 @@ export interface ReconstructResponse {
   scan_count: number;
   reconstruction_quality: 'none' | 'single_view' | 'multi_view' | string;
   is_improving: boolean;
+  /** Per-site free scans left after this one (absent for pass/premium users). */
+  site_scans_remaining?: number;
+}
+
+/**
+ * HTTP 402 body when the per-site free-scan allowance is spent (distinct from the
+ * global daily QuotaExceededResponse). The client shows the site paywall →
+ * Explorer Pass purchase for `site_id`.
+ */
+export interface SitePaywallResponse {
+  error: 'site_scan_quota_exceeded' | string;
+  site_id: string;
+  used: number;
+  limit: number;
+  unlock: 'explorer_pass' | string;
 }
 
 export interface QuotaExceededResponse {
@@ -90,7 +105,8 @@ export interface ScanContributeResponse {
 export type ArResult<T> =
   | { success: true; data: T }
   | { success: false; error: { message: string; statusCode: number } }
-  | { success: false; quotaExceeded: true; data: QuotaExceededResponse };
+  | { success: false; quotaExceeded: true; data: QuotaExceededResponse }
+  | { success: false; sitePaywall: true; data: SitePaywallResponse };
 
 export type AnchorMode = 'geospatial' | 'compass';
 

@@ -1,22 +1,20 @@
 /**
- * Feature walkthrough tooltips shown the first time a user enters the main app.
- * Steps through key features with a spotlight-style overlay.
+ * First-run feature tips for the main app.
+ *
+ * Non-blocking by design: the overlay container uses pointerEvents="box-none"
+ * so only the tip card itself captures touches — the user can keep tapping the
+ * map / UI underneath, and can dismiss the tips at any time (the X or "Skip").
+ * Completion is persisted so the tips appear only once.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Dimensions,
-  Modal,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { Camera, MapPin, Sparkles, Bookmark } from 'lucide-react-native';
+import React, {useCallback, useEffect, useState} from 'react';
+import {Pressable, Text, View} from 'react-native';
+import Animated, {FadeInDown, FadeOutDown} from 'react-native-reanimated';
+import {Bell, MapPin, Sparkles, Ticket, X} from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {FONTS} from '../core/constants/theme';
 
 const STORAGE_KEY = '@epocheye/walkthrough_complete';
-
-const { width: SCREEN_W } = Dimensions.get('window');
 
 interface Step {
   icon: React.ReactNode;
@@ -26,38 +24,41 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    icon: <Camera color="#D4860A" size={28} />,
-    title: 'Lens',
+    icon: <MapPin color="#C9A84C" size={22} />,
+    title: 'Explore the map',
     description:
-      'Point your camera at any heritage site to discover its story through augmented reality.',
+      'Heritage sites near you appear on the map. Tap a marker to see its details and story.',
   },
   {
-    icon: <MapPin color="#D4860A" size={28} />,
-    title: 'Nearby Places',
+    icon: <Bell color="#C9A84C" size={22} />,
+    title: 'Stay in the loop',
     description:
-      'Heritage sites near you appear automatically. Tap any to explore its history.',
+      'Tap the bell at the top for updates, reminders, and news about the places you follow.',
   },
   {
-    icon: <Sparkles color="#D4860A" size={28} />,
-    title: 'Passport',
+    icon: <Ticket color="#C9A84C" size={22} />,
+    title: 'Unlock with a Passport',
     description:
-      'Get your Passport to unlock full experiences at the sites you want to visit.',
+      'Get a Passport to unlock the full augmented-reality experience at the sites you visit.',
   },
   {
-    icon: <Bookmark color="#D4860A" size={28} />,
-    title: 'Saved',
+    icon: <Sparkles color="#C9A84C" size={22} />,
+    title: 'Come back daily',
     description:
-      'Save places you want to visit later. Find them in your Saved tab anytime.',
+      'The Daily tab shows an “on this day” heritage moment and tracks your visit streak.',
   },
 ];
 
 export interface OnboardingTooltipsProps {
-  /** Called once the walkthrough is dismissed (user can be navigated, etc.) */
+  /** Called once the tips are dismissed or completed. */
   onComplete?: () => void;
+  /** Distance from the bottom of the screen, to clear the tab bar. */
+  bottomOffset?: number;
 }
 
 const OnboardingTooltips: React.FC<OnboardingTooltipsProps> = ({
   onComplete,
+  bottomOffset = 96,
 }) => {
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
@@ -67,7 +68,6 @@ const OnboardingTooltips: React.FC<OnboardingTooltipsProps> = ({
     (async () => {
       const done = await AsyncStorage.getItem(STORAGE_KEY);
       if (!cancelled && done !== 'true') {
-        // Short delay after main screen mounts
         setTimeout(() => {
           if (!cancelled) setVisible(true);
         }, 1200);
@@ -78,23 +78,19 @@ const OnboardingTooltips: React.FC<OnboardingTooltipsProps> = ({
     };
   }, []);
 
-  const finishWalkthrough = useCallback(async () => {
+  const finish = useCallback(async () => {
     setVisible(false);
     await AsyncStorage.setItem(STORAGE_KEY, 'true');
     onComplete?.();
   }, [onComplete]);
 
   const handleNext = useCallback(() => {
-    if (step < STEPS.length - 1) {
-      setStep(prev => prev + 1);
-    } else {
-      finishWalkthrough();
-    }
-  }, [step, finishWalkthrough]);
-
-  const handleSkip = useCallback(() => {
-    finishWalkthrough();
-  }, [finishWalkthrough]);
+    setStep(prev => {
+      if (prev < STEPS.length - 1) return prev + 1;
+      void finish();
+      return prev;
+    });
+  }, [finish]);
 
   if (!visible) return null;
 
@@ -102,140 +98,72 @@ const OnboardingTooltips: React.FC<OnboardingTooltipsProps> = ({
   const isLast = step === STEPS.length - 1;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleSkip}
-    >
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          {/* Step indicator */}
-          <View style={styles.dotsRow}>
+    <View
+      pointerEvents="box-none"
+      style={{position: 'absolute', left: 0, right: 0, bottom: bottomOffset}}>
+      <Animated.View
+        entering={FadeInDown.duration(260)}
+        exiting={FadeOutDown.duration(180)}
+        className="mx-4 rounded-2xl bg-[#141414] border border-[rgba(201,168,76,0.35)] p-4"
+        style={{
+          shadowColor: '#000',
+          shadowOpacity: 0.35,
+          shadowRadius: 16,
+          shadowOffset: {width: 0, height: 8},
+          elevation: 12,
+        }}>
+        <View className="flex-row items-start">
+          <View className="w-10 h-10 rounded-full bg-[rgba(201,168,76,0.12)] items-center justify-center mr-3">
+            {current.icon}
+          </View>
+          <View className="flex-1 pr-2">
+            <Text
+              style={{fontFamily: FONTS.serif, fontSize: 17, color: '#F5F0E8', lineHeight: 21}}>
+              {current.title}
+            </Text>
+            <Text
+              style={{marginTop: 3, fontFamily: FONTS.sans, fontSize: 12, color: 'rgba(245,240,232,0.62)', lineHeight: 17}}>
+              {current.description}
+            </Text>
+          </View>
+          <Pressable
+            onPress={finish}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss tips"
+            className="w-7 h-7 rounded-full bg-[rgba(255,255,255,0.06)] items-center justify-center">
+            <X color="rgba(245,240,232,0.6)" size={15} />
+          </Pressable>
+        </View>
+
+        <View className="mt-3 flex-row items-center justify-between">
+          <View className="flex-row gap-1.5">
             {STEPS.map((_, i) => (
               <View
-                key={`dot-${i}`}
-                style={[styles.dot, i === step && styles.dotActive]}
+                key={`tip-dot-${i}`}
+                style={{
+                  width: i === step ? 18 : 7,
+                  height: 7,
+                  borderRadius: 4,
+                  backgroundColor:
+                    i === step ? '#C9A84C' : 'rgba(255,255,255,0.18)',
+                }}
               />
             ))}
           </View>
-
-          {/* Icon */}
-          <View style={styles.iconCircle}>{current.icon}</View>
-
-          {/* Content */}
-          <Text style={styles.title}>{current.title}</Text>
-          <Text style={styles.description}>{current.description}</Text>
-
-          {/* Buttons */}
-          <TouchableOpacity
+          <Pressable
             onPress={handleNext}
-            style={styles.nextBtn}
             accessibilityRole="button"
-          >
-            <Text style={styles.nextBtnText}>
-              {isLast ? 'Got It' : 'Next'}
+            accessibilityLabel={isLast ? 'Got it' : 'Next tip'}
+            className="px-4 py-2 rounded-full bg-[#C9A84C]">
+            <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 13, color: '#0A0A0A'}}>
+              {isLast ? 'Got it' : 'Next'}
             </Text>
-          </TouchableOpacity>
-
-          {!isLast && (
-            <TouchableOpacity
-              onPress={handleSkip}
-              style={styles.skipBtn}
-              accessibilityRole="button"
-            >
-              <Text style={styles.skipText}>Skip</Text>
-            </TouchableOpacity>
-          )}
+          </Pressable>
         </View>
-      </View>
-    </Modal>
+      </Animated.View>
+    </View>
   );
-};
-
-const styles = {
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  } as const,
-  card: {
-    width: '100%',
-    maxWidth: SCREEN_W - 48,
-    backgroundColor: '#141414',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(212,134,10,0.2)',
-    padding: 28,
-    alignItems: 'center',
-  } as const,
-  dotsRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 24,
-  } as const,
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  } as const,
-  dotActive: {
-    width: 20,
-    backgroundColor: '#C9A84C',
-  } as const,
-  iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(212,134,10,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  } as const,
-  title: {
-    color: '#F5F0E8',
-    fontSize: 20,
-    fontFamily: 'MontserratAlternates-Bold',
-    textAlign: 'center',
-  } as const,
-  description: {
-    color: '#B8AF9E',
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: 'MontserratAlternates-Regular',
-    textAlign: 'center',
-    marginTop: 8,
-  } as const,
-  nextBtn: {
-    marginTop: 24,
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: '#D4860A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  } as const,
-  nextBtnText: {
-    color: '#0A0A0A',
-    fontSize: 15,
-    fontFamily: 'MontserratAlternates-Bold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  } as const,
-  skipBtn: {
-    marginTop: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  } as const,
-  skipText: {
-    color: '#6B6357',
-    fontSize: 14,
-    fontFamily: 'MontserratAlternates-Medium',
-  } as const,
 };
 
 export default OnboardingTooltips;

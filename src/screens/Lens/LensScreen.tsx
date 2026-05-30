@@ -97,8 +97,30 @@ import SearchSheet, { type SearchSheetRef } from './components/SearchSheet';
 import HDScanOverlay from './components/HDScanOverlay';
 import SegmentationOverlay from './components/SegmentationOverlay';
 import * as segmentationService from '../../services/segmentationService';
+import MuseumObjectCard from './components/MuseumObjectCard';
+import SitePaywallSheet from './components/SitePaywallSheet';
+import { streamMuseumNarration } from '../../services/museumModeService';
+import { cropAroundTap } from '../../shared/utils/cropAroundTap';
+import {
+  useMuseumPrefsStore,
+  NARRATION_LANGS,
+} from '../../stores/museumPrefsStore';
+import EpocheyePlaneARView, {
+  type EpocheyePlaneARHandle,
+} from '../../native/EpocheyePlaneARView';
 
 type Props = MainScreenProps<'Lens'>;
+
+interface MuseumCardState {
+  anchor: { x: number; y: number };
+  label: string | null;
+  narration: string;
+  identifying: boolean;
+  streaming: boolean;
+  error: string | null;
+  /** AR tracking: false when the anchor is off-screen/behind camera. */
+  visible: boolean;
+}
 
 function formatPendingLabel(phase: string, etaSeconds: number): string {
   const safe = Math.max(0, Math.round(etaSeconds));
@@ -152,8 +174,40 @@ async function findNearestPlace(
   return null;
 }
 
-const LensScreen: React.FC<Props> = ({ navigation }) => {
+const LensScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+  // Universal museum mode — seed-free tap-to-identify. Entered via route param
+  // (Home "explore around you" CTA) OR toggled on from the Lens not-found card.
+  const [museumMode, setMuseumMode] = useState(
+    route.params?.mode === 'museum',
+  );
+  const narrationLang = useMuseumPrefsStore(s => s.narrationLang);
+  const setNarrationLang = useMuseumPrefsStore(s => s.setNarrationLang);
+  const [museumCard, setMuseumCard] = useState<MuseumCardState | null>(null);
+  // Per-site free-scan funnel: the paywall (when the allowance is spent) and the
+  // remaining-count for the "N free scans left" pill. The server (site_scan_usage)
+  // is the source of truth; these just mirror what it reports.
+  const [sitePaywall, setSitePaywall] = useState<{
+    siteId: string;
+    siteName: string | null;
+    used: number;
+    limit: number;
+  } | null>(null);
+  const [siteScansRemaining, setSiteScansRemaining] = useState<number | null>(
+    null,
+  );
+  const museumAbortRef = useRef<(() => void) | null>(null);
+  const arRef = useRef<EpocheyePlaneARHandle>(null);
+  // AR path: the captured frame arrives asynchronously (onFrameCaptured), so we
+  // stash the tap fraction + venue context at tap time to use when it lands.
+  const museumPendingRef = useRef<{
+    xFrac: number;
+    yFrac: number;
+    venue: string | null;
+    lat: number | null;
+    lng: number | null;
+    venueSlug: string | null;
+  } | null>(null);
   const profile = useUser(state => state.profile);
   const nearbyPlaces = usePlaces(state => state.nearbyPlaces);
   const ensureLocationTracking = usePlaces(
@@ -258,7 +312,10 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     checkAndIncrement,
   } = useLensPremium();
   const { isConnected } = useNetwork();
-  const { arAvailable } = useARCore();
+  const { arAvailable, arChecked } = useARCore();
+  // Museum mode runs through ARCore (world-anchored card) only on AR-capable
+  // devices; everything else uses the vision-camera screen-space path.
+  const arMuseumActive = museumMode && arChecked && arAvailable;
 
   // HD Scan state (SAM Lambda)
   const [hdMasks, setHdMasks] = useState<HDScanMask[]>([]);
@@ -616,6 +673,17 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           cached: result.cached ? 'true' : 'false',
           provider: result.provider,
         });
+      } else if (result.kind === 'site_paywall') {
+        setSitePaywall({
+          siteId: result.info.site_id,
+          siteName: matchedPlace?.name ?? activeZone?.name ?? null,
+          used: result.info.used,
+          limit: result.info.limit,
+        });
+        track('lens_site_paywall_hit', {
+          site: result.info.site_id,
+          source: 'reconstruct',
+        });
       } else if (result.kind === 'quota_exceeded') {
         setReconstructionQuotaExceeded(true);
         track('lens_reconstruction_quota_hit', {
@@ -628,7 +696,7 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
         track('lens_reconstruction_error', { message: result.message });
       }
     },
-    [],
+    [matchedPlace, activeZone],
   );
 
   const triggerReconstruction = useCallback(
@@ -1037,6 +1105,205 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
     setIsOfflineResult(false);
   }, []);
 
+  // Shared: kick off the identify + hedged-narration SSE for a captured frame.
+  // ONE backend request per tap (the cost control — no continuous scanning);
+  // the backend does the cheap identify + cache-gated narration. Used by both
+  // the vision-camera path (non-AR) and the ARCore path (AR devices).
+  const startMuseumNarration = useCallback(
+    (
+      imageUri: string,
+      ctx?: {
+        venue?: string | null;
+        lat?: number | null;
+        lng?: number | null;
+        venueSlug?: string | null;
+      },
+    ) => {
+      museumAbortRef.current = streamMuseumNarration({
+        imageUri,
+        venue: ctx?.venue ?? null,
+        lat: ctx?.lat ?? null,
+        lng: ctx?.lng ?? null,
+        venueSlug: ctx?.venueSlug ?? null,
+        lang: narrationLang,
+        onObject: label =>
+          setMuseumCard(c =>
+            c ? { ...c, label, identifying: false, streaming: true } : c,
+          ),
+        onChunk: text =>
+          setMuseumCard(c =>
+            c ? { ...c, narration: c.narration + text, identifying: false } : c,
+          ),
+        onDone: info => {
+          setMuseumCard(c =>
+            c ? { ...c, identifying: false, streaming: false } : c,
+          );
+          track('museum_identified', { cached: info.cached ? 'true' : 'false' });
+        },
+        onError: message =>
+          setMuseumCard(c =>
+            c
+              ? {
+                  ...c,
+                  identifying: false,
+                  streaming: false,
+                  error:
+                    message ?? "Couldn't identify this — try another angle",
+                }
+              : c,
+          ),
+        onPaywall: info => {
+          // Free scans at this venue are spent — drop the identify card and
+          // surface the conversion paywall for this site.
+          museumAbortRef.current = null;
+          setMuseumCard(null);
+          setSitePaywall({
+            siteId: info.siteId,
+            siteName: matchedPlace?.name ?? activeZone?.name ?? null,
+            used: info.used,
+            limit: info.limit,
+          });
+          track('lens_site_paywall_hit', {site: info.siteId, source: 'museum'});
+        },
+        onScanMeta: info => setSiteScansRemaining(info.remaining),
+      });
+    },
+    [narrationLang, matchedPlace, activeZone],
+  );
+
+  // Venue/coords available at scan time: nearest place name (from /findplaces
+  // detection) + GPS. Optional — improves specificity, fine when absent.
+  const museumContext = useCallback(
+    () => ({
+      venue: matchedPlace?.name ?? null,
+      lat: lastKnownCoords?.latitude ?? null,
+      lng: lastKnownCoords?.longitude ?? null,
+      // Seeded-venue slug (when inside a curated zone) → grounded matching.
+      venueSlug: activeZone?.monument_id ?? null,
+    }),
+    [matchedPlace, lastKnownCoords, activeZone],
+  );
+
+  // Non-AR (vision-camera) tap: capture via takePhoto → crop to the tap →
+  // narrate. Card pinned to the tap point.
+  const handleMuseumTap = useCallback(
+    async (evt: { nativeEvent: { locationX: number; locationY: number } }) => {
+      const x = evt.nativeEvent.locationX;
+      const y = evt.nativeEvent.locationY;
+      museumAbortRef.current?.();
+      setMuseumCard({
+        anchor: { x, y },
+        label: null,
+        narration: '',
+        identifying: true,
+        streaming: false,
+        error: null,
+        visible: true,
+      });
+      track('museum_tap', { mode: 'screen' });
+
+      const ctx = museumContext();
+      const xFrac = screenWidth > 0 ? x / screenWidth : 0.5;
+      const yFrac = screenHeight > 0 ? y / screenHeight : 0.5;
+      try {
+        const photo = await cameraRef.current?.takePhoto();
+        if (!photo) {
+          throw new Error('capture failed');
+        }
+        const cropped = await cropAroundTap(
+          normalizePhotoUri(photo.path),
+          xFrac,
+          yFrac,
+        );
+        startMuseumNarration(cropped, ctx);
+      } catch {
+        setMuseumCard(c =>
+          c
+            ? {
+                ...c,
+                identifying: false,
+                streaming: false,
+                error: "Couldn't capture — hold steady and tap again",
+              }
+            : c,
+        );
+      }
+    },
+    [startMuseumNarration, museumContext, screenWidth, screenHeight],
+  );
+
+  // AR tap: lock a world anchor at the tap + ask native to grab the frame.
+  // Stash the tap fraction + context for when onFrameCaptured lands; narration
+  // starts then, and the card follows onAnchorScreenPos.
+  const handleMuseumTapAR = useCallback(
+    (evt: { nativeEvent: { locationX: number; locationY: number } }) => {
+      const x = evt.nativeEvent.locationX;
+      const y = evt.nativeEvent.locationY;
+      museumAbortRef.current?.();
+      setMuseumCard({
+        anchor: { x, y },
+        label: null,
+        narration: '',
+        identifying: true,
+        streaming: false,
+        error: null,
+        visible: true,
+      });
+      track('museum_tap', { mode: 'ar' });
+      const ctx = museumContext();
+      museumPendingRef.current = {
+        xFrac: screenWidth > 0 ? x / screenWidth : 0.5,
+        yFrac: screenHeight > 0 ? y / screenHeight : 0.5,
+        venue: ctx.venue,
+        lat: ctx.lat,
+        lng: ctx.lng,
+        venueSlug: ctx.venueSlug,
+      };
+      arRef.current?.placeAnchor(x, y);
+      arRef.current?.captureFrame();
+    },
+    [museumContext, screenWidth, screenHeight],
+  );
+
+  const handleMuseumFrameCaptured = useCallback(
+    async (uri: string) => {
+      const p = museumPendingRef.current;
+      const cropped = await cropAroundTap(
+        uri,
+        p?.xFrac ?? 0.5,
+        p?.yFrac ?? 0.5,
+      );
+      startMuseumNarration(
+        cropped,
+        p
+          ? { venue: p.venue, lat: p.lat, lng: p.lng, venueSlug: p.venueSlug }
+          : undefined,
+      );
+    },
+    [startMuseumNarration],
+  );
+
+  const handleMuseumAnchorPos = useCallback(
+    (x: number, y: number, visible: boolean) => {
+      setMuseumCard(c => (c ? { ...c, anchor: { x, y }, visible } : c));
+    },
+    [],
+  );
+
+  const handleMuseumDismiss = useCallback(() => {
+    museumAbortRef.current?.();
+    museumAbortRef.current = null;
+    arRef.current?.clearAnchor();
+    setMuseumCard(null);
+  }, []);
+
+  // Abort any in-flight museum stream on unmount.
+  useEffect(() => {
+    return () => {
+      museumAbortRef.current?.();
+    };
+  }, []);
+
   const handleDescribeAnything = useCallback(async () => {
     if (describeAnythingLoading) return;
     setDescribeAnythingLoading(true);
@@ -1204,7 +1471,33 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <GestureHandlerRootView className="flex-1 bg-grey-dark">
       <View className="flex-1 bg-black">
-        {device ? (
+        {/* Camera layer. Museum mode on an AR-capable device swaps the
+            vision-camera for ARCore (it must own the camera to track + anchor);
+            everything else keeps vision-camera. While the ARCore capability
+            check is in flight in museum mode we hold a neutral layer to avoid
+            mounting then tearing down vision-camera. */}
+        {arMuseumActive ? (
+          <EpocheyePlaneARView
+            ref={arRef}
+            style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
+            onFrameCaptured={handleMuseumFrameCaptured}
+            onAnchorScreenPos={handleMuseumAnchorPos}
+            onError={msg => {
+              setMuseumCard(c =>
+                c
+                  ? { ...c, identifying: false, streaming: false, error: msg }
+                  : c,
+              );
+            }}
+          />
+        ) : museumMode && !arChecked ? (
+          <View className="absolute inset-0 items-center justify-center bg-grey-dark">
+            <ScanEye size={38} color="#E8A020" />
+            <Text className="mt-3 text-parchment text-[15px] font-montserrat-medium">
+              Starting…
+            </Text>
+          </View>
+        ) : device ? (
           <VisionCamera
             ref={cameraRef}
             style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
@@ -1240,6 +1533,90 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
 
         <View className="absolute inset-0 bg-[rgba(0,0,0,0.08)]" />
 
+        {/* ── Museum mode: seed-free tap-to-identify ───────────────────── */}
+        {museumMode && (
+          <>
+            {/* Tap target. Rendered below the top bar (which is a later sibling
+                with higher z) so the close button keeps working. ONE identify
+                per tap — no continuous scanning. AR devices route the tap to a
+                world anchor + native frame capture; others use takePhoto. */}
+            <Pressable
+              className="absolute inset-0"
+              onPress={arMuseumActive ? handleMuseumTapAR : handleMuseumTap}
+              accessibilityRole="button"
+              accessibilityLabel="Tap an object to identify it"
+            />
+
+            {/* Narration-language selector (En · हिन्दी · বাংলা). Persisted; the
+                next tap narrates in the chosen language. */}
+            <View
+              className="absolute self-center flex-row items-center gap-x-1 bg-[rgba(13,13,13,0.82)] rounded-full border border-[rgba(255,255,255,0.14)] p-1"
+              style={{ top: insets.top + 52 }}
+            >
+              {NARRATION_LANGS.map(({ code, label }) => {
+                const active = narrationLang === code;
+                return (
+                  <Pressable
+                    key={code}
+                    onPress={() => setNarrationLang(code)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Narration language ${label}`}
+                    accessibilityState={{ selected: active }}
+                    className={`px-3 py-[5px] rounded-full${active ? ' bg-accent-amber' : ''}`}
+                  >
+                    <Text
+                      className={`text-[12px] font-montserrat-semibold ${active ? 'text-[#0D0D0D]' : 'text-parchment'}`}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Free-scan counter — gentle urgency during the free period. Fed by
+                the server's scan_meta (per-site allowance is server-enforced). */}
+            {siteScansRemaining !== null && (
+              <View
+                pointerEvents="none"
+                className="absolute self-center flex-row items-center gap-x-2 bg-[rgba(13,13,13,0.82)] rounded-full border border-[rgba(232,160,32,0.4)] px-3 py-[5px]"
+                style={{ top: insets.top + 92 }}
+              >
+                <ScanEye size={13} color="#E8A020" />
+                <Text className="text-accent-amber text-[12px] font-montserrat-semibold">
+                  {siteScansRemaining <= 0
+                    ? 'No free scans left here'
+                    : `${siteScansRemaining} free ${
+                        siteScansRemaining === 1 ? 'scan' : 'scans'
+                      } left${matchedPlace?.name ? ` at ${matchedPlace.name}` : ''}`}
+                </Text>
+              </View>
+            )}
+
+            {!museumCard && (
+              <View
+                pointerEvents="none"
+                className="absolute self-center flex-row items-center gap-x-2 bg-[rgba(13,13,13,0.82)] rounded-[20px] border border-[rgba(232,160,32,0.4)] px-[14px] py-2"
+                style={{ bottom: insets.bottom + 80 }}
+              >
+                <ScanEye size={14} color="#E8A020" />
+                <Text className="text-accent-amber text-[12px] font-montserrat-semibold">
+                  {arMuseumActive
+                    ? 'Tap an object — it stays pinned in 3D'
+                    : 'Tap any object to explore it'}
+                </Text>
+              </View>
+            )}
+
+            {/* On AR devices the card follows the world anchor (position +
+                visibility come from onAnchorScreenPos). On non-AR devices it
+                sits at the tap point (visible always true). */}
+            {museumCard && (
+              <MuseumObjectCard {...museumCard} onDismiss={handleMuseumDismiss} />
+            )}
+          </>
+        )}
+
         {/* Geofence banner */}
         {activeZone && (
           <Animated.View
@@ -1255,28 +1632,30 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           </Animated.View>
         )}
 
-        {/* Gemini identification — 3D AR on ARCore, 2D card fallback */}
-        {arAvailable && geminiResult && !geminiLoading ? (
-          <EpocheyeARView
-            style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
-            identification={geminiResult}
-            arEnabled
-            onCardTapped={handleExpandIdentification}
-            onARError={() => {}}
-          />
-        ) : (
-          <IdentificationCard
-            identification={geminiResult}
-            isLoading={geminiLoading}
-            error={geminiError}
-            isPremium={canShowDetails}
-            isOffline={isOfflineResult}
-            locationContext={locationContext}
-            onDismiss={handleDismissIdentification}
-            onExpand={handleExpandIdentification}
-            onUpgrade={handleUpgradePremium}
-          />
-        )}
+        {/* Gemini identification — 3D AR on ARCore, 2D card fallback.
+            Suppressed in museum mode (which owns the whole surface). */}
+        {!museumMode &&
+          (arAvailable && geminiResult && !geminiLoading ? (
+            <EpocheyeARView
+              style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
+              identification={geminiResult}
+              arEnabled
+              onCardTapped={handleExpandIdentification}
+              onARError={() => {}}
+            />
+          ) : (
+            <IdentificationCard
+              identification={geminiResult}
+              isLoading={geminiLoading}
+              error={geminiError}
+              isPremium={canShowDetails}
+              isOffline={isOfflineResult}
+              locationContext={locationContext}
+              onDismiss={handleDismissIdentification}
+              onExpand={handleExpandIdentification}
+              onUpgrade={handleUpgradePremium}
+            />
+          ))}
 
         <View
           className="absolute left-0 right-0 top-0 z-[4] px-4 pb-3 bg-[rgba(0,0,0,0.35)] flex-row items-center justify-between"
@@ -1351,12 +1730,15 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           />
         ) : null}
 
-        <EpochChips visible={state === 'matched'} onPress={handleOpenStory} />
+        {!museumMode && (
+          <EpochChips visible={state === 'matched'} onPress={handleOpenStory} />
+        )}
 
         {/* AR reconstruction CTA — shown after the object_scan SSE identifies an
             object and the reconstruct API returns a GLB. Tapping navigates to
             the dedicated composer screen. */}
-        {(reconstructionReady ||
+        {!museumMode &&
+          (reconstructionReady ||
           reconstructionLoading ||
           reconstructionPending ||
           reconstructionQuotaExceeded ||
@@ -1406,21 +1788,25 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         )}
 
-        <BottomCard
-          state={state}
-          place={matchedPlace}
-          locationDenied={locationDenied}
-          onOpenStory={handleOpenStory}
-          onOpenInfo={handleOpenInfo}
-          onScanObject={handleScanObject}
-          onBrowseMonuments={handleBrowseMonuments}
-          onSearchManually={handleSearchManually}
-          onIdentify={canIdentify || devBypass ? handleIdentify : undefined}
-          identifyLoading={geminiLoading}
-          remainingCalls={remainingCalls}
-          onHDScan={canShowMask ? handleHDScan : undefined}
-          hdScanLoading={hdScanLoading}
-        />
+        {!museumMode && (
+          <BottomCard
+            state={state}
+            place={matchedPlace}
+            locationDenied={locationDenied}
+            onOpenStory={handleOpenStory}
+            onOpenInfo={handleOpenInfo}
+            onScanObject={handleScanObject}
+            onBrowseMonuments={handleBrowseMonuments}
+            onSearchManually={handleSearchManually}
+            onIdentify={canIdentify || devBypass ? handleIdentify : undefined}
+            identifyLoading={geminiLoading}
+            remainingCalls={remainingCalls}
+            onHDScan={canShowMask ? handleHDScan : undefined}
+            hdScanLoading={hdScanLoading}
+            onExploreAround={() => setMuseumMode(true)}
+            onExploreArtifacts={() => setMuseumMode(true)}
+          />
+        )}
 
         <AncestorStorySheet
           ref={storySheetRef}
@@ -1448,6 +1834,23 @@ const LensScreen: React.FC<Props> = ({ navigation }) => {
             objects={objectPicker.objects}
             onCancel={() => setObjectPicker(null)}
             onConfirm={handleObjectPickerConfirm}
+          />
+        )}
+
+        {/* Per-site paywall — appears when free scans run out (museum tap or AR
+            reconstruct). Leads into the existing Explorer Pass purchase flow. */}
+        {sitePaywall && (
+          <SitePaywallSheet
+            visible
+            siteId={sitePaywall.siteId}
+            siteName={sitePaywall.siteName ?? undefined}
+            limit={sitePaywall.limit}
+            onClose={() => setSitePaywall(null)}
+            onUnlocked={() => {
+              setSitePaywall(null);
+              setSiteScansRemaining(null);
+              track('lens_site_unlocked', {site: sitePaywall.siteId});
+            }}
           />
         )}
       </View>

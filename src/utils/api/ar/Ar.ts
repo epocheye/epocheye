@@ -16,6 +16,7 @@ import type {
   ScanContributeRequest,
   ScanContributeResponse,
   SiteBundleResponse,
+  SitePaywallResponse,
   SubmitUnknownScanRequest,
   SubmitUnknownScanResponse,
   UserArConfig,
@@ -59,6 +60,15 @@ export async function reconstructObject(
     // Surface this as a discriminated-union success=false variant so the
     // LensScreen can route to the upgrade prompt without reading raw axios.
     if (isApiError(error) && error.response?.status === 402) {
+      const body = error.response.data as { error?: string };
+      // Per-site free-scan paywall is distinct from the global daily quota.
+      if (body?.error === 'site_scan_quota_exceeded') {
+        return {
+          success: false,
+          sitePaywall: true,
+          data: error.response.data as SitePaywallResponse,
+        };
+      }
       return {
         success: false,
         quotaExceeded: true,

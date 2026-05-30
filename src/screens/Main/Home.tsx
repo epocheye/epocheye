@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  ActivityIndicator,
   AppState,
   Image,
   Pressable,
@@ -11,25 +12,27 @@ import {
 } from 'react-native';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import MapView, {Marker, PROVIDER_GOOGLE, type Region} from 'react-native-maps';
+import MapViewDirections from 'react-native-maps-directions';
 import {GOOGLE_MAPS_API_KEY} from '@env';
-import {Search, X} from 'lucide-react-native';
+import {Bell, Search, X} from 'lucide-react-native';
 import mapStyle from '../../content/mapstyle.json';
 import {COLORS, FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
 import {usePlaces} from '../../context';
 import {PermissionService} from '../../shared/services/permission.service';
-import {buildSiteDetailData} from '../../shared/utils';
-import {getSite, type SiteDetail} from '../../utils/api/places';
+import {resolveSiteImageSource} from '../../shared/utils/localSiteImages';
+import {getSites, searchPlaces, type SiteDetail} from '../../utils/api/places';
+import {getUnreadCount} from '../../utils/api/notifications';
 import type {Place} from '../../utils/api/places/types';
+import type {PlaceNavParam} from '../../core/types/navigation.types';
+import UnavailableSiteCard from './components/UnavailableSiteCard';
+import OnboardingTooltips from '../../components/OnboardingTooltips';
 import type {TabScreenProps} from '../../core/types/navigation.types';
 import {useDistanceToSite} from '../../shared/hooks/useDistanceToSite';
-import {useExplorerPass} from '../../shared/hooks/useExplorerPass';
-import {useCurrentZoneStore} from '../../stores/currentZoneStore';
+import {useActiveMonument} from '../../shared/hooks/useActiveMonument';
 import PreArrivalCard from './components/PreArrivalCard';
 import ApproachCard from './components/ApproachCard';
 import ArrivalBanner from './components/ArrivalBanner';
-
-const KONARK_SLUG = 'konark-sun-temple';
 
 type Props = TabScreenProps<'Home'>;
 
@@ -42,12 +45,6 @@ const DEFAULT_REGION: Region = {
   longitudeDelta: 12,
 };
 
-function formatDistance(meters: number): string {
-  if (!Number.isFinite(meters) || meters <= 0) return '';
-  if (meters < 950) return `${Math.round(meters)} m`;
-  return `${(meters / 1000).toFixed(1)} km`;
-}
-
 function deriveLocationTitle(places: Place[]): string {
   const nearest = places[0];
   if (!nearest) return 'Heritage near you';
@@ -59,20 +56,110 @@ function deriveLocationTitle(places: Place[]): string {
   return 'Heritage near you';
 }
 
-function lineCategory(place: Place): string {
-  const cat = place.categories?.[0];
-  if (cat) return `Built · ${cat}`;
-  return 'Built · heritage site';
+/** A place currently focused on the map (tapped marker or search result). */
+interface ActivePlace {
+  key: string;
+  name: string;
+  lat: number;
+  lon: number;
+  imageUrl?: string;
+  categories: string[];
+  source: 'nearby' | 'search';
 }
 
-function lineEra(place: Place): string {
-  if (place.significance) {
-    return place.significance.slice(0, 56);
+// Geoapify is already scoped to tourism/religion, but enrichment can attach a
+// few non-heritage tags. We keep anything with a heritage signal and only drop
+// places that look clearly non-heritage (food, retail, lodging, transit, ...).
+const HERITAGE_PREFIXES = [
+  'tourism',
+  'religion',
+  'heritage',
+  'historic',
+  'building.historic',
+  'man_made',
+];
+const NON_HERITAGE_PREFIXES = [
+  'catering',
+  'commercial',
+  'accommodation',
+  'transport',
+  'service',
+  'office',
+  'healthcare',
+  'education',
+  'parking',
+];
+
+function isHeritagePlace(place: Place): boolean {
+  const cats = (place.categories ?? []).map(c => c.toLowerCase());
+  if (cats.length === 0) return true;
+  if (cats.some(c => HERITAGE_PREFIXES.some(p => c.startsWith(p)))) return true;
+  return !cats.some(c => NON_HERITAGE_PREFIXES.some(p => c.startsWith(p)));
+}
+
+function distanceMeters(
+  aLat: number,
+  aLng: number,
+  bLat: number,
+  bLng: number,
+): number {
+  const R = 6371000;
+  const dLat = ((bLat - aLat) * Math.PI) / 180;
+  const dLon = ((bLng - aLng) * Math.PI) / 180;
+  const lat1 = (aLat * Math.PI) / 180;
+  const lat2 = (bLat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function normalizeName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/**
+ * Returns the curated Epocheye site matching a focused place, or null when the
+ * place is not (yet) supported. Matches by proximity (<500 m) or by name, since
+ * Geoapify place ids do not line up with our stored google_place_id.
+ */
+function matchSupportedSite(
+  place: {lat: number; lon: number; name: string},
+  sites: SiteDetail[],
+): SiteDetail | null {
+  const pName = normalizeName(place.name);
+  for (const s of sites) {
+    if (typeof s.latitude === 'number' && typeof s.longitude === 'number') {
+      if (distanceMeters(place.lat, place.lon, s.latitude, s.longitude) < 500) {
+        return s;
+      }
+    }
+    const sName = normalizeName(s.name);
+    if (
+      pName &&
+      sName &&
+      (pName === sName || pName.includes(sName) || sName.includes(pName))
+    ) {
+      return s;
+    }
   }
-  if (place.place_type) {
-    return `Type · ${place.place_type}`;
-  }
-  return place.address_line2 || place.state || 'Tap to learn more';
+  return null;
+}
+
+function siteToNavParam(site: SiteDetail): PlaceNavParam {
+  return {
+    id: site.slug ?? site.id,
+    name: site.name,
+    lat: site.latitude,
+    lon: site.longitude,
+    city: site.city,
+    country: site.country,
+    formatted: site.short_description,
+    heroImages: site.hero_image_url ? [site.hero_image_url] : undefined,
+  };
 }
 
 const Home: React.FC<Props> = ({navigation}) => {
@@ -86,30 +173,46 @@ const Home: React.FC<Props> = ({navigation}) => {
   const [viewMode, setViewMode] = useState<ViewMode>('nearby');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
-  // TODO: this site reference should later come from a planned-trips / wishlist concept.
-  const [konarkSite, setKonarkSite] = useState<SiteDetail | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [arrivalDismissed, setArrivalDismissed] = useState(false);
+  const [supportedSites, setSupportedSites] = useState<SiteDetail[]>([]);
+  const [selectedPlace, setSelectedPlace] = useState<ActivePlace | null>(null);
+  const [routeActive, setRouteActive] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const mapRef = useRef<MapView>(null);
 
-  const currentZone = useCurrentZoneStore(s => s.zone);
-  const {passes: explorerPasses} = useExplorerPass();
+  const active = useActiveMonument();
+  const activeSite = active.site;
 
   useEffect(() => {
     void ensureLocationTracking();
   }, [ensureLocationTracking]);
 
+  // Curated Epocheye sites — used to decide whether a tapped/searched place has
+  // a real experience or should show the "not available here" card.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const result = await getSite('konark-sun-temple');
-      if (cancelled) return;
-      if (result.success) setKonarkSite(result.data);
+      const result = await getSites();
+      if (!cancelled && result.success) setSupportedSites(result.data);
     })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // Notification unread badge — refreshed on mount and whenever Home regains
+  // focus (e.g. after returning from the Notifications screen).
+  useEffect(() => {
+    const loadUnread = async () => {
+      const res = await getUnreadCount();
+      if (res.success) setUnreadCount(res.data.count);
+    };
+    void loadUnread();
+    const unsub = navigation.addListener('focus', loadUnread);
+    return unsub;
+  }, [navigation]);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,41 +238,35 @@ const Home: React.FC<Props> = ({navigation}) => {
     [currentLocation],
   );
 
-  const konarkCoords = useMemo(
+  const activeCoords = useMemo(
     () =>
-      konarkSite &&
-      typeof konarkSite.latitude === 'number' &&
-      typeof konarkSite.longitude === 'number'
-        ? {lat: konarkSite.latitude, lng: konarkSite.longitude}
+      activeSite &&
+      typeof activeSite.latitude === 'number' &&
+      typeof activeSite.longitude === 'number'
+        ? {lat: activeSite.latitude, lng: activeSite.longitude}
         : {lat: 0, lng: 0},
-    [konarkSite],
+    [activeSite],
   );
 
-  const {distanceKm, etaMinutes} = useDistanceToSite(userLatLng, konarkCoords);
+  const {distanceKm, etaMinutes} = useDistanceToSite(userLatLng, activeCoords);
 
-  const isAtKonark = currentZone?.monument_id === KONARK_SLUG;
+  const isAtSite = active.isAtSite;
   const isPreArrival =
-    !isAtKonark && distanceKm !== null && distanceKm >= 1;
+    !isAtSite && distanceKm !== null && distanceKm >= 1;
   const isApproaching =
-    !isAtKonark && distanceKm !== null && distanceKm < 1;
+    !isAtSite && distanceKm !== null && distanceKm < 1;
 
   const visiblePreArrival =
-    !isAtKonark && (locationDenied || isPreArrival);
+    !isAtSite && (locationDenied || isPreArrival);
   const visibleApproach =
-    !isAtKonark && isApproaching && !locationDenied;
-  const visibleArrival = isAtKonark && !arrivalDismissed;
+    !isAtSite && isApproaching && !locationDenied;
+  const visibleArrival = isAtSite && !arrivalDismissed;
 
-  const hasKonarkAccess = useMemo(
-    () =>
-      explorerPasses.some(
-        p => p.is_active && p.place_ids.includes(KONARK_SLUG),
-      ),
-    [explorerPasses],
-  );
+  const hasAccess = active.hasAccess;
 
   useEffect(() => {
-    if (!isAtKonark && arrivalDismissed) setArrivalDismissed(false);
-  }, [isAtKonark, arrivalDismissed]);
+    if (!isAtSite && arrivalDismissed) setArrivalDismissed(false);
+  }, [isAtSite, arrivalDismissed]);
 
   const handleArrivalDismiss = useCallback(
     () => setArrivalDismissed(true),
@@ -182,10 +279,11 @@ const Home: React.FC<Props> = ({navigation}) => {
   );
 
   const filteredPlaces = useMemo(() => {
-    const list = viewMode === 'nearby' ? allPlaces : [];
+    const base =
+      viewMode === 'nearby' ? allPlaces.filter(isHeritagePlace) : [];
     const q = searchText.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
+    if (!q) return base;
+    return base.filter(
       p =>
         p.name.toLowerCase().includes(q) ||
         p.city?.toLowerCase().includes(q) ||
@@ -220,25 +318,25 @@ const Home: React.FC<Props> = ({navigation}) => {
     [allPlaces],
   );
 
-  const handleLearnMore = useCallback(
-    (place: Place) => {
+  const handleViewSupported = useCallback(
+    (site: SiteDetail) => {
       navigation.navigate(ROUTES.MAIN.SITE_DETAIL, {
-        site: buildSiteDetailData(place),
+        site: siteToNavParam(site),
       });
     },
     [navigation],
   );
 
-  const handleViewInAR = useCallback(
-    (place: Place) => {
-      navigation.navigate(ROUTES.MAIN.AR_EXPERIENCE, {
-        site: buildSiteDetailData(place),
-      });
-    },
-    [navigation],
-  );
-
-  const handleMarkerPress = useCallback((place: Place) => {
+  const handleSelectNearby = useCallback((place: Place) => {
+    setSelectedPlace({
+      key: place.id,
+      name: place.name,
+      lat: place.lat,
+      lon: place.lon,
+      imageUrl: place.image_urls?.[0],
+      categories: place.categories ?? [],
+      source: 'nearby',
+    });
     mapRef.current?.animateToRegion(
       {
         latitude: place.lat,
@@ -250,35 +348,105 @@ const Home: React.FC<Props> = ({navigation}) => {
     );
   }, []);
 
-  // Future: swap fitToCoordinates for a route polyline via react-native-maps-directions
-  // once GOOGLE_MAPS_API_KEY has Directions API enabled.
-  const handleShowDirections = useCallback(() => {
-    if (!konarkSite) return;
-    const destLat = konarkSite.latitude;
-    const destLng = konarkSite.longitude;
-    if (typeof destLat !== 'number' || typeof destLng !== 'number') return;
-    const destCoord = {latitude: destLat, longitude: destLng};
+  const handleSearchSubmit = useCallback(async () => {
+    const q = searchText.trim();
+    if (!q) return;
+    setSearching(true);
+    const result = await searchPlaces(q);
+    setSearching(false);
+    if (!result.success || result.data.length === 0) return;
+    const top = result.data[0];
+    setSelectedPlace({
+      key: `search-${top.place_id}`,
+      name: top.name,
+      lat: top.lat,
+      lon: top.lng,
+      categories: top.place_type ? [top.place_type] : [],
+      source: 'search',
+    });
+    mapRef.current?.animateToRegion(
+      {
+        latitude: top.lat,
+        longitude: top.lng,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      },
+      600,
+    );
+  }, [searchText]);
 
+  const fitUserAndActive = useCallback(() => {
+    const lat = activeSite?.latitude;
+    const lng = activeSite?.longitude;
+    if (!userLatLng || typeof lat !== 'number' || typeof lng !== 'number') {
+      return;
+    }
+    mapRef.current?.fitToCoordinates(
+      [
+        {latitude: userLatLng.lat, longitude: userLatLng.lng},
+        {latitude: lat, longitude: lng},
+      ],
+      {
+        edgePadding: {top: 220, bottom: 240, left: 60, right: 60},
+        animated: true,
+      },
+    );
+  }, [userLatLng, activeSite]);
+
+  // Draw the in-app driving route when we have a user location; otherwise just
+  // frame the destination. The route polyline is rendered by <MapViewDirections>
+  // and needs the Directions API enabled on the Maps key — on error we fall
+  // back to fitting both points in view (see onError below).
+  const handleShowDirections = useCallback(() => {
+    const lat = activeSite?.latitude;
+    const lng = activeSite?.longitude;
+    if (typeof lat !== 'number' || typeof lng !== 'number') return;
     if (userLatLng) {
-      mapRef.current?.fitToCoordinates(
-        [{latitude: userLatLng.lat, longitude: userLatLng.lng}, destCoord],
-        {
-          edgePadding: {top: 220, bottom: 240, left: 60, right: 60},
-          animated: true,
-        },
-      );
+      setRouteActive(true);
+      fitUserAndActive();
     } else {
       mapRef.current?.animateToRegion(
-        {
-          latitude: destLat,
-          longitude: destLng,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        },
+        {latitude: lat, longitude: lng, latitudeDelta: 0.05, longitudeDelta: 0.05},
         500,
       );
     }
-  }, [konarkSite, userLatLng]);
+  }, [activeSite, userLatLng, fitUserAndActive]);
+
+  const dismissSelection = useCallback(() => setSelectedPlace(null), []);
+
+  const activePlace = useMemo<ActivePlace | null>(() => {
+    if (selectedPlace) return selectedPlace;
+    if (viewMode !== 'nearby' || !featuredPlace) return null;
+    return {
+      key: featuredPlace.id,
+      name: featuredPlace.name,
+      lat: featuredPlace.lat,
+      lon: featuredPlace.lon,
+      imageUrl: featuredPlace.image_urls?.[0],
+      categories: featuredPlace.categories ?? [],
+      source: 'nearby',
+    };
+  }, [selectedPlace, viewMode, featuredPlace]);
+
+  const activeSupportedSite = useMemo(
+    () =>
+      activePlace ? matchSupportedSite(activePlace, supportedSites) : null,
+    [activePlace, supportedSites],
+  );
+
+  const supportedImageSource = useMemo(() => {
+    if (!activeSupportedSite) return null;
+    return (
+      resolveSiteImageSource(activeSupportedSite) ??
+      (activePlace?.imageUrl ? {uri: activePlace.imageUrl} : null)
+    );
+  }, [activeSupportedSite, activePlace]);
+
+  const canRoute =
+    routeActive &&
+    !!userLatLng &&
+    typeof activeSite?.latitude === 'number' &&
+    typeof activeSite?.longitude === 'number';
 
   return (
     <View className="flex-1 bg-surface-1">
@@ -287,12 +455,16 @@ const Home: React.FC<Props> = ({navigation}) => {
 
       {/* Header */}
       <View className="px-6 pt-2 pb-2">
-        <Text style={{fontFamily: FONTS.sans, fontSize: 12, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3}}>
+        <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={{fontFamily: FONTS.sans, fontSize: 12, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, alignSelf: 'stretch'}}>
           Heritage Near You
         </Text>
         <Text
-          style={{marginTop: 2, fontFamily: FONTS.serif, fontSize: 28, color: '#FFFFFF', lineHeight: 32}}
-          numberOfLines={1}>
+          style={{marginTop: 2, fontFamily: FONTS.serif, fontSize: 28, color: '#FFFFFF', lineHeight: 34, alignSelf: 'stretch'}}
+          numberOfLines={1}
+          ellipsizeMode="tail">
           {locationTitle}
         </Text>
       </View>
@@ -329,18 +501,39 @@ const Home: React.FC<Props> = ({navigation}) => {
             </Text>
           </Pressable>
         </View>
-        <Pressable
-          onPress={() => setSearchOpen(prev => !prev)}
-          hitSlop={10}
-          className="w-9 h-9 rounded-full bg-[rgba(255,255,255,0.06)] items-center justify-center"
-          accessibilityRole="button"
-          accessibilityLabel={searchOpen ? 'Close search' : 'Open search'}>
-          {searchOpen ? (
-            <X color="#FFFFFF" size={20} />
-          ) : (
-            <Search color="#FFFFFF" size={20} />
-          )}
-        </Pressable>
+        <View className="flex-row items-center gap-x-2">
+          <Pressable
+            onPress={() => navigation.navigate(ROUTES.MAIN.NOTIFICATIONS)}
+            hitSlop={10}
+            className="w-9 h-9 rounded-full bg-[rgba(255,255,255,0.06)] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={
+              unreadCount > 0
+                ? `Notifications, ${unreadCount} unread`
+                : 'Notifications'
+            }>
+            <Bell color="#FFFFFF" size={19} />
+            {unreadCount > 0 ? (
+              <View className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#E05C5C] items-center justify-center">
+                <Text style={{fontFamily: FONTS.sansBold, fontSize: 9, color: '#FFFFFF'}}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+          <Pressable
+            onPress={() => setSearchOpen(prev => !prev)}
+            hitSlop={10}
+            className="w-9 h-9 rounded-full bg-[rgba(255,255,255,0.06)] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={searchOpen ? 'Close search' : 'Open search'}>
+            {searchOpen ? (
+              <X color="#FFFFFF" size={20} />
+            ) : (
+              <Search color="#FFFFFF" size={20} />
+            )}
+          </Pressable>
+        </View>
       </View>
 
       {/* Optional search input */}
@@ -350,13 +543,17 @@ const Home: React.FC<Props> = ({navigation}) => {
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
-            placeholder="Search heritage sites"
+            placeholder="Search any place"
             placeholderTextColor="rgba(255,255,255,0.35)"
             style={{flex: 1, fontFamily: FONTS.sans, fontSize: 14, color: '#FFFFFF', padding: 0}}
             autoFocus
             autoCorrect={false}
             returnKeyType="search"
+            onSubmitEditing={handleSearchSubmit}
           />
+          {searching ? (
+            <ActivityIndicator color="rgba(255,255,255,0.6)" size="small" />
+          ) : null}
           {searchText.length > 0 ? (
             <Pressable onPress={() => setSearchText('')} hitSlop={8}>
               <X color="rgba(255,255,255,0.45)" size={14} />
@@ -385,10 +582,47 @@ const Home: React.FC<Props> = ({navigation}) => {
                 coordinate={{latitude: place.lat, longitude: place.lon}}
                 title={place.name}
                 description={`${place.city ?? ''}${place.city ? ', ' : ''}${place.country ?? ''}`}
-                onPress={() => handleMarkerPress(place)}
+                onPress={() => handleSelectNearby(place)}
                 pinColor={COLORS.sky}
               />
             ))}
+            {selectedPlace?.source === 'search' ? (
+              <Marker
+                key={selectedPlace.key}
+                coordinate={{
+                  latitude: selectedPlace.lat,
+                  longitude: selectedPlace.lon,
+                }}
+                title={selectedPlace.name}
+                pinColor={COLORS.lime}
+              />
+            ) : null}
+            {canRoute && activeSite ? (
+              <MapViewDirections
+                origin={{
+                  latitude: userLatLng!.lat,
+                  longitude: userLatLng!.lng,
+                }}
+                destination={{
+                  latitude: activeSite.latitude as number,
+                  longitude: activeSite.longitude as number,
+                }}
+                apikey={GOOGLE_MAPS_API_KEY?.trim() ?? ''}
+                mode="DRIVING"
+                strokeWidth={4}
+                strokeColor={COLORS.sky}
+                onReady={result =>
+                  mapRef.current?.fitToCoordinates(result.coordinates, {
+                    edgePadding: {top: 220, bottom: 240, left: 60, right: 60},
+                    animated: true,
+                  })
+                }
+                onError={() => {
+                  setRouteActive(false);
+                  fitUserAndActive();
+                }}
+              />
+            ) : null}
           </MapView>
         ) : (
           <View className="flex-1 items-center justify-center px-8">
@@ -400,12 +634,12 @@ const Home: React.FC<Props> = ({navigation}) => {
             </Text>
           </View>
         )}
-        {viewMode === 'nearby' && konarkSite ? (
+        {viewMode === 'nearby' && activeSite ? (
           <View
             pointerEvents="box-none"
             style={styles.preArrivalOverlay}>
             <PreArrivalCard
-              site={konarkSite}
+              site={activeSite}
               userLocation={userLatLng}
               distanceKm={distanceKm}
               etaMinutes={etaMinutes}
@@ -414,16 +648,18 @@ const Home: React.FC<Props> = ({navigation}) => {
               onShowDirections={handleShowDirections}
             />
             <ApproachCard
-              site={konarkSite}
+              site={activeSite}
               userLocation={userLatLng}
               distanceKm={distanceKm ?? 0}
-              hasKonarkAccess={hasKonarkAccess}
+              hasAccess={hasAccess}
+              placeId={active.slug ?? ''}
               visible={visibleApproach}
               onShowDirections={handleShowDirections}
             />
             <ArrivalBanner
-              site={konarkSite}
-              hasKonarkAccess={hasKonarkAccess}
+              site={activeSite}
+              hasAccess={hasAccess}
+              placeId={active.slug ?? ''}
               visible={visibleArrival}
               onDismiss={handleArrivalDismiss}
             />
@@ -431,16 +667,17 @@ const Home: React.FC<Props> = ({navigation}) => {
         ) : null}
       </View>
 
-      {/* Bottom featured card */}
-      {featuredPlace ? (
+      {/* Bottom card — curated Epocheye site shows a details CTA; any other
+          place shows the calm "not available here" card. */}
+      {activePlace && activeSupportedSite ? (
         <View
           className="absolute left-4 right-4 flex-row bg-white rounded-[14px] overflow-hidden"
           style={[styles.cardShadow, {bottom: insets.bottom + 84}]}
           accessibilityRole="summary">
           <View className="w-[132px] h-[132px] bg-[#222]">
-            {featuredPlace.image_urls?.[0] ? (
+            {supportedImageSource ? (
               <Image
-                source={{uri: featuredPlace.image_urls[0]}}
+                source={supportedImageSource}
                 className="w-full h-full"
                 resizeMode="cover"
               />
@@ -452,50 +689,51 @@ const Home: React.FC<Props> = ({navigation}) => {
             <Text
               style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: '#D24A2C', letterSpacing: 0.4}}
               numberOfLines={1}>
-              {featuredPlace.distance_meters > 0
-                ? `Nearest · ${formatDistance(featuredPlace.distance_meters)}`
-                : 'Featured'}
+              {activeSupportedSite.ar_ready
+                ? 'Epocheye site · AR ready'
+                : 'Epocheye site'}
             </Text>
             <Text
               style={{marginTop: 2, fontFamily: FONTS.serif, fontSize: 22, color: '#111111', lineHeight: 26}}
               numberOfLines={1}>
-              {featuredPlace.name}
+              {activeSupportedSite.name}
             </Text>
             <Text
               style={{marginTop: 2, fontFamily: FONTS.sans, fontSize: 11, color: 'rgba(0,0,0,0.55)'}}
-              numberOfLines={1}>
-              {lineCategory(featuredPlace)}
-            </Text>
-            <Text
-              style={{marginTop: 2, fontFamily: FONTS.sans, fontSize: 11, color: 'rgba(0,0,0,0.55)'}}
-              numberOfLines={1}>
-              {lineEra(featuredPlace)}
+              numberOfLines={2}>
+              {activeSupportedSite.one_line_description ||
+                [activeSupportedSite.city, activeSupportedSite.state]
+                  .filter(Boolean)
+                  .join(', ') ||
+                'Tap to explore'}
             </Text>
             <View className="mt-2 flex-row gap-x-[6px]">
               <Pressable
-                onPress={() => handleViewInAR(featuredPlace)}
-                style={({pressed}) => pressed ? {opacity: 0.85} : undefined}
+                onPress={() => handleViewSupported(activeSupportedSite)}
+                style={({pressed}) => (pressed ? {opacity: 0.85} : undefined)}
                 className="px-[14px] py-[6px] rounded-full bg-[#111111]"
                 accessibilityRole="button"
-                accessibilityLabel={`View ${featuredPlace.name} in AR`}>
+                accessibilityLabel={`View details for ${activeSupportedSite.name}`}>
                 <Text style={{fontFamily: FONTS.sansMedium, fontSize: 12, color: '#FFFFFF'}}>
-                  View in AR
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleLearnMore(featuredPlace)}
-                style={({pressed}) => pressed ? {opacity: 0.85} : undefined}
-                className="px-[14px] py-[6px] rounded-full bg-[#2A2A2A]"
-                accessibilityRole="button"
-                accessibilityLabel={`Learn more about ${featuredPlace.name}`}>
-                <Text style={{fontFamily: FONTS.sansMedium, fontSize: 12, color: '#FFFFFF'}}>
-                  Learn More
+                  View Details
                 </Text>
               </Pressable>
             </View>
           </View>
         </View>
+      ) : activePlace ? (
+        <UnavailableSiteCard
+          placeName={activePlace.name}
+          bottom={insets.bottom + 84}
+          onDismiss={dismissSelection}
+          onExplore={() =>
+            navigation.navigate(ROUTES.MAIN.LENS, {mode: 'museum'})
+          }
+        />
       ) : null}
+
+      {/* First-run, non-blocking feature tips */}
+      <OnboardingTooltips bottomOffset={insets.bottom + 96} />
     </View>
   );
 };

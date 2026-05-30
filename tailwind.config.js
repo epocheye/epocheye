@@ -101,6 +101,14 @@ module.exports = {
       fontFamily: {
         'handwritten': ['NothingYouCouldDo-Regular'],
         'serif-italic': ['InstrumentSerif-Italic'],
+        // Instrument family — primary for redesigned screens (serif for
+        // titles/headings, sans for body/UI).
+        'instrument-serif': ['InstrumentSerif-Regular'],
+        'instrument-serif-italic': ['InstrumentSerif-Italic'],
+        'instrument': ['InstrumentSans-Regular'],
+        'instrument-medium': ['InstrumentSans-Medium'],
+        'instrument-semibold': ['InstrumentSans-SemiBold'],
+        'instrument-bold': ['InstrumentSans-Bold'],
         'montserrat': ['MontserratAlternates-Regular'],
         'montserrat-thin': ['MontserratAlternates-Thin'],
         'montserrat-thin-italic': ['MontserratAlternates-ThinItalic'],

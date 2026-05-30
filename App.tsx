@@ -6,8 +6,9 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AppNavigator from './src/navigation';
 import { NetworkProvider, useNetwork } from './src/context';
 import NoInternetScreen from './src/screens/NoInternetScreen';
-import { fcmInit } from './src/services/fcmService';
+import { fcmInit, fcmRegisterAfterPermission } from './src/services/fcmService';
 import { useArQuotaStore } from './src/stores/arQuotaStore';
+import { useSessionStore } from './src/stores/sessionStore';
 
 // Module-load configure() throws if the native module failed to autolink;
 // guard so a mis-linked build reaches the JS runtime instead of dying silently.
@@ -40,6 +41,8 @@ const AppContent: React.FC = () => {
 };
 
 export default function App() {
+  const authenticated = useSessionStore(s => s.authenticated);
+
   useEffect(() => {
     // Best-effort — FCM registration is skipped silently until the user is
     // authenticated and has granted notification permission.
@@ -48,6 +51,16 @@ export default function App() {
     // correctly from first paint. Unauth requests are silently dropped.
     void useArQuotaStore.getState().refresh();
   }, []);
+
+  // fcmInit() runs once at launch and may find the session not yet restored
+  // (or the user logs in later). Re-register the device token whenever the
+  // session becomes authenticated so already-onboarded users still receive
+  // pushes without needing to pass through the onboarding permission screen.
+  useEffect(() => {
+    if (authenticated) {
+      void fcmRegisterAfterPermission();
+    }
+  }, [authenticated]);
 
   return (
     <SafeAreaProvider style={{ backgroundColor: '#000000' }}>

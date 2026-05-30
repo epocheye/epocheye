@@ -28,6 +28,22 @@ export interface Place {
   image_urls?: string[];
 }
 
+/**
+ * A single candidate from the free-text place search
+ * (GET /findplaces/search?q=). Matches the backend `TextSearchResult` struct.
+ */
+export interface PlaceSearchResult {
+  place_id: string;
+  name: string;
+  formatted: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  lat: number;
+  lng: number;
+  place_type?: string;
+}
+
 export interface FindPlacesRequest {
   latitude: number;
   longitude: number;

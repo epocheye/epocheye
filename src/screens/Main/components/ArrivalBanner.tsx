@@ -15,14 +15,16 @@ import type {TabMainNavigationProp} from '../../../core/types/navigation.types';
 
 interface ArrivalBannerProps {
   site: SiteDetail;
-  hasKonarkAccess: boolean;
+  hasAccess: boolean;
+  placeId: string;
   visible: boolean;
   onDismiss: () => void;
 }
 
 const ArrivalBanner: React.FC<ArrivalBannerProps> = ({
-  site: _site,
-  hasKonarkAccess,
+  site,
+  hasAccess,
+  placeId,
   visible,
   onDismiss,
 }) => {
@@ -37,9 +39,9 @@ const ArrivalBanner: React.FC<ArrivalBannerProps> = ({
 
   const handleActivate = useCallback(() => {
     navigation.navigate(ROUTES.MAIN.PURCHASE, {
-      preSelectedPlaceId: 'konark-sun-temple',
+      preSelectedPlaceId: placeId,
     });
-  }, [navigation]);
+  }, [navigation, placeId]);
 
   const handleOpenLens = useCallback(() => {
     navigation.navigate(ROUTES.MAIN.LENS);
@@ -54,9 +56,9 @@ const ArrivalBanner: React.FC<ArrivalBannerProps> = ({
         start={{x: 0, y: 0}}
         end={{x: 1, y: 1}}
         style={styles.banner}>
-        {hasKonarkAccess ? (
+        {hasAccess ? (
           <View>
-            <Text style={styles.heading}>Welcome to Konark</Text>
+            <Text style={styles.heading}>{`Welcome to ${site.name}`}</Text>
             <Text style={styles.body}>Tap to begin.</Text>
             <View style={styles.actionRow}>
               <Button
@@ -64,15 +66,15 @@ const ArrivalBanner: React.FC<ArrivalBannerProps> = ({
                 variant="primary"
                 size="small"
                 onPress={handleOpenLens}
-                accessibilityLabel="Open Lens at Konark"
+                accessibilityLabel={`Open Lens at ${site.name}`}
               />
             </View>
           </View>
         ) : (
           <View>
-            <Text style={styles.heading}>You're at Konark</Text>
+            <Text style={styles.heading}>{`You're at ${site.name}`}</Text>
             <Text style={styles.body}>
-              Activate Epocheye to see this in 1258 CE.
+              Activate Epocheye to see this in a different era.
             </Text>
             <View style={styles.actionRow}>
               <Button
@@ -80,7 +82,7 @@ const ArrivalBanner: React.FC<ArrivalBannerProps> = ({
                 variant="primary"
                 size="small"
                 onPress={handleActivate}
-                accessibilityLabel="Activate Epocheye for Konark"
+                accessibilityLabel={`Activate Epocheye for ${site.name}`}
               />
               <TouchableOpacity
                 onPress={onDismiss}

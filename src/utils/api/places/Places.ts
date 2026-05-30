@@ -8,6 +8,7 @@ import {
   FindPlacesRequest,
   FindPlacesResponse,
   Place,
+  PlaceSearchResult,
   SavePlaceRequest,
   SavedPlace,
   SiteDetail,
@@ -156,6 +157,29 @@ export async function getSites(): Promise<PlacesResult<SiteDetail[]>> {
       ? response.data.sites
       : [];
     return { success: true, data: sites };
+  } catch (error) {
+    return createErrorResult(error);
+  }
+}
+
+/**
+ * Free-text place search (GET /findplaces/search?q=). Used by the Home search
+ * bar to drop a searched location on the in-app map even when it isn't already
+ * in the nearby list. Returns candidate locations ordered by relevance.
+ */
+export async function searchPlaces(
+  query: string,
+): Promise<PlacesResult<PlaceSearchResult[]>> {
+  try {
+    const client = createAuthenticatedClient();
+    const response = await client.get<{ results?: PlaceSearchResult[] }>(
+      '/findplaces/search',
+      { params: { q: query } },
+    );
+    const results = Array.isArray(response.data?.results)
+      ? response.data.results
+      : [];
+    return { success: true, data: results };
   } catch (error) {
     return createErrorResult(error);
   }

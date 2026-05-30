@@ -22,7 +22,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import {
   ArrowLeft,
-  Heart,
   Share2,
   MapPin,
   MessageSquare,
@@ -32,11 +31,10 @@ import {
   ChevronRight,
   ChevronUp,
   Sparkles,
-  Bookmark,
   Shield,
 } from 'lucide-react-native';
 import { formatPlaceType } from '../../shared/utils/formatters';
-import { usePlaces, useUser } from '../../context';
+import { useUser } from '../../context';
 import { useExplorerPass } from '../../shared/hooks';
 import {
   getPersonalizedFacts,
@@ -61,13 +59,9 @@ type Props = MainScreenProps<'SiteDetail'>;
 const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const site = route.params.site;
   const profile = useUser(state => state.profile);
-  const toggleSavePlace = usePlaces(state => state.toggleSavePlace);
-  const isPlaceSaved = usePlaces(state => state.isPlaceSaved);
   const { checkAccess } = useExplorerPass();
 
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
 
   const [facts, setFacts] = useState<PersonalizedFact[]>([]);
@@ -80,7 +74,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [siteDetail, setSiteDetail] = useState<SiteDetail | null>(null);
 
   const scrollY = useSharedValue(0);
-  const isSaved = isPlaceSaved(site.id);
 
   const placeType = useMemo(() => {
     const pt = (site as any).place_type;
@@ -200,33 +193,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     ),
   }));
 
-  const handleToggleSave = useCallback(async () => {
-    if (isSaving) {
-      return;
-    }
-    setIsSaving(true);
-    try {
-      await toggleSavePlace(site.id, {
-        id: site.id,
-        name: site.name,
-        lat: site.lat ?? 0,
-        lon: site.lon ?? 0,
-        city: site.city ?? '',
-        country: site.country ?? '',
-        formatted: (site as any).formatted ?? location,
-        address_line1: (site as any).address_line1 ?? location,
-        address_line2: '',
-        state: '',
-        postcode: '',
-        street: '',
-        distance_meters: 0,
-        categories: categories,
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  }, [isSaving, site, toggleSavePlace, location, categories]);
-
   const handleStartARExperience = useCallback(() => {
     const monumentId = siteDetail?.slug ?? site.id;
     const siteName = siteDetail?.name ?? site.name;
@@ -310,7 +276,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       >
         <Text
           numberOfLines={1}
-          className="text-parchment text-[15px] font-['MontserratAlternates-SemiBold']"
+          className="text-parchment text-[15px] font-['InstrumentSans-SemiBold']"
         >
           {site.name}
         </Text>
@@ -353,39 +319,13 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
 
             <View className="flex-row gap-2">
-              <TouchableOpacity
-                onPress={() => setIsLiked(prev => !prev)}
-                className="w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
-              >
-                <Heart
-                  color={isLiked ? '#E05C5C' : '#F5F0E8'}
-                  fill={isLiked ? '#E05C5C' : 'transparent'}
-                  size={20}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleToggleSave}
-                disabled={isSaving}
-                className="w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
-              >
-                {isSaving ? (
-                  <AnimatedLogo
-                    size={16}
-                    variant="white"
-                    motion="pulse"
-                    showRing={false}
-                  />
-                ) : (
-                  <Bookmark
-                    color={isSaved ? '#C9A84C' : '#F5F0E8'}
-                    fill={isSaved ? '#C9A84C' : 'transparent'}
-                    size={20}
-                  />
-                )}
-              </TouchableOpacity>
+              {/* Share is intentionally inactive for now (functionality TBD). */}
               <TouchableOpacity
                 onPress={handleShare}
-                className="w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
+                disabled
+                accessibilityRole="button"
+                accessibilityLabel="Share (coming soon)"
+                className="w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center opacity-50"
               >
                 <Share2 color="#F5F0E8" size={20} />
               </TouchableOpacity>
@@ -394,17 +334,17 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Banner text */}
           <View className="absolute left-5 right-5 bottom-[16px]">
-            <Text className="text-brand-gold text-[11px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+            <Text className="text-brand-gold text-[11px] uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
               {placeType}
             </Text>
-            <Text className="text-parchment text-[26px] leading-8 font-['MontserratAlternates-Bold'] mt-1">
+            <Text className="text-parchment text-[26px] leading-8 font-['InstrumentSerif-Regular'] mt-1">
               {site.name}
             </Text>
             <View className="flex-row items-center gap-1 mt-1.5">
               <MapPin color="#B8AF9E" size={14} />
               <Text
                 numberOfLines={1}
-                className="flex-1 text-parchment-muted text-[13px] font-['MontserratAlternates-Medium']"
+                className="flex-1 text-parchment-muted text-[13px] font-['InstrumentSans-Medium']"
               >
                 {location}
               </Text>
@@ -432,7 +372,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     }`}
                   >
                     <Text
-                      className={`text-xs font-['MontserratAlternates-SemiBold'] ${
+                      className={`text-xs font-['InstrumentSans-SemiBold'] ${
                         i === 0 ? 'text-brand-gold' : 'text-parchment'
                       }`}
                     >
@@ -452,10 +392,10 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Navigation color="#C9A84C" size={16} />
                 </View>
                 <View>
-                  <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
+                  <Text className="text-parchment text-sm font-['InstrumentSans-SemiBold']">
                     {distance}
                   </Text>
-                  <Text className="text-parchment-dim text-xs font-['MontserratAlternates-Regular']">
+                  <Text className="text-parchment-dim text-xs font-['InstrumentSans-Regular']">
                     Distance
                   </Text>
                 </View>
@@ -470,14 +410,14 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4 gap-3"
             >
               {siteDetail.one_line_description && (
-                <Text className="text-parchment-muted text-[13px] leading-[20px] italic font-['MontserratAlternates-Regular']">
+                <Text className="text-parchment-muted text-[13px] leading-[20px] italic font-['InstrumentSans-Regular']">
                   {siteDetail.one_line_description}
                 </Text>
               )}
 
               {siteDetail.unesco_status && (
                 <View className="self-start rounded-full bg-[rgba(201,168,76,0.18)] px-2.5 py-1">
-                  <Text className="text-brand-gold text-[11px] uppercase tracking-[0.6px] font-['MontserratAlternates-SemiBold']">
+                  <Text className="text-brand-gold text-[11px] uppercase tracking-[0.6px] font-['InstrumentSans-SemiBold']">
                     {siteDetail.unesco_status}
                   </Text>
                 </View>
@@ -496,10 +436,10 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   .filter(([, value]) => Boolean(value))
                   .map(([label, value]) => (
                     <View key={label} className="w-1/2 pr-2 mb-3">
-                      <Text className="text-parchment-dim text-[10px] uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+                      <Text className="text-parchment-dim text-[10px] uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
                         {label}
                       </Text>
-                      <Text className="text-parchment text-[13px] leading-[18px] mt-0.5 font-['MontserratAlternates-Medium']">
+                      <Text className="text-parchment text-[13px] leading-[18px] mt-0.5 font-['InstrumentSans-Medium']">
                         {value}
                       </Text>
                     </View>
@@ -515,7 +455,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               className="flex-row items-center gap-2 bg-status-success/10 border border-status-success/20 rounded-xl px-4 py-3"
             >
               <Shield color="#10B981" size={16} />
-              <Text className="text-status-success text-sm font-['MontserratAlternates-SemiBold']">
+              <Text className="text-status-success text-sm font-['InstrumentSans-SemiBold']">
                 Passport Active
               </Text>
             </Animated.View>
@@ -529,7 +469,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               activeOpacity={0.88}
             >
               <Camera color="#0A0A0A" size={18} />
-              <Text className="text-ink text-[15px] uppercase tracking-[0.8px] font-['MontserratAlternates-Bold']">
+              <Text className="text-ink text-[15px] uppercase tracking-[0.8px] font-['InstrumentSerif-Regular']">
                 Begin Your Journey
               </Text>
             </TouchableOpacity>
@@ -545,7 +485,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               accessibilityLabel="Ask about this site"
             >
               <MessageSquare color="#E8A020" size={16} />
-              <Text className="text-accent-amber text-[14px] tracking-[0.4px] font-['MontserratAlternates-SemiBold']">
+              <Text className="text-accent-amber text-[14px] tracking-[0.4px] font-['InstrumentSans-SemiBold']">
                 Ask about this site
               </Text>
             </TouchableOpacity>
@@ -562,7 +502,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 accessibilityLabel="Get Passport for this site"
               >
                 <Sparkles color="#C9A84C" size={14} />
-                <Text className="text-brand-gold text-[13px] font-['MontserratAlternates-SemiBold']">
+                <Text className="text-brand-gold text-[13px] font-['InstrumentSans-SemiBold']">
                   Get Passport for this site
                 </Text>
                 <ChevronRight color="#C9A84C" size={14} />
@@ -575,11 +515,11 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             entering={FadeInDown.delay(300).duration(400)}
             className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4"
           >
-            <Text className="text-parchment text-lg font-['MontserratAlternates-SemiBold'] mb-2">
+            <Text className="text-parchment text-lg font-['InstrumentSans-SemiBold'] mb-2">
               Historical Overview
             </Text>
             <Text
-              className="text-parchment-muted text-sm leading-[22px] font-['MontserratAlternates-Regular']"
+              className="text-parchment-muted text-sm leading-[22px] font-['InstrumentSans-Regular']"
               numberOfLines={isDescriptionExpanded ? undefined : 3}
             >
               {description}
@@ -590,7 +530,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 className="mt-2.5 flex-row items-center gap-1 self-start"
                 accessibilityRole="button"
               >
-                <Text className="text-brand-gold text-xs uppercase tracking-[0.8px] font-['MontserratAlternates-SemiBold']">
+                <Text className="text-brand-gold text-xs uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
                   {isDescriptionExpanded ? 'Show Less' : 'Read More'}
                 </Text>
                 {isDescriptionExpanded ? (
@@ -606,7 +546,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           <Animated.View entering={FadeInDown.delay(400).duration(400)}>
             <View className="flex-row items-center gap-1.5 mb-3">
               <Sparkles color="#C9A84C" size={18} />
-              <Text className="text-parchment text-lg font-['MontserratAlternates-SemiBold']">
+              <Text className="text-parchment text-lg font-['InstrumentSans-SemiBold']">
                 Insights
               </Text>
             </View>
@@ -628,10 +568,10 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     activeOpacity={0.86}
                     className="w-[240px] rounded-2xl bg-surface-1 border border-[rgba(201,168,76,0.28)] p-3.5"
                   >
-                    <Text className="text-parchment text-[15px] leading-[22px] font-['MontserratAlternates-SemiBold'] mb-1.5">
+                    <Text className="text-parchment text-[15px] leading-[22px] font-['InstrumentSans-SemiBold'] mb-1.5">
                       {fact.headline}
                     </Text>
-                    <Text className="text-parchment-muted text-[13px] leading-[18px] font-['MontserratAlternates-Regular']">
+                    <Text className="text-parchment-muted text-[13px] leading-[18px] font-['InstrumentSans-Regular']">
                       {fact.summary}
                     </Text>
 
@@ -647,14 +587,14 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                             />
                           </View>
                         ) : fact.detail ? (
-                          <Text className="text-brand-goldSoft text-[13px] leading-[20px] font-['MontserratAlternates-Regular']">
+                          <Text className="text-brand-goldSoft text-[13px] leading-[20px] font-['InstrumentSans-Regular']">
                             {fact.detail}
                           </Text>
                         ) : null}
                       </View>
                     )}
 
-                    <Text className="text-brand-gold text-[11px] mt-2 font-['MontserratAlternates-SemiBold']">
+                    <Text className="text-brand-gold text-[11px] mt-2 font-['InstrumentSans-SemiBold']">
                       {expandedFactId === fact.id ? 'Collapse' : 'Learn more'}
                     </Text>
                   </TouchableOpacity>
@@ -662,7 +602,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </ScrollView>
             ) : (
               <View className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4">
-                <Text className="text-parchment-dim text-sm text-center font-['MontserratAlternates-Regular']">
+                <Text className="text-parchment-dim text-sm text-center font-['InstrumentSans-Regular']">
                   Insights will appear as you explore nearby monuments
                 </Text>
               </View>

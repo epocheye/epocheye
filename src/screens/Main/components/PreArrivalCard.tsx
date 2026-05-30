@@ -16,6 +16,7 @@ import Button from '../../../components/ui/Button';
 import {FONTS} from '../../../core/constants/theme';
 import {ROUTES} from '../../../core/constants/routes';
 import {PermissionService} from '../../../shared/services/permission.service';
+import {resolveSiteImageSource} from '../../../shared/utils/localSiteImages';
 import type {SiteDetail} from '../../../utils/api/places';
 import type {
   PlaceNavParam,
@@ -109,7 +110,7 @@ const PreArrivalCard: React.FC<PreArrivalCardProps> = ({
               color: 'rgba(255,255,255,0.72)',
               lineHeight: 18,
             }}>
-            Allow location to see distance to Konark
+            {`Allow location to see distance to ${site.name}`}
           </Text>
           <TouchableOpacity
             onPress={handleOpenSettings}
@@ -139,6 +140,7 @@ const PreArrivalCard: React.FC<PreArrivalCardProps> = ({
     (s): s is string => typeof s === 'string' && s.length > 0,
   );
   const subtitle = subtitleParts.join(' · ');
+  const heroSource = resolveSiteImageSource(site);
   const distanceLine =
     etaMinutes !== null
       ? `${formatEta(etaMinutes)} · ${formatLongDistance(distanceKm)} away`
@@ -153,9 +155,9 @@ const PreArrivalCard: React.FC<PreArrivalCardProps> = ({
         style={styles.cardShadow}
         accessibilityRole="summary">
         <View className="flex-row gap-3">
-          {site.hero_image_url ? (
+          {heroSource ? (
             <Image
-              source={{uri: site.hero_image_url}}
+              source={heroSource}
               style={styles.thumbnail}
               resizeMode="cover"
             />

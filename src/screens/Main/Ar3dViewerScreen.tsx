@@ -6,10 +6,11 @@
  *   - Bottom overlay: "VIEWING / {era} / as it stood" caption + era slider
  *   - Subtle vignette gradients for overlay readability
  *
- * Era-aware behavior is gated by `monumentId`:
- *   - KONARK_SLUG → use KONARK_ERAS; null slots show "Reconstruction coming soon"
- *   - DEV_MONUMENT_ID → all era stops point at route.params.glbUrl
- *   - everything else (catalog viewer_only) → era slider hidden, single asset
+ * Era-aware behavior is resolved via useActiveMonument:
+ *   - real monument slug → parse `site.content.ar_data` for era data;
+ *     null era stops show "Reconstruction coming soon"
+ *   - DEV_MONUMENT_ID → single synthetic era stop at route.params.glbUrl
+ *   - no era data → era slider hidden, single asset from route.params.glbUrl
  *
  * URL flips are debounced 300 ms and the underlying GLBViewer is remounted
  * via `key={resolvedUrl}` so the loading indicator and first-frame logs
@@ -42,10 +43,10 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import type {MainStackParamList} from '../../core/types/navigation.types';
 import {
   DEV_MONUMENT_ID,
-  KONARK_ERAS,
-  KONARK_SLUG,
   type EraModel,
+  type SiteEraConfig,
 } from './components/eraModels';
+import {useActiveMonument} from '../../shared/hooks/useActiveMonument';
 import EraSlider from './components/EraSlider';
 
 // Lazy-loaded so @react-three/fiber + expo-gl are NOT evaluated at app startup.
@@ -96,14 +97,36 @@ const Ar3dViewerScreen: React.FC = () => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
 
-  // Selector — which era table applies for this monumentId.
-  const eras = useMemo<EraModel[] | null>(() => {
-    if (monumentId === KONARK_SLUG) return KONARK_ERAS;
+  // Resolve the monument through the single active-monument hook. The DEV
+  // marker short-circuits the resolver and synthesises a one-stop era
+  // config so the test pipeline doesn't depend on the backend.
+  const active = useActiveMonument({
+    explicitSlug:
+      monumentId && monumentId !== DEV_MONUMENT_ID ? monumentId : null,
+  });
+
+  const eraCfg = useMemo<SiteEraConfig | null>(() => {
     if (monumentId === DEV_MONUMENT_ID) {
-      return KONARK_ERAS.map(e => ({...e, glbUrl}));
+      return {
+        eras: [{year: 0, label: 'Dev', glbUrl: glbUrl || null}],
+        defaultIndex: 0,
+      };
     }
-    return null;
-  }, [monumentId, glbUrl]);
+    return active.eras;
+  }, [monumentId, glbUrl, active.eras]);
+
+  const eras: EraModel[] | null = eraCfg?.eras ?? null;
+
+  // Honour the parser's defaultIndex when era data first arrives or the
+  // monument changes. Keyed on a stable signature so re-parses producing
+  // an equivalent config don't reset user scrubbing.
+  const eraSignature = eraCfg
+    ? `${monumentId}|${eraCfg.eras.length}|${eraCfg.defaultIndex}`
+    : '';
+  useEffect(() => {
+    if (eraCfg) setActiveIndex(eraCfg.defaultIndex);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eraSignature]);
 
   // Dev-only opt-in to drei OrbitControls (drag-rotate, pinch-zoom).
   const interactive = __DEV__ && monumentId === DEV_MONUMENT_ID;
@@ -129,11 +152,9 @@ const Ar3dViewerScreen: React.FC = () => {
 
   const title =
     siteName ??
-    (monumentId === KONARK_SLUG
-      ? 'Konark Sun Temple'
-      : monumentId === DEV_MONUMENT_ID
+    (monumentId === DEV_MONUMENT_ID
       ? 'Test Model'
-      : prettyLabel(objectLabel));
+      : active.title || prettyLabel(objectLabel));
 
   const eraLabel = eras
     ? eras[activeIndex]?.label ?? ''

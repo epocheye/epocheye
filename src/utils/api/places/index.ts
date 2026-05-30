@@ -11,11 +11,13 @@ export {
   getSavedPlaces,
   getSite,
   getSites,
+  searchPlaces,
 } from './Places';
 
 // Types
 export type {
   Place,
+  PlaceSearchResult,
   FindPlacesRequest,
   FindPlacesResponse,
   SavePlaceRequest,

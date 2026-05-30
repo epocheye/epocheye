@@ -34,6 +34,10 @@ interface BottomCardProps {
   onHDScan?: () => void;
   /** Whether an HD scan request is in-flight */
   hdScanLoading?: boolean;
+  /** Opens seed-free museum mode (tap-to-identify any object) from not-found. */
+  onExploreAround?: () => void;
+  /** Opens tap-to-identify at a recognized venue (grounded objects + fallback). */
+  onExploreArtifacts?: () => void;
 }
 
 function formatPlaceSubline(place: Place): string {
@@ -64,6 +68,8 @@ const BottomCard: React.FC<BottomCardProps> = ({
   remainingCalls,
   onHDScan,
   hdScanLoading,
+  onExploreAround,
+  onExploreArtifacts,
 }) => {
   const insets = useSafeAreaInsets();
 
@@ -203,6 +209,21 @@ const BottomCard: React.FC<BottomCardProps> = ({
               )}
             </TouchableOpacity>
           )}
+
+          {onExploreArtifacts && (
+            <TouchableOpacity
+              className="mt-2 h-12 rounded-xl border-[1.5px] border-accent-amber bg-transparent flex-row items-center justify-center gap-x-2"
+              onPress={onExploreArtifacts}
+              accessibilityRole="button"
+              accessibilityLabel="Explore the artifacts — tap any object">
+              <ScanSearch size={18} color="#E8A020" />
+              <Text
+                className="text-accent-amber text-[14px]"
+                style={{fontFamily: FONTS.semiBold}}>
+                Explore the artifacts →
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : null}
 
@@ -242,6 +263,21 @@ const BottomCard: React.FC<BottomCardProps> = ({
               </Text>
             </Pressable>
           </View>
+
+          {onExploreAround ? (
+            <Pressable
+              className="mt-3 h-12 rounded-xl border-[1.5px] border-accent-amber bg-transparent flex-row items-center justify-center gap-x-2"
+              onPress={onExploreAround}
+              accessibilityRole="button"
+              accessibilityLabel="Explore what's around you — tap any object">
+              <ScanSearch size={18} color="#E8A020" />
+              <Text
+                className="text-accent-amber text-[14px]"
+                style={{fontFamily: FONTS.semiBold}}>
+                Explore what's around you →
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
     </View>

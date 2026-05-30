@@ -60,6 +60,22 @@ class EpocheyePlaneARViewManager(
                 .getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onARError", event)
         }
+        view.onFrameCaptured = { uri ->
+            val event = Arguments.createMap().apply { putString("uri", uri) }
+            reactContext
+                .getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onFrameCaptured", event)
+        }
+        view.onAnchorScreenPos = { x, y, visible ->
+            val event = Arguments.createMap().apply {
+                putDouble("x", x.toDouble())
+                putDouble("y", y.toDouble())
+                putBoolean("visible", visible)
+            }
+            reactContext
+                .getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onAnchorScreenPos", event)
+        }
 
         return view
     }
@@ -73,6 +89,8 @@ class EpocheyePlaneARViewManager(
         return MapBuilder.of(
             "performHitTest", CMD_PERFORM_HIT_TEST,
             "clearAnchor", CMD_CLEAR_ANCHOR,
+            "placeAnchor", CMD_PLACE_ANCHOR,
+            "captureFrame", CMD_CAPTURE_FRAME,
         )
     }
 
@@ -89,6 +107,12 @@ class EpocheyePlaneARViewManager(
                 view.performHitTest(x, y)
             }
             CMD_CLEAR_ANCHOR -> view.clearAnchor()
+            CMD_PLACE_ANCHOR -> {
+                val x = args?.getDouble(0)?.toFloat() ?: return
+                val y = args?.getDouble(1)?.toFloat() ?: return
+                view.placeAnchor(x, y)
+            }
+            CMD_CAPTURE_FRAME -> view.captureFrame()
         }
     }
 
@@ -104,6 +128,12 @@ class EpocheyePlaneARViewManager(
                 view.performHitTest(x, y)
             }
             "clearAnchor" -> view.clearAnchor()
+            "placeAnchor" -> {
+                val x = args?.getDouble(0)?.toFloat() ?: return
+                val y = args?.getDouble(1)?.toFloat() ?: return
+                view.placeAnchor(x, y)
+            }
+            "captureFrame" -> view.captureFrame()
         }
     }
 
@@ -113,6 +143,8 @@ class EpocheyePlaneARViewManager(
             .put("onPlaneDetected", MapBuilder.of("registrationName", "onPlaneDetected"))
             .put("onAnchorPlaced", MapBuilder.of("registrationName", "onAnchorPlaced"))
             .put("onARError", MapBuilder.of("registrationName", "onARError"))
+            .put("onFrameCaptured", MapBuilder.of("registrationName", "onFrameCaptured"))
+            .put("onAnchorScreenPos", MapBuilder.of("registrationName", "onAnchorScreenPos"))
             .build()
     }
 
@@ -124,5 +156,7 @@ class EpocheyePlaneARViewManager(
     companion object {
         private const val CMD_PERFORM_HIT_TEST = 1
         private const val CMD_CLEAR_ANCHOR = 2
+        private const val CMD_PLACE_ANCHOR = 3
+        private const val CMD_CAPTURE_FRAME = 4
     }
 }

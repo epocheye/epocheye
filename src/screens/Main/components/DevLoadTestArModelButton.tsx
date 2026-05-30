@@ -3,10 +3,11 @@
  *
  * Two rows, both gated on `__DEV__`:
  *  - "Test AR Model" → opens the viewer with the Khronos Duck (pipeline check).
- *  - "Konark Shell"  → opens the viewer on the Konark route so the "coming
- *                      soon" empty state and era slider are testable without
- *                      a backend. All eras render the empty state until real
- *                      URLs land in eraModels.ts.
+ *  - "Konark Shell"  → opens the viewer on the default-monument route so the
+ *                      "coming soon" empty state and era slider are testable
+ *                      without a backend. Real eras flow from
+ *                      `site.content.ar_data` via useActiveMonument when
+ *                      filled in the backend.
  *
  * Compiles to a no-op in production builds.
  */
@@ -17,7 +18,8 @@ import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {ROUTES} from '../../../core/constants';
 import type {MainStackParamList} from '../../../core/types/navigation.types';
-import {DEV_MONUMENT_ID, KONARK_SLUG} from './eraModels';
+import {DEV_MONUMENT_ID} from './eraModels';
+import {DEFAULT_MONUMENT_SLUG} from '../../../config/monuments';
 
 const KHRONOS_DUCK_URL =
   'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF-Binary/Duck.glb';
@@ -33,19 +35,19 @@ const DevLoadTestArModelButton: React.FC = () => {
       objectLabel: 'Duck',
       glbUrl: KHRONOS_DUCK_URL,
       knowledgeText:
-        'Khronos sample asset used to verify the AR rendering pipeline before the real Konark model is hosted.',
+        'Khronos sample asset used to verify the AR rendering pipeline before real monument models are hosted.',
     });
   }, [navigation]);
 
   const handleKonarkShell = useCallback(() => {
-    console.log('[DevLoadTestArModel] nav to Ar3dViewer with Konark shell');
+    console.log('[DevLoadTestArModel] nav to Ar3dViewer with default-monument shell');
     navigation.navigate(ROUTES.MAIN.AR_3D_VIEWER, {
-      monumentId: KONARK_SLUG,
-      objectLabel: 'Konark Sun Temple',
-      // glbUrl is required by the route param shape, but the Konark branch
-      // pulls from eraModels.KONARK_ERAS instead; the empty string is never read.
+      monumentId: DEFAULT_MONUMENT_SLUG,
+      objectLabel: 'shell',
+      // glbUrl is required by the route param shape but Ar3dViewerScreen
+      // pulls eras from the site's content.ar_data via useActiveMonument
+      // when monumentId is a real slug — the empty string is never read.
       glbUrl: '',
-      siteName: 'Konark Sun Temple',
     });
   }, [navigation]);
 
