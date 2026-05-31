@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import {ChevronRight, Lock, Sparkles} from 'lucide-react-native';
+import {ChevronRight, Lock, Menu, Sparkles} from 'lucide-react-native';
 import {COLORS, FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
 import {
@@ -133,7 +133,15 @@ const Passport: React.FC<Props> = ({navigation}) => {
           colors={[AMBER_LIGHT, AMBER, AMBER_DEEP]}
           start={{x: 0, y: 0}}
           end={{x: 1, y: 1}}
-          style={{paddingHorizontal: 24, paddingTop: 18, paddingBottom: 28}}>
+          style={{paddingHorizontal: 24, paddingTop: 14, paddingBottom: 28}}>
+          <Pressable
+            onPress={() => navigation.openDrawer()}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Open menu"
+            style={{width: 36, height: 36, marginLeft: -6, marginBottom: 4, alignItems: 'flex-start', justifyContent: 'center'}}>
+            <Menu color="#FFFFFF" size={22} />
+          </Pressable>
           <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.85)', letterSpacing: 1.4}}>
             YOUR PASSPORT
           </Text>

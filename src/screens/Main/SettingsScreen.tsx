@@ -22,6 +22,7 @@ import {
   Languages,
   LogOut,
   MapPin,
+  Menu,
   MessageCircle,
   Save,
   Shield,
@@ -275,7 +276,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 64 }}
+          contentContainerStyle={{ paddingBottom: 28 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -285,6 +286,18 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             />
           }
         >
+          {/* Menu */}
+          <View className="px-5 pt-2 flex-row items-center">
+            <Pressable
+              onPress={() => navigation.openDrawer()}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Open menu"
+              className="w-9 h-9 items-center justify-center">
+              <Menu color="#FFFFFF" size={22} />
+            </Pressable>
+          </View>
+
           {/* ── Profile hero header ── */}
 
           {/* ── Stat cards ── */}

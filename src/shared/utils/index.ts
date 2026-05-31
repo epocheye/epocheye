@@ -17,11 +17,9 @@ export {
 export {
   formatDate,
   formatRelativeTime,
-  formatCompactNumber,
   capitalize,
   truncate,
   formatName,
-  formatFileSize,
   formatCategory,
   formatPlaceType,
 } from './formatters';
@@ -36,11 +34,8 @@ export {
   hasMaxLength,
   isLengthInRange,
   isValidName,
-  isValidPhone,
   isValidUrl,
   isNumber,
-  isPositiveNumber,
-  isInRange,
 } from './validators';
 
 export { getPlaceImage, buildSiteDetailData } from './place-presenters';

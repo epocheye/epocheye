@@ -152,7 +152,7 @@ CDN_BASE; // 'https://cdn.jsdelivr.net/gh/epocheye/epocheye/src/assets/'
 
 An extended token set lives in `src/design-system/tokens/` (`typography.ts`, `colors.ts`, `spacing.ts`) — same values, more granular variants. Use `src/core/constants/theme.ts` imports for most screens.
 
-**Font rule:** `MontserratAlternates-*` exclusively. No other font families.
+**Font rule:** Several bundled families are in active use — do not delete any without checking references first. `MontserratAlternates-*` drives the brand mark (`AnimatedLogo` via `FONTS` in `theme.ts`). `InstrumentSans-*`, `InstrumentSerif-*`, and `NothingYouCouldDo-*` are used across post-auth screens (SiteDetail, Settings, Purchase, PlanList, AiGuide) via `theme.ts`. `CormorantGaramond-*` (display) and `DMSans-*` (UI) drive the onboarding v2 design system via `src/core/constants/fonts.ts`. All of these ship in `src/assets/fonts/` and are linked natively through `react-native.config.js`.
 
 **Image rule:** All monument/region images via CDN using `CDN_BASE`. No local `require()` for monument images.
 

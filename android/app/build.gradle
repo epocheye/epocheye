@@ -121,14 +121,13 @@ android {
         }
     }
 
-    splits {
-        abi {
-            reset()
-            enable true
-            universalApk true
-            include 'arm64-v8a', 'armeabi-v7a'
-        }
-    }
+    // Distribution: Google Play App Bundle (./gradlew bundleRelease).
+    // ABI selection is handled by ndk.abiFilters above (arm64-v8a +
+    // armeabi-v7a, excluding x86 emulator libs). The App Bundle splits per
+    // device on the Play side, so a `splits { abi { ... } }` block (an
+    // APK-only mechanism) is intentionally NOT used — it conflicts with
+    // ndk.abiFilters during bundleRelease and would only matter for fat-APK
+    // distribution, which we don't ship.
 
     // Prevent duplicate native library errors when fast-tflite,
     // reanimated, and vision-camera all ship the same shared libs.

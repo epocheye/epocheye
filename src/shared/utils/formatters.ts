@@ -80,31 +80,6 @@ export function formatRelativeTime(dateString: string | Date): string {
 }
 
 /**
- * Format a number with compact notation (e.g., 1.2K, 3.4M)
- * @param value - Number to format
- * @returns Formatted string
- */
-export function formatCompactNumber(value: number): string {
-  if (!Number.isFinite(value)) {
-    return '0';
-  }
-
-  const absValue = Math.abs(value);
-  const sign = value < 0 ? '-' : '';
-
-  if (absValue < 1000) {
-    return `${sign}${absValue}`;
-  }
-  if (absValue < 1000000) {
-    return `${sign}${(absValue / 1000).toFixed(1)}K`;
-  }
-  if (absValue < 1000000000) {
-    return `${sign}${(absValue / 1000000).toFixed(1)}M`;
-  }
-  return `${sign}${(absValue / 1000000000).toFixed(1)}B`;
-}
-
-/**
  * Capitalize the first letter of a string
  * @param str - String to capitalize
  * @returns Capitalized string
@@ -166,26 +141,4 @@ export function formatPlaceType(raw: string): string {
     .split('_')
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
-}
-
-/**
- * Format file size for display
- * @param bytes - Size in bytes
- * @returns Formatted size string
- */
-export function formatFileSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) {
-    return '0 B';
-  }
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let unitIndex = 0;
-  let size = bytes;
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex++;
-  }
-
-  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }

@@ -14,7 +14,7 @@ import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import MapView, {Marker, PROVIDER_GOOGLE, type Region} from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import {GOOGLE_MAPS_API_KEY} from '@env';
-import {Bell, Search, X} from 'lucide-react-native';
+import {Bell, Menu, Search, X} from 'lucide-react-native';
 import mapStyle from '../../content/mapstyle.json';
 import {COLORS, FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
@@ -453,8 +453,20 @@ const Home: React.FC<Props> = ({navigation}) => {
       <StatusBar barStyle="light-content" />
       <SafeAreaView edges={['top']} className="bg-surface-1" />
 
+      {/* Menu */}
+      <View className="px-5 pt-1 flex-row items-center">
+        <Pressable
+          onPress={() => navigation.openDrawer()}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+          className="w-9 h-9 items-center justify-center">
+          <Menu color="#FFFFFF" size={22} />
+        </Pressable>
+      </View>
+
       {/* Header */}
-      <View className="px-6 pt-2 pb-2">
+      <View className="px-6 pt-1 pb-2">
         <Text
           numberOfLines={1}
           ellipsizeMode="tail"
@@ -672,7 +684,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       {activePlace && activeSupportedSite ? (
         <View
           className="absolute left-4 right-4 flex-row bg-white rounded-[14px] overflow-hidden"
-          style={[styles.cardShadow, {bottom: insets.bottom + 84}]}
+          style={[styles.cardShadow, {bottom: insets.bottom + 16}]}
           accessibilityRole="summary">
           <View className="w-[132px] h-[132px] bg-[#222]">
             {supportedImageSource ? (
@@ -724,7 +736,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       ) : activePlace ? (
         <UnavailableSiteCard
           placeName={activePlace.name}
-          bottom={insets.bottom + 84}
+          bottom={insets.bottom + 16}
           onDismiss={dismissSelection}
           onExplore={() =>
             navigation.navigate(ROUTES.MAIN.LENS, {mode: 'museum'})
@@ -733,7 +745,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       ) : null}
 
       {/* First-run, non-blocking feature tips */}
-      <OnboardingTooltips bottomOffset={insets.bottom + 96} />
+      <OnboardingTooltips bottomOffset={insets.bottom + 24} />
     </View>
   );
 };

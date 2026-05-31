@@ -4,7 +4,7 @@
  */
 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { RouteProp, CompositeNavigationProp } from '@react-navigation/native';
 
 /**
@@ -121,10 +121,13 @@ export type OnboardingNavigationProp =
 export type MainNavigationProp =
   NativeStackNavigationProp<MainStackParamList>;
 
-export type TabNavigationProp = BottomTabNavigationProp<TabParamList>;
+// Drawer-backed: the persistent bottom-tab bar was replaced by a side drawer.
+// The `Tab*` names are kept so the destination screens' prop types don't churn;
+// `navigation.openDrawer()` is available through these composite props.
+export type TabNavigationProp = DrawerNavigationProp<TabParamList>;
 
 export type TabMainNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<TabParamList>,
+  DrawerNavigationProp<TabParamList>,
   NativeStackNavigationProp<MainStackParamList>
 >;
 

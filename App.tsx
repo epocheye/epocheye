@@ -1,6 +1,7 @@
 import './global.css';
 
 import React, { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AppNavigator from './src/navigation';
@@ -63,10 +64,12 @@ export default function App() {
   }, [authenticated]);
 
   return (
-    <SafeAreaProvider style={{ backgroundColor: '#000000' }}>
-      <NetworkProvider>
-        <AppContent />
-      </NetworkProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider style={{ backgroundColor: '#000000' }}>
+        <NetworkProvider>
+          <AppContent />
+        </NetworkProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

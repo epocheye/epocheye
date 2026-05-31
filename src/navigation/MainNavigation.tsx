@@ -1,6 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import TabNavigation from './TabNavigation';
+import DrawerNavigation from './DrawerNavigation';
 import SiteDetailScreen from '../screens/Main/SiteDetailScreen';
 import ARExperienceScreen from '../screens/Main/ARExperienceScreen';
 import LensScreen from '../screens/Lens/LensScreen';
@@ -31,7 +31,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
       }}
     >
       <Stack.Screen name={ROUTES.MAIN.TABS}>
-        {props => <TabNavigation {...props} onLogout={onLogout} />}
+        {props => <DrawerNavigation {...props} onLogout={onLogout} />}
       </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.SITE_DETAIL}

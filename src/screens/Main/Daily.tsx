@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import {Bell, ChevronRight} from 'lucide-react-native';
+import {Bell, ChevronRight, Menu} from 'lucide-react-native';
 import {FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
 import {useDailyToday, useDailyNudge} from '../../shared/hooks';
@@ -74,8 +74,19 @@ const Daily: React.FC<Props> = ({navigation}) => {
             colors={[AMBER]}
           />
         }>
+        {/* Menu */}
+        <View className="px-5 pt-2 flex-row items-center">
+          <Pressable
+            onPress={() => navigation.openDrawer()}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Open menu"
+            className="w-9 h-9 items-center justify-center">
+            <Menu color="#FFFFFF" size={22} />
+          </Pressable>
+        </View>
         {/* Header */}
-        <View className="px-6 pt-[18px] pb-4 flex-row items-end justify-between">
+        <View className="px-6 pt-1 pb-4 flex-row items-end justify-between">
           <View className="flex-1">
             <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.4}}>
               {dateLabel}

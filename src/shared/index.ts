@@ -62,11 +62,9 @@ export {
   // Formatters
   formatDate,
   formatRelativeTime,
-  formatCompactNumber,
   capitalize,
   truncate,
   formatName,
-  formatFileSize,
   // Validators
   isValidEmail,
   validatePassword,
@@ -76,9 +74,6 @@ export {
   hasMaxLength,
   isLengthInRange,
   isValidName,
-  isValidPhone,
   isValidUrl,
   isNumber,
-  isPositiveNumber,
-  isInRange,
 } from './utils';

@@ -96,10 +96,6 @@
     {
       "path": "src/assets/fonts/NothingYouCouldDo-Regular.ttf",
       "sha1": "1e8878b7b523286b594fd824f0a8e2a0161b8be7"
-    },
-    {
-      "path": "src/assets/models/sam_segment.tflite",
-      "sha1": "b5f50d19896c047b48e797c8483992e307cdae84"
     }
   ]
 }
