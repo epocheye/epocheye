@@ -3,7 +3,8 @@
  * Unified permission handling for camera, location, and storage
  */
 
-import { Platform, Alert, Linking } from 'react-native';
+import { Platform, Linking } from 'react-native';
+import { AppAlert as Alert } from '../ui/appAlert';
 import {
   check,
   request,
@@ -26,17 +27,18 @@ export interface PermissionResult {
 /**
  * Individual permission status
  */
-export type PermissionName = 'location' | 'camera' | 'storage';
+export type PermissionName = 'location' | 'camera' | 'storage' | 'microphone';
 
 /**
  * Get platform-specific permission constants
  */
-function getPermissions() {
+function getPermissions(): Record<PermissionName, Parameters<typeof check>[0]> {
   if (Platform.OS === 'ios') {
     return {
       location: PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
       camera: PERMISSIONS.IOS.CAMERA,
       storage: PERMISSIONS.IOS.PHOTO_LIBRARY,
+      microphone: PERMISSIONS.IOS.MICROPHONE,
     };
   }
 
@@ -44,6 +46,7 @@ function getPermissions() {
     location: PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
     camera: PERMISSIONS.ANDROID.CAMERA,
     storage: PERMISSIONS.ANDROID.READ_MEDIA_IMAGES,
+    microphone: PERMISSIONS.ANDROID.RECORD_AUDIO,
   };
 }
 
@@ -199,6 +202,7 @@ export class PermissionService {
       location: 'Location',
       camera: 'Camera',
       storage: 'Photo Library',
+      microphone: 'Microphone',
     };
 
     Alert.alert(

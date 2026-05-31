@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   RefreshControl,
   StatusBar,
@@ -9,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppAlert as Alert } from '../../shared/ui/appAlert';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, {
   Easing,

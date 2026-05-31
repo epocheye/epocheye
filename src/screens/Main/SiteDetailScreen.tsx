@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,34 +6,23 @@ import {
   TouchableOpacity,
   StatusBar,
   Image,
+  Dimensions,
 } from 'react-native';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import ThinkingDots from '../../components/ui/ThinkingDots';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import Animated, {
-  Extrapolation,
-  FadeIn,
-  FadeInDown,
-  interpolate,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useSharedValue,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import {
   ArrowLeft,
-  Share2,
-  MapPin,
-  MessageSquare,
-  Navigation,
   Camera,
   ChevronDown,
-  ChevronRight,
   ChevronUp,
+  ChevronRight,
+  MessageSquare,
   Sparkles,
   Shield,
 } from 'lucide-react-native';
-import { formatPlaceType } from '../../shared/utils/formatters';
 import { useUser } from '../../context';
 import { useExplorerPass } from '../../shared/hooks';
 import {
@@ -46,7 +35,9 @@ import type { SiteDetail } from '../../utils/api/places';
 import { ROUTES } from '../../core/constants';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 
-const HERO_HEIGHT = 180;
+const { height: SCREEN_H } = Dimensions.get('window');
+// Figma "Site Details" (238:33) hero is 484 of a 977px frame ≈ 0.5 of height.
+const HERO_HEIGHT = Math.round(SCREEN_H * 0.52);
 
 const FACT_LOADING_LINES = [
   'Reading the stones...',
@@ -58,8 +49,12 @@ type Props = MainScreenProps<'SiteDetail'>;
 
 const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const site = route.params.site;
+  const insets = useSafeAreaInsets();
   const profile = useUser(state => state.profile);
   const { checkAccess } = useExplorerPass();
+
+  const scrollRef = useRef<ScrollView>(null);
+  const overviewY = useRef(0);
 
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
@@ -72,13 +67,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 
   const [siteDetail, setSiteDetail] = useState<SiteDetail | null>(null);
-
-  const scrollY = useSharedValue(0);
-
-  const placeType = useMemo(() => {
-    const pt = (site as any).place_type;
-    return typeof pt === 'string' ? formatPlaceType(pt) : 'Heritage Landmark';
-  }, [site]);
 
   const location = useMemo(() => {
     if (siteDetail) {
@@ -98,11 +86,24 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     return [site.city, site.country].filter(Boolean).join(', ') || 'India';
   }, [site, siteDetail]);
 
-  const categories = useMemo(() => {
-    const cats = (site as any).categories;
-    return Array.isArray(cats) ? cats.slice(0, 3) : [];
-  }, [site]);
+  // Figma "BUILT" + "DYNASTY" stat cards. Each renders only when it has a value.
+  const builtValue = useMemo(
+    () => siteDetail?.century ?? siteDetail?.era ?? null,
+    [siteDetail],
+  );
+  const dynastyValue = useMemo(() => siteDetail?.dynasty ?? null, [siteDetail]);
 
+  // Italic tagline under the title (Figma 238:71).
+  const tagline = useMemo(() => {
+    return (
+      siteDetail?.one_line_description ??
+      siteDetail?.short_description ??
+      (site as any).significance ??
+      null
+    );
+  }, [site, siteDetail]);
+
+  // Longer narrative revealed by "Learn About It" / "Read More".
   const description = useMemo(() => {
     if (siteDetail?.short_description) {
       return siteDetail.short_description;
@@ -116,13 +117,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }, [site, siteDetail, location]);
 
-  const distance = useMemo(() => {
-    const meters = (site as any).distance_meters;
-    if (typeof meters === 'number' && meters > 0) {
-      return `${(meters / 1000).toFixed(1)} km`;
-    }
-    return null;
-  }, [site]);
+  const arReady = Boolean(siteDetail?.ar_ready);
 
   useEffect(() => {
     checkAccess(site.id).then(result => {
@@ -180,19 +175,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     };
   }, [site.name, profile?.name]);
 
-  const onScroll = useAnimatedScrollHandler(event => {
-    scrollY.value = event.contentOffset.y;
-  });
-
-  const stickyHeaderStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      scrollY.value,
-      [80, 140],
-      [0, 1],
-      Extrapolation.CLAMP,
-    ),
-  }));
-
   const handleStartARExperience = useCallback(() => {
     const monumentId = siteDetail?.slug ?? site.id;
     const siteName = siteDetail?.name ?? site.name;
@@ -204,6 +186,17 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   }, [navigation, siteDetail, site]);
 
+  // "Learn About It" → reveal the full narrative and scroll to it.
+  const handleLearnMore = useCallback(() => {
+    setIsDescriptionExpanded(true);
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({
+        y: Math.max(overviewY.current - 16, 0),
+        animated: true,
+      });
+    });
+  }, []);
+
   const handleGetPassport = useCallback(() => {
     navigation.navigate(ROUTES.MAIN.PURCHASE, {
       preSelectedPlaceId: site.id,
@@ -211,10 +204,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [navigation, site.id]);
 
   // "Ask about this site" — open the AI Guide chat for this monument.
-  // The slug must match the backend's monuments.slug; only sites curated
-  // into the monuments table (with content.faq) will have a meaningful
-  // experience. For uncurated /findplaces results, the welcome bubble
-  // falls back to a generic line and there are no suggestion chips.
   const handleAskGuide = useCallback(() => {
     const guideSlug = siteDetail?.slug ?? site.id;
     navigation.navigate(ROUTES.MAIN.AI_GUIDE, {
@@ -223,10 +212,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       heroImageUrl: siteDetail?.hero_image_url,
     });
   }, [navigation, siteDetail, site.id, site.name]);
-
-  const handleShare = useCallback(() => {
-    // Share handler intentionally blank — TBD.
-  }, []);
 
   const handleElaborateFact = useCallback(
     async (fact: PersonalizedFact) => {
@@ -263,33 +248,15 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-ink-deep" edges={['top']}>
-      <StatusBar barStyle="light-content" />
+    <View className="flex-1 bg-warm-deep">
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Sticky header (scroll past hero) */}
-      <Animated.View
-        className="absolute top-0 left-0 right-0 z-20 h-14 justify-center items-center px-14"
-        style={[
-          { backgroundColor: 'rgba(10,10,10,0.94)', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
-          stickyHeaderStyle,
-        ]}
-      >
-        <Text
-          numberOfLines={1}
-          className="text-parchment text-[15px] font-['InstrumentSans-SemiBold']"
-        >
-          {site.name}
-        </Text>
-      </Animated.View>
-
-      <Animated.ScrollView
-        onScroll={onScroll}
-        scrollEventThrottle={16}
+      <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
-        bounces={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       >
-        {/* Compact banner — hero image when available, gradient overlay always */}
+        {/* Full-bleed hero (Figma 238:61) */}
         <View style={{ height: HERO_HEIGHT }}>
           {siteDetail?.hero_image_url ? (
             <Image
@@ -297,127 +264,176 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
               resizeMode="cover"
             />
-          ) : null}
+          ) : (
+            <LinearGradient
+              colors={['#1A1410', '#0F0A05']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+            />
+          )}
+
+          {/* Soft blend into the page background at the bottom edge. */}
           <LinearGradient
-            colors={
-              siteDetail?.hero_image_url
-                ? ['rgba(10,10,10,0.25)', 'rgba(10,10,10,0.92)']
-                : ['#0A0A0A', '#1A1410']
-            }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+            colors={['transparent', 'rgba(15,10,5,0.85)', '#0F0A05']}
+            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 120 }}
           />
 
-          {/* Controls row */}
-          <View className="absolute top-4 left-5 right-5 flex-row justify-between items-center">
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              className="w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
+          {/* Back button — kept for usability (Figma omits it; swipe-back works). */}
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={{ top: insets.top + 8 }}
+            className="absolute left-5 w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
+            <ArrowLeft color="#F5F0E8" size={20} />
+          </TouchableOpacity>
+
+          {/* AR Ready badge (Figma 238:63) — faithful pink/red, shown when ar_ready. */}
+          {arReady && (
+            <View
+              style={{ top: insets.top + 10 }}
+              className="absolute self-center rounded-[15px] bg-arready-bg px-4 py-1"
             >
-              <ArrowLeft color="#F5F0E8" size={20} />
-            </TouchableOpacity>
-
-            <View className="flex-row gap-2">
-              {/* Share is intentionally inactive for now (functionality TBD). */}
-              <TouchableOpacity
-                onPress={handleShare}
-                disabled
-                accessibilityRole="button"
-                accessibilityLabel="Share (coming soon)"
-                className="w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center opacity-50"
-              >
-                <Share2 color="#F5F0E8" size={20} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Banner text */}
-          <View className="absolute left-5 right-5 bottom-[16px]">
-            <Text className="text-brand-gold text-[11px] uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
-              {placeType}
-            </Text>
-            <Text className="text-parchment text-[26px] leading-8 font-['InstrumentSerif-Regular'] mt-1">
-              {site.name}
-            </Text>
-            <View className="flex-row items-center gap-1 mt-1.5">
-              <MapPin color="#B8AF9E" size={14} />
-              <Text
-                numberOfLines={1}
-                className="flex-1 text-parchment-muted text-[13px] font-['InstrumentSans-Medium']"
-              >
-                {location}
+              <Text className="text-arready-fg text-[11px] tracking-[0.4px] font-['MontserratAlternates-SemiBold']">
+                AR Ready
               </Text>
             </View>
-          </View>
+          )}
         </View>
 
-        {/* Content */}
-        <View className="-mt-6 px-5 gap-4">
-          {/* Info card */}
-          <Animated.View
-            entering={FadeInDown.delay(100).duration(400)}
-            className="rounded-[20px] bg-surface-1 border border-white/[0.08] p-3.5"
-          >
-            {/* Category tags */}
-            {categories.length > 0 && (
-              <View className="flex-row flex-wrap gap-2 mb-3">
-                {categories.map((cat: string, i: number) => (
-                  <View
-                    key={cat}
-                    className={`rounded-full px-2.5 py-1 ${
-                      i === 0
-                        ? 'bg-[rgba(201,168,76,0.18)]'
-                        : 'bg-white/[0.08]'
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs font-['InstrumentSans-SemiBold'] ${
-                        i === 0 ? 'text-brand-gold' : 'text-parchment'
-                      }`}
-                    >
-                      {typeof cat === 'string'
-                        ? cat.charAt(0).toUpperCase() + cat.slice(1)
-                        : ''}
-                    </Text>
-                  </View>
-                ))}
+        {/* Title (Figma 238:62) */}
+        <Text className="text-parchment text-[40px] leading-[44px] text-center mt-3 px-6 font-['InstrumentSerif-Regular']">
+          {site.name}
+        </Text>
+
+        {/* BUILT / DYNASTY cards (Figma 238:65 / 238:68) */}
+        {(builtValue || dynastyValue) && (
+          <View className="flex-row gap-3 px-5 mt-5">
+            {builtValue && (
+              <View className="flex-1 bg-cream border border-cream-border rounded-[10px] px-3.5 py-3">
+                <Text className="text-stone-label text-[9px] tracking-[0.9px] font-['InstrumentSans-Bold']">
+                  BUILT
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  className="text-stone-ink text-[24px] leading-[30px] mt-0.5 font-['InstrumentSerif-Regular']"
+                >
+                  {builtValue}
+                </Text>
               </View>
             )}
-
-            {/* Distance (est. tour time removed) */}
-            {distance && (
-              <View className="flex-row items-center gap-2.5 rounded-xl bg-surface-2 p-3">
-                <View className="w-7 h-7 rounded-full bg-[rgba(201,168,76,0.15)] items-center justify-center">
-                  <Navigation color="#C9A84C" size={16} />
-                </View>
-                <View>
-                  <Text className="text-parchment text-sm font-['InstrumentSans-SemiBold']">
-                    {distance}
-                  </Text>
-                  <Text className="text-parchment-dim text-xs font-['InstrumentSans-Regular']">
-                    Distance
-                  </Text>
-                </View>
+            {dynastyValue && (
+              <View className="flex-1 bg-cream border border-cream-border rounded-[10px] px-3.5 py-3">
+                <Text className="text-stone-label text-[9px] tracking-[0.9px] font-['InstrumentSans-Bold']">
+                  DYNASTY
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  className="text-stone-ink text-[22px] leading-[28px] mt-0.5 font-['InstrumentSerif-Regular']"
+                >
+                  {dynastyValue}
+                </Text>
               </View>
+            )}
+          </View>
+        )}
+
+        {/* Italic tagline (Figma 238:71) */}
+        {tagline && (
+          <Text className="text-stone-desc text-[18px] leading-[24px] text-center px-7 mt-5 font-['InstrumentSerif-Italic']">
+            {tagline}
+          </Text>
+        )}
+
+        {/* CTAs (Figma 238:72 / 238:75) */}
+        <View className="px-7 mt-7 gap-3.5">
+          <TouchableOpacity
+            onPress={handleStartARExperience}
+            activeOpacity={0.9}
+            className="h-[53px] rounded-[30px] bg-terracotta flex-row items-center justify-center gap-2"
+            accessibilityRole="button"
+            accessibilityLabel="View in AR"
+          >
+            <Camera color="#FFFFFF" size={18} />
+            <Text className="text-white text-[22px] font-['InstrumentSerif-Regular']">
+              View in AR
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleLearnMore}
+            activeOpacity={0.85}
+            className="h-[53px] rounded-[30px] bg-peach border border-terracotta items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Learn About It"
+          >
+            <Text className="text-terracotta text-[22px] font-['InstrumentSerif-Regular']">
+              Learn About It
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ---- Kept functional sections (restyled onto warm-dark) ---- */}
+        <View className="px-5 mt-8 gap-4">
+          {/* Passport badge */}
+          {hasAccess && (
+            <Animated.View
+              entering={FadeIn.delay(120)}
+              className="flex-row items-center gap-2 bg-status-success/10 border border-status-success/20 rounded-xl px-4 py-3"
+            >
+              <Shield color="#10B981" size={16} />
+              <Text className="text-status-success text-sm font-['InstrumentSans-SemiBold']">
+                Passport Active
+              </Text>
+            </Animated.View>
+          )}
+
+          {/* Historical Overview */}
+          <Animated.View
+            entering={FadeInDown.delay(150).duration(400)}
+            onLayout={e => {
+              overviewY.current = e.nativeEvent.layout.y;
+            }}
+            className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4"
+          >
+            <Text className="text-parchment text-lg font-['InstrumentSans-SemiBold'] mb-2">
+              Historical Overview
+            </Text>
+            <Text
+              className="text-parchment-muted text-sm leading-[22px] font-['InstrumentSans-Regular']"
+              numberOfLines={isDescriptionExpanded ? undefined : 3}
+            >
+              {description}
+            </Text>
+            {description.length > 120 && (
+              <TouchableOpacity
+                onPress={() => setIsDescriptionExpanded(prev => !prev)}
+                className="mt-2.5 flex-row items-center gap-1 self-start"
+                accessibilityRole="button"
+              >
+                <Text className="text-terracotta text-xs uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
+                  {isDescriptionExpanded ? 'Show Less' : 'Read More'}
+                </Text>
+                {isDescriptionExpanded ? (
+                  <ChevronUp color="#B8551A" size={16} />
+                ) : (
+                  <ChevronDown color="#B8551A" size={16} />
+                )}
+              </TouchableOpacity>
             )}
           </Animated.View>
 
-          {/* Heritage Details — curated DB record (era / dynasty / founder / etc.) */}
+          {/* Heritage Details — curated DB record */}
           {siteDetail && (
             <Animated.View
-              entering={FadeInDown.delay(150).duration(400)}
+              entering={FadeInDown.delay(200).duration(400)}
               className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4 gap-3"
             >
-              {siteDetail.one_line_description && (
-                <Text className="text-parchment-muted text-[13px] leading-[20px] italic font-['InstrumentSans-Regular']">
-                  {siteDetail.one_line_description}
-                </Text>
-              )}
-
               {siteDetail.unesco_status && (
-                <View className="self-start rounded-full bg-[rgba(201,168,76,0.18)] px-2.5 py-1">
-                  <Text className="text-brand-gold text-[11px] uppercase tracking-[0.6px] font-['InstrumentSans-SemiBold']">
+                <View className="self-start rounded-full bg-[rgba(184,85,26,0.18)] px-2.5 py-1">
+                  <Text className="text-terracotta text-[11px] uppercase tracking-[0.6px] font-['InstrumentSans-SemiBold']">
                     {siteDetail.unesco_status}
                   </Text>
                 </View>
@@ -448,102 +464,8 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             </Animated.View>
           )}
 
-          {/* Passport badge */}
-          {hasAccess && (
-            <Animated.View
-              entering={FadeIn.delay(200)}
-              className="flex-row items-center gap-2 bg-status-success/10 border border-status-success/20 rounded-xl px-4 py-3"
-            >
-              <Shield color="#10B981" size={16} />
-              <Text className="text-status-success text-sm font-['InstrumentSans-SemiBold']">
-                Passport Active
-              </Text>
-            </Animated.View>
-          )}
-
-          {/* CTA: Begin Your Journey */}
-          <Animated.View entering={FadeInDown.delay(200).duration(400)}>
-            <TouchableOpacity
-              onPress={handleStartARExperience}
-              className="rounded-xl bg-brand-gold py-3.5 items-center justify-center flex-row gap-2"
-              activeOpacity={0.88}
-            >
-              <Camera color="#0A0A0A" size={18} />
-              <Text className="text-ink text-[15px] uppercase tracking-[0.8px] font-['InstrumentSerif-Regular']">
-                Begin Your Journey
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* CTA: Ask about this site (AI Guide) */}
-          <Animated.View entering={FadeInDown.delay(220).duration(400)}>
-            <TouchableOpacity
-              onPress={handleAskGuide}
-              className="rounded-xl bg-surface-1 border border-[rgba(232,160,32,0.35)] py-3 items-center justify-center flex-row gap-2"
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="Ask about this site"
-            >
-              <MessageSquare color="#E8A020" size={16} />
-              <Text className="text-accent-amber text-[14px] tracking-[0.4px] font-['InstrumentSans-SemiBold']">
-                Ask about this site
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Get Passport for this site — secondary link, hidden when user already has access */}
-          {!hasAccess && (
-            <Animated.View entering={FadeInDown.delay(250).duration(400)}>
-              <TouchableOpacity
-                onPress={handleGetPassport}
-                className="flex-row items-center justify-center gap-1.5 py-2"
-                activeOpacity={0.75}
-                accessibilityRole="button"
-                accessibilityLabel="Get Passport for this site"
-              >
-                <Sparkles color="#C9A84C" size={14} />
-                <Text className="text-brand-gold text-[13px] font-['InstrumentSans-SemiBold']">
-                  Get Passport for this site
-                </Text>
-                <ChevronRight color="#C9A84C" size={14} />
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-
-          {/* Historical Overview */}
-          <Animated.View
-            entering={FadeInDown.delay(300).duration(400)}
-            className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4"
-          >
-            <Text className="text-parchment text-lg font-['InstrumentSans-SemiBold'] mb-2">
-              Historical Overview
-            </Text>
-            <Text
-              className="text-parchment-muted text-sm leading-[22px] font-['InstrumentSans-Regular']"
-              numberOfLines={isDescriptionExpanded ? undefined : 3}
-            >
-              {description}
-            </Text>
-            {description.length > 120 && (
-              <TouchableOpacity
-                onPress={() => setIsDescriptionExpanded(prev => !prev)}
-                className="mt-2.5 flex-row items-center gap-1 self-start"
-                accessibilityRole="button"
-              >
-                <Text className="text-brand-gold text-xs uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
-                  {isDescriptionExpanded ? 'Show Less' : 'Read More'}
-                </Text>
-                {isDescriptionExpanded ? (
-                  <ChevronUp color="#C9A84C" size={16} />
-                ) : (
-                  <ChevronDown color="#C9A84C" size={16} />
-                )}
-              </TouchableOpacity>
-            )}
-          </Animated.View>
-
           {/* Personalized Insights */}
-          <Animated.View entering={FadeInDown.delay(400).duration(400)}>
+          <Animated.View entering={FadeInDown.delay(250).duration(400)}>
             <View className="flex-row items-center gap-1.5 mb-3">
               <Sparkles color="#C9A84C" size={18} />
               <Text className="text-parchment text-lg font-['InstrumentSans-SemiBold']">
@@ -566,7 +488,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     key={fact.id}
                     onPress={() => handleElaborateFact(fact)}
                     activeOpacity={0.86}
-                    className="w-[240px] rounded-2xl bg-surface-1 border border-[rgba(201,168,76,0.28)] p-3.5"
+                    className="w-[240px] rounded-2xl bg-surface-1 border border-[rgba(184,85,26,0.28)] p-3.5"
                   >
                     <Text className="text-parchment text-[15px] leading-[22px] font-['InstrumentSans-SemiBold'] mb-1.5">
                       {fact.headline}
@@ -594,7 +516,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                       </View>
                     )}
 
-                    <Text className="text-brand-gold text-[11px] mt-2 font-['InstrumentSans-SemiBold']">
+                    <Text className="text-terracotta text-[11px] mt-2 font-['InstrumentSans-SemiBold']">
                       {expandedFactId === fact.id ? 'Collapse' : 'Learn more'}
                     </Text>
                   </TouchableOpacity>
@@ -608,9 +530,44 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             )}
           </Animated.View>
+
+          {/* Ask about this site (AI Guide) */}
+          <Animated.View entering={FadeInDown.delay(300).duration(400)}>
+            <TouchableOpacity
+              onPress={handleAskGuide}
+              className="rounded-xl bg-surface-1 border border-terracotta/40 py-3 items-center justify-center flex-row gap-2"
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Ask about this site"
+            >
+              <MessageSquare color="#B8551A" size={16} />
+              <Text className="text-terracotta text-[14px] tracking-[0.4px] font-['InstrumentSans-SemiBold']">
+                Ask about this site
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Get Passport — hidden when the user already has access */}
+          {!hasAccess && (
+            <Animated.View entering={FadeInDown.delay(340).duration(400)}>
+              <TouchableOpacity
+                onPress={handleGetPassport}
+                className="flex-row items-center justify-center gap-1.5 py-2"
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Get Passport for this site"
+              >
+                <Sparkles color="#C9A84C" size={14} />
+                <Text className="text-brand-gold text-[13px] font-['InstrumentSans-SemiBold']">
+                  Get Passport for this site
+                </Text>
+                <ChevronRight color="#C9A84C" size={14} />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
         </View>
-      </Animated.ScrollView>
-    </SafeAreaView>
+      </ScrollView>
+    </View>
   );
 };
 

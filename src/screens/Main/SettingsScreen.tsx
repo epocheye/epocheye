@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Alert,
   Image,
   Linking,
   Pressable,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppAlert as Alert, showToast } from '../../shared/ui/appAlert';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
@@ -169,7 +169,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
         preferences: profile?.preferences ?? {},
       });
       if (success) {
-        Alert.alert('Success', 'Profile updated successfully');
+        showToast('Profile updated', { type: 'success' });
         setHasChanges(false);
       } else {
         Alert.alert('Error', 'Failed to update profile. Please try again.');
@@ -210,7 +210,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           try {
             const success = await uploadUserAvatar(formData);
             if (success) {
-              Alert.alert('Success', 'Avatar updated successfully');
+              showToast('Avatar updated', { type: 'success' });
             } else {
               Alert.alert('Error', 'Failed to upload avatar');
             }

@@ -1,6 +1,5 @@
 import React, { Component, Suspense, lazy, useCallback, useState } from 'react';
 import {
-  Alert,
   Image,
   Linking,
   Pressable,
@@ -8,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppAlert as Alert } from '../../shared/ui/appAlert';
 import { Box, ExternalLink, X } from 'lucide-react-native';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 

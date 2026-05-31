@@ -4,13 +4,13 @@ import {
   Text,
   TextInput,
   StatusBar,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   TouchableOpacity,
   Image,
 } from 'react-native';
+import { AppAlert as Alert } from '../../shared/ui/appAlert';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AmberButton from '../../components/onboarding/AmberButton';
 import AuthButton from '../../components/onboarding/AuthButton';

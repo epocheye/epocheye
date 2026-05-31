@@ -7,6 +7,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AppNavigator from './src/navigation';
 import { NetworkProvider, useNetwork } from './src/context';
 import NoInternetScreen from './src/screens/NoInternetScreen';
+import DialogHost from './src/components/ui/DialogHost';
 import { fcmInit, fcmRegisterAfterPermission } from './src/services/fcmService';
 import { useArQuotaStore } from './src/stores/arQuotaStore';
 import { useSessionStore } from './src/stores/sessionStore';
@@ -69,6 +70,8 @@ export default function App() {
         <NetworkProvider>
           <AppContent />
         </NetworkProvider>
+        {/* Global heritage-styled dialog + toast host — overlays every screen. */}
+        <DialogHost />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

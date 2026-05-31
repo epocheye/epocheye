@@ -68,3 +68,12 @@ export type { UseDailyNudgeReturn } from './useDailyNudge';
 
 export { useProfileDigest } from './useProfileDigest';
 export type { UseProfileDigestReturn } from './useProfileDigest';
+
+export { useBackConfirm } from './useBackConfirm';
+export type { UseBackConfirmOptions } from './useBackConfirm';
+
+export { useVoiceInput } from './useVoiceInput';
+export type {
+  UseVoiceInputOptions,
+  UseVoiceInputResult,
+} from './useVoiceInput';

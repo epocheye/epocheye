@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useState } from 'react';
-import { Alert } from 'react-native';
+import { AppAlert as Alert } from '../ui/appAlert';
 // @ts-ignore — react-native-razorpay ships no types; the JS API is stable
 import RazorpayCheckout from 'react-native-razorpay';
 import {

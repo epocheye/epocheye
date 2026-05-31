@@ -20,14 +20,15 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
+import { AppAlert as Alert } from '../../shared/ui/appAlert';
 
 import { captureAnchor } from '../../utils/api/ar';
 import { useCurrentZoneStore } from '../../stores/currentZoneStore';
 import { FONTS } from '../../core/constants/theme';
+import { useBackConfirm } from '../../shared/hooks/useBackConfirm';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 
 type Props = MainScreenProps<'AnchorCapture'>;
@@ -48,6 +49,15 @@ export default function AnchorCaptureScreen({ navigation }: Props): React.ReactE
   const [pose, setPose] = useState<CapturedPose | null>(null);
   const [reading, setReading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Guard against losing an in-progress capture (read pose / typed label).
+  useBackConfirm({
+    enabled: !submitting && (pose !== null || objectLabel.trim().length > 0),
+    title: 'Discard this capture?',
+    message: 'Your pose reading and entered details will be lost.',
+    confirmText: 'Discard',
+    cancelText: 'Keep editing',
+  });
 
   const readPose = () => {
     setReading(true);

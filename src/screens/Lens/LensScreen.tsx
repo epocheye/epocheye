@@ -45,6 +45,7 @@ const REGION_LABELS: Record<string, string> = {
   africa: 'Africa',
 } satisfies Record<UnescoRegion, string>;
 import { useLensPremium } from '../../shared/hooks/useLensPremium';
+import { useBackConfirm } from '../../shared/hooks/useBackConfirm';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
 import {
@@ -335,6 +336,16 @@ const LensScreen: React.FC<Props> = ({ navigation, route }) => {
     () => Dimensions.get('window'),
     [],
   );
+
+  // Confirm before leaving while a story/scan is mid-flight so the user doesn't
+  // lose an in-progress capture by an accidental back gesture.
+  useBackConfirm({
+    enabled: storyStreaming || storyLoading || hdScanLoading || isScanModeActive,
+    title: 'Stop scanning?',
+    message: 'Leaving now will end the current scan.',
+    confirmText: 'Leave',
+    cancelText: 'Keep scanning',
+  });
 
   const firstName = useMemo(() => {
     const fromProfile = profile?.name?.trim();

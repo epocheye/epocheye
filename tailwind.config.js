@@ -60,6 +60,35 @@ module.exports = {
           medium: 'rgba(0,0,0,0.4)',
           light: 'rgba(0,0,0,0.2)',
         },
+        // Figma "Site Details" / "AI Guide (Dark)" palette — terracotta + cream.
+        // Pulled directly from frames 238:33 and 240:3.
+        warm: {
+          deep: '#0F0A05', // page background for both redesigned screens
+        },
+        terracotta: {
+          DEFAULT: '#B8551A', // primary CTA fill
+          dark: '#8B3F12', // gradient top
+          flame: '#D4691F', // waveform + mic accent
+        },
+        peach: '#FFD4BB', // secondary CTA fill
+        cream: {
+          DEFAULT: '#FFFFFF', // white info cards / assistant bubble
+          border: '#E8DDD0', // card hairline
+        },
+        stone: {
+          label: '#9E8F7A', // BUILT / DYNASTY labels
+          desc: '#6B5D4F', // italic description
+          ink: '#1F1611', // dark text on cream / chip fill
+        },
+        guide: {
+          line: '#2D2218', // dividers + chip borders
+          cream: '#F2EBE0', // primary text on AI guide
+          muted: '#A89685', // status / secondary text
+        },
+        arready: {
+          bg: '#FFD7D7', // faithful Figma AR Ready badge (pink/red)
+          fg: '#FF0000',
+        },
         // Onboarding "Through the Lens" design system tokens
         ob: {
           bgDeep: '#07060C',

@@ -1,17 +1,20 @@
 /**
  * AiGuideScreen — site-grounded conversational layer.
  *
- * Streams answers from POST /api/v1/sites/{slug}/guide with the typewriter
- * effect coming for free from chunk arrival. Welcome narration is rendered
- * locally from siteDetail.content.narratives.by_persona.casual — no LLM
- * call for the first bubble.
+ * Redesigned to match Figma "06 AI Guide (Dark)" (240:3): warm-dark canvas,
+ * a thumbnail + status top bar, a white assistant bubble with an EPOCHEYE AI
+ * label + decorative waveform, a 2-column "TRY ASKING" chip grid, and a white
+ * pill input with a single circular accent button that flips between mic
+ * (dictate) and send.
  *
- * Conversation history lives in component state (no Zustand, no persistence)
- * and the last 6 turns travel with each request so follow-ups stay coherent.
+ * Behaviour upgrades over the previous version:
+ *   - Assistant output renders as Markdown (react-native-markdown-display).
+ *   - Voice input is wired (tap mic → dictate → edit → send) via useVoiceInput.
+ *   - Leaving mid-conversation prompts a confirm (useBackConfirm).
  *
- * TODO (later prompts):
- *   - voice input wiring (mic icon is a placeholder for now)
- *   - hook this screen up from the AR experience screen
+ * Streams answers from POST /api/v1/sites/{slug}/guide; welcome narration is
+ * rendered locally from content.narratives.by_persona.casual. Conversation
+ * history lives in component state; the last 6 turns travel with each request.
  */
 
 import React, {
@@ -34,13 +37,24 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {ArrowLeft, Mic, RefreshCcw, Send, Sparkles} from 'lucide-react-native';
-import type {MainScreenProps} from '../../core/types/navigation.types';
-import {getSite} from '../../utils/api/places';
-import type {SiteDetail} from '../../utils/api/places';
-import {streamGuideAnswer} from '../../utils/api/guide';
-import type {GuideHistoryTurn} from '../../utils/api/guide';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  ArrowLeft,
+  Mic,
+  MoreVertical,
+  RefreshCcw,
+  Send,
+  Sparkles,
+  Square,
+} from 'lucide-react-native';
+import type { MainScreenProps } from '../../core/types/navigation.types';
+import { getSite } from '../../utils/api/places';
+import type { SiteDetail } from '../../utils/api/places';
+import { streamGuideAnswer } from '../../utils/api/guide';
+import type { GuideHistoryTurn } from '../../utils/api/guide';
+import { useBackConfirm, useVoiceInput } from '../../shared/hooks';
+import { AppAlert } from '../../shared/ui/appAlert';
+import MarkdownText from '../../components/ui/MarkdownText';
 
 type Props = MainScreenProps<'AiGuide'>;
 
@@ -52,11 +66,22 @@ interface ChatBubble {
   isWelcome?: boolean;
 }
 
-const MAX_SUGGESTIONS = 4;
-const AMBER = '#E8A020';
+const MAX_SUGGESTIONS = 6;
+const FLAME = '#D4691F';
 
-const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
-  const {slug, siteName, heroImageUrl} = route.params;
+// Decorative audio waveform (Figma 240:31-39). Purely visual — no playback.
+const WAVE_BARS = [6, 8, 10, 6, 8, 10, 6, 8];
+
+const Waveform: React.FC = () => (
+  <View style={styles.wave}>
+    {WAVE_BARS.map((h, i) => (
+      <View key={i} style={[styles.waveBar, { height: h }]} />
+    ))}
+  </View>
+);
+
+const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { slug, siteName, heroImageUrl } = route.params;
 
   const [siteDetail, setSiteDetail] = useState<SiteDetail | null>(null);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
@@ -68,6 +93,18 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
 
   const abortRef = useRef<(() => void) | null>(null);
   const listRef = useRef<FlatList<ChatBubble>>(null);
+
+  const voice = useVoiceInput({ onTranscript: setInput });
+
+  // Confirm before leaving once a real conversation exists or a stream is live.
+  const hasConversation = messages.some(m => !m.isWelcome) || isStreaming;
+  useBackConfirm({
+    enabled: hasConversation,
+    title: 'Leave the guide?',
+    message: 'Your conversation with the AI guide will be lost.',
+    confirmText: 'Leave',
+    cancelText: 'Stay',
+  });
 
   // Fetch the full site content (we need narratives + faq from content.*).
   useEffect(() => {
@@ -85,12 +122,11 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
   }, [slug]);
 
   // Seed the welcome bubble from content.narratives.by_persona.casual.
-  // Falls back to a generic line until content loads.
   useEffect(() => {
     if (messages.length > 0) return;
     const welcome = readWelcomeNarration(siteDetail) ?? defaultWelcome(siteName);
     setMessages([
-      {id: 'welcome', role: 'assistant', content: welcome, isWelcome: true},
+      { id: 'welcome', role: 'assistant', content: welcome, isWelcome: true },
     ]);
   }, [siteDetail, siteName, messages.length]);
 
@@ -111,6 +147,10 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
       const question = text.trim();
       if (!question || isStreaming) return;
 
+      if (voice.isListening) {
+        void voice.stop();
+      }
+
       setError(null);
       setLastQuestion(question);
       setInput('');
@@ -124,25 +164,20 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
       };
       setMessages(prev => [...prev, userBubble]);
 
-      // Build history from already-finalized exchanges (exclude the welcome bubble).
+      // Build history from already-finalized exchanges (exclude welcome bubble).
       const history: GuideHistoryTurn[] = messages
         .filter(m => !m.isWelcome)
-        .map(m => ({role: m.role, content: m.content}));
+        .map(m => ({ role: m.role, content: m.content }));
 
       void streamGuideAnswer(slug, question, history, {
         onChunk: chunk => {
           setStreamingText(prev => prev + chunk);
         },
-        onDone: ({full}) => {
-          const finalText =
-            full.length > 0 ? full : '(no response)';
+        onDone: ({ full }) => {
+          const finalText = full.length > 0 ? full : '(no response)';
           setMessages(prev => [
             ...prev,
-            {
-              id: `a-${Date.now()}`,
-              role: 'assistant',
-              content: finalText,
-            },
+            { id: `a-${Date.now()}`, role: 'assistant', content: finalText },
           ]);
           setStreamingText('');
           setIsStreaming(false);
@@ -158,12 +193,25 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
         abortRef.current = abort;
       });
     },
-    [isStreaming, messages, slug],
+    [isStreaming, messages, slug, voice],
   );
 
   const handleSendPress = useCallback(() => {
     sendQuestion(input);
   }, [sendQuestion, input]);
+
+  // Single circular button: stop dictation → send text → start dictation.
+  const handlePrimaryPress = useCallback(() => {
+    if (voice.isListening) {
+      void voice.stop();
+      return;
+    }
+    if (input.trim().length > 0) {
+      handleSendPress();
+      return;
+    }
+    void voice.start();
+  }, [voice, input, handleSendPress]);
 
   const handleSuggestionPress = useCallback(
     (text: string) => {
@@ -172,10 +220,29 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
     [sendQuestion],
   );
 
+  const handleClearChat = useCallback(() => {
+    AppAlert.confirm({
+      title: 'Clear conversation?',
+      message: 'This removes your questions and the guide’s answers.',
+      confirmText: 'Clear',
+      destructive: true,
+      onConfirm: () => {
+        abortRef.current?.();
+        abortRef.current = null;
+        setIsStreaming(false);
+        setStreamingText('');
+        setError(null);
+        const welcome =
+          readWelcomeNarration(siteDetail) ?? defaultWelcome(siteName);
+        setMessages([
+          { id: 'welcome', role: 'assistant', content: welcome, isWelcome: true },
+        ]);
+      },
+    });
+  }, [siteDetail, siteName]);
+
   const handleRetry = useCallback(() => {
     if (!lastQuestion) return;
-    // Drop the user bubble of the failed attempt before retrying so we don't
-    // duplicate it.
     setMessages(prev => {
       const lastUserIdx = [...prev]
         .reverse()
@@ -191,38 +258,33 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
   useEffect(() => {
     if (messages.length === 0 && !streamingText) return;
     requestAnimationFrame(() => {
-      listRef.current?.scrollToEnd({animated: true});
+      listRef.current?.scrollToEnd({ animated: true });
     });
   }, [messages, streamingText]);
 
-  const renderItem = useCallback(
-    ({item}: {item: ChatBubble}) => {
-      const isAssistant = item.role === 'assistant';
-      if (isAssistant) {
-        return (
-          <View style={styles.assistantWrap}>
-            {item.isWelcome ? (
-              <View style={styles.assistantLabelRow}>
-                <Sparkles size={12} color={AMBER} />
-                <Text style={styles.assistantLabel}>EPOCHEYE AI</Text>
-              </View>
-            ) : null}
-            <View style={styles.assistantBubble}>
-              <Text style={styles.assistantText}>{item.content}</Text>
-            </View>
-          </View>
-        );
-      }
+  const renderItem = useCallback(({ item }: { item: ChatBubble }) => {
+    if (item.role === 'assistant') {
       return (
-        <View style={styles.userWrap}>
-          <View style={styles.userBubble}>
-            <Text style={styles.userText}>{item.content}</Text>
+        <View style={styles.assistantWrap}>
+          <View style={styles.assistantBubble}>
+            <View style={styles.assistantLabelRow}>
+              <Sparkles size={11} color={FLAME} />
+              <Text style={styles.assistantLabel}>EPOCHEYE AI</Text>
+            </View>
+            <MarkdownText theme="light">{item.content}</MarkdownText>
+            <Waveform />
           </View>
         </View>
       );
-    },
-    [],
-  );
+    }
+    return (
+      <View style={styles.userWrap}>
+        <View style={styles.userBubble}>
+          <Text style={styles.userText}>{item.content}</Text>
+        </View>
+      </View>
+    );
+  }, []);
 
   const showSuggestions =
     messages.length <= 1 &&
@@ -230,26 +292,31 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
     !streamingText &&
     faqSuggestions.length > 0;
 
+  const hasText = input.trim().length > 0;
+  const statusText = voice.isListening
+    ? 'Listening…'
+    : 'AI guide · grounded in site data';
+
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <StatusBar barStyle="light-content" />
 
-      {/* Top bar */}
+      {/* Top bar (Figma 240:16-25) */}
       <View style={styles.topBar}>
         <Pressable
           onPress={() => navigation.goBack()}
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel="Back"
-          style={styles.iconButton}>
-          <ArrowLeft size={18} color="#FFFFFF" />
+          style={styles.backButton}>
+          <ArrowLeft size={18} color="#F2EBE0" />
         </Pressable>
 
         {heroImageUrl ? (
-          <Image source={{uri: heroImageUrl}} style={styles.thumb} />
+          <Image source={{ uri: heroImageUrl }} style={styles.thumb} />
         ) : (
           <View style={[styles.thumb, styles.thumbFallback]}>
-            <Sparkles size={14} color={AMBER} />
+            <Sparkles size={16} color={FLAME} />
           </View>
         )}
 
@@ -257,16 +324,34 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
           <Text style={styles.title} numberOfLines={1}>
             {siteName}
           </Text>
-          <Text style={styles.status} numberOfLines={1}>
-            AI guide · grounded in site data
-          </Text>
+          <View style={styles.statusRow}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: voice.isListening ? FLAME : '#3FB950' },
+              ]}
+            />
+            <Text style={styles.status} numberOfLines={1}>
+              {statusText}
+            </Text>
+          </View>
         </View>
+
+        <Pressable
+          onPress={handleClearChat}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Conversation options"
+          style={styles.menuButton}>
+          <MoreVertical size={18} color="#A89685" />
+        </Pressable>
       </View>
+
+      <View style={styles.divider} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.flexFill}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+        style={styles.flexFill}>
         <FlatList
           ref={listRef}
           data={messages}
@@ -282,37 +367,40 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
             />
           }
           onContentSizeChange={() =>
-            listRef.current?.scrollToEnd({animated: true})
+            listRef.current?.scrollToEnd({ animated: true })
           }
         />
 
-        {/* Suggestion chips */}
+        {/* TRY ASKING chips (Figma 240:40-50) */}
         {showSuggestions ? (
-          <View style={styles.chipsRow}>
-            {faqSuggestions.map(q => (
-              <TouchableOpacity
-                key={q}
-                onPress={() => handleSuggestionPress(q)}
-                activeOpacity={0.75}
-                style={styles.chip}
-                accessibilityRole="button"
-                accessibilityLabel={`Ask: ${q}`}>
-                <Text style={styles.chipText} numberOfLines={2}>
-                  {q}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.suggestionsBlock}>
+            <Text style={styles.tryAsking}>TRY ASKING</Text>
+            <View style={styles.chipsGrid}>
+              {faqSuggestions.map(q => (
+                <TouchableOpacity
+                  key={q}
+                  onPress={() => handleSuggestionPress(q)}
+                  activeOpacity={0.78}
+                  style={styles.chip}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ask: ${q}`}>
+                  <Text style={styles.chipText} numberOfLines={2}>
+                    {q}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         ) : null}
 
-        {/* Input bar */}
+        {/* Input bar (Figma 240:74-76) */}
         <SafeAreaView edges={['bottom']} style={styles.inputBarOuter}>
           <View style={styles.inputBar}>
             <TextInput
               value={input}
               onChangeText={setInput}
               placeholder={`Ask about ${siteName?.trim() || 'this place'}…`}
-              placeholderTextColor="rgba(255,255,255,0.4)"
+              placeholderTextColor="#898888"
               style={styles.textInput}
               editable={!isStreaming}
               multiline
@@ -321,22 +409,28 @@ const AiGuideScreen: React.FC<Props> = ({navigation, route}) => {
               accessibilityLabel="Question input"
             />
             <Pressable
+              onPress={handlePrimaryPress}
+              disabled={isStreaming}
               accessibilityRole="button"
-              accessibilityLabel="Voice input (coming soon)"
-              disabled
-              style={[styles.inputIconButton, styles.inputIconDisabled]}>
-              <Mic size={18} color="rgba(255,255,255,0.4)" />
-            </Pressable>
-            <Pressable
-              onPress={handleSendPress}
-              disabled={!input.trim() || isStreaming}
-              accessibilityRole="button"
-              accessibilityLabel="Send question"
+              accessibilityLabel={
+                voice.isListening
+                  ? 'Stop dictation'
+                  : hasText
+                  ? 'Send question'
+                  : 'Voice input'
+              }
               style={[
-                styles.sendButton,
-                (!input.trim() || isStreaming) && styles.sendButtonDisabled,
+                styles.primaryButton,
+                voice.isListening && styles.primaryButtonActive,
+                isStreaming && styles.primaryButtonDisabled,
               ]}>
-              <Send size={16} color="#1A0F00" />
+              {voice.isListening ? (
+                <Square size={16} color="#FFFFFF" fill="#FFFFFF" />
+              ) : hasText ? (
+                <Send size={18} color="#FFFFFF" />
+              ) : (
+                <Mic size={20} color="#FFFFFF" />
+              )}
             </Pressable>
           </View>
         </SafeAreaView>
@@ -350,7 +444,7 @@ const FooterArea: React.FC<{
   isStreaming: boolean;
   error: string | null;
   onRetry: () => void;
-}> = ({streamingText, isStreaming, error, onRetry}) => {
+}> = ({ streamingText, isStreaming, error, onRetry }) => {
   if (error) {
     return (
       <View style={styles.errorBubble}>
@@ -361,7 +455,7 @@ const FooterArea: React.FC<{
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="Retry">
-          <RefreshCcw size={14} color={AMBER} />
+          <RefreshCcw size={14} color={FLAME} />
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -372,7 +466,7 @@ const FooterArea: React.FC<{
     return (
       <View style={styles.assistantWrap}>
         <View style={styles.assistantBubble}>
-          <Text style={styles.assistantText}>{streamingText}</Text>
+          <MarkdownText theme="light">{streamingText}</MarkdownText>
         </View>
       </View>
     );
@@ -436,7 +530,7 @@ function defaultWelcome(siteName: string): string {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#020202',
+    backgroundColor: '#0F0A05',
   },
   flexFill: {
     flex: 1,
@@ -444,25 +538,23 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  backButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   thumb: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: '#141414',
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#1F1611',
   },
   thumbFallback: {
     alignItems: 'center',
@@ -472,73 +564,105 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontFamily: 'InstrumentSans-SemiBold',
-    fontSize: 15,
-    color: '#FFFFFF',
+    fontFamily: 'InstrumentSerif-Regular',
+    fontSize: 22,
+    color: '#F2EBE0',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   status: {
-    marginTop: 2,
+    flex: 1,
     fontFamily: 'InstrumentSans-Regular',
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    color: '#A89685',
+  },
+  menuButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  divider: {
+    height: 1,
+    marginHorizontal: 6,
+    backgroundColor: '#2D2218',
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 18,
     paddingBottom: 12,
-    gap: 12,
+    gap: 14,
   },
   assistantWrap: {
     alignItems: 'flex-start',
-    maxWidth: '92%',
+    maxWidth: '94%',
+  },
+  assistantBubble: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   assistantLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginBottom: 6,
-    marginLeft: 4,
   },
   assistantLabel: {
-    fontFamily: 'InstrumentSerif-Regular',
+    fontFamily: 'InstrumentSans-Bold',
     fontSize: 10,
-    color: AMBER,
-    letterSpacing: 1.4,
+    color: '#1F1611',
+    letterSpacing: 0.8,
   },
-  assistantBubble: {
-    backgroundColor: 'rgba(232,160,32,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.25)',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  wave: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    backgroundColor: '#1F1611',
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    height: 18,
   },
-  assistantText: {
-    fontFamily: 'InstrumentSans-Regular',
-    fontSize: 14,
-    color: '#FFFFFF',
-    lineHeight: 22,
+  waveBar: {
+    width: 2,
+    borderRadius: 1,
+    backgroundColor: FLAME,
   },
   userWrap: {
     alignItems: 'flex-end',
   },
   userBubble: {
-    backgroundColor: '#141414',
+    backgroundColor: '#1F1611',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 16,
+    borderColor: '#2D2218',
+    borderRadius: 18,
+    borderBottomRightRadius: 6,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    maxWidth: '92%',
+    maxWidth: '90%',
   },
   userText: {
     fontFamily: 'InstrumentSans-Regular',
     fontSize: 14,
-    color: 'rgba(255,255,255,0.92)',
+    color: '#F2EBE0',
     lineHeight: 20,
   },
   thinkingBubble: {
-    paddingVertical: 14,
+    paddingVertical: 16,
   },
   thinkingRow: {
     flexDirection: 'row',
@@ -548,12 +672,11 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: AMBER,
-    opacity: 0.6,
+    backgroundColor: FLAME,
   },
-  dot1: {opacity: 0.9},
-  dot2: {opacity: 0.6},
-  dot3: {opacity: 0.35},
+  dot1: { opacity: 0.9 },
+  dot2: { opacity: 0.6 },
+  dot3: { opacity: 0.35 },
   errorBubble: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(239,68,68,0.10)',
@@ -562,7 +685,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    maxWidth: '92%',
+    maxWidth: '94%',
   },
   errorText: {
     fontFamily: 'InstrumentSans-Regular',
@@ -580,84 +703,86 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.4)',
+    borderColor: 'rgba(212,105,31,0.4)',
   },
   retryText: {
     fontFamily: 'InstrumentSans-SemiBold',
     fontSize: 12,
-    color: AMBER,
+    color: FLAME,
   },
-  chipsRow: {
+  suggestionsBlock: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 6,
+  },
+  tryAsking: {
+    fontFamily: 'InstrumentSerif-Regular',
+    fontSize: 14,
+    letterSpacing: 1.6,
+    color: '#DEDEDE',
+    marginBottom: 10,
+  },
+  chipsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
   chip: {
+    width: '47%',
+    flexGrow: 1,
+    minHeight: 30,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(232,160,32,0.08)',
+    paddingVertical: 7,
+    borderRadius: 22,
+    backgroundColor: '#1F1611',
     borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.35)',
-    maxWidth: '100%',
+    borderColor: '#2D2218',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chipText: {
-    fontFamily: 'InstrumentSans-Medium',
-    fontSize: 12,
-    color: '#FFE4B5',
+    fontFamily: 'InstrumentSerif-Regular',
+    fontSize: 13,
+    color: '#F2EBE0',
+    textAlign: 'center',
   },
   inputBarOuter: {
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#0F0A05',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
+    borderTopColor: '#2D2218',
   },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
   },
   textInput: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 48,
     maxHeight: 120,
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 10,
-    fontFamily: 'InstrumentSans-Regular',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 12,
+    fontFamily: 'MontserratAlternates-Regular',
     fontSize: 14,
-    color: '#FFFFFF',
+    color: '#1F1611',
   },
-  inputIconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  primaryButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: FLAME,
   },
-  inputIconDisabled: {
-    opacity: 0.6,
+  primaryButtonActive: {
+    backgroundColor: '#EF4444',
   },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: AMBER,
-  },
-  sendButtonDisabled: {
-    backgroundColor: 'rgba(232,160,32,0.35)',
+  primaryButtonDisabled: {
+    opacity: 0.5,
   },
 });
 
