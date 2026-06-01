@@ -47,7 +47,6 @@ import {
   type SiteEraConfig,
 } from './components/eraModels';
 import {useActiveMonument} from '../../shared/hooks/useActiveMonument';
-import EraSlider from './components/EraSlider';
 
 // Lazy-loaded so @react-three/fiber + expo-gl are NOT evaluated at app startup.
 // r3f v8 is incompatible with React 19 and throws at module-evaluation time,
@@ -239,25 +238,6 @@ const Ar3dViewerScreen: React.FC = () => {
         </View>
       </SafeAreaView>
 
-      {/* Bottom overlay */}
-      <SafeAreaView style={styles.bottomOverlay} edges={['bottom']}>
-        {eras ? (
-          <View>
-            <View style={styles.viewingCaption}>
-              <Text style={styles.viewingLabel}>VIEWING</Text>
-              <Text style={styles.viewingEra}>{eraLabel}</Text>
-              <Text style={styles.viewingSubLabel}>as it stood</Text>
-            </View>
-
-            <EraSlider
-              eras={eras}
-              activeIndex={activeIndex}
-              onChangeIndex={setActiveIndex}
-            />
-          </View>
-        ) : null}
-      </SafeAreaView>
-
       {/* Knowledge-text sheet */}
       <Modal
         visible={showInfo}
@@ -374,37 +354,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.6)',
     letterSpacing: 0.6,
-  },
-  bottomOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 24,
-    paddingBottom: 12,
-  },
-  viewingCaption: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  viewingLabel: {
-    fontFamily: 'MontserratAlternates-Medium',
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: 2.4,
-  },
-  viewingEra: {
-    marginTop: 4,
-    fontFamily: 'MontserratAlternates-SemiBold',
-    fontSize: 24,
-    color: AMBER,
-    letterSpacing: 1.2,
-  },
-  viewingSubLabel: {
-    marginTop: 2,
-    fontFamily: 'MontserratAlternates-Italic',
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
   },
   centerFill: {
     flex: 1,

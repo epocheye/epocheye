@@ -45,8 +45,22 @@ export type OnboardingStackParamList = {
  */
 export type MainStackParamList = {
   MainTabs: undefined;
-  /** `mode: 'museum'` opens Lens straight into seed-free tap-to-identify. */
-  Lens: { mode?: 'museum' } | undefined;
+  /**
+   * `mode: 'museum'` opens Lens straight into seed-free tap-to-identify.
+   * When launched from a site's "View in AR", the site context is passed so the
+   * Lens can identify the site and decide whether to show the "AR not available
+   * yet" notice (`arReady === false`) before falling back to object detection.
+   */
+  Lens:
+    | {
+        mode?: 'museum';
+        siteName?: string;
+        siteSlug?: string;
+        arReady?: boolean;
+        lat?: number;
+        lon?: number;
+      }
+    | undefined;
   SiteDetail: { site: PlaceNavParam };
   ARExperience: { site: PlaceNavParam };
   ARComposer: {

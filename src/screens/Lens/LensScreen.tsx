@@ -182,6 +182,22 @@ const LensScreen: React.FC<Props> = ({ navigation, route }) => {
   const [museumMode, setMuseumMode] = useState(
     route.params?.mode === 'museum',
   );
+  // Site context forwarded from a site's "View in AR" (museum launch). When the
+  // site isn't AR-ready we surface a one-time "AR not available yet" notice and
+  // ground the seed-free object-detection flow to that site.
+  const museumSiteName =
+    route.params?.mode === 'museum' ? route.params.siteName ?? null : null;
+  const museumSiteSlug =
+    route.params?.mode === 'museum' ? route.params.siteSlug ?? null : null;
+  const museumSiteArReady =
+    route.params?.mode === 'museum' ? route.params.arReady === true : false;
+  const museumSiteLat =
+    route.params?.mode === 'museum' ? route.params.lat ?? null : null;
+  const museumSiteLon =
+    route.params?.mode === 'museum' ? route.params.lon ?? null : null;
+  const [arNoticeDismissed, setArNoticeDismissed] = useState(false);
+  const showArUnavailableNotice =
+    !!museumSiteName && !museumSiteArReady && !arNoticeDismissed;
   const narrationLang = useMuseumPrefsStore(s => s.narrationLang);
   const setNarrationLang = useMuseumPrefsStore(s => s.setNarrationLang);
   const [museumCard, setMuseumCard] = useState<MuseumCardState | null>(null);
@@ -346,6 +362,14 @@ const LensScreen: React.FC<Props> = ({ navigation, route }) => {
     confirmText: 'Leave',
     cancelText: 'Keep scanning',
   });
+
+  // Auto-dismiss the "AR not available yet" notice after a few seconds so it
+  // doesn't permanently cover the camera; the user can also tap to dismiss.
+  useEffect(() => {
+    if (!showArUnavailableNotice) return;
+    const t = setTimeout(() => setArNoticeDismissed(true), 6000);
+    return () => clearTimeout(t);
+  }, [showArUnavailableNotice]);
 
   const firstName = useMemo(() => {
     const fromProfile = profile?.name?.trim();
@@ -1186,13 +1210,24 @@ const LensScreen: React.FC<Props> = ({ navigation, route }) => {
   // detection) + GPS. Optional — improves specificity, fine when absent.
   const museumContext = useCallback(
     () => ({
-      venue: matchedPlace?.name ?? null,
-      lat: lastKnownCoords?.latitude ?? null,
-      lng: lastKnownCoords?.longitude ?? null,
-      // Seeded-venue slug (when inside a curated zone) → grounded matching.
-      venueSlug: activeZone?.monument_id ?? null,
+      // Prefer live detection; fall back to the site that launched "View in AR"
+      // so narration/labels are grounded to that monument when GPS hasn't matched.
+      venue: matchedPlace?.name ?? museumSiteName ?? null,
+      lat: lastKnownCoords?.latitude ?? museumSiteLat ?? null,
+      lng: lastKnownCoords?.longitude ?? museumSiteLon ?? null,
+      // Seeded-venue slug (when inside a curated zone, or from the launch site)
+      // → grounded matching.
+      venueSlug: activeZone?.monument_id ?? museumSiteSlug ?? null,
     }),
-    [matchedPlace, lastKnownCoords, activeZone],
+    [
+      matchedPlace,
+      lastKnownCoords,
+      activeZone,
+      museumSiteName,
+      museumSiteLat,
+      museumSiteLon,
+      museumSiteSlug,
+    ],
   );
 
   // Non-AR (vision-camera) tap: capture via takePhoto → crop to the tap →
@@ -1558,11 +1593,37 @@ const LensScreen: React.FC<Props> = ({ navigation, route }) => {
               accessibilityLabel="Tap an object to identify it"
             />
 
+            {/* "AR not available yet" notice — shown when opened from a site's
+                "View in AR" and that site isn't AR-ready. We fall back to
+                object detection + anchored labels (this museum flow). */}
+            {showArUnavailableNotice && (
+              <Animated.View
+                entering={FadeIn.duration(300)}
+                exiting={FadeOut.duration(200)}
+                className="absolute left-4 right-4 z-[7] flex-row items-center gap-x-2 bg-[rgba(13,13,13,0.92)] rounded-2xl border border-[rgba(232,160,32,0.4)] px-4 py-3"
+                style={{ top: insets.top + 52 }}
+              >
+                <ScanEye size={16} color="#E8A020" />
+                <Text className="flex-1 text-parchment text-[12px] font-montserrat leading-[17px]">
+                  AR isn&apos;t available at {museumSiteName} yet — exploring with
+                  object detection. Tap any object to identify it.
+                </Text>
+                <Pressable
+                  onPress={() => setArNoticeDismissed(true)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Dismiss AR notice"
+                >
+                  <X size={16} color="#F5F0E8" />
+                </Pressable>
+              </Animated.View>
+            )}
+
             {/* Narration-language selector (En · हिन्दी · বাংলা). Persisted; the
                 next tap narrates in the chosen language. */}
             <View
               className="absolute self-center flex-row items-center gap-x-1 bg-[rgba(13,13,13,0.82)] rounded-full border border-[rgba(255,255,255,0.14)] p-1"
-              style={{ top: insets.top + 52 }}
+              style={{ top: insets.top + (showArUnavailableNotice ? 116 : 52) }}
             >
               {NARRATION_LANGS.map(({ code, label }) => {
                 const active = narrationLang === code;
@@ -1591,7 +1652,7 @@ const LensScreen: React.FC<Props> = ({ navigation, route }) => {
               <View
                 pointerEvents="none"
                 className="absolute self-center flex-row items-center gap-x-2 bg-[rgba(13,13,13,0.82)] rounded-full border border-[rgba(232,160,32,0.4)] px-3 py-[5px]"
-                style={{ top: insets.top + 92 }}
+                style={{ top: insets.top + (showArUnavailableNotice ? 156 : 92) }}
               >
                 <ScanEye size={13} color="#E8A020" />
                 <Text className="text-accent-amber text-[12px] font-montserrat-semibold">

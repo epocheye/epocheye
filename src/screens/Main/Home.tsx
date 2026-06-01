@@ -36,7 +36,10 @@ import ArrivalBanner from './components/ArrivalBanner';
 
 type Props = TabScreenProps<'Home'>;
 
-type ViewMode = 'nearby' | 'virtual';
+// Curated sites within this radius of the user are pinned on the map. Keeps the
+// map focused on the visitor's city (e.g. Kolkata → Victoria Memorial + Indian
+// Museum) without dropping a pin for far-away sites (e.g. Konark in Odisha).
+const CURATED_NEARBY_RADIUS_M = 150000;
 
 const DEFAULT_REGION: Region = {
   latitude: 20.5937,
@@ -170,7 +173,6 @@ const Home: React.FC<Props> = ({navigation}) => {
     state => state.ensureLocationTracking,
   );
 
-  const [viewMode, setViewMode] = useState<ViewMode>('nearby');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [locationDenied, setLocationDenied] = useState(false);
@@ -279,8 +281,7 @@ const Home: React.FC<Props> = ({navigation}) => {
   );
 
   const filteredPlaces = useMemo(() => {
-    const base =
-      viewMode === 'nearby' ? allPlaces.filter(isHeritagePlace) : [];
+    const base = allPlaces.filter(isHeritagePlace);
     const q = searchText.trim().toLowerCase();
     if (!q) return base;
     return base.filter(
@@ -289,9 +290,28 @@ const Home: React.FC<Props> = ({navigation}) => {
         p.city?.toLowerCase().includes(q) ||
         p.country?.toLowerCase().includes(q),
     );
-  }, [allPlaces, viewMode, searchText]);
+  }, [allPlaces, searchText]);
 
   const featuredPlace: Place | null = filteredPlaces[0] ?? null;
+
+  // Curated Epocheye sites to pin on the map: those with coordinates, filtered
+  // to the user's vicinity when we have a location (all of them otherwise, so
+  // the map isn't empty before location permission is granted).
+  const nearbyCuratedSites = useMemo(() => {
+    const withCoords = supportedSites.filter(
+      s => typeof s.latitude === 'number' && typeof s.longitude === 'number',
+    );
+    if (!userLatLng) return withCoords;
+    return withCoords.filter(
+      s =>
+        distanceMeters(
+          userLatLng.lat,
+          userLatLng.lng,
+          s.latitude as number,
+          s.longitude as number,
+        ) <= CURATED_NEARBY_RADIUS_M,
+    );
+  }, [supportedSites, userLatLng]);
 
   const initialRegion = useMemo<Region>(() => {
     if (currentLocation) {
@@ -416,7 +436,7 @@ const Home: React.FC<Props> = ({navigation}) => {
 
   const activePlace = useMemo<ActivePlace | null>(() => {
     if (selectedPlace) return selectedPlace;
-    if (viewMode !== 'nearby' || !featuredPlace) return null;
+    if (!featuredPlace) return null;
     return {
       key: featuredPlace.id,
       name: featuredPlace.name,
@@ -426,7 +446,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       categories: featuredPlace.categories ?? [],
       source: 'nearby',
     };
-  }, [selectedPlace, viewMode, featuredPlace]);
+  }, [selectedPlace, featuredPlace]);
 
   const activeSupportedSite = useMemo(
     () =>
@@ -481,38 +501,8 @@ const Home: React.FC<Props> = ({navigation}) => {
         </Text>
       </View>
 
-      {/* Control row: segmented pill (left) + search icon (right) */}
-      <View className="px-6 pt-5 pb-3 flex-row items-center justify-between">
-        <View className="flex-row p-[3px] rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)]">
-          <Pressable
-            onPress={() => setViewMode('nearby')}
-            className={`px-[18px] py-[6px] rounded-full${viewMode === 'nearby' ? ' bg-[#61A6D3]' : ''}`}
-            accessibilityRole="button"
-            accessibilityState={{selected: viewMode === 'nearby'}}>
-            <Text
-              style={{
-                fontFamily: FONTS.sansMedium,
-                fontSize: 12,
-                color: viewMode === 'nearby' ? '#FFFFFF' : 'rgba(255,255,255,0.55)',
-              }}>
-              Nearby
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setViewMode('virtual')}
-            className={`px-[18px] py-[6px] rounded-full${viewMode === 'virtual' ? ' bg-[#61A6D3]' : ''}`}
-            accessibilityRole="button"
-            accessibilityState={{selected: viewMode === 'virtual'}}>
-            <Text
-              style={{
-                fontFamily: FONTS.sansMedium,
-                fontSize: 12,
-                color: viewMode === 'virtual' ? '#FFFFFF' : 'rgba(255,255,255,0.55)',
-              }}>
-              Virtual
-            </Text>
-          </Pressable>
-        </View>
+      {/* Control row: notification + search icons (right) */}
+      <View className="px-6 pt-5 pb-3 flex-row items-center justify-end">
         <View className="flex-row items-center gap-x-2">
           <Pressable
             onPress={() => navigation.navigate(ROUTES.MAIN.NOTIFICATIONS)}
@@ -576,8 +566,7 @@ const Home: React.FC<Props> = ({navigation}) => {
 
       {/* Map — padded rounded container */}
       <View className="flex-1 mx-4 mt-2 mb-2 rounded-[18px] overflow-hidden bg-surface-1">
-        {viewMode === 'nearby' ? (
-          <MapView
+        <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
             style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
@@ -588,6 +577,21 @@ const Home: React.FC<Props> = ({navigation}) => {
             toolbarEnabled={false}
             // @ts-expect-error googleMapsApiKey is RN-native only, not in type defs
             googleMapsApiKey={GOOGLE_MAPS_API_KEY?.trim()}>
+            {/* Curated Epocheye sites near the user (e.g. Victoria Memorial +
+                Indian Museum in Kolkata) — distinct amber pins → site details. */}
+            {nearbyCuratedSites.map(s => (
+              <Marker
+                key={`curated-${s.id}`}
+                coordinate={{
+                  latitude: s.latitude as number,
+                  longitude: s.longitude as number,
+                }}
+                title={s.name}
+                description={[s.city, s.state].filter(Boolean).join(', ')}
+                onPress={() => handleViewSupported(s)}
+                pinColor="#D4860A"
+              />
+            ))}
             {filteredPlaces.map(place => (
               <Marker
                 key={place.id}
@@ -636,17 +640,7 @@ const Home: React.FC<Props> = ({navigation}) => {
               />
             ) : null}
           </MapView>
-        ) : (
-          <View className="flex-1 items-center justify-center px-8">
-            <Text style={{fontFamily: FONTS.serif, fontSize: 22, color: '#FFFFFF'}}>
-              Virtual tours
-            </Text>
-            <Text style={{marginTop: 6, fontFamily: FONTS.sans, fontSize: 13, color: 'rgba(255,255,255,0.55)', textAlign: 'center'}}>
-              Browse heritage sites worldwide. Coming soon.
-            </Text>
-          </View>
-        )}
-        {viewMode === 'nearby' && activeSite ? (
+        {activeSite ? (
           <View
             pointerEvents="box-none"
             style={styles.preArrivalOverlay}>

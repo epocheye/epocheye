@@ -19,7 +19,6 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronRight,
-  MessageSquare,
   Sparkles,
   Shield,
 } from 'lucide-react-native';
@@ -54,7 +53,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const { checkAccess } = useExplorerPass();
 
   const scrollRef = useRef<ScrollView>(null);
-  const overviewY = useRef(0);
 
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
@@ -175,27 +173,19 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     };
   }, [site.name, profile?.name]);
 
+  // "View in AR" → open the live Lens camera in museum mode. When the site is
+  // not AR-ready, the Lens screen shows an "AR not available yet" notice and
+  // falls back to object detection with 3D anchored labels identifying the site.
   const handleStartARExperience = useCallback(() => {
-    const monumentId = siteDetail?.slug ?? site.id;
-    const siteName = siteDetail?.name ?? site.name;
-    navigation.navigate(ROUTES.MAIN.AR_3D_VIEWER, {
-      monumentId,
-      objectLabel: siteName,
-      glbUrl: '',
-      siteName,
+    navigation.navigate(ROUTES.MAIN.LENS, {
+      mode: 'museum',
+      siteName: siteDetail?.name ?? site.name,
+      siteSlug: siteDetail?.slug ?? site.id,
+      arReady: siteDetail?.ar_ready ?? false,
+      lat: siteDetail?.latitude ?? site.lat,
+      lon: siteDetail?.longitude ?? site.lon,
     });
   }, [navigation, siteDetail, site]);
-
-  // "Learn About It" → reveal the full narrative and scroll to it.
-  const handleLearnMore = useCallback(() => {
-    setIsDescriptionExpanded(true);
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({
-        y: Math.max(overviewY.current - 16, 0),
-        animated: true,
-      });
-    });
-  }, []);
 
   const handleGetPassport = useCallback(() => {
     navigation.navigate(ROUTES.MAIN.PURCHASE, {
@@ -363,7 +353,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={handleLearnMore}
+            onPress={handleAskGuide}
             activeOpacity={0.85}
             className="h-[53px] rounded-[30px] bg-peach border border-terracotta items-center justify-center"
             accessibilityRole="button"
@@ -393,9 +383,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Historical Overview */}
           <Animated.View
             entering={FadeInDown.delay(150).duration(400)}
-            onLayout={e => {
-              overviewY.current = e.nativeEvent.layout.y;
-            }}
             className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4"
           >
             <Text className="text-parchment text-lg font-['InstrumentSans-SemiBold'] mb-2">
@@ -529,22 +516,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 </Text>
               </View>
             )}
-          </Animated.View>
-
-          {/* Ask about this site (AI Guide) */}
-          <Animated.View entering={FadeInDown.delay(300).duration(400)}>
-            <TouchableOpacity
-              onPress={handleAskGuide}
-              className="rounded-xl bg-surface-1 border border-terracotta/40 py-3 items-center justify-center flex-row gap-2"
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="Ask about this site"
-            >
-              <MessageSquare color="#B8551A" size={16} />
-              <Text className="text-terracotta text-[14px] tracking-[0.4px] font-['InstrumentSans-SemiBold']">
-                Ask about this site
-              </Text>
-            </TouchableOpacity>
           </Animated.View>
 
           {/* Get Passport — hidden when the user already has access */}
