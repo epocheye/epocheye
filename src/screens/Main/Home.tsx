@@ -368,6 +368,35 @@ const Home: React.FC<Props> = ({navigation}) => {
     );
   }, []);
 
+  // Tapping a curated pin selects it into the bottom card (same flow as a
+  // nearby place) rather than jumping straight to SiteDetail — so each Kolkata
+  // site (Victoria, Indian Museum) surfaces its own "View Details" card and the
+  // two are freely switchable. matchSupportedSite then re-matches it by name/
+  // proximity so the curated card variant renders.
+  const handleSelectCurated = useCallback((site: SiteDetail) => {
+    if (typeof site.latitude !== 'number' || typeof site.longitude !== 'number') {
+      return;
+    }
+    setSelectedPlace({
+      key: `curated-${site.id}`,
+      name: site.name,
+      lat: site.latitude,
+      lon: site.longitude,
+      imageUrl: site.hero_image_url,
+      categories: [],
+      source: 'nearby',
+    });
+    mapRef.current?.animateToRegion(
+      {
+        latitude: site.latitude,
+        longitude: site.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      },
+      500,
+    );
+  }, []);
+
   const handleSearchSubmit = useCallback(async () => {
     const q = searchText.trim();
     if (!q) return;
@@ -452,6 +481,17 @@ const Home: React.FC<Props> = ({navigation}) => {
     () =>
       activePlace ? matchSupportedSite(activePlace, supportedSites) : null,
     [activePlace, supportedSites],
+  );
+
+  // The top PreArrivalCard (driven by the auto-selected active monument) and the
+  // bottom selected-site card refer to the same place when you tap your nearest
+  // monument's pin. In that case they visually duplicate, so we hide the top
+  // PreArrivalCard and let the bottom card stand. Keyed on slug (slug ?? id, the
+  // same identity used everywhere else for sites).
+  const selectedMatchesActiveSite = !!(
+    activeSupportedSite &&
+    active.slug &&
+    (activeSupportedSite.slug ?? activeSupportedSite.id) === active.slug
   );
 
   const supportedImageSource = useMemo(() => {
@@ -588,7 +628,7 @@ const Home: React.FC<Props> = ({navigation}) => {
                 }}
                 title={s.name}
                 description={[s.city, s.state].filter(Boolean).join(', ')}
-                onPress={() => handleViewSupported(s)}
+                onPress={() => handleSelectCurated(s)}
                 pinColor="#D4860A"
               />
             ))}
@@ -650,7 +690,7 @@ const Home: React.FC<Props> = ({navigation}) => {
               distanceKm={distanceKm}
               etaMinutes={etaMinutes}
               locationPermissionDenied={locationDenied}
-              visible={visiblePreArrival}
+              visible={visiblePreArrival && !selectedMatchesActiveSite}
               onShowDirections={handleShowDirections}
             />
             <ApproachCard

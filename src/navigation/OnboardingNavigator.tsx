@@ -11,14 +11,13 @@ import OB04_Pull from '../screens/Onboarding/OB04_Pull';
 import SignupScreen from '../screens/Onboarding/SignupScreen';
 import OB10_Login from '../screens/Onboarding/OB10_Login';
 import OB11_Notifications from '../screens/Onboarding/OB11_Notifications';
-import OB12_Arrival from '../screens/Onboarding/OB12_Arrival';
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
 
 /**
- * OnboardingNavigator — 5-screen Figma flow + retained auth/arrival screens.
+ * OnboardingNavigator — 5-screen Figma flow + retained auth screen.
  * OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region → OB04_Pull
- *   → OB10_SignUp (or OB10_Login) → OB11_Notifications → OB12_Arrival
+ *   → OB10_SignUp (or OB10_Login) → OB11_Notifications (final; completes onboarding)
  */
 const OnboardingNavigator: React.FC = () => {
   return (
@@ -42,11 +41,6 @@ const OnboardingNavigator: React.FC = () => {
       <Stack.Screen
         name={ROUTES.ONBOARDING.OB11_NOTIFICATIONS}
         component={OB11_Notifications}
-      />
-      <Stack.Screen
-        name={ROUTES.ONBOARDING.OB12_ARRIVAL}
-        component={OB12_Arrival}
-        options={{gestureEnabled: false}}
       />
     </Stack.Navigator>
   );

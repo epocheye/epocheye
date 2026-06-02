@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DrawerNavigation from './DrawerNavigation';
 import SiteDetailScreen from '../screens/Main/SiteDetailScreen';
+import ErrorBoundary from '../components/ui/ErrorBoundary';
 import ARExperienceScreen from '../screens/Main/ARExperienceScreen';
 import LensScreen from '../screens/Lens/LensScreen';
 import ARComposer from '../screens/Lens/ARComposer';
@@ -35,11 +36,16 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
       </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.SITE_DETAIL}
-        component={SiteDetailScreen}
         options={{
           animation: 'slide_from_right',
         }}
-      />
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <SiteDetailScreen {...props} />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.LENS}
         component={LensScreen}

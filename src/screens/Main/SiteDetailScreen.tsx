@@ -65,6 +65,12 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 
   const [siteDetail, setSiteDetail] = useState<SiteDetail | null>(null);
+  // Tracks a hero image that failed to load (e.g. a stale/404 hero_image_url) so
+  // we can fall back to the gradient instead of showing a blank box. Reset per site.
+  const [heroFailed, setHeroFailed] = useState(false);
+  useEffect(() => {
+    setHeroFailed(false);
+  }, [siteDetail?.hero_image_url]);
 
   const location = useMemo(() => {
     if (siteDetail) {
@@ -248,11 +254,12 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       >
         {/* Full-bleed hero (Figma 238:61) */}
         <View style={{ height: HERO_HEIGHT }}>
-          {siteDetail?.hero_image_url ? (
+          {siteDetail?.hero_image_url && !heroFailed ? (
             <Image
               source={{ uri: siteDetail.hero_image_url }}
               style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
               resizeMode="cover"
+              onError={() => setHeroFailed(true)}
             />
           ) : (
             <LinearGradient

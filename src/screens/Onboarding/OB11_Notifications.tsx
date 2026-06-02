@@ -1,18 +1,20 @@
-import React, {useEffect} from 'react';
+import React, {useCallback, useEffect, useRef} from 'react';
 import {View, Text, StatusBar} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withRepeat,
-  withSequence,
+  withDelay,
   withTiming,
-  withSpring,
-  Easing,
 } from 'react-native-reanimated';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {BellRing} from 'lucide-react-native';
+import {BellRing, MapPin, Sparkles} from 'lucide-react-native';
 import {requestNotifications, RESULTS} from 'react-native-permissions';
 import {fcmRegisterAfterPermission} from '../../services/fcmService';
+import {BACKEND_URL} from '../../constants/onboarding';
+import {useOnboardingStore} from '../../stores/onboardingStore';
+import {useOnboardingComplete} from '../../context/OnboardingCallbackContext';
+import {track} from '../../services/analytics';
+import {getValidAccessToken} from '../../utils/api/auth';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSkipLink from '../../components/onboarding/OBSkipLink';
@@ -20,52 +22,76 @@ import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB11_Notifications'>;
 
-const OB11_Notifications: React.FC<Props> = ({navigation}) => {
+const BENEFITS = [
+  {icon: MapPin, text: "A gentle nudge when you're near a heritage site"},
+  {icon: Sparkles, text: 'Never miss an AR experience around you'},
+] as const;
+
+const OB11_Notifications: React.FC<Props> = () => {
   const insets = useSafeAreaInsets();
 
-  const rotate = useSharedValue(0);
-  const bellScale = useSharedValue(0.9);
-  const headingO = useSharedValue(0);
-  const headingY = useSharedValue(16);
-  const descO = useSharedValue(0);
+  const completeOnboarding = useOnboardingStore(s => s.completeOnboarding);
+  const onOnboardingComplete = useOnboardingComplete();
+  const hasCompleted = useRef(false);
 
+  // Entrance animation — one calm fade + rise for the whole content block.
+  const enter = useSharedValue(0);
   useEffect(() => {
-    headingO.value = withTiming(1, {duration: 400});
-    headingY.value = withSpring(0, {damping: 20, stiffness: 140});
-    descO.value = withTiming(1, {duration: 500});
-    bellScale.value = withSpring(1, {damping: 10, stiffness: 100});
-    rotate.value = withRepeat(
-      withSequence(
-        withTiming(12, {duration: 150, easing: Easing.inOut(Easing.ease)}),
-        withTiming(-10, {duration: 150, easing: Easing.inOut(Easing.ease)}),
-        withTiming(8, {duration: 120, easing: Easing.inOut(Easing.ease)}),
-        withTiming(-6, {duration: 120, easing: Easing.inOut(Easing.ease)}),
-        withTiming(0, {duration: 100, easing: Easing.inOut(Easing.ease)}),
-        withTiming(0, {duration: 1800}),
-      ),
-      -1,
-      false,
-    );
-  }, [rotate, bellScale, headingO, headingY, descO]);
+    enter.value = withDelay(60, withTiming(1, {duration: 460}));
+  }, [enter]);
 
-  const bellStyle = useAnimatedStyle(() => ({
-    transform: [{rotateZ: `${rotate.value}deg`}, {scale: bellScale.value}],
+  const sBell = useAnimatedStyle(() => ({
+    opacity: enter.value,
+    transform: [{scale: 0.92 + enter.value * 0.08}],
   }));
-  const sHeading = useAnimatedStyle(() => ({
-    opacity: headingO.value,
-    transform: [{translateY: headingY.value}],
+  const sBody = useAnimatedStyle(() => ({
+    opacity: enter.value,
+    transform: [{translateY: (1 - enter.value) * 16}],
   }));
-  const sDesc = useAnimatedStyle(() => ({opacity: descO.value}));
 
-  const handleEnable = async () => {
+  // All onboarding-completion side effects now live here (OB12 removed).
+  // Guarded so a double tap can't fire the transition twice.
+  const finishOnboarding = useCallback(() => {
+    if (hasCompleted.current) {
+      return;
+    }
+    hasCompleted.current = true;
+
+    completeOnboarding();
+    track('onboarding_completed');
+
+    (async () => {
+      try {
+        const token = await getValidAccessToken();
+        if (token) {
+          const state = useOnboardingStore.getState();
+          await fetch(`${BACKEND_URL}/api/user/onboarding-data`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              firstName: state.firstName,
+              region: state.region,
+            }),
+          });
+        }
+      } catch {}
+    })();
+
+    onOnboardingComplete();
+  }, [completeOnboarding, onOnboardingComplete]);
+
+  const handleEnable = useCallback(async () => {
     try {
       const {status} = await requestNotifications(['alert', 'badge', 'sound']);
       if (status === RESULTS.GRANTED || status === RESULTS.LIMITED) {
         void fcmRegisterAfterPermission();
       }
     } catch {}
-    navigation.navigate('OB12_Arrival');
-  };
+    finishOnboarding();
+  }, [finishOnboarding]);
 
   return (
     <View className="flex-1 bg-ob-bgDeep">
@@ -79,33 +105,44 @@ const OB11_Notifications: React.FC<Props> = ({navigation}) => {
       <View
         className="flex-1 justify-between"
         style={{paddingBottom: insets.bottom + 24}}>
-        <Animated.View className="px-[28px] mt-8" style={sHeading}>
-          <Text className="text-[28px] leading-9 text-parchment font-montserrat-extrabold">
-            Know when history{'\n'}is near you.
-          </Text>
-          <Text className="text-[14px] leading-5 text-grey-muted font-montserrat mt-[10px]">
-            We'll notify you when you're close to a heritage site.
-          </Text>
-        </Animated.View>
-
-        <View className="items-center gap-7">
-          <View className="absolute -top-5 w-[160px] h-[160px] rounded-full bg-[rgba(232,160,32,0.06)]" />
-          <Animated.View style={bellStyle}>
-            <BellRing size={72} color="#E8A020" />
+        <View className="flex-1 items-center justify-center px-7">
+          <Animated.View
+            className="w-[120px] h-[120px] rounded-full items-center justify-center bg-[rgba(232,160,32,0.08)]"
+            style={sBell}>
+            <View className="w-[84px] h-[84px] rounded-full items-center justify-center bg-[rgba(232,160,32,0.12)]">
+              <BellRing size={40} color="#E8A020" />
+            </View>
           </Animated.View>
-          <Animated.Text
-            className="text-grey-muted text-[14px] text-center mx-[40px] font-montserrat leading-[22px]"
-            style={sDesc}>
-            Get notified the moment your ancestor is within reach.
-          </Animated.Text>
+
+          <Animated.View className="mt-9 items-center" style={sBody}>
+            <Text className="text-[26px] leading-[34px] text-center text-parchment font-montserrat-extrabold">
+              Stay close to{'\n'}history.
+            </Text>
+            <Text className="mt-3 text-[14px] leading-[21px] text-center text-grey-muted font-montserrat">
+              Turn on notifications and we'll let you know the moment a heritage
+              site is near.
+            </Text>
+
+            <View className="mt-8 w-full gap-y-3">
+              {BENEFITS.map(({icon: Icon, text}) => (
+                <View
+                  key={text}
+                  className="flex-row items-center px-4 py-3 rounded-2xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)]">
+                  <View className="w-9 h-9 rounded-full items-center justify-center bg-[rgba(232,160,32,0.10)]">
+                    <Icon size={18} color="#E8A020" />
+                  </View>
+                  <Text className="ml-3 flex-1 text-[13px] leading-[19px] text-parchment/90 font-montserrat">
+                    {text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
         </View>
 
         <View>
-          <OBPrimaryButton label={'Yes, notify me  →'} onPress={handleEnable} />
-          <OBSkipLink
-            label="Maybe later"
-            onPress={() => navigation.navigate('OB12_Arrival')}
-          />
+          <OBPrimaryButton label="Enable notifications" onPress={handleEnable} />
+          <OBSkipLink label="Not now" onPress={finishOnboarding} />
         </View>
       </View>
     </View>

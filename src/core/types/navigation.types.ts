@@ -26,7 +26,7 @@ export interface PlaceNavParam {
  * Onboarding Stack Parameter List
  * 5-screen Figma flow + retained auth/arrival screens:
  * OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region → OB04_Pull
- *   → OB10_SignUp (or OB10_Login) → OB11_Notifications → OB12_Arrival
+ *   → OB10_SignUp (or OB10_Login) → OB11_Notifications (final; completes onboarding)
  */
 export type OnboardingStackParamList = {
   OB00_Splash: undefined;
@@ -37,7 +37,6 @@ export type OnboardingStackParamList = {
   OB10_SignUp: {fromOnboarding?: boolean} | undefined;
   OB10_Login: undefined;
   OB11_Notifications: undefined;
-  OB12_Arrival: undefined;
 };
 
 /**

@@ -8,9 +8,9 @@
  */
 export const ROUTES = {
   /**
-   * Onboarding Stack Routes (5-screen Figma flow + retained auth/arrival screens)
+   * Onboarding Stack Routes (5-screen Figma flow + retained auth screen)
    * OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region → OB04_Pull
-   *   → OB10_SignUp (or OB10_Login) → OB11_Notifications → OB12_Arrival
+   *   → OB10_SignUp (or OB10_Login) → OB11_Notifications (final; completes onboarding)
    */
   ONBOARDING: {
     OB00_SPLASH: 'OB00_Splash',
@@ -21,7 +21,6 @@ export const ROUTES = {
     OB10_SIGNUP: 'OB10_SignUp',
     OB10_LOGIN: 'OB10_Login',
     OB11_NOTIFICATIONS: 'OB11_Notifications',
-    OB12_ARRIVAL: 'OB12_Arrival',
   },
 
   /**
