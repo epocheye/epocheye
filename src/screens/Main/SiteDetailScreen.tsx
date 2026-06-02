@@ -31,6 +31,7 @@ import {
 import type { PersonalizedFact } from '../../utils/api/user';
 import { getSite } from '../../utils/api/places';
 import type { SiteDetail } from '../../utils/api/places';
+import { resolveSiteImageSource } from '../../shared/utils/localSiteImages';
 import { ROUTES } from '../../core/constants';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 
@@ -71,6 +72,12 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   useEffect(() => {
     setHeroFailed(false);
   }, [siteDetail?.hero_image_url]);
+
+  // Prefer a bundled local hero (instant/offline) over the remote hero_image_url.
+  const heroSource = useMemo(
+    () => (siteDetail ? resolveSiteImageSource(siteDetail) : null),
+    [siteDetail],
+  );
 
   const location = useMemo(() => {
     if (siteDetail) {
@@ -254,9 +261,9 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       >
         {/* Full-bleed hero (Figma 238:61) */}
         <View style={{ height: HERO_HEIGHT }}>
-          {siteDetail?.hero_image_url && !heroFailed ? (
+          {heroSource && !heroFailed ? (
             <Image
-              source={{ uri: siteDetail.hero_image_url }}
+              source={heroSource}
               style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
               resizeMode="cover"
               onError={() => setHeroFailed(true)}
