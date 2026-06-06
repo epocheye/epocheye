@@ -18,7 +18,7 @@ import {
   MipmapMode,
   Skia,
 } from '@shopify/react-native-skia';
-import { GEMINI_API_KEY } from '@env';
+import { callGeminiProxy } from './geminiProxyClient';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -54,8 +54,7 @@ export type GeminiResult = GeminiSuccess | GeminiFailure;
 
 // ── Constants ──────────────────────────────────────────────────────
 
-const GEMINI_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 const TIMEOUT_MS = 15_000;
 
@@ -233,14 +232,6 @@ async function executeRequest(
   siteHint: string | undefined,
   cacheKey: string,
 ): Promise<GeminiResult> {
-  if (!GEMINI_API_KEY) {
-    return {
-      success: false,
-      error: 'Identification is unavailable right now',
-      code: 'no_api_key',
-    };
-  }
-
   const started = Date.now();
   if (__DEV__) {
     console.log(
@@ -249,8 +240,9 @@ async function executeRequest(
   }
 
   try {
-    const response = await axios.post(
-      `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
+    const data = await callGeminiProxy(
+      GEMINI_MODEL,
+      'generateContent',
       {
         contents: [
           {
@@ -270,19 +262,19 @@ async function executeRequest(
           maxOutputTokens: 512,
         },
       },
-      { timeout: TIMEOUT_MS },
+      TIMEOUT_MS,
     );
 
     const elapsed = Date.now() - started;
-    const candidate = response.data?.candidates?.[0];
+    const candidate = data?.candidates?.[0];
     const text: string = candidate?.content?.parts?.[0]?.text ?? '';
     const finishReason: string | undefined = candidate?.finishReason;
     const blockReason: string | undefined =
-      response.data?.promptFeedback?.blockReason;
+      data?.promptFeedback?.blockReason;
 
     if (__DEV__) {
       console.log(
-        `[geminiVision] response: ${elapsed}ms, status=${response.status}, finish=${finishReason ?? '?'}, block=${blockReason ?? '-'}, textLen=${text.length}`,
+        `[geminiVision] response: ${elapsed}ms, finish=${finishReason ?? '?'}, block=${blockReason ?? '-'}, textLen=${text.length}`,
       );
       if (text) {
         console.log(`[geminiVision] text: ${text.slice(0, 500)}`);
@@ -379,12 +371,10 @@ async function executeRequest(
 export async function identifyAny(
   imageBase64: string,
 ): Promise<{ success: true; text: string } | { success: false; error: string }> {
-  if (!GEMINI_API_KEY) {
-    return { success: false, error: 'Gemini API key not configured' };
-  }
   try {
-    const response = await axios.post(
-      `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
+    const data = await callGeminiProxy(
+      GEMINI_MODEL,
+      'generateContent',
       {
         contents: [
           {
@@ -400,12 +390,12 @@ export async function identifyAny(
         ],
         generationConfig: { temperature: 0.2, maxOutputTokens: 128 },
       },
-      { timeout: TIMEOUT_MS },
+      TIMEOUT_MS,
     );
     const text: string =
-      response.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     const blockReason: string | undefined =
-      response.data?.promptFeedback?.blockReason;
+      data?.promptFeedback?.blockReason;
     if (blockReason) {
       return { success: false, error: `blocked: ${blockReason}` };
     }

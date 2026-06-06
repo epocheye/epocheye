@@ -59,6 +59,14 @@ const DevLoadTestArModelButton: React.FC = () => {
     });
   }, [navigation]);
 
+  const handleDetectAr = useCallback(() => {
+    console.log('[DevLoadTestArModel] nav to DetectAr');
+    navigation.navigate(ROUTES.MAIN.DETECT_AR, {
+      glbUrl: KHRONOS_DUCK_URL,
+      label: 'Duck',
+    });
+  }, [navigation]);
+
   if (!__DEV__) return null;
 
   return (
@@ -102,6 +110,20 @@ const DevLoadTestArModelButton: React.FC = () => {
         </Text>
         <Text className="text-[rgba(255,255,255,0.55)] font-montserrat text-[11px] mt-1">
           Tap a real floor · ARCore plane detection · no Geospatial
+        </Text>
+      </Pressable>
+
+      <Pressable
+        onPress={handleDetectAr}
+        accessibilityRole="button"
+        accessibilityLabel="DEV: Detector test"
+        className="rounded-2xl border border-[rgba(232,160,32,0.45)] bg-[rgba(232,160,32,0.08)] px-4 py-3"
+      >
+        <Text className="text-accent-amber font-montserrat-bold text-[13px] tracking-[1.6px]">
+          DEV: DETECTOR TEST (ROBOFLOW)
+        </Text>
+        <Text className="text-[rgba(255,255,255,0.55)] font-montserrat text-[11px] mt-1">
+          Capture a frame · hosted detector or mock · draws class + box
         </Text>
       </Pressable>
     </View>

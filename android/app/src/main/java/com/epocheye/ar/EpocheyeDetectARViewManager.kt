@@ -1,0 +1,162 @@
+package com.epocheye.ar
+
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.bridge.ReadableArray
+import com.facebook.react.common.MapBuilder
+import com.facebook.react.uimanager.SimpleViewManager
+import com.facebook.react.uimanager.ThemedReactContext
+import com.facebook.react.uimanager.annotations.ReactProp
+import com.facebook.react.uimanager.events.RCTEventEmitter
+
+/**
+ * React Native ViewManager for [EpocheyeDetectARView] (the detect→place stack).
+ *
+ * Props:
+ *   - glbUri:     model to place
+ *   - modelScale: scaleToUnits for the placed model (default 0.5)
+ *
+ * Commands (UIManager.dispatchViewManagerCommand):
+ *   - 'placeAtScreenPoint' [x, y]  — hit-test that screen point, anchor the GLB
+ *   - 'clearAnchor'                — remove the placed model
+ *   - 'nudgeYaw' [deg]             — rotate the placed model about Y
+ *   - 'captureFrame'               — emit onFrameCaptured(file:// uri)
+ */
+class EpocheyeDetectARViewManager(
+    private val reactContext: ReactApplicationContext,
+) : SimpleViewManager<EpocheyeDetectARView>() {
+
+    override fun getName(): String = "EpocheyeDetectARView"
+
+    override fun createViewInstance(
+        context: ThemedReactContext,
+    ): EpocheyeDetectARView {
+        val view = EpocheyeDetectARView(context)
+
+        view.onARReady = {
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onARReady", null)
+        }
+        view.onPlaneDetected = {
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onPlaneDetected", null)
+        }
+        view.onTrackingState = { state ->
+            val event = Arguments.createMap().apply { putString("state", state) }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onTrackingState", event)
+        }
+        view.onAnchorPlaced = { label ->
+            val event = Arguments.createMap().apply { putString("label", label) }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onAnchorPlaced", event)
+        }
+        view.onARError = { error ->
+            val event = Arguments.createMap().apply { putString("error", error) }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onARError", event)
+        }
+        view.onFrameCaptured = { uri ->
+            val event = Arguments.createMap().apply { putString("uri", uri) }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onFrameCaptured", event)
+        }
+
+        return view
+    }
+
+    @ReactProp(name = "glbUri")
+    fun setGlbUri(view: EpocheyeDetectARView, uri: String?) {
+        view.setGlbUri(uri)
+    }
+
+    @ReactProp(name = "modelScale", defaultFloat = 0.5f)
+    fun setModelScale(view: EpocheyeDetectARView, scale: Float) {
+        view.setModelScale(scale)
+    }
+
+    override fun getCommandsMap(): Map<String, Int> {
+        return MapBuilder.of(
+            "placeAtScreenPoint", CMD_PLACE_AT_SCREEN_POINT,
+            "placeFromDetection", CMD_PLACE_FROM_DETECTION,
+            "clearAnchor", CMD_CLEAR_ANCHOR,
+            "nudgeYaw", CMD_NUDGE_YAW,
+            "captureFrame", CMD_CAPTURE_FRAME,
+        )
+    }
+
+    @Deprecated("Old arch RN command dispatch", ReplaceWith("receiveCommand(view, commandId.toString(), args)"))
+    override fun receiveCommand(
+        view: EpocheyeDetectARView,
+        commandId: Int,
+        args: ReadableArray?,
+    ) {
+        when (commandId) {
+            CMD_PLACE_AT_SCREEN_POINT -> {
+                val x = args?.getDouble(0)?.toFloat() ?: return
+                val y = args?.getDouble(1)?.toFloat() ?: return
+                view.placeAtScreenPoint(x, y)
+            }
+            CMD_PLACE_FROM_DETECTION -> {
+                val nx = args?.getDouble(0)?.toFloat() ?: return
+                val ny = args?.getDouble(1)?.toFloat() ?: return
+                view.placeFromDetection(nx, ny)
+            }
+            CMD_CLEAR_ANCHOR -> view.clearAnchor()
+            CMD_NUDGE_YAW -> {
+                val deg = args?.getDouble(0)?.toFloat() ?: return
+                view.nudgeYaw(deg)
+            }
+            CMD_CAPTURE_FRAME -> view.captureFrame()
+        }
+    }
+
+    override fun receiveCommand(
+        view: EpocheyeDetectARView,
+        commandId: String?,
+        args: ReadableArray?,
+    ) {
+        when (commandId) {
+            "placeAtScreenPoint" -> {
+                val x = args?.getDouble(0)?.toFloat() ?: return
+                val y = args?.getDouble(1)?.toFloat() ?: return
+                view.placeAtScreenPoint(x, y)
+            }
+            "placeFromDetection" -> {
+                val nx = args?.getDouble(0)?.toFloat() ?: return
+                val ny = args?.getDouble(1)?.toFloat() ?: return
+                view.placeFromDetection(nx, ny)
+            }
+            "clearAnchor" -> view.clearAnchor()
+            "nudgeYaw" -> {
+                val deg = args?.getDouble(0)?.toFloat() ?: return
+                view.nudgeYaw(deg)
+            }
+            "captureFrame" -> view.captureFrame()
+        }
+    }
+
+    override fun getExportedCustomDirectEventTypeConstants(): Map<String, Any> {
+        return MapBuilder.builder<String, Any>()
+            .put("onARReady", MapBuilder.of("registrationName", "onARReady"))
+            .put("onPlaneDetected", MapBuilder.of("registrationName", "onPlaneDetected"))
+            .put("onTrackingState", MapBuilder.of("registrationName", "onTrackingState"))
+            .put("onAnchorPlaced", MapBuilder.of("registrationName", "onAnchorPlaced"))
+            .put("onARError", MapBuilder.of("registrationName", "onARError"))
+            .put("onFrameCaptured", MapBuilder.of("registrationName", "onFrameCaptured"))
+            .build()
+    }
+
+    override fun onDropViewInstance(view: EpocheyeDetectARView) {
+        view.cleanup()
+        super.onDropViewInstance(view)
+    }
+
+    companion object {
+        private const val CMD_PLACE_AT_SCREEN_POINT = 1
+        private const val CMD_PLACE_FROM_DETECTION = 2
+        private const val CMD_CLEAR_ANCHOR = 3
+        private const val CMD_NUDGE_YAW = 4
+        private const val CMD_CAPTURE_FRAME = 5
+    }
+}

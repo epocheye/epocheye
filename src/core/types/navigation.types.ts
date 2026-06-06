@@ -91,6 +91,17 @@ export type MainStackParamList = {
     glbUrl: string;
     label: string;
   };
+  /**
+   * Detector-driven AR. W1: a non-AR detector-validation surface (capture →
+   * Roboflow → 2D box). W2–W3 add the native ARCore view + world-anchored
+   * placement driven by the detector box. Params optionally carry the test GLB.
+   */
+  DetectAr:
+    | {
+        glbUrl?: string;
+        label?: string;
+      }
+    | undefined;
   /** No-ARCore fallback — render an asset in a 3D orbit/zoom viewer. */
   Ar3dViewer: {
     monumentId: string;

@@ -10,7 +10,7 @@
  */
 
 import axios from 'axios';
-import { GEMINI_API_KEY } from '@env';
+import { callGeminiProxy } from './geminiProxyClient';
 
 export interface DetectedObject {
   name: string;
@@ -28,8 +28,7 @@ interface DetectFailure {
 }
 export type DetectResult = DetectSuccess | DetectFailure;
 
-const GEMINI_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 const TIMEOUT_MS = 15_000;
 
@@ -128,13 +127,10 @@ function extractArray(text: string): DetectedObject[] | null {
 }
 
 export async function detectObjects(imageBase64: string): Promise<DetectResult> {
-  if (!GEMINI_API_KEY) {
-    return { success: false, error: 'Gemini API key not configured' };
-  }
-
   try {
-    const response = await axios.post(
-      `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
+    const data = await callGeminiProxy(
+      GEMINI_MODEL,
+      'generateContent',
       {
         contents: [
           {
@@ -155,11 +151,11 @@ export async function detectObjects(imageBase64: string): Promise<DetectResult> 
           responseMimeType: 'application/json',
         },
       },
-      { timeout: TIMEOUT_MS },
+      TIMEOUT_MS,
     );
 
     const text: string =
-      response.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     if (__DEV__) {
       console.log('[detectObjects] textLen=' + text.length);
       console.log('[detectObjects] preview:', text.slice(0, 400));

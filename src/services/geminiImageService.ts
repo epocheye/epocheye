@@ -13,13 +13,12 @@
 
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GEMINI_API_KEY } from '@env';
+import { callGeminiProxy } from './geminiProxyClient';
 import { STORAGE_KEYS } from '../core/constants/storage-keys';
 
 // ── Configuration ──────────────────────────────────────────────────
 
 const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent`;
 const TIMEOUT_MS = 30_000;
 const MAX_CACHE_ENTRIES = 60;
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
@@ -169,17 +168,11 @@ function extractImageDataUri(response: unknown): string | null {
 async function requestGemini(
   params: GenerateMonumentImageParams,
 ): Promise<GeneratedImageResult | null> {
-  if (!GEMINI_API_KEY) {
-    if (__DEV__) {
-      console.warn('[geminiImageService] GEMINI_API_KEY missing — skipping');
-    }
-    return null;
-  }
-
   await acquireSlot();
   try {
-    const response = await axios.post(
-      `${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`,
+    const data = await callGeminiProxy(
+      GEMINI_IMAGE_MODEL,
+      'generateContent',
       {
         contents: [
           {
@@ -191,10 +184,10 @@ async function requestGemini(
           temperature: 0.4,
         },
       },
-      { timeout: TIMEOUT_MS },
+      TIMEOUT_MS,
     );
 
-    const dataUri = extractImageDataUri(response.data);
+    const dataUri = extractImageDataUri(data);
     if (!dataUri) {
       negativeCache.set(cacheKey(params), Date.now() + NEGATIVE_CACHE_TTL_MS);
       if (__DEV__) {

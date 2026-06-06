@@ -24,6 +24,7 @@ class ARCorePackage : ReactPackage {
             EpocheyeARViewManager(reactContext),
             EpocheyeGeospatialARViewManager(reactContext),
             EpocheyePlaneARViewManager(reactContext),
+            EpocheyeDetectARViewManager(reactContext),
         )
     }
 }
