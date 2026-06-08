@@ -75,14 +75,20 @@ class EpocheyeDetectARViewManager(
         view.setModelScale(scale)
     }
 
+    @ReactProp(name = "cardData")
+    fun setCardData(view: EpocheyeDetectARView, json: String?) {
+        view.setCardData(json)
+    }
+
     override fun getCommandsMap(): Map<String, Int> {
-        return MapBuilder.of(
-            "placeAtScreenPoint", CMD_PLACE_AT_SCREEN_POINT,
-            "placeFromDetection", CMD_PLACE_FROM_DETECTION,
-            "clearAnchor", CMD_CLEAR_ANCHOR,
-            "nudgeYaw", CMD_NUDGE_YAW,
-            "captureFrame", CMD_CAPTURE_FRAME,
-        )
+        return MapBuilder.builder<String, Int>()
+            .put("placeAtScreenPoint", CMD_PLACE_AT_SCREEN_POINT)
+            .put("placeFromDetection", CMD_PLACE_FROM_DETECTION)
+            .put("placeInFront", CMD_PLACE_IN_FRONT)
+            .put("clearAnchor", CMD_CLEAR_ANCHOR)
+            .put("nudgeYaw", CMD_NUDGE_YAW)
+            .put("captureFrame", CMD_CAPTURE_FRAME)
+            .build()
     }
 
     @Deprecated("Old arch RN command dispatch", ReplaceWith("receiveCommand(view, commandId.toString(), args)"))
@@ -102,6 +108,7 @@ class EpocheyeDetectARViewManager(
                 val ny = args?.getDouble(1)?.toFloat() ?: return
                 view.placeFromDetection(nx, ny)
             }
+            CMD_PLACE_IN_FRONT -> view.placeInFront()
             CMD_CLEAR_ANCHOR -> view.clearAnchor()
             CMD_NUDGE_YAW -> {
                 val deg = args?.getDouble(0)?.toFloat() ?: return
@@ -127,6 +134,7 @@ class EpocheyeDetectARViewManager(
                 val ny = args?.getDouble(1)?.toFloat() ?: return
                 view.placeFromDetection(nx, ny)
             }
+            "placeInFront" -> view.placeInFront()
             "clearAnchor" -> view.clearAnchor()
             "nudgeYaw" -> {
                 val deg = args?.getDouble(0)?.toFloat() ?: return
@@ -158,5 +166,6 @@ class EpocheyeDetectARViewManager(
         private const val CMD_CLEAR_ANCHOR = 3
         private const val CMD_NUDGE_YAW = 4
         private const val CMD_CAPTURE_FRAME = 5
+        private const val CMD_PLACE_IN_FRONT = 6
     }
 }

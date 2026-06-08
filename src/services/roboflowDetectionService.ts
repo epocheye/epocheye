@@ -1,37 +1,46 @@
 /**
- * Roboflow hosted-inference object detection.
+ * Roboflow hosted-inference object detection — via the backend proxy.
  *
- * The trained detector is served by Roboflow as a hosted inference URL (the
- * model file itself is NOT downloadable — only this remote endpoint). We POST a
- * base64 JPEG and parse class + confidence + 2D box.
+ * The trained detector is served by Roboflow as a hosted WORKFLOW endpoint, and
+ * that workflow only accepts the full-access (private) API key. To keep that key
+ * out of the mobile bundle we never call Roboflow directly: the app POSTs the
+ * base64 frame to our backend (`POST /api/v1/vision/roboflow-detect`), which
+ * injects ROBOFLOW_API_KEY server-side, forwards to the workflow, and relays the
+ * response. Same rationale as the Gemini proxy.
  *
- * Config-driven (never hardcode the URL/key) via `@env`:
- *   ROBOFLOW_DETECT_URL     full POST endpoint, e.g.
- *                           https://detect.roboflow.com/<model>/<version>
- *   ROBOFLOW_API_KEY        the workspace API key (passed as ?api_key=)
- *   ROBOFLOW_MODEL          informational label only
- *   ROBOFLOW_MIN_CONFIDENCE confidence gate, 0..1 (default 0.5)
- *   ROBOFLOW_MOCK_CLASS     class label used by the mock provider
+ * Config (`@env`):
+ *   ROBOFLOW_ENABLED        'true' → call the live backend proxy; anything else
+ *                           → built-in mock provider (so the detect→place chain
+ *                           is testable before the detector is wired/deployed).
+ *   ROBOFLOW_MIN_CONFIDENCE confidence gate, 0..1 (default 0.5).
+ *   ROBOFLOW_MOCK_CLASS     class label the mock provider returns.
  *
- * If ROBOFLOW_DETECT_URL is empty the service returns a single canned, centered
- * prediction (the MOCK provider) so the rest of the detect->place chain is
- * testable before the real model ships. Setting the URL switches to live HTTP
- * with no other code change.
+ * The private key + workflow URL live ONLY on the backend
+ * (ROBOFLOW_API_KEY / ROBOFLOW_WORKFLOW_URL).
+ *
+ * Workflow response envelope:
+ *   { outputs: [ { predictions: { image: {width,height}|null,
+ *                                 predictions: [ {x,y,width,height,confidence,
+ *                                                 class,class_id}, ... ] } } ] }
+ * The `image` block can come back null, so we fall back to reading the frame's
+ * dimensions from the JPEG itself (placement normalizes the box to 0..1).
  *
  * NOTE on coordinates: Roboflow returns box `x,y` as the box CENTER in
  * source-image pixels (not top-left). For floor placement we also expose the
- * box BASE-CENTER (bottom-middle), which is the point that should be hit-tested
- * against the floor plane.
+ * box BASE-CENTER (bottom-middle), which is the point hit-tested against the
+ * floor plane.
  */
 
 import axios from 'axios';
 import {
-  ROBOFLOW_DETECT_URL,
-  ROBOFLOW_API_KEY,
-  ROBOFLOW_MODEL,
+  ROBOFLOW_ENABLED,
   ROBOFLOW_MIN_CONFIDENCE,
   ROBOFLOW_MOCK_CLASS,
 } from '@env';
+import { BACKEND_URL } from '../constants/onboarding';
+import { getValidAccessToken } from '../utils/api/auth';
+
+const PROXY_URL = `${BACKEND_URL}/api/v1/vision/roboflow-detect`;
 
 export interface RoboflowPrediction {
   class: string;
@@ -58,7 +67,7 @@ export interface RoboflowPrediction {
 interface DetectSuccess {
   success: true;
   data: RoboflowPrediction[];
-  /** True when the canned mock provider produced this (no live URL configured). */
+  /** True when the canned mock provider produced this (no live detector). */
   mock: boolean;
 }
 interface DetectFailure {
@@ -67,19 +76,19 @@ interface DetectFailure {
 }
 export type RoboflowResult = DetectSuccess | DetectFailure;
 
-const TIMEOUT_MS = 15_000;
+const TIMEOUT_MS = 20_000;
 
 function minConfidence(): number {
   const parsed = parseFloat(ROBOFLOW_MIN_CONFIDENCE ?? '');
   return Number.isFinite(parsed) ? parsed : 0.5;
 }
 
-/** Whether a live hosted endpoint is configured (vs. the mock provider). */
+/** Whether the live detector (backend proxy) is enabled vs. the mock provider. */
 export function isRoboflowConfigured(): boolean {
-  return !!ROBOFLOW_DETECT_URL && ROBOFLOW_DETECT_URL.trim().length > 0;
+  return (ROBOFLOW_ENABLED ?? '').trim().toLowerCase() === 'true';
 }
 
-/** Raw Roboflow prediction shape (classic hosted inference response). */
+/** Raw Roboflow detection prediction (same fields for classic + workflow). */
 interface RawPrediction {
   x: number;
   y: number;
@@ -142,17 +151,118 @@ function mockResult(): DetectSuccess {
   return { success: true, data: [toPrediction(raw, imageW, imageH)], mock: true };
 }
 
-function buildUrl(): string {
-  const base = ROBOFLOW_DETECT_URL.trim();
-  const params: string[] = [];
-  if (ROBOFLOW_API_KEY && ROBOFLOW_API_KEY.trim()) {
-    params.push(`api_key=${encodeURIComponent(ROBOFLOW_API_KEY.trim())}`);
+const B64_LOOKUP: Int16Array = (() => {
+  const chars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const table = new Int16Array(256).fill(-1);
+  for (let i = 0; i < chars.length; i++) table[chars.charCodeAt(i)] = i;
+  return table;
+})();
+
+/* eslint-disable no-bitwise -- base64 decode + JPEG marker walking are inherently bit/byte ops */
+
+/** Decode a base64 string to bytes (ignores whitespace / data: prefix). */
+function base64ToBytes(b64: string): Uint8Array | null {
+  try {
+    let clean = b64;
+    const comma = clean.indexOf(',');
+    if (clean.startsWith('data:') && comma >= 0) clean = clean.slice(comma + 1);
+    const len = clean.length;
+    const out = new Uint8Array(Math.floor((len * 3) / 4) + 3);
+    let o = 0;
+    let acc = 0;
+    let accBits = 0;
+    for (let i = 0; i < len; i++) {
+      const v = B64_LOOKUP[clean.charCodeAt(i)];
+      if (v < 0) continue; // skip '=', newlines, etc.
+      acc = (acc << 6) | v;
+      accBits += 6;
+      if (accBits >= 8) {
+        accBits -= 8;
+        out[o++] = (acc >> accBits) & 0xff;
+      }
+    }
+    return out.subarray(0, o);
+  } catch {
+    return null;
   }
-  // Server-side gate too; we also gate client-side below.
-  params.push(`confidence=${Math.round(minConfidence() * 100)}`);
-  params.push('format=json');
-  const sep = base.includes('?') ? '&' : '?';
-  return `${base}${sep}${params.join('&')}`;
+}
+
+/**
+ * Reads {width,height} from a base64-encoded JPEG by walking its segment
+ * markers. Used as a fallback when the workflow response omits image dimensions
+ * (its `image` block can be null) — the AR placement normalizes the detection
+ * box against the source size, so we need real dimensions. Returns null if the
+ * bytes aren't a parseable JPEG.
+ */
+function jpegSizeFromBase64(
+  b64: string,
+): { width: number; height: number } | null {
+  const bytes = base64ToBytes(b64);
+  if (!bytes || bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+    return null; // not a JPEG (no SOI)
+  }
+  let off = 2;
+  while (off + 1 < bytes.length) {
+    if (bytes[off] !== 0xff) {
+      off++;
+      continue;
+    }
+    let marker = bytes[off + 1];
+    // Collapse any 0xFF fill bytes.
+    while (marker === 0xff && off + 2 < bytes.length) {
+      off++;
+      marker = bytes[off + 1];
+    }
+    off += 2;
+    // Standalone markers (no length payload): TEM(01), RSTn(D0-D7), SOI/EOI(D8/D9).
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) continue;
+    if (off + 1 >= bytes.length) break;
+    const segLen = (bytes[off] << 8) | bytes[off + 1];
+    if (segLen < 2) break;
+    // SOF markers carry frame size: C0-CF except DHT(C4), JPG(C8), DAC(CC).
+    const isSOF =
+      marker >= 0xc0 &&
+      marker <= 0xcf &&
+      marker !== 0xc4 &&
+      marker !== 0xc8 &&
+      marker !== 0xcc;
+    if (isSOF) {
+      if (off + 6 >= bytes.length) break;
+      const height = (bytes[off + 3] << 8) | bytes[off + 4];
+      const width = (bytes[off + 5] << 8) | bytes[off + 6];
+      return width > 0 && height > 0 ? { width, height } : null;
+    }
+    off += segLen;
+  }
+  return null;
+}
+
+/* eslint-enable no-bitwise */
+
+/** Pull the workflow detections + image dims out of the proxy response. */
+function parseWorkflowBody(
+  body: any,
+  imageBase64: string,
+): { preds: RawPrediction[]; imageW: number; imageH: number } {
+  // Envelope: outputs[0].predictions = { image: {width,height}|null, predictions: [...] }
+  const block = Array.isArray(body?.outputs)
+    ? body.outputs[0]?.predictions
+    : undefined;
+  const preds: RawPrediction[] = Array.isArray(block?.predictions)
+    ? block.predictions
+    : [];
+
+  let imageW = Number(block?.image?.width) || 0;
+  let imageH = Number(block?.image?.height) || 0;
+  if (!imageW || !imageH) {
+    const size = jpegSizeFromBase64(imageBase64);
+    if (size) {
+      imageW = size.width;
+      imageH = size.height;
+    }
+  }
+  return { preds, imageW, imageH };
 }
 
 /**
@@ -165,24 +275,30 @@ export async function detectObjects(imageBase64: string): Promise<RoboflowResult
 
   if (!isRoboflowConfigured()) {
     if (__DEV__) {
-      console.log('[roboflow] no ROBOFLOW_DETECT_URL — using mock provider');
+      console.log('[roboflow] ROBOFLOW_ENABLED not set — using mock provider');
     }
     const mock = mockResult();
     return { ...mock, data: mock.data.filter(p => p.confidence >= gate) };
   }
 
   try {
-    const response = await axios.post(buildUrl(), imageBase64, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      timeout: TIMEOUT_MS,
-    });
+    const token = await getValidAccessToken();
+    const response = await axios.post(
+      PROXY_URL,
+      { image_base64: imageBase64 },
+      {
+        timeout: TIMEOUT_MS,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      },
+    );
 
-    const body = response.data ?? {};
-    const imageW: number = body.image?.width ?? 0;
-    const imageH: number = body.image?.height ?? 0;
-    const rawPreds: RawPrediction[] = Array.isArray(body.predictions)
-      ? body.predictions
-      : [];
+    const { preds: rawPreds, imageW, imageH } = parseWorkflowBody(
+      response.data ?? {},
+      imageBase64,
+    );
 
     const preds = rawPreds
       .filter(
@@ -201,7 +317,7 @@ export async function detectObjects(imageBase64: string): Promise<RoboflowResult
 
     if (__DEV__) {
       console.log(
-        `[roboflow] model=${ROBOFLOW_MODEL || '?'} preds=${rawPreds.length} kept=${preds.length} gate=${gate}`,
+        `[roboflow] preds=${rawPreds.length} kept=${preds.length} gate=${gate} dims=${imageW}x${imageH}`,
       );
     }
     return { success: true, data: preds, mock: false };
@@ -212,7 +328,10 @@ export async function detectObjects(imageBase64: string): Promise<RoboflowResult
       }
       const status = err.response?.status;
       if (status === 401 || status === 403) {
-        return { success: false, error: 'Detector auth failed — check ROBOFLOW_API_KEY' };
+        return { success: false, error: 'Session expired — please sign in again' };
+      }
+      if (status === 503) {
+        return { success: false, error: 'Detector not configured on the server yet' };
       }
       if (status === 429) {
         return { success: false, error: 'Rate limit reached — try again shortly' };

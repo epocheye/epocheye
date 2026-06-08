@@ -33,6 +33,7 @@ import { getSite } from '../../utils/api/places';
 import type { SiteDetail } from '../../utils/api/places';
 import { resolveSiteImageSource } from '../../shared/utils/localSiteImages';
 import { ROUTES } from '../../core/constants';
+import { venueHasDetector } from '../../config/glbDelivery';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -190,10 +191,16 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   // not AR-ready, the Lens screen shows an "AR not available yet" notice and
   // falls back to object detection with 3D anchored labels identifying the site.
   const handleStartARExperience = useCallback(() => {
+    const slug = siteDetail?.slug ?? site.id;
+    // Venue with a trained detector → the detector→grounded-card→AR flow.
+    if (venueHasDetector(slug)) {
+      navigation.navigate(ROUTES.MAIN.DETECT_AR, {venueSlug: slug});
+      return;
+    }
     navigation.navigate(ROUTES.MAIN.LENS, {
       mode: 'museum',
       siteName: siteDetail?.name ?? site.name,
-      siteSlug: siteDetail?.slug ?? site.id,
+      siteSlug: slug,
       arReady: siteDetail?.ar_ready ?? false,
       lat: siteDetail?.latitude ?? site.lat,
       lon: siteDetail?.longitude ?? site.lon,
@@ -260,12 +267,12 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       >
         {/* Full-bleed hero (Figma 238:61) */}
-        <View style={{ height: HERO_HEIGHT }}>
+        <View style={{ height: HERO_HEIGHT, overflow: 'hidden' }}>
           {heroSource && !heroFailed ? (
             <Image
               source={heroSource}
-              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
-              resizeMode="cover"
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="contain"
               onError={() => setHeroFailed(true)}
             />
           ) : (

@@ -20,6 +20,7 @@ import { Platform } from 'react-native';
 import type { HeritageZone } from '../core/config/geofence.types';
 import { getActiveZone } from './geofenceService';
 import { prefetchSiteForMonument } from './sitePrefetchService';
+import { prefetchVenueMarquee } from './glbSource';
 import { useCurrentZoneStore } from '../stores/currentZoneStore';
 
 const ARRIVAL_CHANNEL_ID = 'epocheye-arrival';
@@ -67,7 +68,12 @@ export async function checkZoneEntry(
   // (rare: overlapping zones). Either way we treat as a new arrival.
   useCurrentZoneStore.getState().setZone(active);
   void fireArrivalNotification(active);
+  // Backend-catalog prefetch (when the site bundle has glb_urls) …
   void prefetchSiteForMonument(active.monument_id);
+  // … plus config-driven marquee prefetch through glbSource, which works with no
+  // backend/bucket: it warms the venue's marquee model (bundled konark today,
+  // CDN once GLB_BASE_URL is set) into the on-device cache before AR opens.
+  prefetchVenueMarquee(active.monument_id);
 }
 
 async function fireArrivalNotification(zone: HeritageZone): Promise<void> {

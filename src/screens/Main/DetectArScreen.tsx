@@ -1,28 +1,30 @@
 /**
- * DetectArScreen — detector-driven world-anchored AR.
+ * DetectArScreen — detector-driven world-anchored AR + a dev model-picker.
  *
- * Two render paths, chosen by native availability:
+ * Modes (chosen by route param + native availability):
  *
- *  • Native AR (W2/W3, ARCore devices): mounts the fresh `EpocheyeDetectARView`.
- *    W2 = tap a floor plane to anchor the test GLB; it stays world-locked as you
- *    walk around. W3 adds detector-driven auto-placement. Yaw nudge for manual
- *    alignment. Placement is gated on camera TRACKING.
+ *  • PRODUCTION (no `devPicker`): point at an artifact → "Detect" captures an
+ *    ARCore frame → Roboflow → class_id → grounded card (truth) or labelled AI
+ *    guess (fallback). On a grounded hit the matching model is loaded from the
+ *    CDN and world-anchored at the object; the data card shows alongside.
  *
- *  • 2D fallback (no ARCore / W1 validation): vision-camera + Detect button that
- *    runs the Roboflow hosted detector (or mock) and draws the top box. Proves
- *    the inference wiring with no AR involved.
+ *  • DEV PICKER (`devPicker: true`, Settings → DEV): home-testable harness —
+ *    pick one of the 5 museum models → it auto-places ~1.2 m in front of you,
+ *    world-locked, with its grounded data card + scan animation. Bypasses the
+ *    detector (you can't point at a real museum artifact at home) so it just
+ *    verifies that models launch and the animations fire.
  *
- * Reached from Settings → DEV (DevLoadTestArModelButton), __DEV__-gated.
+ *  • NON-AR fallback: when ARCore is unavailable, the data card is still shown
+ *    (no 3D model — the JS three.js viewer can't decode the compressed GLBs).
  */
 
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
-  GestureResponderEvent,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -48,19 +50,34 @@ import EpocheyeDetectARView, {
 } from '../../native/EpocheyeDetectARView';
 import {useARCore} from '../../shared/hooks/useARCore';
 import {prepareImageForGemini} from '../../services/geminiVisionService';
-import {
-  detectObjects,
-  isRoboflowConfigured,
-  topPrediction,
-  type RoboflowPrediction,
-} from '../../services/roboflowDetectionService';
+import {detectObjects, topPrediction} from '../../services/roboflowDetectionService';
 import {PermissionService} from '../../shared/services/permission.service';
+import {resolveModelGlb} from '../../services/glbSource';
+import {streamMuseumNarration} from '../../services/museumModeService';
+import {
+  resolveDetection,
+  fetchObjectCard,
+  type ObjectCard,
+} from '../../services/detectorResolver';
+import PulsingRing from '../Lens/components/PulsingRing';
+import GroundedObjectCard from './components/GroundedObjectCard';
+import AiGuessCard from './components/AiGuessCard';
 import type {MainStackParamList} from '../../core/types/navigation.types';
 
 const AMBER = '#E8A020';
-const KHRONOS_DUCK_URL =
-  'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF-Binary/Duck.glb';
 const YAW_STEP_DEG = 15;
+
+/** The only venue with a trained detector today. Overridable via route param. */
+const DEFAULT_DETECTOR_VENUE = 'indian-museum';
+
+/** The 5 detector-class models, for the dev picker (exact seeded class_ids). */
+const DEV_MODELS: {classId: string; name: string}[] = [
+  {classId: 'muchalinda_buddha', name: 'Muchalinda Buddha'},
+  {classId: 'naga_canopy_seated_deity', name: 'Nagaraja'},
+  {classId: 'khadiravani_tara', name: 'Khadiravani Tara'},
+  {classId: 'seated_four_arm_goddess', name: 'Four-Armed Goddess'},
+  {classId: 'seated_buddha_oval_halo', name: 'Earth-Touching Buddha'},
+];
 
 type RouteParam = {
   key: string;
@@ -70,11 +87,91 @@ type RouteParam = {
 
 type ARStatus = 'initializing' | 'searching' | 'ready' | 'placed' | 'error';
 
+/**
+ * Resolution state for the production detector path: a grounded card wins
+ * unconditionally; the AI-guess fallback is a separate, visually-distinct state
+ * reached only when nothing grounded resolves. They never co-exist.
+ */
+type ResolvedState =
+  | {kind: 'idle'}
+  | {kind: 'grounded'; card: ObjectCard; minimal: boolean}
+  | {kind: 'ai'; label: string | null; text: string; streaming: boolean};
+
+/**
+ * Shared resolution engine (production path). Enforces the precedence: a grounded
+ * class_id card wins and Gemini is never called; only a `fallback` resolution
+ * starts the labelled "AI guess" stream. Returns the resolution so the caller can
+ * decide whether to place the 3D model (grounded/minimal) or not (ai/none).
+ */
+function useDetectionResolver(venueSlug: string) {
+  const [resolved, setResolved] = useState<ResolvedState>({kind: 'idle'});
+  const abortRef = useRef<(() => void) | null>(null);
+
+  const reset = useCallback(() => {
+    abortRef.current?.();
+    abortRef.current = null;
+    setResolved({kind: 'idle'});
+  }, []);
+
+  useEffect(() => () => abortRef.current?.(), []);
+
+  const runResolution = useCallback(
+    async (result: Parameters<typeof resolveDetection>[0], frameUri: string) => {
+      abortRef.current?.();
+      abortRef.current = null;
+
+      const resolution = await resolveDetection(result);
+
+      if (resolution.kind === 'grounded' || resolution.kind === 'minimal') {
+        setResolved({
+          kind: 'grounded',
+          card: resolution.card,
+          minimal: resolution.kind === 'minimal',
+        });
+        return resolution;
+      }
+
+      // fallback → the ONLY path that may call Gemini, clearly labelled.
+      setResolved({kind: 'ai', label: null, text: '', streaming: true});
+      let acc = '';
+      abortRef.current = streamMuseumNarration({
+        imageUri: frameUri,
+        venueSlug,
+        onObject: label =>
+          setResolved(prev => (prev.kind === 'ai' ? {...prev, label} : prev)),
+        onChunk: text => {
+          acc += text;
+          setResolved(prev => (prev.kind === 'ai' ? {...prev, text: acc} : prev));
+        },
+        onDone: () =>
+          setResolved(prev =>
+            prev.kind === 'ai' ? {...prev, streaming: false} : prev,
+          ),
+        onError: () =>
+          setResolved(prev =>
+            prev.kind === 'ai'
+              ? {
+                  ...prev,
+                  streaming: false,
+                  text: prev.text || 'Couldn’t identify this — try a clearer angle.',
+                }
+              : prev,
+          ),
+      });
+      return resolution;
+    },
+    [venueSlug],
+  );
+
+  return {resolved, runResolution, reset};
+}
+
 const DetectArScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute() as unknown as RouteParam;
-  const glbUri = route.params?.glbUrl || KHRONOS_DUCK_URL;
+  const venueSlug = route.params?.venueSlug ?? DEFAULT_DETECTOR_VENUE;
+  const devPicker = route.params?.devPicker === true;
 
   const {hasPermission, requestPermission} = useCameraPermission();
   const {arAvailable, arChecked} = useARCore();
@@ -91,11 +188,10 @@ const DetectArScreen: React.FC = () => {
 
   const handleClose = useCallback(() => navigation.goBack(), [navigation]);
 
-  // Use native AR when the module is registered AND ARCore supports the device
-  // (or the support check hasn't completed yet — optimistic until proven false).
+  // Native AR when the module is registered AND ARCore supports the device (or
+  // the support check hasn't completed yet — optimistic until proven false).
   const useNativeAR = isDetectARAvailable && (!arChecked || arAvailable);
 
-  // --- permission gate (shared) ---
   if (!hasPermission) {
     return (
       <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
@@ -127,33 +223,187 @@ const DetectArScreen: React.FC = () => {
     );
   }
 
-  if (useNativeAR) {
-    return <DetectARNative glbUri={glbUri} onClose={handleClose} />;
+  if (devPicker) {
+    // Mount the AR view whenever the native module is present (let ARCore itself
+    // report any real unavailability via onError) — so an over-cautious
+    // availability check can't leave the dev test on a black non-AR card.
+    return (
+      <DetectARDevPicker
+        arAvailable={isDetectARAvailable}
+        onClose={handleClose}
+      />
+    );
   }
-  return <DetectAR2D onClose={handleClose} />;
+  if (useNativeAR) {
+    return <DetectARNative venueSlug={venueSlug} onClose={handleClose} />;
+  }
+  return <DetectAR2D venueSlug={venueSlug} onClose={handleClose} />;
 };
 
 // ============================================================
-// Native AR path (W2: tap-to-place, world-locked; W3 adds detect)
+// DEV model-picker: pick a model → auto-place in front + card
 // ============================================================
 
-const DetectARNative: React.FC<{glbUri: string; onClose: () => void}> = ({
-  glbUri,
-  onClose,
-}) => {
+const DetectARDevPicker: React.FC<{
+  arAvailable: boolean;
+  onClose: () => void;
+}> = ({arAvailable, onClose}) => {
+  const arRef = useRef<EpocheyeDetectARHandle>(null);
+  const [status, setStatus] = useState<ARStatus>('initializing');
+  const [tracking, setTracking] = useState(false);
+  const [glbUri, setGlbUri] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [card, setCard] = useState<ObjectCard | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handlePick = useCallback(
+    async (classId: string) => {
+      setSelected(classId);
+      setLoading(true);
+      setErrorMessage(null);
+      setCard(null);
+      arRef.current?.clearAnchor();
+      try {
+        // Resolve the FULL model (CDN→cache, no low placeholder) + the grounded
+        // card (best-effort) in parallel.
+        const [uri, fetchedCard] = await Promise.all([
+          resolveModelGlb(classId),
+          fetchObjectCard(classId).catch(() => null),
+        ]);
+        setCard(fetchedCard);
+        if (!uri) {
+          setErrorMessage('Model not on the CDN — is GLB_BASE_URL set?');
+          return;
+        }
+        setGlbUri(uri);
+        // Native defers the actual placement until the model + TRACKING are ready.
+        if (arAvailable) arRef.current?.placeInFront();
+      } catch {
+        setErrorMessage('Couldn’t load that model — try again.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [arAvailable],
+  );
+
+  const handleReady = useCallback(() => {
+    setStatus(prev => (prev === 'placed' ? prev : 'searching'));
+  }, []);
+  const handleTrackingState = useCallback((state: string) => {
+    setTracking(state === 'TRACKING');
+  }, []);
+  const handlePlaneDetected = useCallback(() => {
+    setStatus(prev => (prev === 'placed' ? prev : 'ready'));
+  }, []);
+  const handleAnchorPlaced = useCallback(() => setStatus('placed'), []);
+  const handleError = useCallback((err: string) => setErrorMessage(err), []);
+  const handleYaw = useCallback(() => arRef.current?.nudgeYaw(YAW_STEP_DEG), []);
+
+  const hint = !arAvailable
+    ? 'Native AR module not in this build — do a full "npm run android" rebuild.'
+    : !tracking
+      ? 'Move your phone slowly to scan the area'
+      : selected
+        ? 'Model placed ~1.2 m ahead · ⟳ rotate · pick another below'
+        : 'Pick a model below — it appears in front of you';
+
+  return (
+    <View style={styles.root}>
+      {arAvailable ? (
+        <EpocheyeDetectARView
+          ref={arRef}
+          style={StyleSheet.absoluteFill}
+          glbUri={glbUri ?? undefined}
+          cardData={card ? JSON.stringify(card) : undefined}
+          onReady={handleReady}
+          onTrackingState={handleTrackingState}
+          onPlaneDetected={handlePlaneDetected}
+          onAnchorPlaced={handleAnchorPlaced}
+          onError={handleError}
+        />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, styles.noArBackdrop]} />
+      )}
+
+      {loading && <PulsingRing matched={false} />}
+
+      <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
+        <View style={styles.topRow} pointerEvents="box-none">
+          <Pressable onPress={onClose} hitSlop={12} style={styles.iconButton}>
+            <X size={18} color="#FFFFFF" />
+          </Pressable>
+          <View style={styles.titleBlock}>
+            <Text style={styles.title}>DEV · AR Model Test</Text>
+            <Text style={styles.subtitle}>
+              {arAvailable ? (tracking ? 'tracking' : 'scanning') : 'no AR'} · pick a model
+            </Text>
+          </View>
+          {status === 'placed' && arAvailable ? (
+            <Pressable onPress={handleYaw} hitSlop={12} style={styles.iconButton}>
+              <RotateCw size={16} color="#FFFFFF" />
+            </Pressable>
+          ) : (
+            <View style={styles.iconButton} />
+          )}
+        </View>
+      </SafeAreaView>
+
+      <SafeAreaView style={styles.bottomOverlay} edges={['bottom']} pointerEvents="box-none">
+        {/* The grounded data shows on the world-anchored AR placard above the
+            model — the on-screen card is intentionally omitted in the dev test. */}
+        <View
+          style={[styles.messageBubble, status === 'error' && styles.bubbleError]}
+          pointerEvents="none">
+          <Text style={styles.messageText}>{errorMessage ?? hint}</Text>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.pickerBar}>
+          {DEV_MODELS.map(m => (
+            <Pressable
+              key={m.classId}
+              onPress={() => void handlePick(m.classId)}
+              disabled={loading}
+              style={[
+                styles.pickerChip,
+                selected === m.classId && styles.pickerChipActive,
+              ]}>
+              <Text
+                style={[
+                  styles.pickerChipText,
+                  selected === m.classId && styles.pickerChipTextActive,
+                ]}>
+                {m.name}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+};
+
+// ============================================================
+// PRODUCTION native AR: detect → grounded card → world-anchored model
+// ============================================================
+
+const DetectARNative: React.FC<{
+  venueSlug: string;
+  onClose: () => void;
+}> = ({venueSlug, onClose}) => {
   const arRef = useRef<EpocheyeDetectARHandle>(null);
   const [status, setStatus] = useState<ARStatus>('initializing');
   const [tracking, setTracking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [detecting, setDetecting] = useState(false);
-  const [detected, setDetected] = useState<{
-    label: string;
-    confidence: number;
-    mock: boolean;
-  } | null>(null);
+  // The model to render — set from the DETECTED class (not a hardcoded marquee).
+  const [glbUri, setGlbUri] = useState<string | null>(null);
+  const {resolved, runResolution, reset} = useDetectionResolver(venueSlug);
 
-  // Keep `tracking` readable inside the async frame-captured callback without
-  // re-subscribing the native listener each time it flips.
   const trackingRef = useRef(false);
   useEffect(() => {
     trackingRef.current = tracking;
@@ -163,9 +413,7 @@ const DetectARNative: React.FC<{glbUri: string; onClose: () => void}> = ({
     setStatus(prev => (prev === 'placed' ? prev : 'searching'));
   }, []);
 
-  // Detect→place: capture an ARCore frame, run the detector, and (if a
-  // confident detection lands while TRACKING) place from the bbox base-center.
-  const handleDetectAndPlace = useCallback(() => {
+  const handleDetect = useCallback(() => {
     if (detecting) return;
     if (!trackingRef.current) {
       setErrorMessage('Move your phone slowly to scan first');
@@ -173,113 +421,90 @@ const DetectARNative: React.FC<{glbUri: string; onClose: () => void}> = ({
     }
     setDetecting(true);
     setErrorMessage('Scanning…');
-    // Triggers onFrameCaptured with a file:// uri of the ARCore camera frame.
     arRef.current?.captureFrame();
   }, [detecting]);
 
-  const handleFrameCaptured = useCallback(async (uri: string) => {
-    try {
-      const base64 = await prepareImageForGemini(uri);
-      const result = await detectObjects(base64);
-      if (!result.success) {
-        setErrorMessage(result.error);
-        return;
+  const handleFrameCaptured = useCallback(
+    async (uri: string) => {
+      try {
+        const base64 = await prepareImageForGemini(uri);
+        const result = await detectObjects(base64);
+        if (!result.success) {
+          setErrorMessage(result.error);
+          return;
+        }
+        const top = topPrediction(result);
+        // Strict precedence: a grounded class_id card wins → load THAT class's
+        // model and anchor it; otherwise the hook starts the labelled AI-guess
+        // fallback and nothing is placed (no grounded model).
+        const resolution = await runResolution(result, uri);
+        if (
+          (resolution.kind === 'grounded' || resolution.kind === 'minimal') &&
+          top
+        ) {
+          const modelUri = await resolveModelGlb(top.class);
+          if (modelUri) setGlbUri(modelUri);
+          // Native defers placement until the model + TRACKING are both ready.
+          arRef.current?.placeFromDetection(top.nBaseX, top.nBaseY);
+        }
+        setErrorMessage(null);
+      } catch {
+        setErrorMessage('Detection failed — try again');
+      } finally {
+        setDetecting(false);
       }
-      const top = topPrediction(result);
-      if (!top) {
-        setDetected(null);
-        setErrorMessage('No object above the confidence gate — move closer');
-        return;
-      }
-      setDetected({label: top.class, confidence: top.confidence, mock: result.mock});
-      // Gate: confidence is already above threshold (detectObjects filters it),
-      // and the native side re-checks TRACKING before anchoring.
-      arRef.current?.placeFromDetection(top.nBaseX, top.nBaseY);
-      setErrorMessage(null);
-    } catch {
-      setErrorMessage('Detection failed — try again');
-    } finally {
-      setDetecting(false);
-    }
-  }, []);
+    },
+    [runResolution],
+  );
 
   const handleTrackingState = useCallback((state: string) => {
     setTracking(state === 'TRACKING');
   }, []);
-
   const handlePlaneDetected = useCallback(() => {
     setStatus(prev => (prev === 'placed' ? prev : 'ready'));
   }, []);
-
   const handleAnchorPlaced = useCallback(() => {
     setStatus('placed');
     setErrorMessage(null);
   }, []);
-
   const handleError = useCallback((err: string) => {
-    // A placement/transform miss during a detect cycle should release the button.
     setDetecting(false);
-    // Soft errors (transient placement misses) shouldn't lock the screen.
-    if (
-      err.includes('no floor') ||
-      err.includes('not tracking') ||
-      err.includes('move phone') ||
-      err.includes('coordinate transform')
-    ) {
-      setErrorMessage(err);
-      return;
-    }
     setErrorMessage(err);
-    setStatus('error');
   }, []);
-
-  const handleTap = useCallback(
-    (event: GestureResponderEvent) => {
-      if (!arRef.current) return;
-      if (status === 'initializing' || status === 'error') return;
-      const {locationX, locationY} = event.nativeEvent;
-      arRef.current.placeAtScreenPoint(locationX, locationY);
-    },
-    [status],
-  );
 
   const handleReset = useCallback(() => {
     arRef.current?.clearAnchor();
+    setGlbUri(null);
+    reset();
     setStatus(prev => (prev === 'placed' ? 'ready' : prev));
-  }, []);
+  }, [reset]);
 
-  const handleYaw = useCallback(() => {
-    arRef.current?.nudgeYaw(YAW_STEP_DEG);
-  }, []);
+  const handleYaw = useCallback(() => arRef.current?.nudgeYaw(YAW_STEP_DEG), []);
 
-  const hint = useMemo(() => {
-    if (status === 'error') {
-      return `${errorMessage ?? 'AR error'} · close and reopen to retry`;
-    }
-    if (!tracking) return 'Move your phone slowly to scan the area';
-    if (status === 'searching') return 'Look around at a floor or table';
-    if (status === 'ready') return 'Tap a flat surface to place the model';
-    if (status === 'placed') {
-      return 'Walk around — it stays locked · ⟳ rotate · tap to re-place';
-    }
-    return 'Starting AR session…';
-  }, [status, tracking, errorMessage]);
+  const hint = !tracking
+    ? 'Move your phone slowly to scan the area'
+    : status === 'placed'
+      ? 'Walk around — it stays locked · ⟳ rotate · Detect again to re-scan'
+      : 'Point at an artifact and tap Detect';
 
   return (
     <View style={styles.root}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={handleTap}>
-        <EpocheyeDetectARView
-          ref={arRef}
-          style={StyleSheet.absoluteFill}
-          glbUri={glbUri}
-          onReady={handleReady}
-          onTrackingState={handleTrackingState}
-          onPlaneDetected={handlePlaneDetected}
-          onAnchorPlaced={handleAnchorPlaced}
-          onError={handleError}
-          onFrameCaptured={handleFrameCaptured}
-        />
-      </Pressable>
+      <EpocheyeDetectARView
+        ref={arRef}
+        style={StyleSheet.absoluteFill}
+        glbUri={glbUri ?? undefined}
+        cardData={
+          resolved.kind === 'grounded' ? JSON.stringify(resolved.card) : undefined
+        }
+        onReady={handleReady}
+        onTrackingState={handleTrackingState}
+        onPlaneDetected={handlePlaneDetected}
+        onAnchorPlaced={handleAnchorPlaced}
+        onError={handleError}
+        onFrameCaptured={handleFrameCaptured}
+      />
+
+      {detecting && <PulsingRing matched={false} />}
 
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">
@@ -287,7 +512,7 @@ const DetectARNative: React.FC<{glbUri: string; onClose: () => void}> = ({
             <X size={18} color="#FFFFFF" />
           </Pressable>
           <View style={styles.titleBlock}>
-            <Text style={styles.title}>Detect → Place AR</Text>
+            <Text style={styles.title}>Scan artifact</Text>
             <Text style={styles.subtitle}>
               {tracking ? 'tracking' : 'scanning'} · world-anchored
             </Text>
@@ -305,28 +530,30 @@ const DetectARNative: React.FC<{glbUri: string; onClose: () => void}> = ({
       </SafeAreaView>
 
       <SafeAreaView style={styles.bottomOverlay} edges={['bottom']} pointerEvents="box-none">
+        {resolved.kind === 'grounded' && (
+          <View style={styles.cardWrap}>
+            <GroundedObjectCard card={resolved.card} minimal={resolved.minimal} />
+          </View>
+        )}
+        {resolved.kind === 'ai' && (
+          <View style={styles.cardWrap}>
+            <AiGuessCard
+              label={resolved.label}
+              text={resolved.text}
+              streaming={resolved.streaming}
+            />
+          </View>
+        )}
+
         <View
-          style={[
-            styles.messageBubble,
-            status === 'ready' && styles.bubbleReady,
-            status === 'error' && styles.bubbleError,
-          ]}
+          style={[styles.messageBubble, status === 'error' && styles.bubbleError]}
           pointerEvents="none">
           <Text style={styles.messageText}>{errorMessage ?? hint}</Text>
         </View>
 
-        {detected && (
-          <View style={styles.detectedChip} pointerEvents="none">
-            <Text style={styles.detectedChipText}>
-              {detected.label} · {(detected.confidence * 100).toFixed(0)}%
-              {detected.mock ? ' · MOCK' : ''}
-            </Text>
-          </View>
-        )}
-
         <View style={styles.buttonRow} pointerEvents="box-none">
           <Pressable
-            onPress={handleDetectAndPlace}
+            onPress={handleDetect}
             disabled={detecting}
             style={[styles.detectButton, detecting && styles.detectButtonBusy]}>
             {detecting ? (
@@ -334,7 +561,7 @@ const DetectARNative: React.FC<{glbUri: string; onClose: () => void}> = ({
             ) : (
               <>
                 <ScanSearch size={18} color="#1A0F00" />
-                <Text style={styles.detectButtonText}>Detect &amp; Place</Text>
+                <Text style={styles.detectButtonText}>Detect</Text>
               </>
             )}
           </Pressable>
@@ -350,18 +577,19 @@ const DetectARNative: React.FC<{glbUri: string; onClose: () => void}> = ({
 };
 
 // ============================================================
-// 2D fallback path (W1: detector validation, no AR)
+// NON-AR fallback: scan → data card only (no 3D model)
 // ============================================================
 
-const DetectAR2D: React.FC<{onClose: () => void}> = ({onClose}) => {
-  const {width: screenW, height: screenH} = useWindowDimensions();
+const DetectAR2D: React.FC<{venueSlug: string; onClose: () => void}> = ({
+  venueSlug,
+  onClose,
+}) => {
   const cameraRef = useRef<VisionCamera | null>(null);
   const device = useCameraDevice('back');
 
   const [busy, setBusy] = useState(false);
-  const [prediction, setPrediction] = useState<RoboflowPrediction | null>(null);
-  const [isMock, setIsMock] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const {resolved, runResolution} = useDetectionResolver(venueSlug);
 
   const handleDetect = useCallback(async () => {
     if (busy) return;
@@ -376,20 +604,20 @@ const DetectAR2D: React.FC<{onClose: () => void}> = ({onClose}) => {
       const base64 = await prepareImageForGemini(photo.path);
       const result = await detectObjects(base64);
       if (!result.success) {
-        setPrediction(null);
         setMessage(result.error);
         return;
       }
-      const top = topPrediction(result);
-      setPrediction(top);
-      setIsMock(result.mock);
-      setMessage(top ? null : 'No object above the confidence gate — retry');
+      // Same precedence as AR; no 3D model here (this device can't do AR, and the
+      // compressed CDN GLBs aren't decodable by the JS viewer) — the card is the
+      // surface.
+      await runResolution(result, photo.path);
+      setMessage(null);
     } catch {
       setMessage('Detection failed — try again');
     } finally {
       setBusy(false);
     }
-  }, [busy]);
+  }, [busy, runResolution]);
 
   if (!device) {
     return (
@@ -404,15 +632,6 @@ const DetectAR2D: React.FC<{onClose: () => void}> = ({onClose}) => {
     );
   }
 
-  const box = prediction
-    ? {
-        left: (prediction.nCx - prediction.w / prediction.imageW / 2) * screenW,
-        top: (prediction.nCy - prediction.h / prediction.imageH / 2) * screenH,
-        width: (prediction.w / prediction.imageW) * screenW,
-        height: (prediction.h / prediction.imageH) * screenH,
-      }
-    : null;
-
   return (
     <View style={styles.root}>
       <VisionCamera
@@ -423,49 +642,47 @@ const DetectAR2D: React.FC<{onClose: () => void}> = ({onClose}) => {
         photo
       />
 
-      {box && prediction && (
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <View style={[styles.bbox, box]} />
-          <View
-            style={[
-              styles.baseDot,
-              {left: prediction.nBaseX * screenW - 6, top: prediction.nBaseY * screenH - 6},
-            ]}
-          />
-          <View style={[styles.label, {left: box.left, top: Math.max(0, box.top - 26)}]}>
-            <Text style={styles.labelText}>
-              {prediction.class} · {(prediction.confidence * 100).toFixed(0)}%
-            </Text>
-          </View>
-        </View>
-      )}
-
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">
           <Pressable onPress={onClose} hitSlop={12} style={styles.iconButton}>
             <X size={18} color="#FFFFFF" />
           </Pressable>
           <View style={styles.titleBlock}>
-            <Text style={styles.title}>Detector test</Text>
-            <Text style={styles.subtitle}>
-              {isRoboflowConfigured() ? 'hosted Roboflow' : 'MOCK provider'} · no AR
-            </Text>
+            <Text style={styles.title}>Scan artifact</Text>
+            <Text style={styles.subtitle}>identify · no AR on this device</Text>
           </View>
           <View style={styles.iconButton} />
         </View>
       </SafeAreaView>
 
       <SafeAreaView style={styles.bottomOverlay} edges={['bottom']} pointerEvents="box-none">
+        <View style={styles.arNotice} pointerEvents="none">
+          <Text style={styles.arNoticeText}>
+            AR isn’t available on this device — showing the info card instead.
+          </Text>
+        </View>
+
+        {resolved.kind === 'grounded' && (
+          <View style={styles.cardWrap}>
+            <GroundedObjectCard card={resolved.card} minimal={resolved.minimal} />
+          </View>
+        )}
+        {resolved.kind === 'ai' && (
+          <View style={styles.cardWrap}>
+            <AiGuessCard
+              label={resolved.label}
+              text={resolved.text}
+              streaming={resolved.streaming}
+            />
+          </View>
+        )}
+
         {message && (
           <View style={styles.messageBubble} pointerEvents="none">
             <Text style={styles.messageText}>{message}</Text>
           </View>
         )}
-        {isMock && prediction && (
-          <View style={styles.mockChip} pointerEvents="none">
-            <Text style={styles.mockChipText}>MOCK RESULT</Text>
-          </View>
-        )}
+
         <Pressable
           onPress={handleDetect}
           disabled={busy}
@@ -486,34 +703,7 @@ const DetectAR2D: React.FC<{onClose: () => void}> = ({onClose}) => {
 
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: '#000000'},
-  bbox: {
-    position: 'absolute',
-    borderWidth: 2,
-    borderColor: AMBER,
-    borderRadius: 4,
-    backgroundColor: 'rgba(232,160,32,0.10)',
-  },
-  baseDot: {
-    position: 'absolute',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  label: {
-    position: 'absolute',
-    backgroundColor: AMBER,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  labelText: {
-    fontFamily: 'MontserratAlternates-Bold',
-    fontSize: 12,
-    color: '#1A0F00',
-  },
+  noArBackdrop: {backgroundColor: '#0A0A0A'},
   topOverlay: {position: 'absolute', top: 0, left: 0, right: 0},
   topRow: {
     flexDirection: 'row',
@@ -554,6 +744,21 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     gap: 10,
   },
+  cardWrap: {width: '100%', alignSelf: 'stretch'},
+  arNotice: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: 'rgba(138,160,180,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(138,160,180,0.4)',
+  },
+  arNoticeText: {
+    fontFamily: 'InstrumentSans-Medium',
+    fontSize: 12,
+    color: '#C7D4DF',
+    textAlign: 'center',
+  },
   messageBubble: {
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -563,7 +768,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
     maxWidth: '90%',
   },
-  bubbleReady: {borderColor: 'rgba(232,160,32,0.55)'},
   bubbleError: {borderColor: 'rgba(239,68,68,0.55)'},
   messageText: {
     fontFamily: 'MontserratAlternates-Medium',
@@ -571,20 +775,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
   },
-  mockChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  pickerBar: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  pickerChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: 'rgba(76,175,80,0.18)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     borderWidth: 1,
-    borderColor: 'rgba(76,175,80,0.5)',
+    borderColor: 'rgba(232,160,32,0.45)',
   },
-  mockChipText: {
-    fontFamily: 'MontserratAlternates-Bold',
-    fontSize: 10,
-    letterSpacing: 1,
-    color: '#9BE39E',
+  pickerChipActive: {backgroundColor: AMBER, borderColor: AMBER},
+  pickerChipText: {
+    fontFamily: 'MontserratAlternates-SemiBold',
+    fontSize: 13,
+    color: AMBER,
   },
+  pickerChipTextActive: {color: '#1A0F00'},
   buttonRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -603,6 +814,11 @@ const styles = StyleSheet.create({
     backgroundColor: AMBER,
   },
   detectButtonBusy: {opacity: 0.7},
+  detectButtonText: {
+    fontFamily: 'MontserratAlternates-Bold',
+    fontSize: 15,
+    color: '#1A0F00',
+  },
   roundButton: {
     width: 52,
     height: 52,
@@ -610,24 +826,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: AMBER,
-  },
-  detectedChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(232,160,32,0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.5)',
-  },
-  detectedChipText: {
-    fontFamily: 'MontserratAlternates-Bold',
-    fontSize: 12,
-    color: AMBER,
-  },
-  detectButtonText: {
-    fontFamily: 'MontserratAlternates-Bold',
-    fontSize: 15,
-    color: '#1A0F00',
   },
   fallbackBlock: {
     flex: 1,

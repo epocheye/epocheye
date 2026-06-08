@@ -7,7 +7,8 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "compress-glb": "node tools/compress-glb.mjs"
   },
   "dependencies": {
     "@dr.pogodin/react-native-fs": "^2.32.0",

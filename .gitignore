@@ -67,6 +67,11 @@ yarn-error.log
 # testing
 /coverage
 
+# Native gltfpack binary (platform-specific, ~3MB) — download per tools/README.md
+/tools/gltfpack/
+# Intermediate file from tools/compress-glb.mjs
+*.decoded.tmp.glb
+
 # Yarn
 .yarn/*
 !.yarn/patches

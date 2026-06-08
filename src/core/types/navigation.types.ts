@@ -86,20 +86,19 @@ export type MainStackParamList = {
     siteName: string;
     heroImageUrl?: string;
   };
-  /** Dev-only plane-detection AR sanity check. */
-  PlaneArTest: {
-    glbUrl: string;
-    label: string;
-  };
   /**
-   * Detector-driven AR. W1: a non-AR detector-validation surface (capture →
-   * Roboflow → 2D box). W2–W3 add the native ARCore view + world-anchored
-   * placement driven by the detector box. Params optionally carry the test GLB.
+   * Detector-driven AR. Production: scan an artifact → Roboflow → grounded card
+   * + world-anchored model. `devPicker` opens the dev model-picker harness
+   * instead (pick a model → auto-place in front, for home testing).
    */
   DetectAr:
     | {
         glbUrl?: string;
         label?: string;
+        /** Seeded venue slug for grounded resolution + Gemini-fallback scoping. */
+        venueSlug?: string;
+        /** DEV: open the model-picker test instead of the detector flow. */
+        devPicker?: boolean;
       }
     | undefined;
   /** No-ARCore fallback — render an asset in a 3D orbit/zoom viewer. */

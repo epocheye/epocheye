@@ -12,7 +12,6 @@ import HistoryScreen from '../screens/History/HistoryScreen';
 import AnchorCaptureScreen from '../screens/Admin/AnchorCaptureScreen';
 import Ar3dViewerScreen from '../screens/Main/Ar3dViewerScreen';
 import AiGuideScreen from '../screens/Main/AiGuideScreen';
-import PlaneArTestScreen from '../screens/Main/PlaneArTestScreen';
 import DetectArScreen from '../screens/Main/DetectArScreen';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
@@ -103,11 +102,6 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         name={ROUTES.MAIN.AI_GUIDE}
         component={AiGuideScreen}
         options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
-      />
-      <Stack.Screen
-        name={ROUTES.MAIN.PLANE_AR_TEST}
-        component={PlaneArTestScreen}
-        options={{ animation: 'fade', presentation: 'fullScreenModal' }}
       />
       <Stack.Screen
         name={ROUTES.MAIN.DETECT_AR}

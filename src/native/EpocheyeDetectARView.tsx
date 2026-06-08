@@ -32,6 +32,8 @@ interface NativeProps {
   style?: ViewStyle;
   glbUri?: string;
   modelScale?: number;
+  /** Grounded card JSON to render as a world-anchored 3D panel. */
+  cardData?: string;
   onARReady?: () => void;
   onPlaneDetected?: () => void;
   onTrackingState?: (event: {nativeEvent: {state: string}}) => void;
@@ -52,6 +54,8 @@ export interface EpocheyeDetectARHandle {
   placeAtScreenPoint: (screenX: number, screenY: number) => void;
   /** Place from a detector bbox base-center in IMAGE_NORMALIZED coords (0..1). */
   placeFromDetection: (imgNormX: number, imgNormY: number) => void;
+  /** Auto-place the model ~1.2 m in front of the camera (dev model-picker). */
+  placeInFront: () => void;
   clearAnchor: () => void;
   nudgeYaw: (deg: number) => void;
   captureFrame: () => void;
@@ -61,6 +65,8 @@ interface Props {
   style?: ViewStyle;
   glbUri?: string;
   modelScale?: number;
+  /** Grounded card JSON → world-anchored 3D data panel beside the model. */
+  cardData?: string;
   onReady?: () => void;
   onPlaneDetected?: () => void;
   /** ARCore camera tracking state, e.g. 'TRACKING' | 'PAUSED' | 'STOPPED'. */
@@ -77,6 +83,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       style,
       glbUri,
       modelScale,
+      cardData,
       onReady,
       onPlaneDetected,
       onTrackingState,
@@ -99,6 +106,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       return {
         placeAtScreenPoint: commands.placeAtScreenPoint,
         placeFromDetection: commands.placeFromDetection,
+        placeInFront: commands.placeInFront,
         clearAnchor: commands.clearAnchor,
         nudgeYaw: commands.nudgeYaw,
         captureFrame: commands.captureFrame,
@@ -121,6 +129,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           dispatch(commandIds?.placeAtScreenPoint, [screenX, screenY]),
         placeFromDetection: (imgNormX, imgNormY) =>
           dispatch(commandIds?.placeFromDetection, [imgNormX, imgNormY]),
+        placeInFront: () => dispatch(commandIds?.placeInFront, []),
         clearAnchor: () => dispatch(commandIds?.clearAnchor, []),
         nudgeYaw: deg => dispatch(commandIds?.nudgeYaw, [deg]),
         captureFrame: () => dispatch(commandIds?.captureFrame, []),
@@ -138,6 +147,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         style={style}
         glbUri={glbUri}
         modelScale={modelScale}
+        cardData={cardData}
         onARReady={onReady}
         onPlaneDetected={onPlaneDetected}
         onTrackingState={
