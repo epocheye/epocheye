@@ -7,7 +7,6 @@ import ARExperienceScreen from '../screens/Main/ARExperienceScreen';
 import LensScreen from '../screens/Lens/LensScreen';
 import ARComposer from '../screens/Lens/ARComposer';
 import PurchaseScreen from '../screens/Main/PurchaseScreen';
-import NotificationsScreen from '../screens/Main/NotificationsScreen';
 import HistoryScreen from '../screens/History/HistoryScreen';
 import AnchorCaptureScreen from '../screens/Admin/AnchorCaptureScreen';
 import Ar3dViewerScreen from '../screens/Main/Ar3dViewerScreen';
@@ -77,11 +76,6 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
           presentation: 'modal',
           animation: 'slide_from_bottom',
         }}
-      />
-      <Stack.Screen
-        name={ROUTES.MAIN.NOTIFICATIONS}
-        component={NotificationsScreen}
-        options={{ animation: 'slide_from_right' }}
       />
       <Stack.Screen
         name={ROUTES.MAIN.HISTORY}

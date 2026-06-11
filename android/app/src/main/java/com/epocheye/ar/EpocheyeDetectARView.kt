@@ -8,7 +8,10 @@ import android.net.Uri
 import android.util.Log
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import com.facebook.react.uimanager.ThemedReactContext
 import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Plane
 import com.google.ar.core.Pose
@@ -39,7 +42,16 @@ import kotlin.math.atan2
  * The GLB is parented to an [AnchorNode], so it stays world-locked as the device
  * moves (it does NOT drift with the camera).
  */
-class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
+class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOwner {
+
+    // SceneView is driven by a view-tied lifecycle: CREATED at construction (no
+    // session/rendering yet), RESUMED only once attached to a window (so the
+    // Display + GL surface exist), DESTROYED on detach. Hosting it off
+    // ProcessLifecycleOwner started rendering before the surface was ready
+    // ("OpenGL ES API with no current context" → black) and read the Display
+    // before attach ("Display.getRotation() on null" → crash).
+    private val lifecycleRegistry = LifecycleRegistry(this)
+    override val lifecycle: Lifecycle get() = lifecycleRegistry
 
     private var glbUri: String? = null
     private var modelScale: Float = 0.5f
@@ -60,6 +72,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     private var cardNode: ImageNode? = null
     private var readyReported = false
     private var planeReported = false
+    private var lightingApplied = false
     private var lastTrackingState: TrackingState? = null
 
     /**
@@ -77,14 +90,26 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     private var pending: Pending? = null
 
     init {
-        setupAR()
+        // Do NOT build the ARSceneView here. SceneView's onLayout reads the
+        // View's own Display rotation, which is null until the view is attached
+        // to a window — building it at construction time crashes with
+        // "Display.getRotation() on a null object reference". Construction is
+        // deferred to onAttachedToWindow().
+        lifecycleRegistry.currentState = Lifecycle.State.CREATED
     }
 
     private fun setupAR() {
         try {
+            // ARSceneView reads the Display rotation, so it MUST be built with a
+            // display-associated context. The ThemedReactContext (a non-Activity
+            // context) returns a null Display on API 30+, which crashes SceneView
+            // with "Display.getRotation() on a null object reference". Use the
+            // current Activity context instead.
+            val hostContext: Context =
+                (context as? ThemedReactContext)?.currentActivity ?: context
             val sceneView = ARSceneView(
-                context = context,
-                sharedLifecycle = ProcessLifecycleOwner.get().lifecycle,
+                context = hostContext,
+                sharedLifecycle = lifecycleRegistry,
             ).apply {
                 layoutParams = LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -95,9 +120,12 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     config.geospatialMode = Config.GeospatialMode.DISABLED
                     config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     config.depthMode = Config.DepthMode.DISABLED
-                    // Fixed scene lighting (ensureLighting) instead of AR estimation —
-                    // estimation would override our IndirectLight each frame and can
-                    // leave models pitch-black indoors.
+                    // Light estimation DISABLED — on this device it produced no usable
+                    // scene light (models stayed black). Instead we apply our own
+                    // bright diffuse IndirectLight in ensureLighting(); because the
+                    // model materials are forced dielectric (metallicFactor=0) at load,
+                    // a diffuse-only IBL lights them reliably (a metal would still need
+                    // reflections). Deterministic and independent of ARCore estimates.
                     config.lightEstimationMode = Config.LightEstimationMode.DISABLED
                     config.focusMode = Config.FocusMode.AUTO
                     config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
@@ -107,6 +135,13 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     if (!readyReported) {
                         readyReported = true
                         post { onARReady?.invoke() }
+                    }
+                    // Apply our explicit scene lighting once the session/scene is live
+                    // (doing it at construction can touch Filament before the surface
+                    // exists). Estimation is off, so this is the only light source.
+                    if (!lightingApplied) {
+                        lightingApplied = true
+                        arSceneView?.let { ensureLighting(it) }
                     }
                     // Emit camera tracking state transitions so JS can gate placement.
                     val ts = try {
@@ -155,7 +190,6 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             }
             addView(sceneView)
             arSceneView = sceneView
-            ensureLighting(sceneView)
         } catch (e: Throwable) {
             Log.e(TAG, "detect AR setup failed", e)
             post { onARError?.invoke(e.message ?: "detect AR setup failed") }
@@ -173,16 +207,18 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     }
 
     /**
-     * Fixed, asset-free scene lighting so models are never pitch-black indoors: a
-     * flat ambient IndirectLight (1-band SH irradiance) for even fill + a boosted
-     * main directional "key" light. Replaces AR light estimation (disabled above).
-     * Best-effort and guarded so a Filament hiccup never blocks the camera.
+     * Explicit, asset-free scene lighting (AR light estimation is disabled). A
+     * bright flat-ambient [IndirectLight] (1-band SH irradiance) lights every
+     * dielectric surface uniformly — combined with the forced metallicFactor=0 at
+     * load, this reliably lights the heritage models — and the main directional
+     * light is boosted for some shading/relief. Best-effort and guarded so a
+     * Filament hiccup never blocks the camera.
      */
     private fun ensureLighting(sceneView: ARSceneView) {
         try {
             val ibl = com.google.android.filament.IndirectLight.Builder()
-                .irradiance(1, floatArrayOf(0.7f, 0.7f, 0.7f))
-                .intensity(40_000f)
+                .irradiance(1, floatArrayOf(1.0f, 1.0f, 1.0f))
+                .intensity(80_000f)
                 .build(sceneView.engine)
             sceneView.indirectLight = ibl
         } catch (t: Throwable) {
@@ -190,7 +226,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         }
         try {
             sceneView.mainLightNode?.let { ln ->
-                ln.lightManager.setIntensity(ln.lightInstance, 100_000f)
+                ln.lightManager.setIntensity(ln.lightInstance, 120_000f)
             }
         } catch (t: Throwable) {
             Log.w(TAG, "ensureLighting: main light boost failed", t)
@@ -475,6 +511,34 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     post { onARError?.invoke("model load failed") }
                     return@loadModelInstanceAsync
                 }
+                // Fix-ups for the recompressed heritage GLBs:
+                //  1) They are stone sculpture but mis-authored as fully metallic
+                //     (metallicFactor=1). A metal has no diffuse term, so under indoor
+                //     AR light estimation it renders near-black — force dielectric so
+                //     the diffuse path (estimated SH + main light) lights it.
+                //  2) gltfpack's meshopt/quantization left the winding reversed, so
+                //     back-face culling hid the camera-facing surfaces — the model
+                //     showed as a black shell with the floor visible through it.
+                //     setDoubleSided(true) renders both faces AND flips normals for the
+                //     back side so the lighting is correct (plus cull NONE as backstop).
+                // Per-material, each call guarded (setParameter throws on a missing param).
+                try {
+                    modelInstance.materialInstances.forEach { mi ->
+                        try { mi.setParameter("metallicFactor", 0.0f) } catch (_: Throwable) {}
+                        try { mi.setParameter("roughnessFactor", 0.85f) } catch (_: Throwable) {}
+                        try { mi.isDoubleSided = true } catch (_: Throwable) {}
+                        try {
+                            mi.cullingMode = com.google.android.filament.Material.CullingMode.NONE
+                        } catch (_: Throwable) {}
+                        // DIAGNOSTIC (temporary): green emissive, independent of light
+                        // AND albedo. Now that culling is fixed, if the whole statue
+                        // glows green the render pipeline is fine and the black is the
+                        // albedo/KTX2 texture; if it stays black the issue is deeper.
+                        try { mi.setParameter("emissiveFactor", 0.0f, 0.9f, 0.2f) } catch (_: Throwable) {}
+                    }
+                } catch (t: Throwable) {
+                    Log.w(TAG, "material fix-up skipped", t)
+                }
                 try {
                     val modelNode = ModelNode(
                         modelInstance = modelInstance,
@@ -622,10 +686,47 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         arSceneView = null
         readyReported = false
         planeReported = false
+        lightingApplied = false
         lastTrackingState = null
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // Now attached: build the ARSceneView (its child View attaches immediately,
+        // so getDisplay() is non-null and onLayout won't NPE), THEN resume — the
+        // window/display + render surface exist, so the GL context is ready before
+        // SceneView starts the session and renders.
+        if (arSceneView == null) setupAR()
+        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+    }
+
+    /**
+     * Re-run a real measure + layout pass on this view and its children.
+     *
+     * React Native drives layout from its shadow tree and swallows requestLayout()
+     * on the native view hierarchy. The ARSceneView is a SurfaceView added natively
+     * (outside RN's shadow tree): when its surface is (re)created it calls
+     * requestLayout() so SurfaceView.updateSurface() can size/position the surface.
+     * RN drops that request, so the surface is never presented and the camera
+     * renders to nothing → BLACK SCREEN. Forcing this pass applies the geometry.
+     */
+    private val measureAndLayout = Runnable {
+        measure(
+            MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY),
+        )
+        layout(left, top, right, bottom)
+    }
+
+    override fun requestLayout() {
+        super.requestLayout()
+        // Bridge RN's swallowed requestLayout → a real Android layout pass so the
+        // embedded SurfaceView actually presents (see measureAndLayout above).
+        post(measureAndLayout)
+    }
+
     override fun onDetachedFromWindow() {
+        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         super.onDetachedFromWindow()
         cleanup()
     }

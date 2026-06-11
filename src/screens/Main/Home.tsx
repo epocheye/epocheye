@@ -27,6 +27,7 @@ import type {Place} from '../../utils/api/places/types';
 import type {PlaceNavParam} from '../../core/types/navigation.types';
 import UnavailableSiteCard from './components/UnavailableSiteCard';
 import OnboardingTooltips from '../../components/OnboardingTooltips';
+import NotificationsModal from '../../components/NotificationsModal';
 import type {TabScreenProps} from '../../core/types/navigation.types';
 import {useDistanceToSite} from '../../shared/hooks/useDistanceToSite';
 import {useActiveMonument} from '../../shared/hooks/useActiveMonument';
@@ -182,6 +183,7 @@ const Home: React.FC<Props> = ({navigation}) => {
   const [routeActive, setRouteActive] = useState(false);
   const [searching, setSearching] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
   const mapRef = useRef<MapView>(null);
 
   const active = useActiveMonument();
@@ -545,7 +547,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       <View className="px-6 pt-5 pb-3 flex-row items-center justify-end">
         <View className="flex-row items-center gap-x-2">
           <Pressable
-            onPress={() => navigation.navigate(ROUTES.MAIN.NOTIFICATIONS)}
+            onPress={() => setNotifOpen(true)}
             hitSlop={10}
             className="w-9 h-9 rounded-full bg-[rgba(255,255,255,0.06)] items-center justify-center"
             accessibilityRole="button"
@@ -780,6 +782,12 @@ const Home: React.FC<Props> = ({navigation}) => {
 
       {/* First-run, non-blocking feature tips */}
       <OnboardingTooltips bottomOffset={insets.bottom + 24} />
+
+      <NotificationsModal
+        visible={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        onUnreadChange={setUnreadCount}
+      />
     </View>
   );
 };

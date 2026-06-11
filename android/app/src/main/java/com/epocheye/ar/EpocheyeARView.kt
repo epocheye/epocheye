@@ -47,14 +47,15 @@ class EpocheyeARView(context: Context) : FrameLayout(context) {
     private var readyReported = false
     private var errorReported = false
 
-    init {
-        setupAR()
-    }
+    // ARSceneView is created in onAttachedToWindow (not here): SceneView's
+    // onLayout reads the View's Display rotation, null until attached → crash.
 
     private fun setupAR() {
         try {
             val sceneView = ARSceneView(
-                context = context,
+                // Activity context — a non-Activity context has a null Display on
+                // API 30+ and crashes SceneView's Display.getRotation().
+                context = (context as? com.facebook.react.uimanager.ThemedReactContext)?.currentActivity ?: context,
                 sharedLifecycle = ProcessLifecycleOwner.get().lifecycle,
             ).apply {
                 layoutParams = LayoutParams(
@@ -175,6 +176,28 @@ class EpocheyeARView(context: Context) : FrameLayout(context) {
 
     private fun dp(value: Int): Int =
         (value * context.resources.displayMetrics.density).toInt()
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (arSceneView == null) setupAR()
+    }
+
+    // React Native swallows requestLayout() on the native view tree, so the
+    // embedded ARSceneView (a SurfaceView) never re-runs updateSurface() when its
+    // surface is created → it renders to an unpresented surface → black screen.
+    // Force a real measure + layout pass to apply the SurfaceView's geometry.
+    private val measureAndLayout = Runnable {
+        measure(
+            MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY),
+        )
+        layout(left, top, right, bottom)
+    }
+
+    override fun requestLayout() {
+        super.requestLayout()
+        post(measureAndLayout)
+    }
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()

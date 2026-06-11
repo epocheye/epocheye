@@ -45,7 +45,11 @@ function getPermissions(): Record<PermissionName, Parameters<typeof check>[0]> {
   return {
     location: PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
     camera: PERMISSIONS.ANDROID.CAMERA,
-    storage: PERMISSIONS.ANDROID.READ_MEDIA_IMAGES,
+    // Android 13+ uses the system photo picker (no runtime permission needed),
+    // so the avatar flow only requests this on API ≤32. READ_MEDIA_IMAGES is
+    // intentionally NOT declared in the manifest to avoid Google Play's
+    // Photo & Video Permissions policy declaration.
+    storage: PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE,
     microphone: PERMISSIONS.ANDROID.RECORD_AUDIO,
   };
 }

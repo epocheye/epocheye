@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Image,
   Linking,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -182,10 +183,18 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   }, [hasChanges, updateProfile, fullName, phone, profile]);
 
   const handleAvatarUpload = useCallback(async () => {
-    const hasStoragePermission = await PermissionService.request('storage');
-    if (!hasStoragePermission) {
-      PermissionService.showSettingsAlert('storage');
-      return;
+    // Android 13+ uses the system photo picker, which grants access to the
+    // chosen image without any runtime permission. Only request storage access
+    // on iOS and Android ≤12 (where READ_EXTERNAL_STORAGE still applies).
+    const needsStoragePermission =
+      Platform.OS === 'ios' ||
+      (Platform.OS === 'android' && Number(Platform.Version) < 33);
+    if (needsStoragePermission) {
+      const hasStoragePermission = await PermissionService.request('storage');
+      if (!hasStoragePermission) {
+        PermissionService.showSettingsAlert('storage');
+        return;
+      }
     }
 
     launchImageLibrary(
