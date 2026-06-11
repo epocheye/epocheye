@@ -12,6 +12,8 @@ import AnchorCaptureScreen from '../screens/Admin/AnchorCaptureScreen';
 import Ar3dViewerScreen from '../screens/Main/Ar3dViewerScreen';
 import AiGuideScreen from '../screens/Main/AiGuideScreen';
 import DetectArScreen from '../screens/Main/DetectArScreen';
+import GoToVenueScreen from '../screens/Main/GoToVenueScreen';
+import VenueActivationBanner from '../components/VenueActivationBanner';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
 
@@ -23,6 +25,7 @@ interface MainNavigationProps {
 
 const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
   return (
+    <>
     <Stack.Navigator
       initialRouteName={ROUTES.MAIN.TABS}
       screenOptions={{
@@ -102,7 +105,14 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         component={DetectArScreen}
         options={{ animation: 'fade', presentation: 'fullScreenModal' }}
       />
+      <Stack.Screen
+        name={ROUTES.MAIN.GO_TO_VENUE}
+        component={GoToVenueScreen}
+        options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}
+      />
     </Stack.Navigator>
+    <VenueActivationBanner />
+    </>
   );
 };
 

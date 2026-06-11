@@ -39,6 +39,7 @@ export const ROUTES = {
     AR_3D_VIEWER: 'Ar3dViewer',
     AI_GUIDE: 'AiGuide',
     DETECT_AR: 'DetectAr',
+    GO_TO_VENUE: 'GoToVenue',
   },
 
   /**

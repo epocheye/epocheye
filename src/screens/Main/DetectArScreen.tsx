@@ -50,21 +50,26 @@ import EpocheyeDetectARView, {
 } from '../../native/EpocheyeDetectARView';
 import {useARCore} from '../../shared/hooks/useARCore';
 import {prepareImageForGemini} from '../../services/geminiVisionService';
-import {detectObjects, topPrediction} from '../../services/roboflowDetectionService';
 import {PermissionService} from '../../shared/services/permission.service';
 import {resolveModelGlb} from '../../services/glbSource';
-import {streamMuseumNarration} from '../../services/museumModeService';
-import {
-  resolveDetection,
-  fetchObjectCard,
-  type ObjectCard,
-} from '../../services/detectorResolver';
+import {recognize} from '../../services/recognizeService';
+// fetchObjectCard is the grounded data-card lookup (GET /vision/object/{class_id});
+// it is NOT the Roboflow detector. Roboflow (roboflowDetectionService /
+// resolveDetection) is retired off the live recognition path — kept dormant in the
+// repo behind ROBOFLOW_ENABLED for a possible future cheap pre-filter.
+import {fetchObjectCard, type ObjectCard} from '../../services/detectorResolver';
+import {useVenueGate} from '../../shared/hooks/useVenueGate';
 import PulsingRing from '../Lens/components/PulsingRing';
 import GroundedObjectCard from './components/GroundedObjectCard';
 import AiGuessCard from './components/AiGuessCard';
+import AnalyzingOverlay from './components/AnalyzingOverlay';
+import {ROUTES} from '../../core/constants';
+import {COLORS} from '../../core/constants/theme';
 import type {MainStackParamList} from '../../core/types/navigation.types';
 
-const AMBER = '#E8A020';
+// Primary accent for the scan screen — the theme's sky token (was a stale amber
+// hex). Named AMBER for historical reasons; it now drives the current palette.
+const AMBER = COLORS.sky;
 const YAW_STEP_DEG = 15;
 
 /** The only venue with a trained detector today. Overridable via route param. */
@@ -97,11 +102,26 @@ type ResolvedState =
   | {kind: 'grounded'; card: ObjectCard; minimal: boolean}
   | {kind: 'ai'; label: string | null; text: string; streaming: boolean};
 
+/** What runResolution decided, so the caller can place the model / route the user. */
+type ResolutionOutcome =
+  | {kind: 'grounded' | 'minimal'; classId: string}
+  | {kind: 'ai'}
+  | {kind: 'paywall'; paywall: {siteId: string; used: number; limit: number}}
+  | {kind: 'error'};
+
 /**
- * Shared resolution engine (production path). Enforces the precedence: a grounded
- * class_id card wins and Gemini is never called; only a `fallback` resolution
- * starts the labelled "AI guess" stream. Returns the resolution so the caller can
- * decide whether to place the 3D model (grounded/minimal) or not (ai/none).
+ * Shared resolution engine. The PRIMARY (and only) recognizer is the server-side
+ * three-layer agent behind POST /api/v1/recognize. There is NO universal
+ * museum-mode fallback — recognition only happens inside a venue (the screen is
+ * venue-gated), and the two-gate rule is enforced server-side:
+ *
+ *   - match 'grounded'          → fetch the grounded data card (GET /vision/object)
+ *                                 and place that class's model. A grounded card wins.
+ *   - match 'ai_interpretation' → a clearly-labelled, non-streaming "AI" card.
+ *   - match 'paywall'           → free scans spent at this venue → route to purchase.
+ *
+ * Grounded and AI content never co-exist. Returns the outcome so the caller can
+ * place the model, route to the paywall, or show a retry message.
  */
 function useDetectionResolver(venueSlug: string) {
   const [resolved, setResolved] = useState<ResolvedState>({kind: 'idle'});
@@ -116,49 +136,50 @@ function useDetectionResolver(venueSlug: string) {
   useEffect(() => () => abortRef.current?.(), []);
 
   const runResolution = useCallback(
-    async (result: Parameters<typeof resolveDetection>[0], frameUri: string) => {
-      abortRef.current?.();
-      abortRef.current = null;
-
-      const resolution = await resolveDetection(result);
-
-      if (resolution.kind === 'grounded' || resolution.kind === 'minimal') {
-        setResolved({
-          kind: 'grounded',
-          card: resolution.card,
-          minimal: resolution.kind === 'minimal',
-        });
-        return resolution;
+    async (frameBase64: string): Promise<ResolutionOutcome> => {
+      let result;
+      try {
+        result = await recognize({imageBase64: frameBase64, venueId: venueSlug});
+      } catch {
+        return {kind: 'error'};
       }
 
-      // fallback → the ONLY path that may call Gemini, clearly labelled.
-      setResolved({kind: 'ai', label: null, text: '', streaming: true});
-      let acc = '';
-      abortRef.current = streamMuseumNarration({
-        imageUri: frameUri,
-        venueSlug,
-        onObject: label =>
-          setResolved(prev => (prev.kind === 'ai' ? {...prev, label} : prev)),
-        onChunk: text => {
-          acc += text;
-          setResolved(prev => (prev.kind === 'ai' ? {...prev, text: acc} : prev));
-        },
-        onDone: () =>
-          setResolved(prev =>
-            prev.kind === 'ai' ? {...prev, streaming: false} : prev,
-          ),
-        onError: () =>
-          setResolved(prev =>
-            prev.kind === 'ai'
-              ? {
-                  ...prev,
-                  streaming: false,
-                  text: prev.text || 'Couldn’t identify this — try a clearer angle.',
-                }
-              : prev,
-          ),
-      });
-      return resolution;
+      // Per-site free scans spent → caller routes to the Explorer-Pass purchase.
+      if (result.match === 'paywall') {
+        return {
+          kind: 'paywall',
+          paywall: result.paywall ?? {siteId: venueSlug, used: 0, limit: 0},
+        };
+      }
+
+      // GROUNDED → reuse the grounded data-card lookup so GroundedObjectCard and the
+      // native cardData contract stay unchanged; class_id drives GLB placement.
+      if (result.match === 'grounded' && result.class_id) {
+        try {
+          const card = await fetchObjectCard(result.class_id);
+          if (card) {
+            const minimal = !card.narrative || card.narrative.trim().length === 0;
+            setResolved({kind: 'grounded', card, minimal});
+            return {kind: minimal ? 'minimal' : 'grounded', classId: result.class_id};
+          }
+        } catch {
+          // fall through to the AI card / error
+        }
+      }
+
+      // AI interpretation (the in-venue two-gate fallback) → labelled card, no stream.
+      if (result.match === 'ai_interpretation' && result.card) {
+        setResolved({
+          kind: 'ai',
+          label: result.card.title || null,
+          text: result.card.body || '',
+          streaming: false,
+        });
+        return {kind: 'ai'};
+      }
+
+      // out_of_venue / unexpected — the venue gate should prevent this.
+      return {kind: 'error'};
     },
     [venueSlug],
   );
@@ -175,6 +196,7 @@ const DetectArScreen: React.FC = () => {
 
   const {hasPermission, requestPermission} = useCameraPermission();
   const {arAvailable, arChecked} = useARCore();
+  const {inVenue} = useVenueGate();
   const permissionRequestedRef = useRef(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
 
@@ -186,7 +208,20 @@ const DetectArScreen: React.FC = () => {
     });
   }, [hasPermission, requestPermission]);
 
+  // Venue lock: the live scan/AR experience only runs inside a curated venue.
+  // Away from one, redirect to the "go to your nearest venue" screen. The dev
+  // picker is a home-testing harness and intentionally bypasses the gate.
+  useEffect(() => {
+    if (!devPicker && !inVenue) {
+      navigation.replace(ROUTES.MAIN.GO_TO_VENUE);
+    }
+  }, [devPicker, inVenue, navigation]);
+
   const handleClose = useCallback(() => navigation.goBack(), [navigation]);
+
+  if (!devPicker && !inVenue) {
+    return <View style={styles.root} />; // redirecting to GoToVenue
+  }
 
   // Native AR when the module is registered AND ARCore supports the device (or
   // the support check hasn't completed yet — optimistic until proven false).
@@ -395,6 +430,8 @@ const DetectARNative: React.FC<{
   venueSlug: string;
   onClose: () => void;
 }> = ({venueSlug, onClose}) => {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const arRef = useRef<EpocheyeDetectARHandle>(null);
   const [status, setStatus] = useState<ARStatus>('initializing');
   const [tracking, setTracking] = useState(false);
@@ -428,33 +465,33 @@ const DetectARNative: React.FC<{
     async (uri: string) => {
       try {
         const base64 = await prepareImageForGemini(uri);
-        const result = await detectObjects(base64);
-        if (!result.success) {
-          setErrorMessage(result.error);
-          return;
-        }
-        const top = topPrediction(result);
-        // Strict precedence: a grounded class_id card wins → load THAT class's
-        // model and anchor it; otherwise the hook starts the labelled AI-guess
-        // fallback and nothing is placed (no grounded model).
-        const resolution = await runResolution(result, uri);
-        if (
-          (resolution.kind === 'grounded' || resolution.kind === 'minimal') &&
-          top
-        ) {
-          const modelUri = await resolveModelGlb(top.class);
+        // Strict precedence (enforced server-side by the two-gate agent): a grounded
+        // class wins → load THAT class's model and anchor it; an AI card is shown by
+        // the hook; a spent allowance routes to purchase.
+        const resolution = await runResolution(base64);
+        if (resolution.kind === 'grounded' || resolution.kind === 'minimal') {
+          const modelUri = await resolveModelGlb(resolution.classId);
           if (modelUri) setGlbUri(modelUri);
-          // Native defers placement until the model + TRACKING are both ready.
-          arRef.current?.placeFromDetection(top.nBaseX, top.nBaseY);
+          // The recognizer no longer returns a detector bounding box. The user aimed
+          // at the artifact, so anchor near the screen centre; native defers
+          // placement until the model + TRACKING are both ready. (Precise hit-test
+          // placement / AR placard UI is a later step.)
+          arRef.current?.placeFromDetection(0.5, 0.85);
+          setErrorMessage(null);
+        } else if (resolution.kind === 'paywall') {
+          navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
+        } else if (resolution.kind === 'error') {
+          setErrorMessage('Couldn’t reach the lens — try again');
+        } else {
+          setErrorMessage(null); // 'ai' — labelled card set by the hook
         }
-        setErrorMessage(null);
       } catch {
         setErrorMessage('Detection failed — try again');
       } finally {
         setDetecting(false);
       }
     },
-    [runResolution],
+    [runResolution, navigation, venueSlug],
   );
 
   const handleTrackingState = useCallback((state: string) => {
@@ -504,7 +541,7 @@ const DetectARNative: React.FC<{
         onFrameCaptured={handleFrameCaptured}
       />
 
-      {detecting && <PulsingRing matched={false} />}
+      <AnalyzingOverlay visible={detecting} />
 
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">
@@ -584,6 +621,8 @@ const DetectAR2D: React.FC<{venueSlug: string; onClose: () => void}> = ({
   venueSlug,
   onClose,
 }) => {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const cameraRef = useRef<VisionCamera | null>(null);
   const device = useCameraDevice('back');
 
@@ -602,22 +641,23 @@ const DetectAR2D: React.FC<{venueSlug: string; onClose: () => void}> = ({
         return;
       }
       const base64 = await prepareImageForGemini(photo.path);
-      const result = await detectObjects(base64);
-      if (!result.success) {
-        setMessage(result.error);
-        return;
-      }
       // Same precedence as AR; no 3D model here (this device can't do AR, and the
       // compressed CDN GLBs aren't decodable by the JS viewer) — the card is the
       // surface.
-      await runResolution(result, photo.path);
-      setMessage(null);
+      const resolution = await runResolution(base64);
+      if (resolution.kind === 'paywall') {
+        navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
+      } else if (resolution.kind === 'error') {
+        setMessage('Couldn’t reach the lens — try again');
+      } else {
+        setMessage(null);
+      }
     } catch {
       setMessage('Detection failed — try again');
     } finally {
       setBusy(false);
     }
-  }, [busy, runResolution]);
+  }, [busy, runResolution, navigation, venueSlug]);
 
   if (!device) {
     return (
@@ -641,6 +681,8 @@ const DetectAR2D: React.FC<{venueSlug: string; onClose: () => void}> = ({
         isActive
         photo
       />
+
+      <AnalyzingOverlay visible={busy} />
 
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">

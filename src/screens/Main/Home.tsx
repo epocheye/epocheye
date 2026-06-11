@@ -775,7 +775,9 @@ const Home: React.FC<Props> = ({navigation}) => {
           bottom={insets.bottom + 16}
           onDismiss={dismissSelection}
           onExplore={() =>
-            navigation.navigate(ROUTES.MAIN.LENS, {mode: 'museum'})
+            // This is an UNAVAILABLE (non-Epocheye) place — the lens only opens at a
+            // venue, so point the user to their nearest one instead of museum mode.
+            navigation.navigate(ROUTES.MAIN.GO_TO_VENUE)
           }
         />
       ) : null}

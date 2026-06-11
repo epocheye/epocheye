@@ -73,6 +73,7 @@ import { performHDScan, type HDScanMask } from '../../services/hdScanService';
 import { getValidAccessToken } from '../../utils/api/auth';
 import { logVisit } from '../../utils/api/userActions';
 import { useARCore } from '../../shared/hooks/useARCore';
+import { useVenueGate } from '../../shared/hooks/useVenueGate';
 import EpocheyeARView from '../../native/EpocheyeARView';
 import {
   pollReconstructionJob,
@@ -195,6 +196,21 @@ const LensScreen: React.FC<Props> = ({ navigation, route }) => {
     route.params?.mode === 'museum' ? route.params.lat ?? null : null;
   const museumSiteLon =
     route.params?.mode === 'museum' ? route.params.lon ?? null : null;
+  // Universal museum mode is retired. The agent recognizer (DetectAr) is the single
+  // scan surface, and it only runs inside a venue. So any museum-mode entry here is
+  // re-routed: away from a venue → "go to your nearest venue"; inside one → the
+  // agent scanner for that venue.
+  const { inVenue, venueSlug } = useVenueGate();
+  useEffect(() => {
+    if (!museumMode) return;
+    if (!inVenue) {
+      navigation.replace(ROUTES.MAIN.GO_TO_VENUE);
+    } else {
+      navigation.replace(ROUTES.MAIN.DETECT_AR, {
+        venueSlug: venueSlug ?? museumSiteSlug ?? undefined,
+      });
+    }
+  }, [museumMode, inVenue, venueSlug, museumSiteSlug, navigation]);
   const [arNoticeDismissed, setArNoticeDismissed] = useState(false);
   const showArUnavailableNotice =
     !!museumSiteName && !museumSiteArReady && !arNoticeDismissed;

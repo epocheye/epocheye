@@ -113,6 +113,8 @@ export type MainStackParamList = {
     /** Default era subtitle when no era slider applies (e.g. catalog viewer_only callers). */
     defaultEraLabel?: string;
   };
+  /** Away-from-venue gate: shown when the user tries to scan outside any venue. */
+  GoToVenue: undefined;
 };
 
 /**

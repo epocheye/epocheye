@@ -80,8 +80,8 @@ async function fireArrivalNotification(zone: HeritageZone): Promise<void> {
   await ensureArrivalChannel();
   try {
     await notifee.displayNotification({
-      title: `You're at ${zone.name}`,
-      body: `${zone.epochLabel} · Open Lens to begin your AR experience.`,
+      title: `Epocheye is now active at ${zone.name}`,
+      body: `${zone.epochLabel} · Point your phone at an exhibit to begin.`,
       android: {
         channelId: ARRIVAL_CHANNEL_ID,
         smallIcon: 'ic_launcher',
