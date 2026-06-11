@@ -107,6 +107,7 @@ type ResolutionOutcome =
   | {kind: 'grounded' | 'minimal'; classId: string}
   | {kind: 'ai'}
   | {kind: 'paywall'; paywall: {siteId: string; used: number; limit: number}}
+  | {kind: 'limit'}
   | {kind: 'error'};
 
 /**
@@ -150,6 +151,11 @@ function useDetectionResolver(venueSlug: string) {
           kind: 'paywall',
           paywall: result.paywall ?? {siteId: venueSlug, used: 0, limit: 0},
         };
+      }
+
+      // Daily exploration budget reached (a soft circuit breaker) → gentle message.
+      if (result.match === 'daily_limit') {
+        return {kind: 'limit'};
       }
 
       // GROUNDED → reuse the grounded data-card lookup so GroundedObjectCard and the
@@ -480,6 +486,10 @@ const DetectARNative: React.FC<{
           setErrorMessage(null);
         } else if (resolution.kind === 'paywall') {
           navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
+        } else if (resolution.kind === 'limit') {
+          setErrorMessage(
+            'You’ve explored a lot here today — come back tomorrow for more.',
+          );
         } else if (resolution.kind === 'error') {
           setErrorMessage('Couldn’t reach the lens — try again');
         } else {
@@ -647,6 +657,8 @@ const DetectAR2D: React.FC<{venueSlug: string; onClose: () => void}> = ({
       const resolution = await runResolution(base64);
       if (resolution.kind === 'paywall') {
         navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
+      } else if (resolution.kind === 'limit') {
+        setMessage('You’ve explored a lot here today — come back tomorrow for more.');
       } else if (resolution.kind === 'error') {
         setMessage('Couldn’t reach the lens — try again');
       } else {

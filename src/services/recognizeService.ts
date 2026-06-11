@@ -30,7 +30,8 @@ export type RecognizeMatch =
   | 'grounded'
   | 'ai_interpretation'
   | 'out_of_venue'
-  | 'paywall';
+  | 'paywall'
+  | 'daily_limit';
 
 /** The agent's Layer-3 card (grounded or AI). Mirrors the backend `Card` shape. */
 export interface RecognizeCard {
