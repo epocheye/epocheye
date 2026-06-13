@@ -85,6 +85,8 @@ class EpocheyeARView(context: Context) : FrameLayout(context) {
                 }
             }
 
+            // Hide SceneView's dotted plane-visualization grid (detection stays on).
+            try { sceneView.planeRenderer.isEnabled = false } catch (_: Throwable) {}
             addView(sceneView)
             arSceneView = sceneView
 

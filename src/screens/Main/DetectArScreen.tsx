@@ -53,6 +53,7 @@ import {prepareImageForGemini} from '../../services/geminiVisionService';
 import {PermissionService} from '../../shared/services/permission.service';
 import {resolveModelGlb} from '../../services/glbSource';
 import {recognize} from '../../services/recognizeService';
+import {streamMuseumNarration} from '../../services/museumModeService';
 // fetchObjectCard is the grounded data-card lookup (GET /vision/object/{class_id});
 // it is NOT the Roboflow detector. Roboflow (roboflowDetectionService /
 // resolveDetection) is retired off the live recognition path — kept dormant in the
@@ -124,15 +125,19 @@ type ResolutionOutcome =
   | {kind: 'error'};
 
 /**
- * Shared resolution engine. The PRIMARY (and only) recognizer is the server-side
- * three-layer agent behind POST /api/v1/recognize. There is NO universal
- * museum-mode fallback — recognition only happens inside a venue (the screen is
- * venue-gated), and the two-gate rule is enforced server-side:
+ * Shared resolution engine. The PRIMARY recognizer is the server-side three-layer
+ * agent behind POST /api/v1/recognize:
  *
  *   - match 'grounded'          → fetch the grounded data card (GET /vision/object)
  *                                 and place that class's model. A grounded card wins.
  *   - match 'ai_interpretation' → a clearly-labelled, non-streaming "AI" card.
  *   - match 'paywall'           → free scans spent at this venue → route to purchase.
+ *
+ * DEV "scan anything" (allowUngrounded) and the documented out_of_venue case fall
+ * back to the universal museum-mode identify (POST /api/v1/vision/identify, the
+ * cheap streaming identifier) so the test works on any object — and keeps working
+ * even when the agent endpoint isn't reachable/deployed. Streamed narration feeds
+ * the same AI card (with the live typewriter).
  *
  * Grounded and AI content never co-exist. Returns the outcome so the caller can
  * place the model, route to the paywall, or show a retry message.
@@ -149,8 +154,68 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
 
   useEffect(() => () => abortRef.current?.(), []);
 
+  // Universal identify fallback: streams an "AI interpretation" card for any
+  // object via the deployed museum-mode endpoint. Resolves the outcome as soon as
+  // the object label arrives so the card shows immediately and narration continues
+  // streaming in; the stream is aborted on reset/unmount via abortRef.
+  const runMuseumFallback = useCallback(
+    (imageUri: string): Promise<ResolutionOutcome> =>
+      new Promise<ResolutionOutcome>(resolve => {
+        let settled = false;
+        const finish = (outcome: ResolutionOutcome) => {
+          if (!settled) {
+            settled = true;
+            resolve(outcome);
+          }
+        };
+        setResolved({kind: 'ai', label: null, text: '', streaming: true});
+        abortRef.current?.();
+        abortRef.current = streamMuseumNarration({
+          imageUri,
+          onObject: label => {
+            setResolved(prev =>
+              prev.kind === 'ai'
+                ? {...prev, label}
+                : {kind: 'ai', label, text: '', streaming: true},
+            );
+            finish({kind: 'ai'});
+          },
+          onChunk: chunk => {
+            setResolved(prev =>
+              prev.kind === 'ai'
+                ? {...prev, text: prev.text + chunk}
+                : {kind: 'ai', label: null, text: chunk, streaming: true},
+            );
+          },
+          onDone: () => {
+            setResolved(prev =>
+              prev.kind === 'ai' ? {...prev, streaming: false} : prev,
+            );
+            finish({kind: 'ai'});
+          },
+          onError: () => {
+            setResolved({kind: 'idle'});
+            finish({kind: 'error'});
+          },
+          onPaywall: info =>
+            finish({
+              kind: 'paywall',
+              paywall: {
+                siteId: info.siteId || venueSlug,
+                used: info.used,
+                limit: info.limit,
+              },
+            }),
+        });
+      }),
+    [venueSlug],
+  );
+
   const runResolution = useCallback(
-    async (frameBase64: string): Promise<ResolutionOutcome> => {
+    async (
+      frameBase64: string,
+      imageUri?: string,
+    ): Promise<ResolutionOutcome> => {
       let result;
       try {
         result = await recognize({
@@ -159,6 +224,9 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
           allowUngrounded,
         });
       } catch {
+        // Agent endpoint unreachable — in dev "scan anything", still try the
+        // deployed universal identify so the test isn't blocked on a deploy.
+        if (allowUngrounded && imageUri) return runMuseumFallback(imageUri);
         return {kind: 'error'};
       }
 
@@ -201,10 +269,12 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
         return {kind: 'ai'};
       }
 
-      // out_of_venue / unexpected — the venue gate should prevent this.
+      // out_of_venue / unexpected. In dev "scan anything" this is expected (no
+      // seeded venue), so fall back to the universal identify on the frame.
+      if (allowUngrounded && imageUri) return runMuseumFallback(imageUri);
       return {kind: 'error'};
     },
-    [venueSlug, allowUngrounded],
+    [venueSlug, allowUngrounded, runMuseumFallback],
   );
 
   return {resolved, runResolution, reset};
@@ -355,8 +425,9 @@ const DetectARNative: React.FC<{
         const base64 = await prepareImageForGemini(uri);
         // Strict precedence (enforced server-side by the two-gate agent): a grounded
         // class wins → load THAT class's model and anchor it; an AI card is shown by
-        // the hook; a spent allowance routes to purchase.
-        const resolution = await runResolution(base64);
+        // the hook; a spent allowance routes to purchase. `uri` lets the dev
+        // "scan anything" path fall back to the universal identify.
+        const resolution = await runResolution(base64, uri);
         if (resolution.kind === 'grounded' || resolution.kind === 'minimal') {
           const modelUri = await resolveModelGlb(resolution.classId);
           if (modelUri) setGlbUri(modelUri);
@@ -550,8 +621,8 @@ const DetectAR2D: React.FC<{
       const base64 = await prepareImageForGemini(photo.path);
       // Same precedence as AR; no 3D model here (this device can't do AR, and the
       // compressed CDN GLBs aren't decodable by the JS viewer) — the card is the
-      // surface.
-      const resolution = await runResolution(base64);
+      // surface. photo.path lets the dev "scan anything" path fall back to identify.
+      const resolution = await runResolution(base64, photo.path);
       if (resolution.kind === 'paywall') {
         navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
       } else if (resolution.kind === 'limit') {

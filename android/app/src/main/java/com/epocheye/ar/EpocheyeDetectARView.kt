@@ -188,6 +188,13 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
                     }
                 }
             }
+            // Hide SceneView's built-in plane visualization (the dotted grid). Plane
+            // DETECTION stays on (config.planeFindingMode above) so hit-testing still
+            // works — only the on-screen technical overlay is suppressed.
+            try {
+                sceneView.planeRenderer.isEnabled = false
+            } catch (_: Throwable) {
+            }
             addView(sceneView)
             arSceneView = sceneView
         } catch (e: Throwable) {
@@ -475,6 +482,27 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
 
     fun clearAnchor() {
         clearCurrentAnchor()
+        // Re-scan: detection is needed again to hit-test the next placement.
+        setPlaneFinding(true)
+    }
+
+    /**
+     * Toggle continuous plane finding on the live session. We keep it ON while
+     * the user is aiming/placing, then turn it OFF once a model is anchored — the
+     * model is world-locked via its anchor (which survives mode changes), so the
+     * heavy per-frame plane detection is pure wasted CPU/heat after placement.
+     */
+    private fun setPlaneFinding(enabled: Boolean) {
+        val session = arSceneView?.session ?: return
+        try {
+            val config = session.config
+            config.planeFindingMode =
+                if (enabled) Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                else Config.PlaneFindingMode.DISABLED
+            session.configure(config)
+        } catch (t: Throwable) {
+            Log.w(TAG, "setPlaneFinding($enabled) failed", t)
+        }
     }
 
     private fun clearCurrentAnchor() {
@@ -530,11 +558,6 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
                         try {
                             mi.cullingMode = com.google.android.filament.Material.CullingMode.NONE
                         } catch (_: Throwable) {}
-                        // DIAGNOSTIC (temporary): green emissive, independent of light
-                        // AND albedo. Now that culling is fixed, if the whole statue
-                        // glows green the render pipeline is fine and the black is the
-                        // albedo/KTX2 texture; if it stays black the issue is deeper.
-                        try { mi.setParameter("emissiveFactor", 0.0f, 0.9f, 0.2f) } catch (_: Throwable) {}
                     }
                 } catch (t: Throwable) {
                     Log.w(TAG, "material fix-up skipped", t)
@@ -550,6 +573,10 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
                     }
                     anchorNode.addChildNode(modelNode)
                     currentModelNode = modelNode
+                    // Model is now world-locked via its anchor — stop continuous
+                    // plane finding to cut sustained CPU load / heat. Re-enabled on
+                    // clearAnchor() for a re-scan.
+                    setPlaneFinding(false)
                     post { onAnchorPlaced?.invoke("detect_place") }
                     // Float the data placard above the model, if a card is set.
                     cardData?.let { attachCard(sceneView, anchorNode, it) }
