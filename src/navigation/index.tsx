@@ -5,7 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigation from './MainNavigation';
 import LoginScreen from '../screens/Auth/LoginScreen';
-import { STORAGE_KEYS } from '../core/constants';
+import { ROUTES, STORAGE_KEYS } from '../core/constants';
+import type { LinkingOptions } from '@react-navigation/native';
+import type { MainStackParamList } from '../core/types/navigation.types';
 import AnimatedLogo from '../components/ui/AnimatedLogo';
 import { OnboardingCallbackProvider } from '../context/OnboardingCallbackContext';
 import { useSessionStore } from '../stores/sessionStore';
@@ -13,6 +15,18 @@ import { useUserStore } from '../stores/userStore';
 import { usePlacesStore } from '../stores/placesStore';
 
 type AppState = 'loading' | 'onboarding' | 'login' | 'main';
+
+// Deep links: epocheye://site/<slug> (and https://epocheye.com/s/... → the website
+// bounces to the scheme) open SiteDetail directly. Only resolves once the main
+// navigator is mounted (authenticated); otherwise the user lands on login first.
+const linking: LinkingOptions<MainStackParamList> = {
+  prefixes: ['epocheye://', 'https://epocheye.com', 'https://epocheye.app'],
+  config: {
+    screens: {
+      [ROUTES.MAIN.SITE_DETAIL]: 'site/:slug',
+    },
+  },
+};
 
 const AppNavigator: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('loading');
@@ -97,7 +111,7 @@ const AppNavigator: React.FC = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       {appState === 'onboarding' ? (
         <OnboardingCallbackProvider
           value={{ onOnboardingComplete: handleOnboardingComplete }}

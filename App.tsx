@@ -9,6 +9,10 @@ import { NetworkProvider, useNetwork } from './src/context';
 import NoInternetScreen from './src/screens/NoInternetScreen';
 import DialogHost from './src/components/ui/DialogHost';
 import { fcmInit, fcmRegisterAfterPermission } from './src/services/fcmService';
+import {
+  startNotificationsRealtime,
+  stopNotificationsRealtime,
+} from './src/services/notificationsSocketService';
 import { useArQuotaStore } from './src/stores/arQuotaStore';
 import { useSessionStore } from './src/stores/sessionStore';
 
@@ -61,7 +65,12 @@ export default function App() {
   useEffect(() => {
     if (authenticated) {
       void fcmRegisterAfterPermission();
+      // Realtime in-app notifications (WS where available, light poll + FCM
+      // otherwise). Torn down on logout so it doesn't poll while signed out.
+      startNotificationsRealtime();
+      return () => stopNotificationsRealtime();
     }
+    return undefined;
   }, [authenticated]);
 
   return (

@@ -14,6 +14,7 @@ import {
   markNotificationRead,
   type Notification,
 } from '../utils/api/notifications';
+import { useNotificationsStore } from '../stores/notificationsStore';
 
 export interface NotificationsModalProps {
   visible: boolean;
@@ -81,6 +82,14 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
       cancelled = true;
     };
   }, [visible, load]);
+
+  // Live refresh: when a new notification arrives over FCM/WS while the modal is
+  // open, reload the list in place (no spinner flash).
+  const incomingTick = useNotificationsStore(s => s.incomingTick);
+  useEffect(() => {
+    if (visible && incomingTick > 0) void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incomingTick]);
 
   const handleMarkRead = useCallback(
     async (id: string) => {

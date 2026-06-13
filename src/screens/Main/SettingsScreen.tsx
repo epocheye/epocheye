@@ -37,6 +37,7 @@ import { PermissionService } from '../../shared/services/permission.service';
 import { APP_CONFIG } from '../../core/config';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import type { TabScreenProps } from '../../core/types/navigation.types';
+import { ENABLE_ANCHOR_CAPTURE } from '@env';
 import { ROUTES } from '../../core/constants';
 import {
   useExplorerPass,
@@ -61,6 +62,12 @@ type Props = TabScreenProps<'Account'> & { onLogout?: () => void };
 const AMBER = '#D4860A';
 const AMBER_DEEP = '#7A4A0A';
 const AMBER_LIGHT = '#E8A020';
+
+// Capture Anchor is an internal admin tool. It is admin-gated AND hidden behind
+// this build flag so it never appears in production — even for admin accounts —
+// unless ENABLE_ANCHOR_CAPTURE is explicitly turned on for a dev build.
+const ANCHOR_CAPTURE_ENABLED =
+  ENABLE_ANCHOR_CAPTURE === 'true' || ENABLE_ANCHOR_CAPTURE === '1';
 
 const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   const { hasAnyActivePass, loading: explorerPassLoading } = useExplorerPass();
@@ -690,8 +697,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </Animated.View>
           )}
 
-          {/* ── Admin: Anchor capture ── */}
-          {isAdmin && (
+          {/* ── Admin: Anchor capture (admin + build-flag gated) ── */}
+          {isAdmin && ANCHOR_CAPTURE_ENABLED && (
             <Animated.View entering={FadeInDown.delay(260).duration(350)}>
               <TouchableOpacity
                 className="mx-5 mb-5 flex-row items-center rounded-2xl border border-[rgba(72,187,120,0.3)] bg-[rgba(72,187,120,0.06)] p-4"

@@ -24,6 +24,7 @@ import {
   registerDevice,
   type DeviceType,
 } from '../utils/api/notifications';
+import { useNotificationsStore } from '../stores/notificationsStore';
 
 const STORED_TOKEN_KEY = '@epocheye/fcm_device_token';
 const CHANNEL_ID = 'epocheye-default';
@@ -87,6 +88,10 @@ async function sendTokenToBackend(token: string): Promise<void> {
 async function showForegroundNotification(
   msg: FirebaseMessagingTypes.RemoteMessage,
 ): Promise<void> {
+  // Live in-app update: bump the unread badge / refresh an open list even when
+  // there's no visible body (e.g. data-only pushes).
+  useNotificationsStore.getState().noteIncoming();
+
   const title = msg.notification?.title ?? (msg.data?.title as string) ?? 'EpochEye';
   const body = msg.notification?.body ?? (msg.data?.message as string) ?? '';
   if (!body) return;

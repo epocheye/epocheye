@@ -1,10 +1,10 @@
 /**
- * DEV-only AR model-picker entry.
+ * DEV-only "scan anything" entry.
  *
- * Opens the detector screen in `devPicker` mode: pick one of the 5 museum models
- * → it auto-places ~1.2 m in front of you with its data card + scan animation.
- * A home-testable check that models launch and animations fire, decoupled from
- * being at the museum / the detector recognizing a real artifact.
+ * Opens the detector screen in `devPicker` mode: the same live scan UX + animation
+ * as production, but the recognition agent runs ungrounded (any object, no venue,
+ * no paywall) so it can be tested at home. AR devices get the world-anchored AR
+ * card; non-AR devices get the on-screen card.
  *
  * Compiles to a no-op in production builds.
  */
@@ -31,14 +31,14 @@ const DevLoadTestArModelButton: React.FC = () => {
       <Pressable
         onPress={handleArModelTest}
         accessibilityRole="button"
-        accessibilityLabel="DEV: AR Model Test"
+        accessibilityLabel="DEV: Scan anything"
         className="rounded-2xl border border-[rgba(232,160,32,0.45)] bg-[rgba(232,160,32,0.08)] px-4 py-3"
       >
         <Text className="text-accent-amber font-montserrat-bold text-[13px] tracking-[1.6px]">
-          DEV: AR MODEL TEST
+          DEV: SCAN ANYTHING
         </Text>
         <Text className="text-[rgba(255,255,255,0.55)] font-montserrat text-[11px] mt-1">
-          Pick a museum model · auto-places in front · checks model + animations
+          Run the recognition agent on any object at home · AR or on-screen card
         </Text>
       </Pressable>
     </View>

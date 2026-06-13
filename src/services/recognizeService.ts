@@ -72,6 +72,12 @@ export interface RecognizeParams {
   lat?: number;
   lng?: number;
   question?: string;
+  /**
+   * Dev-build "scan anything": ask the backend to run the agent on any object,
+   * outside a seeded venue and without the paywall. The server only honors this
+   * for admins / RECOGNIZE_DEV_UNGROUNDED — production users stay geofenced.
+   */
+  allowUngrounded?: boolean;
 }
 
 /**
@@ -89,6 +95,7 @@ export async function recognize(params: RecognizeParams): Promise<RecognizeResul
         lat: params.lat,
         lng: params.lng,
         question: params.question,
+        allow_ungrounded: params.allowUngrounded === true,
       },
       {
         timeout: RECOGNIZE_TIMEOUT_MS,

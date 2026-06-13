@@ -19,9 +19,11 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronRight,
+  Share2,
   Sparkles,
   Shield,
 } from 'lucide-react-native';
+import ShareExperienceModal from '../../components/ShareExperienceModal';
 import { useUser } from '../../context';
 import { useExplorerPass } from '../../shared/hooks';
 import {
@@ -34,7 +36,10 @@ import type { SiteDetail } from '../../utils/api/places';
 import { resolveSiteImageSource } from '../../shared/utils/localSiteImages';
 import { ROUTES } from '../../core/constants';
 import { venueHasDetector } from '../../config/glbDelivery';
-import type { MainScreenProps } from '../../core/types/navigation.types';
+import type {
+  MainScreenProps,
+  PlaceNavParam,
+} from '../../core/types/navigation.types';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 // Figma "Site Details" (238:33) hero is 484 of a 977px frame ≈ 0.5 of height.
@@ -49,7 +54,13 @@ const FACT_LOADING_LINES = [
 type Props = MainScreenProps<'SiteDetail'>;
 
 const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
-  const site = route.params.site;
+  // Normal navigation passes `site`; a deep link (epocheye://site/<slug>) passes
+  // only `slug` — synthesize a minimal param so the slug-keyed `getSite` lookup runs.
+  const site = useMemo<PlaceNavParam>(
+    () =>
+      route.params.site ?? {id: route.params.slug ?? '', name: ''},
+    [route.params.site, route.params.slug],
+  );
   const insets = useSafeAreaInsets();
   const profile = useUser(state => state.profile);
   const { checkAccess } = useExplorerPass();
@@ -58,6 +69,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const [facts, setFacts] = useState<PersonalizedFact[]>([]);
   const [factsLoading, setFactsLoading] = useState(true);
@@ -299,6 +311,17 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             accessibilityLabel="Back"
           >
             <ArrowLeft color="#F5F0E8" size={20} />
+          </TouchableOpacity>
+
+          {/* Share this site — mirrors the back button at top-right. */}
+          <TouchableOpacity
+            onPress={() => setShareOpen(true)}
+            style={{ top: insets.top + 8 }}
+            className="absolute right-5 w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Share this site"
+          >
+            <Share2 color="#F5F0E8" size={18} />
           </TouchableOpacity>
 
           {/* AR Ready badge (Figma 238:63) — faithful pink/red, shown when ar_ready. */}
@@ -559,6 +582,14 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </View>
       </ScrollView>
+
+      <ShareExperienceModal
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        siteSlug={siteDetail?.slug ?? site.id}
+        title={siteDetail?.name ?? site.name}
+        imageUrl={siteDetail?.hero_image_url ?? undefined}
+      />
     </View>
   );
 };

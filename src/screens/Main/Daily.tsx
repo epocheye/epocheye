@@ -1,5 +1,7 @@
 import React, {useCallback, useMemo, useState} from 'react';
 import {
+  Image,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -46,10 +48,15 @@ const Daily: React.FC<Props> = ({navigation}) => {
   }, [refreshDaily]);
 
   const onCtaPress = useCallback(() => {
-    if (!daily?.cta_place_id) return;
-    navigation.navigate(ROUTES.MAIN.SITE_DETAIL, {
-      site: {id: daily.cta_place_id, name: daily.cta_label ?? ''},
-    });
+    if (!daily) return;
+    // Prefer deep-linking into an Epocheye site; otherwise open the source article.
+    if (daily.cta_place_id) {
+      navigation.navigate(ROUTES.MAIN.SITE_DETAIL, {
+        site: {id: daily.cta_place_id, name: daily.cta_label ?? ''},
+      });
+    } else if (daily.cta_url) {
+      void Linking.openURL(daily.cta_url);
+    }
   }, [daily, navigation]);
 
   const onSeeAll = useCallback(() => {
@@ -114,7 +121,22 @@ const Daily: React.FC<Props> = ({navigation}) => {
             paddingTop: 18,
             paddingBottom: 22,
             minHeight: 280,
+            overflow: 'hidden',
           }}>
+          {daily?.image_url ? (
+            <Image
+              source={{uri: daily.image_url}}
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 0,
+                left: 0,
+                opacity: 0.22,
+              }}
+              resizeMode="cover"
+            />
+          ) : null}
           {daily ? (
             <>
               <Text style={{fontFamily: FONTS.serifItalic, fontSize: 84, color: '#FFFFFF', lineHeight: 90, letterSpacing: -1}}>
@@ -126,7 +148,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
               <Text style={{marginTop: 14, fontFamily: FONTS.sans, fontSize: 14, color: 'rgba(255,255,255,0.92)', lineHeight: 21}}>
                 {daily.body}
               </Text>
-              {daily.cta_place_id && daily.cta_label ? (
+              {(daily.cta_place_id || daily.cta_url) && daily.cta_label ? (
                 <Pressable
                   onPress={onCtaPress}
                   style={({pressed}) => [

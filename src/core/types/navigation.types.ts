@@ -60,7 +60,9 @@ export type MainStackParamList = {
         lon?: number;
       }
     | undefined;
-  SiteDetail: { site: PlaceNavParam };
+  // `site` is the normal in-app param; `slug` is used by deep links
+  // (epocheye://site/<slug>) where only the slug is known.
+  SiteDetail: { site?: PlaceNavParam; slug?: string };
   ARExperience: { site: PlaceNavParam };
   ARComposer: {
     monumentId: string;

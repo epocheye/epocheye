@@ -1,18 +1,18 @@
 /**
- * DetectArScreen — detector-driven world-anchored AR + a dev model-picker.
+ * DetectArScreen — detector-driven world-anchored AR scan.
  *
  * Modes (chosen by route param + native availability):
  *
- *  • PRODUCTION (no `devPicker`): point at an artifact → "Detect" captures an
- *    ARCore frame → Roboflow → class_id → grounded card (truth) or labelled AI
- *    guess (fallback). On a grounded hit the matching model is loaded from the
- *    CDN and world-anchored at the object; the data card shows alongside.
+ *  • PRODUCTION (no `devPicker`): venue-gated. Point at an artifact → "Detect"
+ *    captures an ARCore frame → the recognition agent → grounded card (truth) or
+ *    labelled AI guess (fallback). On a grounded hit the matching model is loaded
+ *    from the CDN and world-anchored at the object; the data card shows alongside.
  *
- *  • DEV PICKER (`devPicker: true`, Settings → DEV): home-testable harness —
- *    pick one of the 5 museum models → it auto-places ~1.2 m in front of you,
- *    world-locked, with its grounded data card + scan animation. Bypasses the
- *    detector (you can't point at a real museum artifact at home) so it just
- *    verifies that models launch and the animations fire.
+ *  • DEV "scan anything" (`devPicker: true`, the __DEV__-only Settings entry):
+ *    the SAME live scan UX + animation as production, but the agent runs
+ *    ungrounded (any object, no venue, no paywall — server only honors this for
+ *    admins / RECOGNIZE_DEV_UNGROUNDED) so it can be tested at home. The venue
+ *    gate is bypassed; production stays geofenced.
  *
  *  • NON-AR fallback: when ARCore is unavailable, the data card is still shown
  *    (no 3D model — the JS three.js viewer can't decode the compressed GLBs).
@@ -59,10 +59,11 @@ import {recognize} from '../../services/recognizeService';
 // repo behind ROBOFLOW_ENABLED for a possible future cheap pre-filter.
 import {fetchObjectCard, type ObjectCard} from '../../services/detectorResolver';
 import {useVenueGate} from '../../shared/hooks/useVenueGate';
-import PulsingRing from '../Lens/components/PulsingRing';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import GroundedObjectCard from './components/GroundedObjectCard';
 import AiGuessCard from './components/AiGuessCard';
 import AnalyzingOverlay from './components/AnalyzingOverlay';
+import ShareExperienceModal from '../../components/ShareExperienceModal';
 import {ROUTES} from '../../core/constants';
 import {COLORS} from '../../core/constants/theme';
 import type {MainStackParamList} from '../../core/types/navigation.types';
@@ -75,14 +76,26 @@ const YAW_STEP_DEG = 15;
 /** The only venue with a trained detector today. Overridable via route param. */
 const DEFAULT_DETECTOR_VENUE = 'indian-museum';
 
-/** The 5 detector-class models, for the dev picker (exact seeded class_ids). */
-const DEV_MODELS: {classId: string; name: string}[] = [
-  {classId: 'muchalinda_buddha', name: 'Muchalinda Buddha'},
-  {classId: 'naga_canopy_seated_deity', name: 'Nagaraja'},
-  {classId: 'khadiravani_tara', name: 'Khadiravani Tara'},
-  {classId: 'seated_four_arm_goddess', name: 'Four-Armed Goddess'},
-  {classId: 'seated_buddha_oval_halo', name: 'Earth-Touching Buddha'},
-];
+// After a real (production) scan we invite the user to share — but at most once a
+// day so it never nags. Skipped entirely for the dev "scan anything" path.
+const SHARE_PROMPT_KEY = '@epocheye/last_share_prompt';
+const SHARE_PROMPT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+async function maybePromptShare(
+  allowUngrounded: boolean,
+  open: (v: boolean) => void,
+): Promise<void> {
+  if (allowUngrounded) return; // dev scan has no real site to share
+  try {
+    const raw = await AsyncStorage.getItem(SHARE_PROMPT_KEY);
+    const last = raw ? parseInt(raw, 10) : 0;
+    if (Date.now() - last < SHARE_PROMPT_COOLDOWN_MS) return;
+    await AsyncStorage.setItem(SHARE_PROMPT_KEY, String(Date.now()));
+    open(true);
+  } catch {
+    // Storage hiccup — just skip the prompt rather than nagging on every scan.
+  }
+}
 
 type RouteParam = {
   key: string;
@@ -124,7 +137,7 @@ type ResolutionOutcome =
  * Grounded and AI content never co-exist. Returns the outcome so the caller can
  * place the model, route to the paywall, or show a retry message.
  */
-function useDetectionResolver(venueSlug: string) {
+function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
   const [resolved, setResolved] = useState<ResolvedState>({kind: 'idle'});
   const abortRef = useRef<(() => void) | null>(null);
 
@@ -140,7 +153,11 @@ function useDetectionResolver(venueSlug: string) {
     async (frameBase64: string): Promise<ResolutionOutcome> => {
       let result;
       try {
-        result = await recognize({imageBase64: frameBase64, venueId: venueSlug});
+        result = await recognize({
+          imageBase64: frameBase64,
+          venueId: venueSlug,
+          allowUngrounded,
+        });
       } catch {
         return {kind: 'error'};
       }
@@ -187,7 +204,7 @@ function useDetectionResolver(venueSlug: string) {
       // out_of_venue / unexpected — the venue gate should prevent this.
       return {kind: 'error'};
     },
-    [venueSlug],
+    [venueSlug, allowUngrounded],
   );
 
   return {resolved, runResolution, reset};
@@ -264,167 +281,27 @@ const DetectArScreen: React.FC = () => {
     );
   }
 
-  if (devPicker) {
-    // Mount the AR view whenever the native module is present (let ARCore itself
-    // report any real unavailability via onError) — so an over-cautious
-    // availability check can't leave the dev test on a black non-AR card.
+  // DEV "scan anything": same live scan UX as production, but the agent runs
+  // ungrounded (any object, no venue) so it can be tested at home. The venue gate
+  // is bypassed above. Production keeps geofencing + grounded recognition.
+  const allowUngrounded = devPicker;
+  const effectiveVenue = devPicker ? venueSlug || 'dev' : venueSlug;
+
+  if (useNativeAR) {
     return (
-      <DetectARDevPicker
-        arAvailable={isDetectARAvailable}
+      <DetectARNative
+        venueSlug={effectiveVenue}
+        allowUngrounded={allowUngrounded}
         onClose={handleClose}
       />
     );
   }
-  if (useNativeAR) {
-    return <DetectARNative venueSlug={venueSlug} onClose={handleClose} />;
-  }
-  return <DetectAR2D venueSlug={venueSlug} onClose={handleClose} />;
-};
-
-// ============================================================
-// DEV model-picker: pick a model → auto-place in front + card
-// ============================================================
-
-const DetectARDevPicker: React.FC<{
-  arAvailable: boolean;
-  onClose: () => void;
-}> = ({arAvailable, onClose}) => {
-  const arRef = useRef<EpocheyeDetectARHandle>(null);
-  const [status, setStatus] = useState<ARStatus>('initializing');
-  const [tracking, setTracking] = useState(false);
-  const [glbUri, setGlbUri] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [card, setCard] = useState<ObjectCard | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const handlePick = useCallback(
-    async (classId: string) => {
-      setSelected(classId);
-      setLoading(true);
-      setErrorMessage(null);
-      setCard(null);
-      arRef.current?.clearAnchor();
-      try {
-        // Resolve the FULL model (CDN→cache, no low placeholder) + the grounded
-        // card (best-effort) in parallel.
-        const [uri, fetchedCard] = await Promise.all([
-          resolveModelGlb(classId),
-          fetchObjectCard(classId).catch(() => null),
-        ]);
-        setCard(fetchedCard);
-        if (!uri) {
-          setErrorMessage('Model not on the CDN — is GLB_BASE_URL set?');
-          return;
-        }
-        setGlbUri(uri);
-        // Native defers the actual placement until the model + TRACKING are ready.
-        if (arAvailable) arRef.current?.placeInFront();
-      } catch {
-        setErrorMessage('Couldn’t load that model — try again.');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [arAvailable],
-  );
-
-  const handleReady = useCallback(() => {
-    setStatus(prev => (prev === 'placed' ? prev : 'searching'));
-  }, []);
-  const handleTrackingState = useCallback((state: string) => {
-    setTracking(state === 'TRACKING');
-  }, []);
-  const handlePlaneDetected = useCallback(() => {
-    setStatus(prev => (prev === 'placed' ? prev : 'ready'));
-  }, []);
-  const handleAnchorPlaced = useCallback(() => setStatus('placed'), []);
-  const handleError = useCallback((err: string) => setErrorMessage(err), []);
-  const handleYaw = useCallback(() => arRef.current?.nudgeYaw(YAW_STEP_DEG), []);
-
-  const hint = !arAvailable
-    ? 'Native AR module not in this build — do a full "npm run android" rebuild.'
-    : !tracking
-      ? 'Move your phone slowly to scan the area'
-      : selected
-        ? 'Model placed ~1.2 m ahead · ⟳ rotate · pick another below'
-        : 'Pick a model below — it appears in front of you';
-
   return (
-    <View style={styles.root}>
-      {arAvailable ? (
-        <EpocheyeDetectARView
-          ref={arRef}
-          style={StyleSheet.absoluteFill}
-          glbUri={glbUri ?? undefined}
-          cardData={card ? JSON.stringify(card) : undefined}
-          onReady={handleReady}
-          onTrackingState={handleTrackingState}
-          onPlaneDetected={handlePlaneDetected}
-          onAnchorPlaced={handleAnchorPlaced}
-          onError={handleError}
-        />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, styles.noArBackdrop]} />
-      )}
-
-      {loading && <PulsingRing matched={false} />}
-
-      <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
-        <View style={styles.topRow} pointerEvents="box-none">
-          <Pressable onPress={onClose} hitSlop={12} style={styles.iconButton}>
-            <X size={18} color="#FFFFFF" />
-          </Pressable>
-          <View style={styles.titleBlock}>
-            <Text style={styles.title}>DEV · AR Model Test</Text>
-            <Text style={styles.subtitle}>
-              {arAvailable ? (tracking ? 'tracking' : 'scanning') : 'no AR'} · pick a model
-            </Text>
-          </View>
-          {status === 'placed' && arAvailable ? (
-            <Pressable onPress={handleYaw} hitSlop={12} style={styles.iconButton}>
-              <RotateCw size={16} color="#FFFFFF" />
-            </Pressable>
-          ) : (
-            <View style={styles.iconButton} />
-          )}
-        </View>
-      </SafeAreaView>
-
-      <SafeAreaView style={styles.bottomOverlay} edges={['bottom']} pointerEvents="box-none">
-        {/* The grounded data shows on the world-anchored AR placard above the
-            model — the on-screen card is intentionally omitted in the dev test. */}
-        <View
-          style={[styles.messageBubble, status === 'error' && styles.bubbleError]}
-          pointerEvents="none">
-          <Text style={styles.messageText}>{errorMessage ?? hint}</Text>
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.pickerBar}>
-          {DEV_MODELS.map(m => (
-            <Pressable
-              key={m.classId}
-              onPress={() => void handlePick(m.classId)}
-              disabled={loading}
-              style={[
-                styles.pickerChip,
-                selected === m.classId && styles.pickerChipActive,
-              ]}>
-              <Text
-                style={[
-                  styles.pickerChipText,
-                  selected === m.classId && styles.pickerChipTextActive,
-                ]}>
-                {m.name}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
-    </View>
+    <DetectAR2D
+      venueSlug={effectiveVenue}
+      allowUngrounded={allowUngrounded}
+      onClose={handleClose}
+    />
   );
 };
 
@@ -435,7 +312,8 @@ const DetectARDevPicker: React.FC<{
 const DetectARNative: React.FC<{
   venueSlug: string;
   onClose: () => void;
-}> = ({venueSlug, onClose}) => {
+  allowUngrounded?: boolean;
+}> = ({venueSlug, onClose, allowUngrounded = false}) => {
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const arRef = useRef<EpocheyeDetectARHandle>(null);
@@ -443,9 +321,13 @@ const DetectARNative: React.FC<{
   const [tracking, setTracking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [detecting, setDetecting] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   // The model to render — set from the DETECTED class (not a hardcoded marquee).
   const [glbUri, setGlbUri] = useState<string | null>(null);
-  const {resolved, runResolution, reset} = useDetectionResolver(venueSlug);
+  const {resolved, runResolution, reset} = useDetectionResolver(
+    venueSlug,
+    allowUngrounded,
+  );
 
   const trackingRef = useRef(false);
   useEffect(() => {
@@ -484,6 +366,7 @@ const DetectARNative: React.FC<{
           // placement / AR placard UI is a later step.)
           arRef.current?.placeFromDetection(0.5, 0.85);
           setErrorMessage(null);
+          void maybePromptShare(allowUngrounded, setShareOpen);
         } else if (resolution.kind === 'paywall') {
           navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
         } else if (resolution.kind === 'limit') {
@@ -494,6 +377,7 @@ const DetectARNative: React.FC<{
           setErrorMessage('Couldn’t reach the lens — try again');
         } else {
           setErrorMessage(null); // 'ai' — labelled card set by the hook
+          void maybePromptShare(allowUngrounded, setShareOpen);
         }
       } catch {
         setErrorMessage('Detection failed — try again');
@@ -501,7 +385,7 @@ const DetectARNative: React.FC<{
         setDetecting(false);
       }
     },
-    [runResolution, navigation, venueSlug],
+    [runResolution, navigation, venueSlug, allowUngrounded],
   );
 
   const handleTrackingState = useCallback((state: string) => {
@@ -559,7 +443,9 @@ const DetectARNative: React.FC<{
             <X size={18} color="#FFFFFF" />
           </Pressable>
           <View style={styles.titleBlock}>
-            <Text style={styles.title}>Scan artifact</Text>
+            <Text style={styles.title}>
+              {allowUngrounded ? 'DEV · Scan anything' : 'Scan artifact'}
+            </Text>
             <Text style={styles.subtitle}>
               {tracking ? 'tracking' : 'scanning'} · world-anchored
             </Text>
@@ -619,6 +505,12 @@ const DetectARNative: React.FC<{
           )}
         </View>
       </SafeAreaView>
+
+      <ShareExperienceModal
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        siteSlug={venueSlug}
+      />
     </View>
   );
 };
@@ -627,18 +519,23 @@ const DetectARNative: React.FC<{
 // NON-AR fallback: scan → data card only (no 3D model)
 // ============================================================
 
-const DetectAR2D: React.FC<{venueSlug: string; onClose: () => void}> = ({
-  venueSlug,
-  onClose,
-}) => {
+const DetectAR2D: React.FC<{
+  venueSlug: string;
+  onClose: () => void;
+  allowUngrounded?: boolean;
+}> = ({venueSlug, onClose, allowUngrounded = false}) => {
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const cameraRef = useRef<VisionCamera | null>(null);
   const device = useCameraDevice('back');
 
   const [busy, setBusy] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const {resolved, runResolution} = useDetectionResolver(venueSlug);
+  const {resolved, runResolution} = useDetectionResolver(
+    venueSlug,
+    allowUngrounded,
+  );
 
   const handleDetect = useCallback(async () => {
     if (busy) return;
@@ -663,13 +560,14 @@ const DetectAR2D: React.FC<{venueSlug: string; onClose: () => void}> = ({
         setMessage('Couldn’t reach the lens — try again');
       } else {
         setMessage(null);
+        void maybePromptShare(allowUngrounded, setShareOpen);
       }
     } catch {
       setMessage('Detection failed — try again');
     } finally {
       setBusy(false);
     }
-  }, [busy, runResolution, navigation, venueSlug]);
+  }, [busy, runResolution, navigation, venueSlug, allowUngrounded]);
 
   if (!device) {
     return (
@@ -702,7 +600,9 @@ const DetectAR2D: React.FC<{venueSlug: string; onClose: () => void}> = ({
             <X size={18} color="#FFFFFF" />
           </Pressable>
           <View style={styles.titleBlock}>
-            <Text style={styles.title}>Scan artifact</Text>
+            <Text style={styles.title}>
+              {allowUngrounded ? 'DEV · Scan anything' : 'Scan artifact'}
+            </Text>
             <Text style={styles.subtitle}>identify · no AR on this device</Text>
           </View>
           <View style={styles.iconButton} />
@@ -751,6 +651,12 @@ const DetectAR2D: React.FC<{venueSlug: string; onClose: () => void}> = ({
           )}
         </Pressable>
       </SafeAreaView>
+
+      <ShareExperienceModal
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        siteSlug={venueSlug}
+      />
     </View>
   );
 };

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   Image,
+  Linking,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -14,7 +15,7 @@ import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import MapView, {Marker, PROVIDER_GOOGLE, type Region} from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import {GOOGLE_MAPS_API_KEY} from '@env';
-import {Bell, Menu, Search, X} from 'lucide-react-native';
+import {Bell, Menu, Navigation, Search, X} from 'lucide-react-native';
 import mapStyle from '../../content/mapstyle.json';
 import {COLORS, FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
@@ -22,7 +23,11 @@ import {usePlaces} from '../../context';
 import {PermissionService} from '../../shared/services/permission.service';
 import {resolveSiteImageSource} from '../../shared/utils/localSiteImages';
 import {getSites, searchPlaces, type SiteDetail} from '../../utils/api/places';
-import {getUnreadCount} from '../../utils/api/notifications';
+import {useNotificationsStore} from '../../stores/notificationsStore';
+import {reverseGeocode, reverseGeocodeLabel} from '../../utils/api/geo';
+import {useVenueGate} from '../../shared/hooks/useVenueGate';
+import {getNearestZone} from '../../services/geofenceService';
+import type {HeritageZone} from '../../core/config/geofence.types';
 import type {Place} from '../../utils/api/places/types';
 import type {PlaceNavParam} from '../../core/types/navigation.types';
 import UnavailableSiteCard from './components/UnavailableSiteCard';
@@ -58,6 +63,18 @@ function deriveLocationTitle(places: Place[]): string {
   if (city) return city;
   if (country) return country;
   return 'Heritage near you';
+}
+
+function formatVenueDistance(meters: number): string {
+  if (meters < 950) {
+    return `${Math.max(1, Math.round(meters / 10) * 10)} m away`;
+  }
+  return `${(meters / 1000).toFixed(meters < 9500 ? 1 : 0)} km away`;
+}
+
+function openVenueDirections(zone: HeritageZone): void {
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${zone.lat},${zone.lon}`;
+  void Linking.openURL(url).catch(() => undefined);
 }
 
 /** A place currently focused on the map (tapped marker or search result). */
@@ -182,8 +199,12 @@ const Home: React.FC<Props> = ({navigation}) => {
   const [selectedPlace, setSelectedPlace] = useState<ActivePlace | null>(null);
   const [routeActive, setRouteActive] = useState(false);
   const [searching, setSearching] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
+  // Unread badge is driven by the shared store so live FCM/WS events update it
+  // without reopening the modal.
+  const unreadCount = useNotificationsStore(s => s.unreadCount);
+  const refreshUnread = useNotificationsStore(s => s.refreshUnread);
+  const setUnreadCount = useNotificationsStore(s => s.setUnreadCount);
   const mapRef = useRef<MapView>(null);
 
   const active = useActiveMonument();
@@ -207,16 +228,13 @@ const Home: React.FC<Props> = ({navigation}) => {
   }, []);
 
   // Notification unread badge — refreshed on mount and whenever Home regains
-  // focus (e.g. after returning from the Notifications screen).
+  // focus (e.g. after returning from the Notifications screen). Live updates
+  // arrive separately via the notifications store (FCM/WS).
   useEffect(() => {
-    const loadUnread = async () => {
-      const res = await getUnreadCount();
-      if (res.success) setUnreadCount(res.data.count);
-    };
-    void loadUnread();
-    const unsub = navigation.addListener('focus', loadUnread);
+    void refreshUnread();
+    const unsub = navigation.addListener('focus', () => void refreshUnread());
     return unsub;
-  }, [navigation]);
+  }, [navigation, refreshUnread]);
 
   useEffect(() => {
     let cancelled = false;
@@ -335,10 +353,67 @@ const Home: React.FC<Props> = ({navigation}) => {
     return DEFAULT_REGION;
   }, [currentLocation, featuredPlace]);
 
-  const locationTitle = useMemo(
-    () => deriveLocationTitle(allPlaces),
-    [allPlaces],
+  // Reverse-geocode the device location to a city/locality for the header. The
+  // geo client caches by coarse coordinate, so re-running on a coordinate that
+  // rounds to the same ~110 m bucket is a no-op (no network, no churn).
+  const [geoLabel, setGeoLabel] = useState('');
+  const coarseLoc = useMemo(
+    () =>
+      currentLocation
+        ? `${currentLocation.latitude.toFixed(3)},${currentLocation.longitude.toFixed(3)}`
+        : null,
+    [currentLocation],
   );
+  useEffect(() => {
+    if (!currentLocation) return;
+    let cancelled = false;
+    void (async () => {
+      const res = await reverseGeocode(
+        currentLocation.latitude,
+        currentLocation.longitude,
+      );
+      if (!cancelled && res.success) {
+        const label = reverseGeocodeLabel(res.data);
+        if (label) setGeoLabel(label);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coarseLoc]);
+
+  const locationTitle = geoLabel || deriveLocationTitle(allPlaces);
+
+  // Nearest Epocheye venue + the in-venue signal, for the persistent "go to your
+  // nearest site" nudge (shown only when the user isn't already inside a venue).
+  const {inVenue} = useVenueGate();
+  const nearestVenue = useMemo(
+    () =>
+      currentLocation
+        ? getNearestZone(currentLocation.latitude, currentLocation.longitude)
+        : null,
+    [currentLocation],
+  );
+
+  // Recenter the map onto the user the first time GPS resolves. `initialRegion`
+  // only applies on first paint, so without this the map stays on the all-India
+  // default whenever the fix arrives after mount. Guarded to fire once so it
+  // never fights manual panning.
+  const hasCenteredRef = useRef(false);
+  useEffect(() => {
+    if (hasCenteredRef.current || !currentLocation) return;
+    hasCenteredRef.current = true;
+    mapRef.current?.animateToRegion(
+      {
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        latitudeDelta: 0.4,
+        longitudeDelta: 0.4,
+      },
+      600,
+    );
+  }, [currentLocation]);
 
   const handleViewSupported = useCallback(
     (site: SiteDetail) => {
@@ -580,6 +655,37 @@ const Home: React.FC<Props> = ({navigation}) => {
         </View>
       </View>
 
+      {/* Persistent nearest-venue nudge — Epocheye only works inside a curated
+          venue, so when the user is outside one we continuously point them to the
+          nearest site with one-tap directions (never static). */}
+      {!inVenue && nearestVenue ? (
+        <Pressable
+          onPress={() => openVenueDirections(nearestVenue.zone)}
+          style={({pressed}) => [
+            styles.nudge,
+            pressed ? {opacity: 0.9} : undefined,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`Get directions to ${nearestVenue.zone.name}, ${formatVenueDistance(
+            nearestVenue.distance,
+          )}`}>
+          <View style={styles.nudgeIcon}>
+            <Navigation color={COLORS.sky} size={15} />
+          </View>
+          <View style={{flex: 1}}>
+            <Text style={styles.nudgeEyebrow} numberOfLines={1}>
+              Nearest Epocheye site
+            </Text>
+            <Text style={styles.nudgeTitle} numberOfLines={1}>
+              {nearestVenue.zone.name} · {formatVenueDistance(nearestVenue.distance)}
+            </Text>
+          </View>
+          <View style={styles.nudgeCta}>
+            <Text style={styles.nudgeCtaText}>Directions</Text>
+          </View>
+        </Pressable>
+      ) : null}
+
       {/* Optional search input */}
       {searchOpen ? (
         <View className="mx-6 mb-2 px-3 py-2 rounded-xl bg-[rgba(255,255,255,0.06)] flex-row items-center gap-x-2">
@@ -801,6 +907,51 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: {width: 0, height: 8},
     elevation: 8,
+  },
+  nudge: {
+    marginHorizontal: 16,
+    marginTop: 2,
+    marginBottom: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(97,166,211,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(97,166,211,0.28)',
+  },
+  nudgeIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(97,166,211,0.16)',
+  },
+  nudgeEyebrow: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.55)',
+    letterSpacing: 0.3,
+  },
+  nudgeTitle: {
+    marginTop: 1,
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
+  nudgeCta: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: COLORS.sky,
+  },
+  nudgeCtaText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 12,
+    color: '#0A0A0A',
   },
   preArrivalOverlay: {
     position: 'absolute',
