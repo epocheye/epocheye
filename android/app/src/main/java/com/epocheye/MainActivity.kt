@@ -1,5 +1,7 @@
 package com.epocheye
 
+import android.content.res.Configuration
+import android.content.res.Resources
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -19,4 +21,18 @@ class MainActivity : ReactActivity() {
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+
+  // Re-assert the tablet density override on this Activity's resources so native
+  // views (incl. the AR SurfaceView) match RN's scaled metrics. No-op on phones.
+  override fun getResources(): Resources {
+    val res = super.getResources()
+    ScreenScaling.apply(res)
+    return res
+  }
+
+  // Keep the scale (and RN's metrics) correct across rotation / multi-window.
+  override fun onConfigurationChanged(newConfig: Configuration) {
+    super.onConfigurationChanged(newConfig)
+    ScreenScaling.applyAndSyncReactNative(this)
+  }
 }

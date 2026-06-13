@@ -122,7 +122,32 @@ type ResolutionOutcome =
   | {kind: 'ai'}
   | {kind: 'paywall'; paywall: {siteId: string; used: number; limit: number}}
   | {kind: 'limit'}
-  | {kind: 'error'};
+  | {kind: 'error'; message?: string};
+
+/**
+ * Pull a human-readable reason out of an axios/transport error so the dev test can
+ * show WHY recognition failed (e.g. the backend's "recognition unavailable" / a
+ * missing-key 503) instead of a black-box "couldn't reach the lens".
+ */
+function extractErrorMessage(err: unknown): string | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const e = err as {
+    response?: {status?: number; data?: unknown};
+    message?: string;
+  };
+  let body: string | undefined;
+  const data = e.response?.data;
+  if (typeof data === 'string') body = data;
+  else if (data && typeof data === 'object') {
+    const d = data as {error?: unknown; message?: unknown};
+    if (typeof d.error === 'string') body = d.error;
+    else if (typeof d.message === 'string') body = d.message;
+  }
+  body = body ?? e.message;
+  const status = e.response?.status;
+  if (body && status) return `[${status}] ${body}`;
+  return body ?? (status ? `HTTP ${status}` : undefined);
+}
 
 /**
  * Shared resolution engine. The PRIMARY recognizer is the server-side three-layer
@@ -159,7 +184,7 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
   // the object label arrives so the card shows immediately and narration continues
   // streaming in; the stream is aborted on reset/unmount via abortRef.
   const runMuseumFallback = useCallback(
-    (imageUri: string): Promise<ResolutionOutcome> =>
+    (imageUri: string, priorMessage?: string): Promise<ResolutionOutcome> =>
       new Promise<ResolutionOutcome>(resolve => {
         let settled = false;
         const finish = (outcome: ResolutionOutcome) => {
@@ -193,9 +218,13 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
             );
             finish({kind: 'ai'});
           },
-          onError: () => {
+          onError: msg => {
             setResolved({kind: 'idle'});
-            finish({kind: 'error'});
+            const reason = msg || priorMessage;
+            if (__DEV__) {
+              console.warn('[detect] museum identify failed:', reason);
+            }
+            finish({kind: 'error', message: reason});
           },
           onPaywall: info =>
             finish({
@@ -223,11 +252,15 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
           venueId: venueSlug,
           allowUngrounded,
         });
-      } catch {
-        // Agent endpoint unreachable — in dev "scan anything", still try the
+      } catch (err) {
+        const message = extractErrorMessage(err);
+        if (__DEV__) {
+          console.warn('[detect] recognize failed:', message ?? err);
+        }
+        // Agent endpoint unreachable/errored — in dev "scan anything", still try the
         // deployed universal identify so the test isn't blocked on a deploy.
-        if (allowUngrounded && imageUri) return runMuseumFallback(imageUri);
-        return {kind: 'error'};
+        if (allowUngrounded && imageUri) return runMuseumFallback(imageUri, message);
+        return {kind: 'error', message};
       }
 
       // Per-site free scans spent → caller routes to the Explorer-Pass purchase.
@@ -271,8 +304,10 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
 
       // out_of_venue / unexpected. In dev "scan anything" this is expected (no
       // seeded venue), so fall back to the universal identify on the frame.
-      if (allowUngrounded && imageUri) return runMuseumFallback(imageUri);
-      return {kind: 'error'};
+      if (allowUngrounded && imageUri) {
+        return runMuseumFallback(imageUri, `agent: ${result.match}`);
+      }
+      return {kind: 'error', message: `agent: ${result.match}`};
     },
     [venueSlug, allowUngrounded, runMuseumFallback],
   );
@@ -445,7 +480,11 @@ const DetectARNative: React.FC<{
             'You’ve explored a lot here today — come back tomorrow for more.',
           );
         } else if (resolution.kind === 'error') {
-          setErrorMessage('Couldn’t reach the lens — try again');
+          setErrorMessage(
+            __DEV__ && resolution.message
+              ? `Lens error — ${resolution.message}`
+              : 'Couldn’t reach the lens — try again',
+          );
         } else {
           setErrorMessage(null); // 'ai' — labelled card set by the hook
           void maybePromptShare(allowUngrounded, setShareOpen);
@@ -618,17 +657,26 @@ const DetectAR2D: React.FC<{
         setMessage('Could not capture a frame');
         return;
       }
-      const base64 = await prepareImageForGemini(photo.path);
+      // vision-camera returns a bare filesystem path; the SSE upload (FormData)
+      // and image prep need a file:// URI to read it.
+      const imageUri = photo.path.startsWith('file://')
+        ? photo.path
+        : `file://${photo.path}`;
+      const base64 = await prepareImageForGemini(imageUri);
       // Same precedence as AR; no 3D model here (this device can't do AR, and the
       // compressed CDN GLBs aren't decodable by the JS viewer) — the card is the
-      // surface. photo.path lets the dev "scan anything" path fall back to identify.
-      const resolution = await runResolution(base64, photo.path);
+      // surface. imageUri lets the dev "scan anything" path fall back to identify.
+      const resolution = await runResolution(base64, imageUri);
       if (resolution.kind === 'paywall') {
         navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
       } else if (resolution.kind === 'limit') {
         setMessage('You’ve explored a lot here today — come back tomorrow for more.');
       } else if (resolution.kind === 'error') {
-        setMessage('Couldn’t reach the lens — try again');
+        setMessage(
+          __DEV__ && resolution.message
+            ? `Lens error — ${resolution.message}`
+            : 'Couldn’t reach the lens — try again',
+        );
       } else {
         setMessage(null);
         void maybePromptShare(allowUngrounded, setShareOpen);
