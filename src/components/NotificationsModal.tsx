@@ -177,26 +177,20 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
       animationType="fade"
       onRequestClose={onClose}
       statusBarTranslucent>
-      <View className="flex-1 bg-black/70 justify-end">
-        {/* Tap-outside scrim */}
+      {/* Tap-outside scrim — a centered, clearly-floating popup (not a full sheet). */}
+      <TouchableOpacity
+        className="flex-1 bg-black/70 justify-center px-5"
+        activeOpacity={1}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close notifications">
         <TouchableOpacity
-          className="flex-1"
           activeOpacity={1}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Close notifications"
-        />
-
-        <View
-          className="bg-[#141414] rounded-t-3xl border-t border-l border-r border-[rgba(255,255,255,0.06)]"
-          style={{ maxHeight: '72%' }}>
-          {/* Grab handle */}
-          <View className="items-center pt-3">
-            <View className="w-10 h-1 rounded-full bg-[rgba(255,255,255,0.15)]" />
-          </View>
-
+          onPress={() => {}}
+          className="bg-[#141414] rounded-2xl border border-[rgba(255,255,255,0.08)] overflow-hidden"
+          style={{ maxHeight: '60%' }}>
           {/* Header */}
-          <View className="flex-row items-center px-5 pt-3 pb-3">
+          <View className="flex-row items-center px-5 pt-4 pb-3">
             <Text className="flex-1 text-parchment font-instrument-semibold text-[18px]">
               Notifications
             </Text>
@@ -223,17 +217,17 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
           </View>
 
           {loading ? (
-            <View className="py-16 justify-center items-center px-8">
+            <View className="py-10 justify-center items-center px-8">
               <ActivityIndicator color="#E8A020" />
             </View>
           ) : error ? (
-            <View className="py-16 justify-center items-center px-8">
+            <View className="py-10 justify-center items-center px-8">
               <Text className="text-[#FF6B6B] font-instrument text-[14px] text-center">
                 {error}
               </Text>
             </View>
           ) : items.length === 0 ? (
-            <View className="py-16 justify-center items-center px-8 gap-y-3">
+            <View className="py-10 justify-center items-center px-8 gap-y-3">
               <BellOff size={36} color="#4A4A4A" />
               <Text className="text-parchment font-instrument-semibold text-[16px]">
                 No notifications yet
@@ -256,8 +250,8 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
               showsVerticalScrollIndicator={false}
             />
           )}
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 };

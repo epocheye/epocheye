@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   DrawerContentScrollView,
   type DrawerContentComponentProps,
@@ -17,7 +17,6 @@ import {
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import { ROUTES } from '../../core/constants';
 import { FONTS } from '../../core/constants/theme';
-import { useUserStore } from '../../stores/userStore';
 import type { TabParamList } from '../../core/types';
 
 // Higher-contrast palette than the old flat panel: brighter gold + a parchment
@@ -52,23 +51,14 @@ interface Props extends DrawerContentComponentProps {
   onLogout?: () => void;
 }
 
-function initialsOf(name?: string, email?: string): string {
-  const src = (name || email || '').trim();
-  if (!src) return 'E';
-  const parts = src.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return src.slice(0, 2).toUpperCase();
-}
-
 /**
- * Heritage-styled drawer: gradient backdrop with a faint gold top glow, a small
- * profile block, the primary destinations with an active accent bar + pill, a
- * Preferences group (Settings / Language), and a Sign Out footer.
+ * Heritage-styled drawer: gradient backdrop with a faint gold top glow, the
+ * Epocheye logo-white mark, the primary destinations with an active accent bar +
+ * pill, a Settings shortcut, and a Sign Out footer.
  */
 const CustomDrawerContent: React.FC<Props> = ({ onLogout, ...props }) => {
   const insets = useSafeAreaInsets();
   const activeRoute = props.state.routeNames[props.state.index];
-  const profile = useUserStore(s => s.profile);
 
   const go = (route: keyof TabParamList) => {
     props.navigation.navigate(route);
@@ -114,33 +104,10 @@ const CustomDrawerContent: React.FC<Props> = ({ onLogout, ...props }) => {
           styles.scrollContent,
           { paddingTop: insets.top + 8 },
         ]}>
-        {/* Brand — logo mark only (no wordmark). */}
+        {/* Brand — Epocheye logo-white mark (no wordmark, no profile card). */}
         <View style={styles.brand}>
-          <AnimatedLogo size={56} motion="pulse" variant="white" showRing={false} />
+          <AnimatedLogo size={64} motion="pulse" variant="white" showRing={false} />
           <Text style={styles.brandSub}>Walk where they walked</Text>
-        </View>
-
-        {/* Profile */}
-        <View style={styles.profile}>
-          {profile?.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.avatarFallback]}>
-              <Text style={styles.avatarInitials}>
-                {initialsOf(profile?.name, profile?.email)}
-              </Text>
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <Text style={styles.profileName} numberOfLines={1}>
-              {profile?.name?.trim() || 'Traveler'}
-            </Text>
-            {profile?.email ? (
-              <Text style={styles.profileEmail} numberOfLines={1}>
-                {profile.email}
-              </Text>
-            ) : null}
-          </View>
         </View>
 
         <View style={styles.divider} />
@@ -190,51 +157,15 @@ const styles = StyleSheet.create({
   scrollContent: { paddingTop: 0 },
   brand: {
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 14,
-    alignItems: 'flex-start',
+    paddingTop: 12,
+    paddingBottom: 16,
+    alignItems: 'center',
   },
   brandSub: {
     marginTop: 12,
     color: PARCHMENT_DIM,
     fontFamily: FONTS.italic,
     fontStyle: 'italic',
-    fontSize: 12,
-  },
-  profile: {
-    marginHorizontal: 16,
-    marginTop: 4,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(226,197,106,0.14)',
-  },
-  avatar: { width: 40, height: 40, borderRadius: 20 },
-  avatarFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(226,197,106,0.18)',
-  },
-  avatarInitials: {
-    color: GOLD,
-    fontFamily: FONTS.bold,
-    fontSize: 15,
-    letterSpacing: 0.5,
-  },
-  profileName: {
-    color: PARCHMENT,
-    fontFamily: FONTS.semiBold,
-    fontSize: 15,
-  },
-  profileEmail: {
-    marginTop: 1,
-    color: PARCHMENT_DIM,
-    fontFamily: FONTS.sans,
     fontSize: 12,
   },
   divider: {

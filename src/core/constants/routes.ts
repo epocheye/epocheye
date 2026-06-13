@@ -33,7 +33,6 @@ export const ROUTES = {
     AR_EXPERIENCE: 'ARExperience',
     AR_COMPOSER: 'ARComposer',
     PURCHASE: 'Purchase',
-    NOTIFICATIONS: 'Notifications',
     HISTORY: 'History',
     ANCHOR_CAPTURE: 'AnchorCapture',
     AR_3D_VIEWER: 'Ar3dViewer',

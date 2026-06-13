@@ -78,7 +78,6 @@ export type MainStackParamList = {
     testObjectDescription?: string;
   };
   Purchase: { preSelectedPlaceId?: string } | undefined;
-  Notifications: undefined;
   History: undefined;
   /** Admin-only: capture geo-anchors for the curated AR catalog. */
   AnchorCapture: undefined;

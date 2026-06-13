@@ -37,6 +37,37 @@ export function reverseGeocodeLabel(g: ReverseGeocode | null): string {
   return g.city || g.locality || '';
 }
 
+export interface IpLocation {
+  country_iso: string;
+  country: string;
+  lat: number;
+  lon: number;
+}
+
+/**
+ * Coarse IP→country location, used as a last resort when the device can't
+ * produce a GPS/network fix. Returns null when the lookup is unavailable or
+ * carries no usable coordinate. Backend: GET /api/v1/geo/ip.
+ */
+export async function ipLocate(): Promise<IpLocation | null> {
+  try {
+    const client = await createAuthenticatedClient();
+    const response = await client.get<IpLocation>('/api/v1/geo/ip');
+    const d = response.data;
+    if (
+      d &&
+      typeof d.lat === 'number' &&
+      typeof d.lon === 'number' &&
+      (d.lat !== 0 || d.lon !== 0)
+    ) {
+      return d;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function reverseGeocode(
   lat: number,
   lon: number,

@@ -12,6 +12,23 @@ import {
 } from '../utils/api/places';
 import { useSessionStore } from './sessionStore';
 import { PermissionService } from '../shared/services/permission.service';
+import { ipLocate } from '../utils/api/geo/Geo';
+
+// Use Google Play Services' fused location provider when available. Without this,
+// @react-native-community/geolocation defaults to Android's legacy
+// `android.location` provider, which often never returns a fix on WiFi-only
+// tablets / emulators (no GPS) — leaving the whole Home experience stuck on the
+// all-India default. 'auto' falls back to android.location where Play Services
+// isn't present. Guarded so a platform without the native config can't crash init.
+try {
+  Geolocation.setRNConfiguration({
+    skipPermissionRequests: false,
+    authorizationLevel: 'whenInUse',
+    locationProvider: 'auto',
+  });
+} catch {
+  // no-op — keep the default provider
+}
 
 interface LocationData {
   latitude: number;
@@ -173,12 +190,26 @@ async function fetchNearbyPlacesInternal(
   };
 }
 
-function handleLocationUpdate(position: GeolocationResponse): void {
-  const newLocation: LocationData = {
-    latitude: position.coords.latitude,
-    longitude: position.coords.longitude,
-    timestamp: position.timestamp,
-  };
+// getCurrentPosition wrapped as a promise that resolves null (never rejects) on
+// timeout/error, so the caller can try a sequence of strategies cleanly.
+function getCurrentPositionOnce(
+  options: Parameters<typeof Geolocation.getCurrentPosition>[2],
+): Promise<GeolocationResponse | null> {
+  return new Promise(resolve => {
+    Geolocation.getCurrentPosition(
+      pos => resolve(pos),
+      () => resolve(null),
+      options,
+    );
+  });
+}
+
+function applyLocation(
+  latitude: number,
+  longitude: number,
+  timestamp: number,
+): void {
+  const newLocation: LocationData = { latitude, longitude, timestamp };
 
   usePlacesStore.setState({
     currentLocation: newLocation,
@@ -193,7 +224,15 @@ function handleLocationUpdate(position: GeolocationResponse): void {
   // Imported lazily to avoid pulling Notifee into the bundle path of a
   // store init when the app is started cold.
   void import('../services/siteDetectionService').then(m =>
-    m.checkZoneEntry(newLocation.latitude, newLocation.longitude),
+    m.checkZoneEntry(latitude, longitude),
+  );
+}
+
+function handleLocationUpdate(position: GeolocationResponse): void {
+  applyLocation(
+    position.coords.latitude,
+    position.coords.longitude,
+    position.timestamp,
   );
 }
 
@@ -230,26 +269,47 @@ export const usePlacesStore = create<PlacesStoreState>((set, get) => ({
       nearbyError: null,
     });
 
-    await new Promise<void>(resolve => {
-      Geolocation.getCurrentPosition(
-        position => {
-          handleLocationUpdate(position);
-          get().refreshNearbyPlaces().catch(() => undefined);
-          resolve();
-        },
-        () => {
-          set({
-            nearbyError: 'Unable to get your location',
-          });
-          resolve();
-        },
-        {
-          enableHighAccuracy: false,
-          timeout: 15000,
-          maximumAge: 10000,
-        },
-      );
+    // Acquire the first fix robustly across device types:
+    //  1. A cached/last-known fix (accepts up to 10 min old) paints instantly.
+    //  2. A fresh network/fused fix refines it.
+    //  3. If that fails, one GPS-only retry (some devices only return via GPS).
+    // Each strategy resolves null on failure rather than throwing.
+    const cached = await getCurrentPositionOnce({
+      enableHighAccuracy: false,
+      timeout: 8000,
+      maximumAge: 600000,
     });
+    if (cached) {
+      handleLocationUpdate(cached);
+      get().refreshNearbyPlaces().catch(() => undefined);
+    }
+
+    let fresh = await getCurrentPositionOnce({
+      enableHighAccuracy: false,
+      timeout: 15000,
+      maximumAge: 0,
+    });
+    if (!fresh) {
+      fresh = await getCurrentPositionOnce({
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0,
+      });
+    }
+    if (fresh) {
+      handleLocationUpdate(fresh);
+      get().refreshNearbyPlaces().catch(() => undefined);
+    } else if (!cached) {
+      // No device fix at all (e.g. a GPS-less tablet). Fall back to a coarse
+      // IP→country location so the map, title, and nearest still resolve to
+      // something sensible. A later watchPosition fix overrides it.
+      const ip = await ipLocate();
+      if (ip) {
+        applyLocation(ip.lat, ip.lon, Date.now());
+      } else {
+        set({ nearbyError: 'Unable to get your location' });
+      }
+    }
 
     locationWatchId = Geolocation.watchPosition(
       position => {

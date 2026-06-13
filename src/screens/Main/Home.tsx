@@ -54,15 +54,18 @@ const DEFAULT_REGION: Region = {
   longitudeDelta: 12,
 };
 
+// Returns a place label from the nearest known place, or '' when nothing is
+// known — the caller supplies a distinct evergreen title so the big heading never
+// duplicates the "Heritage Near You" eyebrow.
 function deriveLocationTitle(places: Place[]): string {
   const nearest = places[0];
-  if (!nearest) return 'Heritage near you';
+  if (!nearest) return '';
   const city = nearest.city?.trim();
   const country = nearest.country?.trim();
   if (city && country) return `${city}, ${country}`;
   if (city) return city;
   if (country) return country;
-  return 'Heritage near you';
+  return '';
 }
 
 function formatVenueDistance(meters: number): string {
@@ -333,6 +336,23 @@ const Home: React.FC<Props> = ({navigation}) => {
     );
   }, [supportedSites, userLatLng]);
 
+  // First curated heritage site with coordinates — the map's fallback focus when
+  // there's no device location and no nearby places (e.g. GPS-less tablet), so it
+  // opens on a real site instead of the blank all-India default.
+  const curatedFallbackRegion = useMemo<Region | null>(() => {
+    const site = supportedSites.find(
+      s => typeof s.latitude === 'number' && typeof s.longitude === 'number',
+    );
+    return site
+      ? {
+          latitude: site.latitude as number,
+          longitude: site.longitude as number,
+          latitudeDelta: 0.4,
+          longitudeDelta: 0.4,
+        }
+      : null;
+  }, [supportedSites]);
+
   const initialRegion = useMemo<Region>(() => {
     if (currentLocation) {
       return {
@@ -350,8 +370,8 @@ const Home: React.FC<Props> = ({navigation}) => {
         longitudeDelta: 0.4,
       };
     }
-    return DEFAULT_REGION;
-  }, [currentLocation, featuredPlace]);
+    return curatedFallbackRegion ?? DEFAULT_REGION;
+  }, [currentLocation, featuredPlace, curatedFallbackRegion]);
 
   // Reverse-geocode the device location to a city/locality for the header. The
   // geo client caches by coarse coordinate, so re-running on a coordinate that
@@ -383,7 +403,11 @@ const Home: React.FC<Props> = ({navigation}) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coarseLoc]);
 
-  const locationTitle = geoLabel || deriveLocationTitle(allPlaces);
+  // Big heading: resolved city → nearest place's city → a distinct evergreen line
+  // (never the "Heritage Near You" eyebrow text, so it can't read as a duplicate
+  // when location is unavailable — e.g. on a GPS-less tablet).
+  const locationTitle =
+    geoLabel || deriveLocationTitle(allPlaces) || 'Explore Indian heritage';
 
   // Nearest Epocheye venue + the in-venue signal, for the persistent "go to your
   // nearest site" nudge (shown only when the user isn't already inside a venue).
@@ -414,6 +438,23 @@ const Home: React.FC<Props> = ({navigation}) => {
       600,
     );
   }, [currentLocation]);
+
+  // No device location yet: once the curated sites load, ease the map onto the
+  // first one so a GPS-less device doesn't sit on the all-India default. Fires at
+  // most once and yields to the user fix above (which clears no ref) when it lands.
+  const hasCuratedCenteredRef = useRef(false);
+  useEffect(() => {
+    if (
+      hasCenteredRef.current ||
+      hasCuratedCenteredRef.current ||
+      currentLocation ||
+      !curatedFallbackRegion
+    ) {
+      return;
+    }
+    hasCuratedCenteredRef.current = true;
+    mapRef.current?.animateToRegion(curatedFallbackRegion, 600);
+  }, [currentLocation, curatedFallbackRegion]);
 
   const handleViewSupported = useCallback(
     (site: SiteDetail) => {
