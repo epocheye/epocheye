@@ -29,9 +29,6 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
-    // Scale the UI up on tablets (phones untouched) BEFORE React initializes, so
-    // RN reads the phone-like dp width and the layout fills the larger screen.
-    ScreenScaling.applyAndSyncReactNative(this)
     loadReactNative(this)
   }
 }
