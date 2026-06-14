@@ -127,17 +127,22 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const renderInitial = () => (
     <View className="gap-5">
-      <AuthButton
-        title={googleLoading ? 'Signing in...' : 'Sign up with Google'}
-        variant="google"
-        onPress={handleGoogleAuth}
-        disabled={googleLoading}
-      />
-      <AuthButton
-        title="Sign up with Apple"
-        variant="apple"
-        onPress={handleAppleAuth}
-      />
+      {/* Google on Android, Apple on iOS (Apple sign-in is iOS-only). */}
+      {Platform.OS === 'android' ? (
+        <AuthButton
+          title={googleLoading ? 'Signing in...' : 'Sign up with Google'}
+          variant="google"
+          onPress={handleGoogleAuth}
+          disabled={googleLoading}
+        />
+      ) : null}
+      {Platform.OS === 'ios' ? (
+        <AuthButton
+          title="Sign up with Apple"
+          variant="apple"
+          onPress={handleAppleAuth}
+        />
+      ) : null}
       <AuthButton
         title="Sign up with Email"
         variant="email"

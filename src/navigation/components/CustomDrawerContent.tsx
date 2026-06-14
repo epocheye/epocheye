@@ -1,10 +1,9 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   DrawerContentScrollView,
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
-import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Clock,
@@ -14,7 +13,6 @@ import {
   Ticket,
   UserRound,
 } from 'lucide-react-native';
-import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import { ROUTES } from '../../core/constants';
 import { FONTS } from '../../core/constants/theme';
 import type { TabParamList } from '../../core/types';
@@ -52,9 +50,9 @@ interface Props extends DrawerContentComponentProps {
 }
 
 /**
- * Heritage-styled drawer: gradient backdrop with a faint gold top glow, the
- * Epocheye logo-white mark, the primary destinations with an active accent bar +
- * pill, a Settings shortcut, and a Sign Out footer.
+ * Heritage-styled drawer: flat black backdrop, the Epocheye logo-white mark, the
+ * primary destinations with an active accent bar + pill, a Settings shortcut, and
+ * a Sign Out footer.
  */
 const CustomDrawerContent: React.FC<Props> = ({ onLogout, ...props }) => {
   const insets = useSafeAreaInsets();
@@ -86,18 +84,7 @@ const CustomDrawerContent: React.FC<Props> = ({ onLogout, ...props }) => {
   );
 
   return (
-    <LinearGradient
-      colors={['#15120B', '#0C0A07', '#060606']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={styles.container}>
-      {/* Faint gold glow at the top edge for depth. */}
-      <LinearGradient
-        colors={['rgba(226,197,106,0.16)', 'rgba(226,197,106,0)']}
-        style={styles.topGlow}
-        pointerEvents="none"
-      />
-
+    <View style={styles.container}>
       <DrawerContentScrollView
         {...props}
         contentContainerStyle={[
@@ -106,8 +93,10 @@ const CustomDrawerContent: React.FC<Props> = ({ onLogout, ...props }) => {
         ]}>
         {/* Brand — Epocheye logo-white mark (no wordmark, no profile card). */}
         <View style={styles.brand}>
-          <AnimatedLogo size={64} motion="pulse" variant="white" showRing={false} />
-          <Text style={styles.brandSub}>Walk where they walked</Text>
+          <Image
+            source={require('../../assets/images/logo-white.png')}
+            style={styles.logo}
+          />
         </View>
 
         <View style={styles.divider} />
@@ -141,19 +130,12 @@ const CustomDrawerContent: React.FC<Props> = ({ onLogout, ...props }) => {
           </Pressable>
         </View>
       ) : null}
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  topGlow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 160,
-  },
+  container: { flex: 1, backgroundColor: '#000000' },
   scrollContent: { paddingTop: 0 },
   brand: {
     paddingHorizontal: 20,
@@ -161,12 +143,10 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     alignItems: 'center',
   },
-  brandSub: {
-    marginTop: 12,
-    color: PARCHMENT_DIM,
-    fontFamily: FONTS.italic,
-    fontStyle: 'italic',
-    fontSize: 12,
+  logo: {
+    width: 64,
+    height: 64,
+    resizeMode: 'contain',
   },
   divider: {
     height: 1,
@@ -179,7 +159,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     marginHorizontal: 24,
     color: GOLD_DIM,
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 11,
     letterSpacing: 1.5,
   },
@@ -203,7 +183,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 3,
     backgroundColor: GOLD,
   },
-  itemLabel: { fontFamily: FONTS.semiBold, fontSize: 15 },
+  itemLabel: { fontFamily: FONTS.sansSemiBold, fontSize: 15 },
   footer: { paddingHorizontal: 12 },
 });
 
