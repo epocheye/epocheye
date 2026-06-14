@@ -10,6 +10,14 @@ import type { HeritageZone } from '../core/config/geofence.types';
 import { getCachedZones } from './zoneService';
 
 /**
+ * Max meters of reported GPS accuracy we add to a zone's radius before deciding
+ * the user is inside. Real indoor/urban fixes drift 30–80m, so a hard
+ * `dist <= radius` test locks legitimate visitors out. The cap stops a wildly
+ * inaccurate fix (hundreds of metres) from making everywhere read as "inside".
+ */
+export const ACCURACY_SLACK_CAP_M = 150;
+
+/**
  * Haversine distance in meters between two lat/lon points.
  */
 function haversineMeters(
@@ -35,16 +43,48 @@ function haversineMeters(
 export function getActiveZone(
   lat: number,
   lon: number,
+  accuracyMeters = 0,
 ): HeritageZone | null {
+  // Widen each zone's radius by the fix's reported accuracy (capped). A fix that
+  // is 50m-accurate near the edge of a venue should still count as inside.
+  const slack = Math.min(Math.max(accuracyMeters, 0), ACCURACY_SLACK_CAP_M);
+
   let best: HeritageZone | null = null;
   let bestDist = Infinity;
+  let nearest: HeritageZone | null = null;
+  let nearestDist = Infinity;
 
   for (const zone of getCachedZones()) {
     const dist = haversineMeters(lat, lon, zone.lat, zone.lon);
-    if (dist <= zone.radiusMeters && dist < bestDist) {
+    if (dist < nearestDist) {
+      nearest = zone;
+      nearestDist = dist;
+    }
+    if (dist <= zone.radiusMeters + slack && dist < bestDist) {
       best = zone;
       bestDist = dist;
     }
+  }
+
+  // One-line field decision log (plain console.log so it surfaces in
+  // `adb logcat` even on release builds during an on-site test).
+  const chosen = best ?? nearest;
+  if (chosen) {
+    console.log(
+      `[geofence] lat=${lat.toFixed(5)} lon=${lon.toFixed(5)} acc=${Math.round(
+        accuracyMeters,
+      )}m venue=${chosen.monument_id} dist=${Math.round(
+        best ? bestDist : nearestDist,
+      )}m radius=${chosen.radiusMeters}m slack=${Math.round(
+        slack,
+      )}m inside=${best != null}`,
+    );
+  } else {
+    console.log(
+      `[geofence] lat=${lat.toFixed(5)} lon=${lon.toFixed(5)} acc=${Math.round(
+        accuracyMeters,
+      )}m no zones loaded`,
+    );
   }
 
   return best;

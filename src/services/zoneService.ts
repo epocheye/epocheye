@@ -22,6 +22,17 @@ interface RawZone {
 }
 
 let cachedZones: HeritageZone[] | null = null;
+// Distinguish "zones fetched successfully" from "fetch failed (network)" so the
+// UI can tell a network blip apart from genuinely being outside all venues.
+let everLoaded = false;
+let lastFailed = false;
+
+/**
+ * Client-side floor for a venue's radius. Backend-seeded radii (200–500m) are
+ * too tight once normal GPS drift is added; this guarantees a generous minimum
+ * (museum footprint + buffer) regardless of the stored value.
+ */
+const MIN_VENUE_RADIUS_M = 300;
 
 function normalizeZone(raw: RawZone): HeritageZone {
   return {
@@ -30,7 +41,10 @@ function normalizeZone(raw: RawZone): HeritageZone {
     monument_id: raw.monument_id ?? slugify(raw.name),
     lat: raw.lat,
     lon: raw.lon,
-    radiusMeters: raw.radius_meters ?? raw.radiusMeters ?? 500,
+    radiusMeters: Math.max(
+      raw.radius_meters ?? raw.radiusMeters ?? 500,
+      MIN_VENUE_RADIUS_M,
+    ),
     epochLabel: raw.epoch_label ?? raw.epochLabel ?? '',
   };
 }
@@ -63,12 +77,17 @@ export async function fetchZones(
       { params, timeout: 10000 },
     );
 
+    // Request reached the server (any 2xx) — not a network failure, even if it
+    // returned zero zones (genuinely no venues near the user).
+    lastFailed = false;
     if (resp.data.zones && resp.data.zones.length > 0) {
       cachedZones = resp.data.zones.map(normalizeZone);
+      everLoaded = true;
       return cachedZones;
     }
   } catch {
-    // Silent — fall back to hardcoded config
+    // Network/transport failure — flag it so the UI doesn't read this as "outside".
+    lastFailed = true;
   }
 
   return [];
@@ -80,4 +99,16 @@ export async function fetchZones(
  */
 export function getCachedZones(): HeritageZone[] {
   return cachedZones ?? [];
+}
+
+/**
+ * Fetch state, so callers can tell "couldn't check (network failure)" apart
+ * from "checked, and you're genuinely outside all venues".
+ */
+export function getZonesStatus(): {
+  everLoaded: boolean;
+  lastFailed: boolean;
+  count: number;
+} {
+  return { everLoaded, lastFailed, count: cachedZones?.length ?? 0 };
 }

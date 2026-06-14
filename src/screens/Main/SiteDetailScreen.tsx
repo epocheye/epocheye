@@ -35,7 +35,6 @@ import { getSite } from '../../utils/api/places';
 import type { SiteDetail } from '../../utils/api/places';
 import { resolveSiteImageSource } from '../../shared/utils/localSiteImages';
 import { ROUTES } from '../../core/constants';
-import { venueHasDetector } from '../../config/glbDelivery';
 import type {
   MainScreenProps,
   PlaceNavParam,
@@ -204,19 +203,9 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   // falls back to object detection with 3D anchored labels identifying the site.
   const handleStartARExperience = useCallback(() => {
     const slug = siteDetail?.slug ?? site.id;
-    // Venue with a trained detector → the detector→grounded-card→AR flow.
-    if (venueHasDetector(slug)) {
-      navigation.navigate(ROUTES.MAIN.DETECT_AR, {venueSlug: slug});
-      return;
-    }
-    navigation.navigate(ROUTES.MAIN.LENS, {
-      mode: 'museum',
-      siteName: siteDetail?.name ?? site.name,
-      siteSlug: slug,
-      arReady: siteDetail?.ar_ready ?? false,
-      lat: siteDetail?.latitude ?? site.lat,
-      lon: siteDetail?.longitude ?? site.lon,
-    });
+    // Single AR surface: the detector→grounded-card→AR flow (DetectARScreen).
+    // It runs the agent recognizer for the venue and is gated by useVenueGate.
+    navigation.navigate(ROUTES.MAIN.DETECT_AR, {venueSlug: slug});
   }, [navigation, siteDetail, site]);
 
   const handleGetPassport = useCallback(() => {

@@ -28,7 +28,6 @@ export const ROUTES = {
    */
   MAIN: {
     TABS: 'MainTabs',
-    LENS: 'Lens',
     SITE_DETAIL: 'SiteDetail',
     AR_EXPERIENCE: 'ARExperience',
     AR_COMPOSER: 'ARComposer',

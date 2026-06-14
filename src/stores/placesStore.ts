@@ -34,7 +34,14 @@ interface LocationData {
   latitude: number;
   longitude: number;
   timestamp: number;
+  /** Reported horizontal accuracy in meters (when the device provides it). */
+  accuracy?: number;
 }
+
+// First-fix convergence: a single low-accuracy fix can land far outside a venue,
+// so we briefly prefer a better one — but never hang waiting for it.
+const GOOD_ACCURACY_M = 30; // good enough to commit immediately
+const MAX_CONVERGE_MS = 8000; // hard cap on the wait
 
 interface PlacesStoreState {
   nearbyPlaces: Place[];
@@ -204,12 +211,42 @@ function getCurrentPositionOnce(
   });
 }
 
+// Acquire the first authoritative fix without committing to a bad one. Samples
+// high-accuracy fixes via a short-lived watch, keeps the best-accuracy fix seen,
+// exits early once a fix is "good enough", and always resolves by MAX_CONVERGE_MS
+// (returns the best so far, or null if none arrived) so it can never hang.
+function acquireConvergedFix(): Promise<GeolocationResponse | null> {
+  return new Promise(resolve => {
+    let best: GeolocationResponse | null = null;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      Geolocation.clearWatch(watchId);
+      clearTimeout(timer);
+      resolve(best);
+    };
+    const watchId = Geolocation.watchPosition(
+      pos => {
+        if (!best || pos.coords.accuracy < best.coords.accuracy) {
+          best = pos;
+        }
+        if (best.coords.accuracy <= GOOD_ACCURACY_M) finish();
+      },
+      () => finish(),
+      { enableHighAccuracy: true, distanceFilter: 0, interval: 1000, fastestInterval: 500 },
+    );
+    const timer = setTimeout(finish, MAX_CONVERGE_MS);
+  });
+}
+
 function applyLocation(
   latitude: number,
   longitude: number,
   timestamp: number,
+  accuracy?: number,
 ): void {
-  const newLocation: LocationData = { latitude, longitude, timestamp };
+  const newLocation: LocationData = { latitude, longitude, timestamp, accuracy };
 
   usePlacesStore.setState({
     currentLocation: newLocation,
@@ -222,9 +259,10 @@ function applyLocation(
   // Heritage-site arrival detection — fires a local notification + prefetches
   // the AR catalog when the user crosses into one of the curated zones.
   // Imported lazily to avoid pulling Notifee into the bundle path of a
-  // store init when the app is started cold.
+  // store init when the app is started cold. Pass accuracy so the zone check
+  // can tolerate normal GPS drift instead of locking visitors out.
   void import('../services/siteDetectionService').then(m =>
-    m.checkZoneEntry(latitude, longitude),
+    m.checkZoneEntry(latitude, longitude, accuracy),
   );
 }
 
@@ -233,6 +271,7 @@ function handleLocationUpdate(position: GeolocationResponse): void {
     position.coords.latitude,
     position.coords.longitude,
     position.timestamp,
+    position.coords.accuracy,
   );
 }
 
@@ -284,12 +323,11 @@ export const usePlacesStore = create<PlacesStoreState>((set, get) => ({
       get().refreshNearbyPlaces().catch(() => undefined);
     }
 
-    let fresh = await getCurrentPositionOnce({
-      enableHighAccuracy: false,
-      timeout: 15000,
-      maximumAge: 0,
-    });
+    // Prefer a well-converged high-accuracy fix over the first one that arrives;
+    // a single low-accuracy fix is exactly what reads "outside" at a venue.
+    let fresh = await acquireConvergedFix();
     if (!fresh) {
+      // Last resort: one bounded high-accuracy single-shot.
       fresh = await getCurrentPositionOnce({
         enableHighAccuracy: true,
         timeout: 20000,
@@ -317,7 +355,7 @@ export const usePlacesStore = create<PlacesStoreState>((set, get) => ({
       },
       () => undefined,
       {
-        enableHighAccuracy: false,
+        enableHighAccuracy: true,
         distanceFilter: 100,
         interval: 30000,
         fastestInterval: 15000,

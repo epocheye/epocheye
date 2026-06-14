@@ -49,8 +49,9 @@ async function ensureArrivalChannel(): Promise<void> {
 export async function checkZoneEntry(
   lat: number,
   lon: number,
+  accuracyMeters?: number,
 ): Promise<void> {
-  const active = getActiveZone(lat, lon);
+  const active = getActiveZone(lat, lon, accuracyMeters);
   const previous = useCurrentZoneStore.getState().zone;
 
   // Same zone (or both null) — nothing to do.

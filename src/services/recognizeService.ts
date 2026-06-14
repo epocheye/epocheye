@@ -22,9 +22,15 @@ import {BACKEND_URL} from '../constants/onboarding';
 import {getValidAccessToken} from '../utils/api/auth';
 
 const RECOGNIZE_URL = `${BACKEND_URL}/api/v1/recognize`;
-// The agent runs ~4 Gemini calls on a cache MISS; give it room. Cache HITs return
-// near-instantly. The backend caps its own chain well under this.
-const RECOGNIZE_TIMEOUT_MS = 32_000;
+const RECOGNIZE_RESULT_URL = `${BACKEND_URL}/api/v1/recognize/result`;
+// Recognition is async (submit + poll) so it never depends on finishing inside the
+// API Gateway 29s limit. The submit returns fast — either a terminal result (cache
+// hit / gate / paywall) or {match:'processing', job_id}. On 'processing' we poll the
+// result endpoint until the out-of-band agent finishes.
+const SUBMIT_TIMEOUT_MS = 10_000; // submit just persists + kicks the worker
+const POLL_TIMEOUT_MS = 8_000; // per poll request
+const POLL_INTERVAL_MS = 1_500; // between polls
+const POLL_DEADLINE_MS = 45_000; // hard cap → graceful "try again", never an infinite spin
 
 export type RecognizeMatch =
   | 'grounded'
@@ -87,10 +93,53 @@ export interface RecognizeParams {
  * Run primary recognition on a captured frame. Throws on transport/HTTP failure so
  * the caller can show a calm "try again" message.
  */
+/** Submit/poll wire shape: a normal result may instead carry an async job handle. */
+type RecognizeWire = Omit<RecognizeResult, 'match'> & {
+  match: RecognizeMatch | 'processing' | 'error';
+  job_id?: string;
+};
+
+const sleep = (ms: number) =>
+  new Promise<void>(resolve => {
+    setTimeout(() => resolve(), ms);
+  });
+
+/**
+ * Poll GET /api/v1/recognize/result?id= until the out-of-band agent finishes. Resolves
+ * with the final result, or throws on a terminal error / once the deadline is hit (the
+ * caller turns a throw into the calm "try again" UI — never an infinite spinner).
+ */
+async function pollResult(
+  jobId: string,
+  token: string | null,
+): Promise<RecognizeResult> {
+  const deadline = Date.now() + POLL_DEADLINE_MS;
+  while (Date.now() < deadline) {
+    await sleep(POLL_INTERVAL_MS);
+    let data: RecognizeWire;
+    try {
+      const res = await axios.get<RecognizeWire>(RECOGNIZE_RESULT_URL, {
+        params: {id: jobId},
+        timeout: POLL_TIMEOUT_MS,
+        headers: token ? {Authorization: `Bearer ${token}`} : undefined,
+      });
+      data = res.data;
+    } catch {
+      continue; // transient poll error — keep trying until the deadline
+    }
+    if (data.match === 'processing') continue;
+    if (data.match === 'error') {
+      throw new Error(data.message || 'recognition failed');
+    }
+    return data as RecognizeResult;
+  }
+  throw new Error('recognition timed out');
+}
+
 export async function recognize(params: RecognizeParams): Promise<RecognizeResult> {
   const token = await getValidAccessToken();
   try {
-    const res = await axios.post<RecognizeResult>(
+    const res = await axios.post<RecognizeWire>(
       RECOGNIZE_URL,
       {
         image_base64: params.imageBase64,
@@ -101,11 +150,16 @@ export async function recognize(params: RecognizeParams): Promise<RecognizeResul
         allow_ungrounded: params.allowUngrounded === true,
       },
       {
-        timeout: RECOGNIZE_TIMEOUT_MS,
+        timeout: SUBMIT_TIMEOUT_MS,
         headers: token ? {Authorization: `Bearer ${token}`} : undefined,
       },
     );
-    return res.data;
+    // Cache miss → the backend queued the agent and returned a job handle. Poll for
+    // the final card. Cache hits / gate / out_of_venue come back terminal here.
+    if (res.data.match === 'processing' && res.data.job_id) {
+      return await pollResult(res.data.job_id, token);
+    }
+    return res.data as RecognizeResult;
   } catch (err) {
     // HTTP 402 = per-site free-scan allowance spent. Surface as a paywall result
     // (not an error) so the caller can route to the Explorer-Pass purchase.

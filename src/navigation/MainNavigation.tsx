@@ -4,7 +4,6 @@ import DrawerNavigation from './DrawerNavigation';
 import SiteDetailScreen from '../screens/Main/SiteDetailScreen';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
 import ARExperienceScreen from '../screens/Main/ARExperienceScreen';
-import LensScreen from '../screens/Lens/LensScreen';
 import ARComposer from '../screens/Lens/ARComposer';
 import PurchaseScreen from '../screens/Main/PurchaseScreen';
 import HistoryScreen from '../screens/History/HistoryScreen';
@@ -48,14 +47,6 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
           </ErrorBoundary>
         )}
       </Stack.Screen>
-      <Stack.Screen
-        name={ROUTES.MAIN.LENS}
-        component={LensScreen}
-        options={{
-          animation: 'fade',
-          presentation: 'fullScreenModal',
-        }}
-      />
       <Stack.Screen
         name={ROUTES.MAIN.AR_EXPERIENCE}
         component={ARExperienceScreen}

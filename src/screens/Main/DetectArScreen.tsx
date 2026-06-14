@@ -551,7 +551,7 @@ const DetectARNative: React.FC<{
           setErrorMessage(
             __DEV__ && resolution.message
               ? `Lens error — ${resolution.message}`
-              : 'Couldn’t reach the lens — try again',
+              : 'Couldn’t identify this — try again, or move a little closer.',
           );
         } else if (resolution.kind === 'ai') {
           // AI interpretation of an allowed statue. In a real venue (not DEV),
@@ -784,7 +784,7 @@ const DetectAR2D: React.FC<{
         setMessage(
           __DEV__ && resolution.message
             ? `Lens error — ${resolution.message}`
-            : 'Couldn’t reach the lens — try again',
+            : 'Couldn’t identify this — try again, or move a little closer.',
         );
       } else {
         setMessage(null);

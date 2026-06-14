@@ -31,8 +31,7 @@ import kotlin.math.atan2
 /**
  * Detector-driven plane AR view (the W2/W3 "fresh ARCore" stack).
  *
- * Distinct from [EpocheyePlaneARView] (museum/geo flows) — this one is built for
- * the detect→place pipeline:
+ * The single AR surface, built for the detect→place pipeline:
  *   - reports continuous camera TRACKING state (so JS can gate placement)
  *   - places the GLB from an arbitrary screen point (a TAP in W2, the detector
  *     bbox base-center in W3) via the SAME hit-test path

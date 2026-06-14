@@ -10,7 +10,7 @@
  * Location off/denied → we can't compute "nearest", so we show the full curated
  * venue list and a prompt to enable location.
  */
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
   Linking,
   Pressable,
@@ -21,14 +21,14 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Animated, {FadeIn, FadeInUp} from 'react-native-reanimated';
-import {Compass, MapPin, Navigation, X} from 'lucide-react-native';
+import {Compass, MapPin, Navigation, RefreshCw, WifiOff, X} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
 import {COLORS, FONTS, FONT_SIZES, RADIUS, SPACING} from '../../core/constants/theme';
 import {usePlacesStore} from '../../stores/placesStore';
 import {getNearestZone} from '../../services/geofenceService';
-import {getCachedZones} from '../../services/zoneService';
+import {fetchZones, getCachedZones, getZonesStatus} from '../../services/zoneService';
 import type {HeritageZone} from '../../core/config/geofence.types';
 import type {MainStackParamList} from '../../core/types/navigation.types';
 
@@ -57,10 +57,23 @@ const GoToVenueScreen: React.FC = () => {
 
   const allZones = useMemo(() => getCachedZones(), []);
 
+  // Network failure (zones never loaded) is NOT the same as being outside a
+  // venue — surface a connection-issue + retry state instead of a false "outside".
+  const [checkError, setCheckError] = useState(() => {
+    const s = getZonesStatus();
+    return s.lastFailed && !s.everLoaded;
+  });
+
   const handleClose = useCallback(() => navigation.goBack(), [navigation]);
   const handleEnableLocation = useCallback(() => {
     void ensureLocationTracking?.();
   }, [ensureLocationTracking]);
+  const handleRetry = useCallback(async () => {
+    await fetchZones(currentLocation?.latitude, currentLocation?.longitude);
+    await ensureLocationTracking?.();
+    const s = getZonesStatus();
+    setCheckError(s.lastFailed && !s.everLoaded);
+  }, [currentLocation, ensureLocationTracking]);
 
   return (
     <View style={styles.root}>
@@ -78,6 +91,25 @@ const GoToVenueScreen: React.FC = () => {
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}>
+          {checkError ? (
+            <Animated.View entering={FadeIn.duration(400)} style={styles.card}>
+              <View style={styles.cardTopRow}>
+                <WifiOff size={15} color={COLORS.sky} />
+                <Text style={styles.cardLabel}>COULDN'T CHECK YOUR LOCATION</Text>
+              </View>
+              <Text style={styles.venueName}>Connection issue</Text>
+              <Text style={styles.venueMeta}>
+                We couldn't reach Epocheye to confirm where you are — this looks
+                like a network problem, not that you're away from a venue. Check
+                your connection and try again.
+              </Text>
+              <Pressable onPress={handleRetry} style={styles.primaryBtn}>
+                <RefreshCw size={16} color={COLORS.bg} />
+                <Text style={styles.primaryBtnText}>Retry</Text>
+              </Pressable>
+            </Animated.View>
+          ) : (
+            <>
           <Animated.View entering={FadeIn.duration(400)}>
             <Text style={styles.kicker}>The lens only opens on site</Text>
             <Text style={styles.title}>Epocheye comes alive at the venue.</Text>
@@ -140,6 +172,8 @@ const GoToVenueScreen: React.FC = () => {
                 </Animated.View>
               ))}
             </View>
+          )}
+            </>
           )}
         </ScrollView>
       </SafeAreaView>
