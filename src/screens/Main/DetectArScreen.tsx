@@ -493,6 +493,11 @@ const DetectARNative: React.FC<{
     trackingRef.current = tracking;
   }, [tracking]);
 
+  // The AI narration text we've already anchored as AR placards (DEV "scan
+  // anything" path). Guards against re-placing on every React re-render; cleared
+  // on reset / a fresh Detect so the next scan re-anchors.
+  const placedAiTextRef = useRef<string | null>(null);
+
   const handleReady = useCallback(() => {
     setStatus(prev => (prev === 'placed' ? prev : 'searching'));
   }, []);
@@ -505,6 +510,7 @@ const DetectARNative: React.FC<{
     }
     setDetecting(true);
     setErrorMessage('Scanning…');
+    placedAiTextRef.current = null; // a new scan may anchor a fresh AR card
     arRef.current?.captureFrame();
   }, [detecting]);
 
@@ -588,11 +594,30 @@ const DetectARNative: React.FC<{
   const handleReset = useCallback(() => {
     arRef.current?.clearAnchor();
     setGlbUri(null);
+    placedAiTextRef.current = null;
     reset();
     setStatus(prev => (prev === 'placed' ? 'ready' : prev));
   }, [reset]);
 
   const handleYaw = useCallback(() => arRef.current?.nudgeYaw(YAW_STEP_DEG), []);
+
+  // DEV "scan anything": the AI narration streams in via runMuseumFallback, so its
+  // final text isn't known at frame-capture time (unlike the venue path's
+  // non-streaming card). Anchor the world placards once the stream completes,
+  // mirroring the venue AI placement. Gated on allowUngrounded so it never
+  // collides with the venue path's immediate placeCardsOnly in handleFrameCaptured.
+  useEffect(() => {
+    if (!allowUngrounded) return;
+    if (resolved.kind !== 'ai' || resolved.streaming) return;
+    const body = resolved.text.trim();
+    if (!body || placedAiTextRef.current === body) return;
+    placedAiTextRef.current = body;
+    arRef.current?.placeCardsOnly(
+      0.5,
+      0.85,
+      buildArCards(resolved.label ?? null, body),
+    );
+  }, [allowUngrounded, resolved]);
 
   const hint = !tracking
     ? 'Move your phone slowly to scan the area'

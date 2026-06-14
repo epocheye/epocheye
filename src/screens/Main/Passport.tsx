@@ -5,15 +5,18 @@ import {
   RefreshControl,
   ScrollView,
   StatusBar,
+  StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import {ChevronRight, Lock, Menu, Sparkles} from 'lucide-react-native';
-import {COLORS, FONTS} from '../../core/constants/theme';
+import {ChevronRight, Flame, Lock, Menu, Sparkles} from 'lucide-react-native';
+import {COLORS, FONTS, SKY_GRADIENT} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
+import LevelBadge from '../../components/ui/LevelBadge';
+import XPProgress from '../../components/ui/XPProgress';
 import {
   usePassportSummary,
   usePassportStamps,
@@ -30,10 +33,6 @@ import PlanList from './components/PlanList';
 type Mode = 'stamps' | 'plan';
 
 type Props = TabScreenProps<'Passport'>;
-
-const AMBER = '#D4860A';
-const AMBER_DEEP = '#7A4A0A';
-const AMBER_LIGHT = '#E8A020';
 
 const GRID_HORIZONTAL_PADDING = 18;
 const GRID_GAP = 8;
@@ -123,14 +122,13 @@ const Passport: React.FC<Props> = ({navigation}) => {
   const sitesGoal = summary?.sites_goal ?? 50;
   const dynastiesCount = summary?.dynasties_count ?? 0;
   const activePasses = summary?.active_passes ?? [];
-  const progress = sitesGoal > 0 ? Math.min(sitesVisited / sitesGoal, 1) : 0;
 
   return (
     <View className="flex-1 bg-surface-1">
       <StatusBar barStyle="light-content" />
-      <SafeAreaView edges={['top']} style={{backgroundColor: AMBER}}>
+      <SafeAreaView edges={['top']} style={{backgroundColor: COLORS.sky}}>
         <LinearGradient
-          colors={[AMBER_LIGHT, AMBER, AMBER_DEEP]}
+          colors={SKY_GRADIENT}
           start={{x: 0, y: 0}}
           end={{x: 1, y: 1}}
           style={{paddingHorizontal: 24, paddingTop: 14, paddingBottom: 28}}>
@@ -139,15 +137,18 @@ const Passport: React.FC<Props> = ({navigation}) => {
             hitSlop={10}
             accessibilityRole="button"
             accessibilityLabel="Open menu"
-            style={{width: 36, height: 36, marginLeft: -6, marginBottom: 4, alignItems: 'flex-start', justifyContent: 'center'}}>
+            style={{width: 40, height: 40, marginLeft: -6, marginBottom: 4, alignItems: 'flex-start', justifyContent: 'center'}}>
             <Menu color="#FFFFFF" size={22} />
           </Pressable>
           <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.85)', letterSpacing: 1.4}}>
             YOUR PASSPORT
           </Text>
-          <Text style={{marginTop: 8, fontFamily: FONTS.serif, fontSize: 34, color: '#FFFFFF', letterSpacing: 0.2, lineHeight: 38}}>
-            {streakDays} day {streakDays === 1 ? 'streak' : 'streak'}
-          </Text>
+          <View style={{marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 10}}>
+            <Flame color="#FFFFFF" size={30} fill="rgba(255,255,255,0.28)" />
+            <Text style={{fontFamily: FONTS.serif, fontSize: 34, color: '#FFFFFF', letterSpacing: 0.2, lineHeight: 38}}>
+              {streakDays} day streak
+            </Text>
+          </View>
         </LinearGradient>
       </SafeAreaView>
 
@@ -156,7 +157,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
         <View className="flex-row p-[3px] rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)]">
           <Pressable
             onPress={() => setMode('stamps')}
-            className={`px-[22px] py-[7px] rounded-full${mode === 'stamps' ? ' bg-[#D4860A]' : ''}`}
+            className={`px-[22px] py-[7px] rounded-full${mode === 'stamps' ? ' bg-[#61A6D3]' : ''}`}
             accessibilityRole="button"
             accessibilityState={{selected: mode === 'stamps'}}>
             <Text style={{fontFamily: FONTS.sansMedium, fontSize: 12, color: mode === 'stamps' ? '#FFFFFF' : 'rgba(255,255,255,0.55)', letterSpacing: 0.3}}>
@@ -165,7 +166,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
           </Pressable>
           <Pressable
             onPress={() => setMode('plan')}
-            className={`px-[22px] py-[7px] rounded-full${mode === 'plan' ? ' bg-[#D4860A]' : ''}`}
+            className={`px-[22px] py-[7px] rounded-full${mode === 'plan' ? ' bg-[#61A6D3]' : ''}`}
             accessibilityRole="button"
             accessibilityState={{selected: mode === 'plan'}}>
             <Text style={{fontFamily: FONTS.sansMedium, fontSize: 12, color: mode === 'plan' ? '#FFFFFF' : 'rgba(255,255,255,0.55)', letterSpacing: 0.3}}>
@@ -185,39 +186,32 @@ const Passport: React.FC<Props> = ({navigation}) => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={AMBER}
-              colors={[AMBER]}
+              tintColor={COLORS.sky}
+              colors={[COLORS.sky]}
             />
           }>
-          {/* Stats card */}
-          <View className="mx-[18px] mt-4 py-[18px] px-5 rounded-2xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] flex-row items-center">
-            <View style={{flex: 1.4}}>
-              <View className="flex-row items-end">
-                <Text style={{fontFamily: FONTS.serif, fontSize: 44, color: '#FFFFFF', lineHeight: 46}}>
-                  {sitesVisited}
+          {/* Stats card — gamified: explorer rank, XP toward goal, dynasties */}
+          <View
+            className="mx-[18px] mt-4 py-[18px] px-5 rounded-2xl bg-[rgba(255,255,255,0.04)] border border-[rgba(97,166,211,0.20)]"
+            style={styles.statsGlow}>
+            <View className="flex-row items-center justify-between">
+              <LevelBadge sites={sitesVisited} />
+              <View className="items-end">
+                <Text style={{fontFamily: FONTS.serif, fontSize: 30, color: '#FFFFFF', lineHeight: 32}}>
+                  {dynastiesCount}
                 </Text>
-                <Text style={{fontFamily: FONTS.sansMedium, fontSize: 18, color: 'rgba(255,255,255,0.55)', marginLeft: 8, marginBottom: 4}}>
-                  / {sitesGoal}
+                <Text style={{marginTop: 2, fontFamily: FONTS.sansSemiBold, fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.1}}>
+                  DYNASTIES
                 </Text>
-              </View>
-              <Text style={{marginTop: 4, fontFamily: FONTS.sansSemiBold, fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.1}}>
-                SITES VISITED
-              </Text>
-              <View className="mt-[10px] h-1 w-full rounded-sm bg-[rgba(255,255,255,0.08)] overflow-hidden">
-                <View
-                  className="h-full rounded-sm bg-[#D4860A]"
-                  style={{width: `${progress * 100}%`}}
-                />
               </View>
             </View>
-            <View className="w-px h-[50px] bg-[rgba(255,255,255,0.08)] mx-[14px]" />
-            <View className="flex-1 items-start">
-              <Text style={{fontFamily: FONTS.serif, fontSize: 44, color: '#FFFFFF', lineHeight: 46}}>
-                {dynastiesCount}
-              </Text>
-              <Text style={{marginTop: 4, fontFamily: FONTS.sansSemiBold, fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.1}}>
-                DYNASTIES
-              </Text>
+            <View className="mt-[18px]">
+              <XPProgress
+                value={sitesVisited}
+                goal={sitesGoal}
+                label="Sites visited"
+                height={10}
+              />
             </View>
           </View>
 
@@ -278,13 +272,13 @@ const Passport: React.FC<Props> = ({navigation}) => {
                   <Pressable
                     key={pass.id}
                     style={({pressed}) => pressed ? {opacity: 0.85} : undefined}
-                    className="px-[14px] py-[10px] rounded-xl border border-[rgba(212,134,10,0.4)] bg-[rgba(212,134,10,0.08)] min-w-[140px]"
+                    className="px-[14px] py-[10px] rounded-xl border border-[rgba(97,166,211,0.4)] bg-[rgba(97,166,211,0.08)] min-w-[140px]"
                     onPress={() => onPassPress(pass)}
                     accessibilityRole="button">
                     <Text style={{fontFamily: FONTS.sansMedium, fontSize: 13, color: '#FFFFFF'}} numberOfLines={1}>
                       {pass.place_count} place{pass.place_count === 1 ? '' : 's'}
                     </Text>
-                    <Text style={{marginTop: 2, fontFamily: FONTS.sans, fontSize: 11, color: AMBER_LIGHT}}>
+                    <Text style={{marginTop: 2, fontFamily: FONTS.sans, fontSize: 11, color: COLORS.skyLight}}>
                       {formatPassExpiry(pass.expires_at)}
                     </Text>
                   </Pressable>
@@ -303,7 +297,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
               onPress={() => { /* MVP: filter sheet not yet implemented */ }}
               accessibilityRole="button"
               accessibilityLabel="Filter stamps">
-              <Text style={{fontFamily: FONTS.sansMedium, fontSize: 13, color: AMBER}}>
+              <Text style={{fontFamily: FONTS.sansMedium, fontSize: 13, color: COLORS.sky}}>
                 Filter
               </Text>
             </Pressable>
@@ -318,13 +312,14 @@ const Passport: React.FC<Props> = ({navigation}) => {
                 key={stamp.place_id}
                 style={({pressed}) => [
                   {width: tileWidth},
+                  styles.stampGlow,
                   pressed && {opacity: 0.85},
                 ]}
-                className="pt-2 px-2 pb-[10px] rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)]"
+                className="pt-2 px-2 pb-[10px] rounded-xl bg-[rgba(97,166,211,0.06)] border border-[rgba(97,166,211,0.22)]"
                 onPress={() => onStampPress(stamp)}
                 accessibilityRole="button"
                 accessibilityLabel={`${stamp.place_name} stamp`}>
-                <View className="h-[62px] rounded-lg overflow-hidden bg-[rgba(212,134,10,0.18)] items-center justify-center">
+                <View className="h-[62px] rounded-lg overflow-hidden bg-[rgba(97,166,211,0.18)] items-center justify-center">
                   {stamp.image_url ? (
                     <Image
                       source={{uri: stamp.image_url}}
@@ -332,7 +327,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
                       resizeMode="cover"
                     />
                   ) : (
-                    <View className="w-full h-full bg-[rgba(212,134,10,0.22)]" />
+                    <View className="w-full h-full bg-[rgba(97,166,211,0.22)]" />
                   )}
                   <View className="absolute top-1 right-1 w-[18px] h-[18px] rounded-full bg-[#3FB950] items-center justify-center">
                     <Text style={{color: '#FFFFFF', fontSize: 11, fontFamily: FONTS.sansBold, lineHeight: 13}}>
@@ -388,5 +383,23 @@ const Passport: React.FC<Props> = ({navigation}) => {
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  // Sky glow for depth on dark surfaces (brand: glow over drop shadow).
+  statsGlow: {
+    shadowColor: COLORS.sky,
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: {width: 0, height: 0},
+    elevation: 4,
+  },
+  stampGlow: {
+    shadowColor: COLORS.sky,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: {width: 0, height: 0},
+    elevation: 2,
+  },
+});
 
 export default Passport;

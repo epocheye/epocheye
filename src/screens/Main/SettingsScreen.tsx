@@ -53,15 +53,13 @@ import DevLoadTestArModelButton from './components/DevLoadTestArModelButton';
 import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 import { getVisitHistory, type VisitRow } from '../../utils/api/visits';
 import { formatRelativeTime } from '../../shared/utils';
-import { FONTS } from '../../core/constants/theme';
+import { COLORS, FONTS, SKY_GRADIENT } from '../../core/constants/theme';
+import StreakFlame from '../../components/ui/StreakFlame';
+import LevelBadge from '../../components/ui/LevelBadge';
 
 type RNFile = { uri: string; type: string; name: string };
 
 type Props = TabScreenProps<'Account'> & { onLogout?: () => void };
-
-const AMBER = '#D4860A';
-const AMBER_DEEP = '#7A4A0A';
-const AMBER_LIGHT = '#E8A020';
 
 // Capture Anchor is an internal admin tool. It is admin-gated AND hidden behind
 // this build flag so it never appears in production — even for admin accounts —
@@ -286,7 +284,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
     <SafeAreaView className="flex-1 bg-ink-deep">
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#000000', '#0C0A07', '#000000']}
+        colors={['#050505', '#0A0A0A', '#050505']}
         locations={[0, 0.5, 1]}
         className="flex-1"
       >
@@ -297,8 +295,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={AMBER}
-              colors={[AMBER]}
+              tintColor={COLORS.sky}
+              colors={[COLORS.sky]}
             />
           }
         >
@@ -316,45 +314,51 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
 
           {/* ── Profile hero header ── */}
 
-          {/* ── Stat cards ── */}
+          {/* ── Explorer rank + stat cards ── */}
           <Animated.View
             entering={FadeInDown.delay(60).duration(350)}
-            className="mt-4 px-6 flex-row gap-x-[10px]"
+            className="mt-4 px-6"
           >
-            {(
-              [
-                { label: 'SITES', value: sites },
-                { label: 'DYNASTIES', value: dynasties },
-                { label: 'STREAK', value: streakDays },
-              ] as const
-            ).map(stat => (
-              <View
-                key={stat.label}
-                className="flex-1 py-[14px] px-[10px] rounded-[14px] bg-white/[0.04] border border-white/[0.06] items-center"
-              >
-                <Text
-                  style={{
-                    fontFamily: FONTS.serif,
-                    fontSize: 32,
-                    color: '#FFFFFF',
-                    lineHeight: 36,
-                  }}
+            <View className="mb-3 flex-row items-center justify-between">
+              <LevelBadge sites={sites} />
+              <StreakFlame days={streakDays} size={20} label="day streak" />
+            </View>
+            <View className="flex-row gap-x-[10px]">
+              {(
+                [
+                  { label: 'SITES', value: sites },
+                  { label: 'DYNASTIES', value: dynasties },
+                  { label: 'STREAK', value: streakDays },
+                ] as const
+              ).map(stat => (
+                <View
+                  key={stat.label}
+                  className="flex-1 py-[14px] px-[10px] rounded-[14px] bg-white/[0.04] border border-[rgba(97,166,211,0.18)] items-center"
                 >
-                  {stat.value}
-                </Text>
-                <Text
-                  style={{
-                    marginTop: 4,
-                    fontFamily: FONTS.sansSemiBold,
-                    fontSize: 10,
-                    color: 'rgba(255,255,255,0.55)',
-                    letterSpacing: 1.1,
-                  }}
-                >
-                  {stat.label}
-                </Text>
-              </View>
-            ))}
+                  <Text
+                    style={{
+                      fontFamily: FONTS.serif,
+                      fontSize: 32,
+                      color: '#FFFFFF',
+                      lineHeight: 36,
+                    }}
+                  >
+                    {stat.value}
+                  </Text>
+                  <Text
+                    style={{
+                      marginTop: 4,
+                      fontFamily: FONTS.sansSemiBold,
+                      fontSize: 10,
+                      color: 'rgba(255,255,255,0.55)',
+                      letterSpacing: 1.1,
+                    }}
+                  >
+                    {stat.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </Animated.View>
 
           {/* ── Weekly digest ── */}
@@ -374,7 +378,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               THIS WEEK
             </Text>
             <LinearGradient
-              colors={[AMBER_LIGHT, AMBER, AMBER_DEEP]}
+              colors={SKY_GRADIENT}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{
@@ -484,7 +488,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   style={{
                     fontFamily: FONTS.sansMedium,
                     fontSize: 13,
-                    color: AMBER,
+                    color: COLORS.sky,
                   }}
                 >
                   View all
@@ -503,7 +507,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   accessibilityRole="button"
                   accessibilityLabel={`Visit: ${visit.place_name}`}
                 >
-                  <View className="w-11 h-11 rounded-lg bg-[rgba(212,134,10,0.22)] mr-3" />
+                  <View className="w-11 h-11 rounded-lg bg-[rgba(97,166,211,0.22)] mr-3" />
                   <View className="flex-1">
                     <Text
                       style={{
@@ -675,14 +679,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           {!explorerPassLoading && !hasAnyActivePass && (
             <Animated.View entering={FadeInDown.delay(220).duration(350)}>
               <TouchableOpacity
-                className="mx-5 mb-5 flex-row items-center rounded-2xl border border-[rgba(212,134,10,0.25)] bg-[rgba(26,18,10,0.8)] p-4"
+                className="mx-5 mb-5 flex-row items-center rounded-2xl border border-[rgba(97,166,211,0.25)] bg-[rgba(10,18,26,0.8)] p-4"
                 onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
                 activeOpacity={0.85}
                 accessibilityRole="button"
                 accessibilityLabel="Get Passport"
               >
-                <View className="w-10 h-10 rounded-full bg-brand-amber/15 items-center justify-center mr-3">
-                  <Sparkles size={18} color="#D4860A" />
+                <View className="w-10 h-10 rounded-full bg-brand-sky/15 items-center justify-center mr-3">
+                  <Sparkles size={18} color={COLORS.sky} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-parchment text-base font-['InstrumentSans-SemiBold']">
@@ -692,7 +696,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     Unlock heritage sites near you
                   </Text>
                 </View>
-                <ChevronRight size={18} color="#D4860A" />
+                <ChevronRight size={18} color={COLORS.sky} />
               </TouchableOpacity>
             </Animated.View>
           )}

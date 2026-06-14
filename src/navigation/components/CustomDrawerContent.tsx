@@ -13,14 +13,16 @@ import {
   Ticket,
 } from 'lucide-react-native';
 import { ROUTES } from '../../core/constants';
-import { FONTS } from '../../core/constants/theme';
+import { COLORS, FONTS } from '../../core/constants/theme';
+import { usePassportSummary } from '../../shared/hooks';
+import StreakFlame from '../../components/ui/StreakFlame';
+import LevelBadge from '../../components/ui/LevelBadge';
 import type { TabParamList } from '../../core/types';
 
-// Higher-contrast palette than the old flat panel: brighter gold + a parchment
-// that actually reads against the gradient, plus a dim tone reserved for
-// secondary/footer rows only.
-const GOLD = '#E2C56A';
-const GOLD_DIM = '#B89B4E';
+// Sky accent (matches the unified app palette) for the active row + glow, plus a
+// parchment text scale for primary/secondary rows.
+const ACCENT = COLORS.sky;
+const ACCENT_DIM = COLORS.skyDark;
 const PARCHMENT = '#F3EEE3';
 const PARCHMENT_DIM = '#A79F8C';
 
@@ -55,6 +57,9 @@ interface Props extends DrawerContentComponentProps {
 const CustomDrawerContent: React.FC<Props> = ({ onLogout, ...props }) => {
   const insets = useSafeAreaInsets();
   const activeRoute = props.state.routeNames[props.state.index];
+  const { summary } = usePassportSummary();
+  const sites = summary?.sites_visited ?? 0;
+  const streak = summary?.streak_days ?? 0;
 
   const go = (route: keyof TabParamList) => {
     props.navigation.navigate(route);
@@ -74,8 +79,8 @@ const CustomDrawerContent: React.FC<Props> = ({ onLogout, ...props }) => {
       accessibilityState={{ selected: active }}
       accessibilityLabel={label}>
       {active ? <View style={styles.activeBar} /> : null}
-      <Icon color={active ? GOLD : PARCHMENT_DIM} size={20} />
-      <Text style={[styles.itemLabel, { color: active ? GOLD : PARCHMENT }]}>
+      <Icon color={active ? ACCENT : PARCHMENT_DIM} size={20} />
+      <Text style={[styles.itemLabel, { color: active ? ACCENT : PARCHMENT }]}>
         {label}
       </Text>
     </Pressable>
@@ -95,6 +100,12 @@ const CustomDrawerContent: React.FC<Props> = ({ onLogout, ...props }) => {
             source={require('../../assets/images/logo-white.png')}
             style={styles.logo}
           />
+        </View>
+
+        {/* Gamified status — explorer rank + current streak. */}
+        <View style={styles.status}>
+          <LevelBadge sites={sites} />
+          <StreakFlame days={streak} size={18} />
         </View>
 
         <View style={styles.divider} />
@@ -133,12 +144,12 @@ const CustomDrawerContent: React.FC<Props> = ({ onLogout, ...props }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000000' },
+  container: { flex: 1, backgroundColor: '#050505' },
   scrollContent: { paddingTop: 0 },
   brand: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 16,
+    paddingBottom: 12,
     alignItems: 'center',
   },
   logo: {
@@ -146,9 +157,16 @@ const styles = StyleSheet.create({
     height: 64,
     resizeMode: 'contain',
   },
+  status: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    paddingBottom: 4,
+  },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(226,197,106,0.16)',
+    backgroundColor: COLORS.skyGlow,
     marginHorizontal: 16,
     marginVertical: 10,
   },
@@ -156,7 +174,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 2,
     marginHorizontal: 24,
-    color: GOLD_DIM,
+    color: ACCENT_DIM,
     fontFamily: FONTS.sansSemiBold,
     fontSize: 11,
     letterSpacing: 1.5,
@@ -170,7 +188,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 12,
   },
-  itemActive: { backgroundColor: 'rgba(226,197,106,0.16)' },
+  itemActive: { backgroundColor: COLORS.skyGlow },
   activeBar: {
     position: 'absolute',
     left: 0,
@@ -179,7 +197,7 @@ const styles = StyleSheet.create({
     width: 3,
     borderTopRightRadius: 3,
     borderBottomRightRadius: 3,
-    backgroundColor: GOLD,
+    backgroundColor: ACCENT,
   },
   itemLabel: { fontFamily: FONTS.sansSemiBold, fontSize: 15 },
   footer: { paddingHorizontal: 12 },

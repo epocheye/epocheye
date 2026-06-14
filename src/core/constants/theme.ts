@@ -40,6 +40,10 @@ export const COLORS = {
   sky: '#61A6D3',
   skyLight: '#8FC3E2',
   skyDark: '#4A86B0',
+  /** Deep end for the sky gradient (replaces the old AMBER_DEEP). */
+  skyDeep: '#2F5E7A',
+  /** Sky glow used for depth on dark surfaces (in place of drop shadows). */
+  skyGlow: 'rgba(97,166,211,0.16)',
   lime: '#8EC24B',
   limeDark: '#6FA037',
 
@@ -97,6 +101,13 @@ export const FONT_SIZES = {
   hero: 34,
   display: 40,
 } as const;
+
+/**
+ * Sky accent gradient (light → base → deep) for headers and hero cards.
+ * Exported as a plain mutable string[] so it satisfies LinearGradient's
+ * `colors` prop type (COLORS is `as const`, which would make it readonly).
+ */
+export const SKY_GRADIENT: string[] = ['#8FC3E2', '#61A6D3', '#2F5E7A'];
 
 /** CDN base for monument/region images */
 export const CDN_BASE =

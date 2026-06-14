@@ -26,6 +26,10 @@ import {getSites, searchPlaces, type SiteDetail} from '../../utils/api/places';
 import {useNotificationsStore} from '../../stores/notificationsStore';
 import {reverseGeocode, reverseGeocodeLabel} from '../../utils/api/geo';
 import {useVenueGate} from '../../shared/hooks/useVenueGate';
+import {usePassportSummary} from '../../shared/hooks';
+import StreakFlame from '../../components/ui/StreakFlame';
+import LevelBadge from '../../components/ui/LevelBadge';
+import XPProgress from '../../components/ui/XPProgress';
 import {getNearestZone} from '../../services/geofenceService';
 import type {HeritageZone} from '../../core/config/geofence.types';
 import type {Place} from '../../utils/api/places/types';
@@ -207,6 +211,12 @@ const Home: React.FC<Props> = ({navigation}) => {
   // without reopening the modal.
   const unreadCount = useNotificationsStore(s => s.unreadCount);
   const refreshUnread = useNotificationsStore(s => s.refreshUnread);
+
+  // Read-only passport summary powers the gamified explorer HUD at the top.
+  const {summary} = usePassportSummary();
+  const hudStreak = summary?.streak_days ?? 0;
+  const hudSites = summary?.sites_visited ?? 0;
+  const hudGoal = summary?.sites_goal ?? 50;
   const setUnreadCount = useNotificationsStore(s => s.setUnreadCount);
   const mapRef = useRef<MapView>(null);
 
@@ -659,6 +669,15 @@ const Home: React.FC<Props> = ({navigation}) => {
         </Text>
       </View>
 
+      {/* Explorer HUD — gamified status: rank, streak, and XP toward the goal */}
+      <View className="mx-6 mt-3 px-4 py-3 rounded-2xl bg-[rgba(97,166,211,0.06)] border border-[rgba(97,166,211,0.20)]">
+        <View className="flex-row items-center justify-between mb-[10px]">
+          <LevelBadge sites={hudSites} />
+          <StreakFlame days={hudStreak} size={18} label="day streak" />
+        </View>
+        <XPProgress value={hudSites} goal={hudGoal} label="Sites visited" height={8} />
+      </View>
+
       {/* Control row: notification + search icons (right) */}
       <View className="px-6 pt-5 pb-3 flex-row items-center justify-end">
         <View className="flex-row items-center gap-x-2">
@@ -877,7 +896,7 @@ const Home: React.FC<Props> = ({navigation}) => {
                 resizeMode="cover"
               />
             ) : (
-              <View className="flex-1 bg-[rgba(212,134,10,0.22)]" />
+              <View className="flex-1 bg-[rgba(97,166,211,0.22)]" />
             )}
           </View>
           <View className="flex-1 py-[10px] px-3">

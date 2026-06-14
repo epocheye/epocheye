@@ -13,17 +13,14 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import {Bell, ChevronRight, Menu} from 'lucide-react-native';
-import {FONTS} from '../../core/constants/theme';
+import {COLORS, FONTS, SKY_GRADIENT} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
+import StreakFlame from '../../components/ui/StreakFlame';
 import {useDailyToday, useDailyNudge} from '../../shared/hooks';
 import type {DailyStreakDay} from '../../utils/api/daily';
 import type {TabScreenProps} from '../../core/types/navigation.types';
 
 type Props = TabScreenProps<'Daily'>;
-
-const AMBER = '#D4860A';
-const AMBER_DEEP = '#7A4A0A';
-const AMBER_LIGHT = '#E8A020';
 
 function todayDateLabel(): string {
   const months = [
@@ -77,8 +74,8 @@ const Daily: React.FC<Props> = ({navigation}) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={AMBER}
-            colors={[AMBER]}
+            tintColor={COLORS.sky}
+            colors={[COLORS.sky]}
           />
         }>
         {/* Menu */}
@@ -102,16 +99,14 @@ const Daily: React.FC<Props> = ({navigation}) => {
               On this day
             </Text>
           </View>
-          <View className="px-[14px] py-2 rounded-full bg-[#D4860A]">
-            <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 14, color: '#FFFFFF'}}>
-              🔥 {streakCount}
-            </Text>
+          <View className="px-[14px] py-2 rounded-full bg-[rgba(97,166,211,0.12)] border border-[rgba(97,166,211,0.35)]">
+            <StreakFlame days={streakCount} size={16} />
           </View>
         </View>
 
         {/* Hero card */}
         <LinearGradient
-          colors={[AMBER_LIGHT, AMBER, AMBER_DEEP]}
+          colors={SKY_GRADIENT}
           start={{x: 0, y: 0}}
           end={{x: 1, y: 1}}
           style={{
@@ -191,7 +186,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="See all visit history">
-            <Text style={{fontFamily: FONTS.sansMedium, fontSize: 13, color: AMBER}}>
+            <Text style={{fontFamily: FONTS.sansMedium, fontSize: 13, color: COLORS.sky}}>
               See all
             </Text>
           </Pressable>
@@ -202,7 +197,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
               key={`${d.weekday}-${i}`}
               className={`w-11 h-[62px] rounded-[10px] border items-center pt-2${
                 d.is_today
-                  ? ' bg-[#D4860A] border-[#E8A020]'
+                  ? ' bg-[#61A6D3] border-[#8FC3E2]'
                   : !d.visited
                   ? ' bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.06)] opacity-[0.55]'
                   : ' bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.06)]'
@@ -230,8 +225,8 @@ const Daily: React.FC<Props> = ({navigation}) => {
 
         {/* Daily nudge row */}
         <View className="mt-6 mx-6 px-4 py-[14px] rounded-[14px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] flex-row items-center">
-          <View className="w-[42px] h-[42px] rounded-full bg-[rgba(212,134,10,0.15)] items-center justify-center mr-3">
-            <Bell color={AMBER_LIGHT} size={20} />
+          <View className="w-[42px] h-[42px] rounded-full bg-[rgba(97,166,211,0.15)] items-center justify-center mr-3">
+            <Bell color={COLORS.skyLight} size={20} />
           </View>
           <View className="flex-1">
             <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 14, color: '#FFFFFF'}}>
@@ -244,7 +239,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
           <Switch
             value={nudge.enabled}
             onValueChange={toggleNudge}
-            trackColor={{false: 'rgba(255,255,255,0.18)', true: AMBER}}
+            trackColor={{false: 'rgba(255,255,255,0.18)', true: COLORS.sky}}
             thumbColor="#FFFFFF"
             ios_backgroundColor="rgba(255,255,255,0.18)"
           />
