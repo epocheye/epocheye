@@ -26,6 +26,21 @@ import { BACKEND_URL } from '../constants/onboarding';
 import { getValidAccessToken } from '../utils/api/auth';
 import { topPrediction, type RoboflowResult } from './roboflowDetectionService';
 
+/**
+ * One ordered "context layer" (migration 055): a single rung of the timeline/
+ * context slider. Present only on grounded statues that were seeded with layers.
+ *  - confidence === 'inferred' → that layer must keep its hedge while active.
+ *  - period_hint is a real date string for the "When It Was Made" layer, null
+ *    for the narrative layers (so the floating date only shows on dated stops).
+ */
+export interface ContextLayer {
+  layer_id: number;
+  label: string;
+  period_hint?: string | null;
+  body: string;
+  confidence: 'inferred' | 'placard_confirmed' | string;
+}
+
 /** Grounded data card returned by GET /api/v1/vision/object/{class_id}. */
 export interface ObjectCard {
   class_id: string;
@@ -39,6 +54,12 @@ export interface ObjectCard {
   narrative: string;
   iconography: string;
   has_reconstruction: boolean;
+  /**
+   * Ordered layered context for the slider (migration 055). Absent for AI
+   * fallback cards and grounded rows without layers — the slider only renders
+   * when there are 2+ layers; otherwise the plain card shows.
+   */
+  context_layers?: ContextLayer[];
 }
 
 export type DetectorResolution =

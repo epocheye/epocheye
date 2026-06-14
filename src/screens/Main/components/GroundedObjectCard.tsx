@@ -11,10 +11,17 @@
  * wins unconditionally (truth beats fluency). See AiGuessCard for the fallback.
  */
 
-import React from 'react';
+import React, {useState} from 'react';
 import {ScrollView, StyleSheet, Text, View} from 'react-native';
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
+} from 'react-native-reanimated';
 import {BadgeCheck, CircleHelp} from 'lucide-react-native';
-import type {ObjectCard} from '../../../services/detectorResolver';
+import type {ContextLayer, ObjectCard} from '../../../services/detectorResolver';
+import ContextLayerSlider from './ContextLayerSlider';
 
 const AMBER = '#E8A020';
 const GREEN = '#4CAF50';
@@ -31,6 +38,24 @@ const GroundedObjectCard: React.FC<Props> = ({card, minimal}) => {
   const meta = [card.period, card.dynasty, card.material, card.origin]
     .map(s => (s ?? '').trim())
     .filter(Boolean);
+
+  // The slider only appears for grounded records with 2+ layers; minimal/no-layer
+  // records (and the AI fallback, which is a different component) get the plain card.
+  const layers =
+    !minimal && Array.isArray(card.context_layers) && card.context_layers.length >= 2
+      ? card.context_layers
+      : null;
+
+  if (layers) {
+    return (
+      <LayeredObjectCard
+        card={card}
+        inferred={inferred}
+        meta={meta}
+        layers={layers}
+      />
+    );
+  }
 
   return (
     <View style={styles.card}>
@@ -91,6 +116,119 @@ const GroundedObjectCard: React.FC<Props> = ({card, minimal}) => {
   );
 };
 
+/**
+ * LayeredObjectCard — the grounded card with the timeline/context slider.
+ *
+ * The body cross-fades between the layer texts as the shared `progress` value
+ * scrubs (interpolated opacity per layer), and the per-layer hedge follows the
+ * ACTIVE layer's confidence — so honesty persists rung by rung, independently of
+ * the card-level identity badge at the top.
+ */
+const LayeredObjectCard: React.FC<{
+  card: ObjectCard;
+  inferred: boolean;
+  meta: string[];
+  layers: ContextLayer[];
+}> = ({card, inferred, meta, layers}) => {
+  const progress = useSharedValue(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const activeInferred = layers[activeIndex]?.confidence === 'inferred';
+
+  return (
+    <View style={[styles.card, styles.cardLayered]}>
+      {/* Card-level identity badge — unchanged from the plain card. */}
+      <View style={[styles.badge, inferred ? styles.badgeInferred : styles.badgeConfirmed]}>
+        {inferred ? (
+          <CircleHelp size={13} color={AMBER} />
+        ) : (
+          <BadgeCheck size={13} color={GREEN} />
+        )}
+        <Text style={[styles.badgeText, {color: inferred ? AMBER : GREEN}]}>
+          {inferred ? 'Inferred — not placard-confirmed' : 'Placard-confirmed'}
+        </Text>
+      </View>
+
+      {/* Per-layer hedge: visible whenever the ACTIVE layer is inferred. */}
+      {activeInferred && (
+        <Text style={styles.hedge}>
+          This layer is read from the iconography and comparable pieces, not confirmed
+          by a museum placard for this object.
+        </Text>
+      )}
+
+      <Text style={styles.title}>
+        {inferred ? `Likely: ${card.display_name}` : card.display_name}
+      </Text>
+
+      {meta.length > 0 && (
+        <View style={styles.metaRow}>
+          {meta.map((m, i) => (
+            <View key={`${m}-${i}`} style={styles.metaChip}>
+              <Text style={styles.metaText}>{m}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Cross-fading layer body — texts stacked, opacity driven by `progress`. */}
+      <View style={styles.crossfade}>
+        {layers.map((layer, i) => (
+          <CrossfadeLayer
+            key={`body-${layer.layer_id}`}
+            index={i}
+            progress={progress}
+            body={layer.body}
+          />
+        ))}
+      </View>
+
+      {!!card.iconography?.trim() && (
+        <View style={styles.iconoBlock}>
+          <Text style={styles.iconoLabel}>WHAT TO LOOK FOR</Text>
+          <Text style={styles.iconoText} numberOfLines={3}>
+            {card.iconography.trim()}
+          </Text>
+        </View>
+      )}
+
+      <ContextLayerSlider
+        layers={layers}
+        progress={progress}
+        onActiveChange={setActiveIndex}
+      />
+    </View>
+  );
+};
+
+/** One absolutely-stacked layer body that fades in as `progress` reaches its stop. */
+const CrossfadeLayer: React.FC<{
+  index: number;
+  progress: SharedValue<number>;
+  body: string;
+}> = ({index, progress, body}) => {
+  const style = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      progress.value,
+      [index - 1, index, index + 1],
+      [0, 1, 0],
+      'clamp',
+    );
+    return {opacity};
+  });
+  return (
+    <Animated.View
+      style={[styles.crossfadeLayer, style]}
+      pointerEvents="box-none">
+      <ScrollView
+        style={styles.crossfadeScroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        <Text style={styles.body}>{body.trim()}</Text>
+      </ScrollView>
+    </Animated.View>
+  );
+};
+
 const styles = StyleSheet.create({
   card: {
     backgroundColor: 'rgba(12,10,8,0.92)',
@@ -101,6 +239,24 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     maxHeight: 360,
   },
+  // Layered mode is a touch taller to seat the cross-fade body + slider without
+  // cramping. Still bounded so it never grows unbounded over the camera feed.
+  cardLayered: {
+    maxHeight: 480,
+  },
+  // Fixed-height window the layer bodies cross-fade within (each is absolute).
+  crossfade: {
+    height: 150,
+    position: 'relative',
+  },
+  crossfadeLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  crossfadeScroll: {flex: 1},
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

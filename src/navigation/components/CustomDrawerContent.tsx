@@ -11,7 +11,6 @@ import {
   Map as MapIcon,
   Settings as SettingsIcon,
   Ticket,
-  UserRound,
 } from 'lucide-react-native';
 import { ROUTES } from '../../core/constants';
 import { FONTS } from '../../core/constants/theme';
@@ -36,7 +35,6 @@ const ITEMS: DrawerItemDef[] = [
   { route: ROUTES.TABS.HOME, label: 'Explore', Icon: MapIcon },
   { route: ROUTES.TABS.PASSPORT, label: 'Passport', Icon: Ticket },
   { route: ROUTES.TABS.DAILY, label: 'Daily', Icon: Clock },
-  { route: ROUTES.TABS.ACCOUNT, label: 'Account', Icon: UserRound },
 ];
 
 // Preferences shortcut — a single Settings entry (profile, narration language,
