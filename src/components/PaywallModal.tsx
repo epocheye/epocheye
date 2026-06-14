@@ -27,8 +27,8 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
       <View className="flex-1 bg-black/70 items-center justify-center px-6">
         <View className="w-full bg-[#141414] rounded-3xl border border-[rgba(212,134,10,0.25)] p-6">
           <View className="flex-row items-start justify-between mb-4">
-            <View className="w-12 h-12 rounded-full bg-[#D4860A]/15 items-center justify-center">
-              <Sparkles color="#D4860A" size={22} />
+            <View className="w-12 h-12 rounded-full bg-[#B8923F]/15 items-center justify-center">
+              <Sparkles color="#B8923F" size={22} />
             </View>
             <TouchableOpacity
               onPress={onClose}
@@ -49,7 +49,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
 
           <TouchableOpacity
             onPress={onUpgrade}
-            className="mt-6 py-4 rounded-2xl items-center justify-center flex-row gap-2 bg-[#D4860A]"
+            className="mt-6 py-4 rounded-2xl items-center justify-center flex-row gap-2 bg-[#B8923F]"
             accessibilityRole="button"
           >
             <Sparkles color="#0A0A0A" size={18} />

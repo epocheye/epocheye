@@ -333,11 +333,11 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               ).map(stat => (
                 <View
                   key={stat.label}
-                  className="flex-1 py-[14px] px-[10px] rounded-[14px] bg-white/[0.04] border border-[rgba(97,166,211,0.18)] items-center"
+                  className="flex-1 py-[14px] px-[10px] rounded-[14px] bg-white/[0.04] border border-[rgba(203,168,98,0.18)] items-center"
                 >
                   <Text
                     style={{
-                      fontFamily: FONTS.serif,
+                      fontFamily: FONTS.display,
                       fontSize: 32,
                       color: '#FFFFFF',
                       lineHeight: 36,
@@ -417,7 +417,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     <Text
                       style={{
                         marginTop: 4,
-                        fontFamily: FONTS.serifItalic,
+                        fontFamily: FONTS.display,
                         fontSize: 28,
                         color: '#FFFFFF',
                         lineHeight: 34,
@@ -507,7 +507,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   accessibilityRole="button"
                   accessibilityLabel={`Visit: ${visit.place_name}`}
                 >
-                  <View className="w-11 h-11 rounded-lg bg-[rgba(97,166,211,0.22)] mr-3" />
+                  <View className="w-11 h-11 rounded-lg bg-[rgba(203,168,98,0.22)] mr-3" />
                   <View className="flex-1">
                     <Text
                       style={{
@@ -679,7 +679,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           {!explorerPassLoading && !hasAnyActivePass && (
             <Animated.View entering={FadeInDown.delay(220).duration(350)}>
               <TouchableOpacity
-                className="mx-5 mb-5 flex-row items-center rounded-2xl border border-[rgba(97,166,211,0.25)] bg-[rgba(10,18,26,0.8)] p-4"
+                className="mx-5 mb-5 flex-row items-center rounded-2xl border border-[rgba(203,168,98,0.25)] bg-[rgba(10,18,26,0.8)] p-4"
                 onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
                 activeOpacity={0.85}
                 accessibilityRole="button"

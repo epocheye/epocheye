@@ -211,7 +211,7 @@ const LoadingFallback: React.FC<{ onTimeout: () => void }> = ({ onTimeout }) => 
 
   return (
     <View className="absolute inset-0 items-center justify-center gap-y-2" pointerEvents="none">
-      <ActivityIndicator color="#E8A020" />
+      <ActivityIndicator color="#CBA862" />
       <Text className="text-accent-amber text-[13px] font-montserrat-medium">
         Loading 3D model…
       </Text>

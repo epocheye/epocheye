@@ -662,7 +662,7 @@ const Home: React.FC<Props> = ({navigation}) => {
           Heritage Near You
         </Text>
         <Text
-          style={{marginTop: 2, fontFamily: FONTS.serif, fontSize: 28, color: '#FFFFFF', lineHeight: 34, alignSelf: 'stretch'}}
+          style={{marginTop: 2, fontFamily: FONTS.display, fontSize: 28, color: '#FFFFFF', lineHeight: 34, alignSelf: 'stretch'}}
           numberOfLines={1}
           ellipsizeMode="tail">
           {locationTitle}
@@ -670,7 +670,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       </View>
 
       {/* Explorer HUD — gamified status: rank, streak, and XP toward the goal */}
-      <View className="mx-6 mt-3 px-4 py-3 rounded-2xl bg-[rgba(97,166,211,0.06)] border border-[rgba(97,166,211,0.20)]">
+      <View className="mx-6 mt-3 px-4 py-3 rounded-2xl bg-[rgba(203,168,98,0.06)] border border-[rgba(203,168,98,0.20)]">
         <View className="flex-row items-center justify-between mb-[10px]">
           <LevelBadge sites={hudSites} />
           <StreakFlame days={hudStreak} size={18} label="day streak" />
@@ -797,7 +797,7 @@ const Home: React.FC<Props> = ({navigation}) => {
                 title={s.name}
                 description={[s.city, s.state].filter(Boolean).join(', ')}
                 onPress={() => handleSelectCurated(s)}
-                pinColor="#D4860A"
+                pinColor="#B8923F"
               />
             ))}
             {filteredPlaces.map(place => (
@@ -896,7 +896,7 @@ const Home: React.FC<Props> = ({navigation}) => {
                 resizeMode="cover"
               />
             ) : (
-              <View className="flex-1 bg-[rgba(97,166,211,0.22)]" />
+              <View className="flex-1 bg-[rgba(203,168,98,0.22)]" />
             )}
           </View>
           <View className="flex-1 py-[10px] px-3">
@@ -908,7 +908,7 @@ const Home: React.FC<Props> = ({navigation}) => {
                 : 'Epocheye site'}
             </Text>
             <Text
-              style={{marginTop: 2, fontFamily: FONTS.serif, fontSize: 22, color: '#111111', lineHeight: 26}}
+              style={{marginTop: 2, fontFamily: FONTS.display, fontSize: 22, color: '#111111', lineHeight: 26}}
               numberOfLines={1}>
               {activeSupportedSite.name}
             </Text>
@@ -978,9 +978,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: 'rgba(97,166,211,0.10)',
+    backgroundColor: 'rgba(203,168,98,0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(97,166,211,0.28)',
+    borderColor: 'rgba(203,168,98,0.28)',
   },
   nudgeIcon: {
     width: 30,
@@ -988,7 +988,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(97,166,211,0.16)',
+    backgroundColor: 'rgba(203,168,98,0.16)',
   },
   nudgeEyebrow: {
     fontFamily: FONTS.sans,

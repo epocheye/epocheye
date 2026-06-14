@@ -22,40 +22,67 @@ export const FONTS = {
   sansMedium: 'InstrumentSans-Medium',
   sansSemiBold: 'InstrumentSans-SemiBold',
   sansBold: 'InstrumentSans-Bold',
+
+  /**
+   * Premium pairing (heritage-gold redesign): Cormorant Garamond display serif
+   * for headlines/numerals + DM Sans grotesk for UI/body. Both already bundled
+   * and natively linked — no rebuild required.
+   */
+  display: 'CormorantGaramond-SemiBold',
+  displayRegular: 'CormorantGaramond-Regular',
+  ui: 'DMSans-Regular',
+  uiMedium: 'DMSans-Medium',
 } as const;
 
 export const COLORS = {
-  /** Core backgrounds */
-  bg: '#050505',
-  bgWarm: '#111111',
-  bgCard: 'rgba(255,255,255,0.06)',
+  /** Core backgrounds — premium warm-black, layered. */
+  bg: '#0A0A0C',
+  bgWarm: '#131218',
+  bgCard: 'rgba(255,255,255,0.05)',
 
-  /** Primary accent (sky) — was amber. Keys kept for transition. */
-  amber: '#61A6D3',
-  amberLight: '#8FC3E2',
-  amberDark: '#4A86B0',
-  amberSubtle: 'rgba(97,166,211,0.15)',
+  /**
+   * Primary accent — antique champagne gold (premium heritage redesign).
+   * `amber*` / `sky*` key names kept so every existing screen repoints for free.
+   */
+  amber: '#CBA862',
+  amberLight: '#E6C88B',
+  amberDark: '#B8923F',
+  amberSubtle: 'rgba(203,168,98,0.14)',
 
-  /** Figma accents */
-  sky: '#61A6D3',
-  skyLight: '#8FC3E2',
-  skyDark: '#4A86B0',
-  /** Deep end for the sky gradient (replaces the old AMBER_DEEP). */
-  skyDeep: '#2F5E7A',
-  /** Sky glow used for depth on dark surfaces (in place of drop shadows). */
-  skyGlow: 'rgba(97,166,211,0.16)',
-  lime: '#8EC24B',
-  limeDark: '#6FA037',
+  /** Gold accents (aliases of the primary above; key names preserved). */
+  sky: '#CBA862',
+  skyLight: '#E6C88B',
+  skyDark: '#B8923F',
+  /** Deep end for the gold gradient. */
+  skyDeep: '#9C7B3A',
+  /** Gold glow used for depth on dark surfaces (in place of drop shadows). */
+  skyGlow: 'rgba(203,168,98,0.16)',
+  lime: '#C9A24B',
+  limeDark: '#A8843A',
 
-  /** Text hierarchy */
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255,255,255,0.7)',
-  textTertiary: 'rgba(255,255,255,0.45)',
-  textMuted: 'rgba(255,255,255,0.3)',
+  /** Explicit gold tokens for new (gamification) UI. */
+  gold: '#CBA862',
+  goldLight: '#E6C88B',
+  goldDeep: '#9C7B3A',
 
-  /** Borders & dividers */
-  border: 'rgba(255,255,255,0.12)',
-  borderFocus: 'rgba(255,255,255,0.25)',
+  /** Elevated surface + glass treatment for premium cards. */
+  cardElevated: '#1A1822',
+  glass: 'rgba(255,255,255,0.05)',
+  glassBorder: 'rgba(255,255,255,0.10)',
+
+  /** Gamification helpers. */
+  xpTrack: 'rgba(255,255,255,0.08)',
+  badgeLocked: '#1B1A21',
+
+  /** Text hierarchy — warm parchment white. */
+  textPrimary: '#F4EFE7',
+  textSecondary: 'rgba(244,239,231,0.70)',
+  textTertiary: 'rgba(244,239,231,0.45)',
+  textMuted: 'rgba(244,239,231,0.30)',
+
+  /** Borders & dividers — hairlines. */
+  border: 'rgba(255,255,255,0.10)',
+  borderFocus: 'rgba(203,168,98,0.35)',
 
   /** Overlays */
   overlayLight: 'rgba(0,0,0,0.4)',
@@ -66,7 +93,7 @@ export const COLORS = {
   apple: '#000000',
 
   /** Status */
-  error: '#E5534B',
+  error: '#C2553F',
   success: '#3FB950',
 } as const;
 
@@ -103,11 +130,14 @@ export const FONT_SIZES = {
 } as const;
 
 /**
- * Sky accent gradient (light → base → deep) for headers and hero cards.
+ * Gold accent gradient (light → base → deep) for headers, hero cards, CTAs.
  * Exported as a plain mutable string[] so it satisfies LinearGradient's
  * `colors` prop type (COLORS is `as const`, which would make it readonly).
  */
-export const SKY_GRADIENT: string[] = ['#8FC3E2', '#61A6D3', '#2F5E7A'];
+export const SKY_GRADIENT: string[] = ['#E6C88B', '#CBA862', '#B8923F'];
+
+/** Alias under the redesign's own name; same values as SKY_GRADIENT. */
+export const GOLD_GRADIENT: string[] = ['#E6C88B', '#CBA862', '#B8923F'];
 
 /** CDN base for monument/region images */
 export const CDN_BASE =

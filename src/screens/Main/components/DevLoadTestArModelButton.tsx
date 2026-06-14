@@ -32,7 +32,7 @@ const DevLoadTestArModelButton: React.FC = () => {
         onPress={handleArModelTest}
         accessibilityRole="button"
         accessibilityLabel="DEV: Scan anything"
-        className="rounded-2xl border border-[rgba(232,160,32,0.45)] bg-[rgba(232,160,32,0.08)] px-4 py-3"
+        className="rounded-2xl border border-[rgba(203,168,98,0.45)] bg-[rgba(203,168,98,0.08)] px-4 py-3"
       >
         <Text className="text-accent-amber font-montserrat-bold text-[13px] tracking-[1.6px]">
           DEV: SCAN ANYTHING

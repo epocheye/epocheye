@@ -118,7 +118,7 @@ const OnboardingTooltips: React.FC<OnboardingTooltipsProps> = ({
           </View>
           <View className="flex-1 pr-2">
             <Text
-              style={{fontFamily: FONTS.serif, fontSize: 17, color: '#F5F0E8', lineHeight: 21}}>
+              style={{fontFamily: FONTS.display, fontSize: 17, color: '#F5F0E8', lineHeight: 21}}>
               {current.title}
             </Text>
             <Text

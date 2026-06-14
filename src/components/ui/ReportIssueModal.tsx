@@ -92,7 +92,7 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
               </Text>
               <TouchableOpacity
                 onPress={handleClose}
-                className="bg-[#D4860A] rounded-[14px] py-[14px] items-center justify-center w-full">
+                className="bg-[#B8923F] rounded-[14px] py-[14px] items-center justify-center w-full">
                 <Text className="text-surface-1 text-[14px] font-montserrat-semibold">
                   Close
                 </Text>
@@ -151,7 +151,7 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
               <TouchableOpacity
                 disabled={!selectedReason || submitting}
                 onPress={handleSubmit}
-                className={`bg-[#D4860A] rounded-[14px] py-[14px] items-center justify-center${
+                className={`bg-[#B8923F] rounded-[14px] py-[14px] items-center justify-center${
                   (!selectedReason || submitting) ? ' opacity-[0.45]' : ''
                 }`}>
                 {submitting ? (

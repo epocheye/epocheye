@@ -8,34 +8,34 @@ module.exports = {
       colors: {
         // Heritage-dark brand surfaces. Use these instead of hardcoded hex.
         ink: {
-          DEFAULT: '#050505', // page background
-          deep: '#020202',
-          warm: '#111111',
+          DEFAULT: '#0A0A0C', // page background (premium warm-black)
+          deep: '#060608',
+          warm: '#131218',
         },
         surface: {
-          1: '#0A0A0A', // cards
-          2: '#141414', // elevated
-          3: '#1C1C1C', // pressed / inner
+          1: '#131218', // cards
+          2: '#1A1822', // elevated
+          3: '#201E29', // pressed / inner
         },
         brand: {
-          // Keys kept (gold/goldSoft/amber) so existing classNames compile.
-          // Values repointed to Figma sky/lime palette.
-          gold: '#61A6D3',
-          goldSoft: '#8FC3E2',
-          amber: '#61A6D3',
-          amberLight: '#8FC3E2',
-          amberDark: '#4A86B0',
-          sky: '#61A6D3',
-          skyLight: '#8FC3E2',
-          skyDark: '#4A86B0',
-          lime: '#8EC24B',
-          limeDark: '#6FA037',
+          // Keys kept (gold/goldSoft/amber/sky) so existing classNames compile.
+          // Values repointed to the premium antique-gold palette.
+          gold: '#CBA862',
+          goldSoft: '#E6C88B',
+          amber: '#CBA862',
+          amberLight: '#E6C88B',
+          amberDark: '#B8923F',
+          sky: '#CBA862',
+          skyLight: '#E6C88B',
+          skyDark: '#B8923F',
+          lime: '#C9A24B',
+          limeDark: '#A8843A',
         },
         parchment: {
-          DEFAULT: '#FFFFFF', // primary body text on dark
-          muted: 'rgba(255,255,255,0.72)',
-          dim: 'rgba(255,255,255,0.45)',
-          faint: 'rgba(255,255,255,0.28)',
+          DEFAULT: '#F4EFE7', // primary body text on dark (warm parchment)
+          muted: 'rgba(244,239,231,0.70)',
+          dim: 'rgba(244,239,231,0.45)',
+          faint: 'rgba(244,239,231,0.28)',
         },
         status: {
           success: '#10B981',
@@ -43,11 +43,11 @@ module.exports = {
           warning: '#E05C5C',
         },
         accent: {
-          amber: '#E8A020',
-          amberDark: '#D4860A',
-          amberSoft: 'rgba(232,160,32,0.14)',
-          amberBorder: 'rgba(232,160,32,0.35)',
-          amberSubtle: 'rgba(232,160,32,0.08)',
+          amber: '#CBA862',
+          amberDark: '#B8923F',
+          amberSoft: 'rgba(203,168,98,0.14)',
+          amberBorder: 'rgba(203,168,98,0.35)',
+          amberSubtle: 'rgba(203,168,98,0.08)',
         },
         grey: {
           muted: '#8C93A0',
@@ -122,12 +122,17 @@ module.exports = {
         },
       },
       boxShadow: {
-        'gold-glow': '0 0 24px rgba(97,166,211,0.25)',
-        'amber-glow': '0 0 32px rgba(97,166,211,0.35)',
-        'sky-glow': '0 0 24px rgba(97,166,211,0.3)',
-        'lime-glow': '0 0 24px rgba(142,194,75,0.3)',
+        'gold-glow': '0 0 24px rgba(203,168,98,0.25)',
+        'amber-glow': '0 0 32px rgba(203,168,98,0.35)',
+        'sky-glow': '0 0 24px rgba(203,168,98,0.3)',
+        'lime-glow': '0 0 24px rgba(203,168,98,0.28)',
       },
       fontFamily: {
+        // Premium pairing (heritage-gold redesign).
+        'display': ['CormorantGaramond-SemiBold'],
+        'display-regular': ['CormorantGaramond-Regular'],
+        'ui': ['DMSans-Regular'],
+        'ui-medium': ['DMSans-Medium'],
         'handwritten': ['NothingYouCouldDo-Regular'],
         'serif-italic': ['InstrumentSerif-Italic'],
         // Instrument family — primary for redesigned screens (serif for

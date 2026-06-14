@@ -117,7 +117,7 @@ const PreArrivalCard: React.FC<PreArrivalCardProps> = ({
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel="Open settings"
-            className="mt-3 self-start px-4 py-2 rounded-xl bg-[#D4860A]">
+            className="mt-3 self-start px-4 py-2 rounded-xl bg-[#B8923F]">
             <Text
               style={{
                 fontFamily: FONTS.sansSemiBold,

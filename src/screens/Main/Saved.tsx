@@ -432,7 +432,7 @@ const Saved: React.FC<Props> = ({ navigation }) => {
         ) : filteredPlaces.length === 0 ? (
           <View className="flex-1 items-center justify-center px-8 pb-16">
             <View className="w-20 h-20 rounded-full bg-surface-1 border border-[rgba(201,168,76,0.2)] items-center justify-center mb-5">
-              <Bookmark color="#D4860A" size={32} />
+              <Bookmark color="#B8923F" size={32} />
             </View>
             <Text className="text-parchment text-lg text-center font-['MontserratAlternates-SemiBold']">
               {activeFilter !== 'All'
@@ -474,8 +474,8 @@ const Saved: React.FC<Props> = ({ navigation }) => {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                tintColor="#D4860A"
-                colors={['#D4860A']}
+                tintColor="#B8923F"
+                colors={['#B8923F']}
               />
             }
           />

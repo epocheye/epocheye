@@ -47,7 +47,7 @@ const Input: React.FC<InputProps> = ({
 
   const isSecure = secureTextEntry && !isPasswordVisible;
   const focusClass = isFocused
-    ? 'border-[#D4860A]'
+    ? 'border-[#B8923F]'
     : error
     ? 'border-[#D9534F]'
     : 'border-transparent';

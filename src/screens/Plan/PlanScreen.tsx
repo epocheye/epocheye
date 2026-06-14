@@ -128,7 +128,7 @@ const PlanScreen: React.FC = () => {
           onPress={() => setShowHistory(s => !s)}
           hitSlop={12}
           className="p-[6px]">
-          <History size={20} color="#E8A020" />
+          <History size={20} color="#CBA862" />
         </TouchableOpacity>
         <View className="flex-1 flex-row items-center justify-center gap-x-[6px]">
           <Sparkles size={16} color="#C9A84C" />
@@ -138,7 +138,7 @@ const PlanScreen: React.FC = () => {
           onPress={handleNewChat}
           hitSlop={12}
           className="p-[6px]">
-          <Plus size={20} color="#E8A020" />
+          <Plus size={20} color="#CBA862" />
         </TouchableOpacity>
       </View>
 
@@ -191,7 +191,7 @@ const PlanScreen: React.FC = () => {
                 <TouchableOpacity
                   key={s}
                   className="px-[14px] py-3 bg-[#121212] rounded-[14px]"
-                  style={{borderWidth: 0.5, borderColor: 'rgba(232,160,32,0.18)'}}
+                  style={{borderWidth: 0.5, borderColor: 'rgba(203,168,98,0.18)'}}
                   onPress={() => void handleSend(s)}>
                   <Text className="text-[#E8DFD1] font-montserrat text-[13px]">{s}</Text>
                 </TouchableOpacity>

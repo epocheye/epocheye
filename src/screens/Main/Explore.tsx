@@ -91,7 +91,7 @@ const ExploreCard: React.FC<ExploreCardProps> = React.memo(
           >
             <View className="flex-row items-center gap-1.5 flex-wrap">
               <View className="flex-row items-center gap-1 rounded-full bg-brand-amber/15 border border-brand-amber/30 px-2 py-0.5">
-                <Sparkles color="#D4860A" size={10} />
+                <Sparkles color="#B8923F" size={10} />
                 <Text className="text-brand-amber text-[9px] uppercase tracking-[0.5px] font-['MontserratAlternates-SemiBold']">
                   {friendlyTag}
                 </Text>
@@ -256,7 +256,7 @@ const PlaceMapView: React.FC<PlaceMapViewProps> = React.memo(
               coordinate={{ latitude: place.lat, longitude: place.lon }}
               title={place.name}
               description={`${place.city} · ${(place.distance_meters / 1000).toFixed(1)} km`}
-              pinColor="#D4860A"
+              pinColor="#B8923F"
               onCalloutPress={() => onPlacePress(place)}
             />
           ))}

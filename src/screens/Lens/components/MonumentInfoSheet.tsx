@@ -4,7 +4,6 @@ import BottomSheet, {BottomSheetScrollView} from '@gorhom/bottom-sheet';
 import {MapPin} from 'lucide-react-native';
 import ResolvedSubjectImage from '../../../components/ui/ResolvedSubjectImage';
 import type {Place} from '../../../utils/api/places';
-import {FONTS} from '../../../core/constants/theme';
 import {getPlaceImage} from '../../../shared/utils';
 
 export interface MonumentInfoSheetRef {
@@ -85,7 +84,7 @@ const MonumentInfoSheet = forwardRef<
         </View>
 
         <View className="mt-5 flex-row items-center">
-          <MapPin size={16} color="#E8A020" />
+          <MapPin size={16} color="#CBA862" />
           <Text className="ml-2 text-parchment text-[14px] font-montserrat-medium">
             {distanceKm}
           </Text>

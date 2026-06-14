@@ -38,7 +38,7 @@ const SIDE_PAD = THUMB_SIZE / 2;
 const LABEL_WIDTH = 96;
 const HINT_WIDTH = 150;
 const SPRING = {damping: 18, stiffness: 220, mass: 0.9};
-const AMBER = '#E8A020';
+const AMBER = '#CBA862';
 
 const ContextLayerSlider: React.FC<ContextLayerSliderProps> = ({
   layers,

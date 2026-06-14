@@ -108,12 +108,12 @@ const NearbyAnchorsList: React.FC<Props> = ({
       {entries.map(({ asset, placement, distance }) => (
         <TouchableOpacity
           key={`${asset.asset_id}:${placement.id}`}
-          className="flex-row items-center gap-x-[6px] px-3 py-2 rounded-full bg-[rgba(13,13,13,0.92)] border border-[rgba(232,160,32,0.35)] max-w-[200px]"
+          className="flex-row items-center gap-x-[6px] px-3 py-2 rounded-full bg-[rgba(13,13,13,0.92)] border border-[rgba(203,168,98,0.35)] max-w-[200px]"
           onPress={() => onSelect(asset, placement)}
           accessibilityRole="button"
           accessibilityLabel={`${asset.object_label}, ${Math.round(distance)} meters away`}
         >
-          <ArrowUpRight color="#E8A020" size={12} />
+          <ArrowUpRight color="#CBA862" size={12} />
           <Text className="text-parchment font-montserrat-semibold text-[12px] shrink" numberOfLines={1}>
             {asset.object_label}
           </Text>

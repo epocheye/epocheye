@@ -69,7 +69,7 @@ const Checkbox: React.FC<CheckboxProps> = ({
       <View
         className={`items-center justify-center rounded border-2 ${
           checked
-            ? 'border-[#D4860A] bg-[#D4860A]'
+            ? 'border-[#B8923F] bg-[#B8923F]'
             : 'border-[rgba(255,255,255,0.2)] bg-[#1F1B16]'
         } ${disabled ? 'opacity-50' : ''}`}
         style={[{ width: checkboxSize, height: checkboxSize }]}

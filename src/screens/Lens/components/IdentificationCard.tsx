@@ -67,7 +67,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
     <Animated.View
       entering={SlideInUp.duration(300).springify()}
       exiting={FadeOut.duration(200)}
-      className="absolute top-[100px] left-4 right-4 bg-[rgba(13,13,13,0.9)] rounded-[20px] p-5 border border-[rgba(232,160,32,0.25)]">
+      className="absolute top-[100px] left-4 right-4 bg-[rgba(13,13,13,0.9)] rounded-[20px] p-5 border border-[rgba(203,168,98,0.25)]">
       <Pressable
         className="absolute top-3 right-3 z-[1]"
         onPress={onDismiss}
@@ -86,7 +86,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
 
       {isLoading && (
         <View className="flex-row items-center gap-x-[10px]">
-          <ActivityIndicator color="#E8A020" size="small" />
+          <ActivityIndicator color="#CBA862" size="small" />
           <Text className="text-grey-muted text-[14px] font-montserrat">
             Identifying this heritage site...
           </Text>
@@ -146,7 +146,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
             <Pressable
               className="flex-row items-center gap-x-[6px] my-2"
               onPress={onUpgrade}>
-              <Lock size={12} color="#E8A020" />
+              <Lock size={12} color="#CBA862" />
               <Text className="text-accent-amber text-[12px] font-montserrat-semibold">
                 Unlock full details with Passport
               </Text>

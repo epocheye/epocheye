@@ -186,7 +186,7 @@ const AncestorStorySheet = forwardRef<
             <Animated.View
               className="self-start flex-row items-center bg-grey-subtle rounded-[20px] px-[10px] py-[4px] mb-[10px] gap-x-[6px]"
               style={{opacity: chipOpacity}}>
-              <Landmark size={14} color="#E8A020" />
+              <Landmark size={14} color="#CBA862" />
               <Text className="text-grey-muted text-[12px] font-montserrat-medium">
                 {identifiedObject.name} · {identifiedObject.era}
               </Text>
@@ -195,7 +195,7 @@ const AncestorStorySheet = forwardRef<
 
           {isLoading && storyText.length === 0 ? (
             <View className="mt-1 gap-[10px]">
-              <ActivityIndicator color="#E8A020" size="small" />
+              <ActivityIndicator color="#CBA862" size="small" />
               <Text className="text-grey-muted text-[13px] font-montserrat">
                 Crafting your ancestor's story...
               </Text>

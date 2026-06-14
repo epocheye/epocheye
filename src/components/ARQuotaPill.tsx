@@ -15,7 +15,7 @@ const ARQuotaPill: React.FC<Props> = ({ compact = false }) => {
   const isDisabled = !enabled || maintenanceMode;
   const colorClass = isDisabled
     ? 'bg-[rgba(140,147,160,0.08)] border-[rgba(140,147,160,0.3)]'
-    : 'bg-[rgba(232,160,32,0.12)] border-[rgba(232,160,32,0.35)]';
+    : 'bg-[rgba(203,168,98,0.12)] border-[rgba(203,168,98,0.35)]';
   const paddingClass = compact ? 'px-2 py-[3px]' : 'px-[10px] py-[5px]';
 
   if (isDisabled) {
@@ -35,8 +35,8 @@ const ARQuotaPill: React.FC<Props> = ({ compact = false }) => {
 
   return (
     <View className={`flex-row items-center gap-x-[6px] rounded-full border ${paddingClass} ${colorClass}`}>
-      <Box size={12} color="#E8A020" />
-      <Text style={{fontSize: 11, color: '#E8A020', fontFamily: FONTS.semiBold, letterSpacing: 0.3}}>{label}</Text>
+      <Box size={12} color="#CBA862" />
+      <Text style={{fontSize: 11, color: '#CBA862', fontFamily: FONTS.semiBold, letterSpacing: 0.3}}>{label}</Text>
     </View>
   );
 };

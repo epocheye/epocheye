@@ -147,7 +147,7 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
                     style={{
                       fontFamily: FONTS.sansSemiBold,
                       fontSize: 12,
-                      color: '#D4860A',
+                      color: '#B8923F',
                       textDecorationLine: 'underline',
                     }}>
                     Activate

@@ -78,7 +78,7 @@ const ThinkingIndicator: React.FC = () => {
 
   return (
     <Animated.View
-      className="flex-row items-center gap-[10px] px-[14px] py-[10px] bg-[#121212] rounded-[14px] self-start border border-[rgba(232,160,32,0.25)]"
+      className="flex-row items-center gap-[10px] px-[14px] py-[10px] bg-[#121212] rounded-[14px] self-start border border-[rgba(203,168,98,0.25)]"
       style={[containerStyle, {borderWidth: 0.5}]}
     >
       <View className="flex-row gap-1">

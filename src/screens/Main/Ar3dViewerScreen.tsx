@@ -289,7 +289,7 @@ function prettyLabel(label: string): string {
 }
 
 const VIGNETTE_HEIGHT = 200;
-const AMBER = '#E8A020';
+const AMBER = '#CBA862';
 
 const styles = StyleSheet.create({
   root: {

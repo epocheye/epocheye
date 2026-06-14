@@ -87,7 +87,7 @@ const MuseumObjectCard: React.FC<MuseumObjectCardProps> = ({
       entering={SlideInUp.duration(260).springify()}
       exiting={FadeOut.duration(180)}
       style={{ position: 'absolute', left, top, width: CARD_WIDTH }}
-      className="bg-[rgba(13,13,13,0.92)] rounded-[20px] p-5 border border-[rgba(232,160,32,0.25)]"
+      className="bg-[rgba(13,13,13,0.92)] rounded-[20px] p-5 border border-[rgba(203,168,98,0.25)]"
     >
       <Pressable
         className="absolute top-3 right-3 z-[1]"
@@ -101,7 +101,7 @@ const MuseumObjectCard: React.FC<MuseumObjectCardProps> = ({
 
       {identifying ? (
         <View className="flex-row items-center gap-x-[10px]">
-          <ActivityIndicator color="#E8A020" size="small" />
+          <ActivityIndicator color="#CBA862" size="small" />
           <Text className="text-grey-muted text-[14px] font-montserrat">
             Looking at this…
           </Text>

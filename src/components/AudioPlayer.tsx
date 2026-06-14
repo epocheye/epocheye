@@ -153,7 +153,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri, title }) => {
         {...panResponder.panHandlers}
       >
         <Animated.View
-          className="h-full bg-[#D4860A] rounded-full"
+          className="h-full bg-[#B8923F] rounded-full"
           style={progressBarStyle}
         />
       </View>
@@ -185,7 +185,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri, title }) => {
         {/* Play/Pause */}
         <TouchableOpacity
           onPress={() => setPaused(p => !p)}
-          className="w-14 h-14 rounded-full bg-[#D4860A] items-center justify-center"
+          className="w-14 h-14 rounded-full bg-[#B8923F] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={paused ? 'Play' : 'Pause'}
         >

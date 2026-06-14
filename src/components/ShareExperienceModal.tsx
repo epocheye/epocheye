@@ -97,8 +97,8 @@ const ShareExperienceModal: React.FC<ShareExperienceModalProps> = ({
           </View>
 
           <View className="flex-row items-start">
-            <View className="w-11 h-11 rounded-full bg-[rgba(232,160,32,0.15)] items-center justify-center mr-3">
-              <Share2 size={20} color="#E8A020" />
+            <View className="w-11 h-11 rounded-full bg-[rgba(203,168,98,0.15)] items-center justify-center mr-3">
+              <Share2 size={20} color="#CBA862" />
             </View>
             <View className="flex-1">
               <Text className="text-parchment font-instrument-semibold text-[18px]">

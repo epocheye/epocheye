@@ -11,7 +11,7 @@
  * AR view or the 2D camera.
  */
 import React, {useEffect, useState} from 'react';
-import {StyleSheet, Text, View, useWindowDimensions} from 'react-native';
+import {StyleSheet, View, useWindowDimensions} from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   },
   stageText: {
     marginTop: SPACING.section,
-    fontFamily: FONTS.serifItalic,
+    fontFamily: FONTS.display,
     fontSize: FONT_SIZES.subtitle,
     color: COLORS.textPrimary,
     textAlign: 'center',

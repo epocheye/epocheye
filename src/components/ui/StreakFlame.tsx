@@ -65,7 +65,7 @@ const StreakFlame: React.FC<Props> = ({ days, size = 22, label }) => {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  count: { fontFamily: FONTS.serif },
+  count: { fontFamily: FONTS.display },
   label: {
     marginLeft: 2,
     fontFamily: FONTS.sansMedium,

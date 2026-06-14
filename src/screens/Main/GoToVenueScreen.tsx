@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   title: {
-    fontFamily: FONTS.serif,
+    fontFamily: FONTS.display,
     fontSize: FONT_SIZES.hero,
     lineHeight: FONT_SIZES.hero * 1.15,
     color: COLORS.textPrimary,
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
   },
   venueName: {
-    fontFamily: FONTS.serif,
+    fontFamily: FONTS.display,
     fontSize: FONT_SIZES.heading,
     color: COLORS.textPrimary,
     marginTop: SPACING.md,

@@ -133,7 +133,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
           style={{
             borderWidth: 0.5,
             borderColor: unread
-              ? 'rgba(232,160,32,0.35)'
+              ? 'rgba(203,168,98,0.35)'
               : 'rgba(255,255,255,0.05)',
           }}>
           <View className="flex-row items-center gap-x-2 mb-[6px]">
@@ -157,7 +157,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
             </Text>
             {unread ? (
               <View className="flex-row items-center gap-x-1">
-                <Check size={12} color="#E8A020" />
+                <Check size={12} color="#CBA862" />
                 <Text className="text-accent-amber font-instrument-medium text-[11px]">
                   Tap to mark read
                 </Text>
@@ -203,7 +203,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
               accessibilityLabel="Mark all as read">
               <CheckCheck
                 size={18}
-                color={unreadCount === 0 ? '#4A4A4A' : '#E8A020'}
+                color={unreadCount === 0 ? '#4A4A4A' : '#CBA862'}
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -218,7 +218,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
 
           {loading ? (
             <View className="py-10 justify-center items-center px-8">
-              <ActivityIndicator color="#E8A020" />
+              <ActivityIndicator color="#CBA862" />
             </View>
           ) : error ? (
             <View className="py-10 justify-center items-center px-8">

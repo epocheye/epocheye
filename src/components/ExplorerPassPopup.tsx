@@ -65,7 +65,7 @@ const ExplorerPassPopup: React.FC<ExplorerPassPopupProps> = ({
         <View style={styles.card}>
           <View style={styles.headerRow}>
             <View style={styles.iconCircle}>
-              <MapPin color="#D4860A" size={22} />
+              <MapPin color="#B8923F" size={22} />
             </View>
             <TouchableOpacity
               onPress={dismiss}
@@ -156,7 +156,7 @@ const styles = {
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
-    backgroundColor: '#D4860A',
+    backgroundColor: '#B8923F',
   } as const,
   ctaText: {
     color: '#0A0A0A',

@@ -29,7 +29,7 @@ const TRACK_HEIGHT = 2;
 const SIDE_PAD = THUMB_SIZE / 2;
 const LABEL_WIDTH = 72;
 const SPRING = {damping: 18, stiffness: 220, mass: 0.9};
-const AMBER = '#E8A020';
+const AMBER = '#CBA862';
 
 const EraSlider: React.FC<EraSliderProps> = ({eras, activeIndex, onChangeIndex}) => {
   const [trackWidth, setTrackWidth] = useState(0);

@@ -107,10 +107,10 @@ const OB11_Notifications: React.FC<Props> = () => {
         style={{paddingBottom: insets.bottom + 24}}>
         <View className="flex-1 items-center justify-center px-7">
           <Animated.View
-            className="w-[120px] h-[120px] rounded-full items-center justify-center bg-[rgba(232,160,32,0.08)]"
+            className="w-[120px] h-[120px] rounded-full items-center justify-center bg-[rgba(203,168,98,0.08)]"
             style={sBell}>
-            <View className="w-[84px] h-[84px] rounded-full items-center justify-center bg-[rgba(232,160,32,0.12)]">
-              <BellRing size={40} color="#E8A020" />
+            <View className="w-[84px] h-[84px] rounded-full items-center justify-center bg-[rgba(203,168,98,0.12)]">
+              <BellRing size={40} color="#CBA862" />
             </View>
           </Animated.View>
 
@@ -128,8 +128,8 @@ const OB11_Notifications: React.FC<Props> = () => {
                 <View
                   key={text}
                   className="flex-row items-center px-4 py-3 rounded-2xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)]">
-                  <View className="w-9 h-9 rounded-full items-center justify-center bg-[rgba(232,160,32,0.10)]">
-                    <Icon size={18} color="#E8A020" />
+                  <View className="w-9 h-9 rounded-full items-center justify-center bg-[rgba(203,168,98,0.10)]">
+                    <Icon size={18} color="#CBA862" />
                   </View>
                   <Text className="ml-3 flex-1 text-[13px] leading-[19px] text-parchment/90 font-montserrat">
                     {text}

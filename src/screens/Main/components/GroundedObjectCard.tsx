@@ -23,7 +23,7 @@ import {BadgeCheck, CircleHelp} from 'lucide-react-native';
 import type {ContextLayer, ObjectCard} from '../../../services/detectorResolver';
 import ContextLayerSlider from './ContextLayerSlider';
 
-const AMBER = '#E8A020';
+const AMBER = '#CBA862';
 const GREEN = '#4CAF50';
 
 interface Props {
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(12,10,8,0.92)',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.45)',
+    borderColor: 'rgba(203,168,98,0.45)',
     paddingHorizontal: 18,
     paddingVertical: 16,
     maxHeight: 360,
@@ -273,8 +273,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(76,175,80,0.5)',
   },
   badgeInferred: {
-    backgroundColor: 'rgba(232,160,32,0.14)',
-    borderColor: 'rgba(232,160,32,0.5)',
+    backgroundColor: 'rgba(203,168,98,0.14)',
+    borderColor: 'rgba(203,168,98,0.5)',
   },
   badgeText: {
     fontFamily: 'InstrumentSans-SemiBold',

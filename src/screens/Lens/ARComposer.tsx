@@ -112,8 +112,8 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         <View className="absolute top-5 self-center flex-row gap-x-2">
-          <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(232,160,32,0.14)] rounded-full border border-[rgba(232,160,32,0.35)]">
-            <Box size={12} color="#E8A020" />
+          <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(203,168,98,0.14)] rounded-full border border-[rgba(203,168,98,0.35)]">
+            <Box size={12} color="#CBA862" />
             <Text className="text-accent-amber font-montserrat-semibold text-[11px]">
               {cached ? 'Cached' : 'Generated'} · {provider}
             </Text>
@@ -126,12 +126,12 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
             </View>
           )}
           {quality === 'single_view' && (
-            <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(232,160,32,0.14)] rounded-full border border-[rgba(232,160,32,0.35)]">
+            <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(203,168,98,0.14)] rounded-full border border-[rgba(203,168,98,0.35)]">
               <Text className="text-accent-amber font-montserrat-semibold text-[11px]">Basic 3D</Text>
             </View>
           )}
           {scanCount > 0 && (
-            <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(232,160,32,0.14)] rounded-full border border-[rgba(232,160,32,0.35)]">
+            <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(203,168,98,0.14)] rounded-full border border-[rgba(203,168,98,0.35)]">
               <Text className="text-accent-amber font-montserrat-semibold text-[11px]">
                 {scanCount} {scanCount === 1 ? 'scan' : 'scans'}
               </Text>

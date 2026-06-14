@@ -95,11 +95,11 @@ const Daily: React.FC<Props> = ({navigation}) => {
             <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.4}}>
               {dateLabel}
             </Text>
-            <Text style={{marginTop: 6, fontFamily: FONTS.serifItalic, fontSize: 32, color: '#FFFFFF', lineHeight: 38}}>
+            <Text style={{marginTop: 6, fontFamily: FONTS.display, fontSize: 32, color: '#FFFFFF', lineHeight: 38}}>
               On this day
             </Text>
           </View>
-          <View className="px-[14px] py-2 rounded-full bg-[rgba(97,166,211,0.12)] border border-[rgba(97,166,211,0.35)]">
+          <View className="px-[14px] py-2 rounded-full bg-[rgba(203,168,98,0.12)] border border-[rgba(203,168,98,0.35)]">
             <StreakFlame days={streakCount} size={16} />
           </View>
         </View>
@@ -134,7 +134,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
           ) : null}
           {daily ? (
             <>
-              <Text style={{fontFamily: FONTS.serifItalic, fontSize: 84, color: '#FFFFFF', lineHeight: 90, letterSpacing: -1}}>
+              <Text style={{fontFamily: FONTS.display, fontSize: 84, color: '#FFFFFF', lineHeight: 90, letterSpacing: -1}}>
                 {daily.year}
               </Text>
               <Text style={{marginTop: 6, fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.78)', letterSpacing: 1.4}}>
@@ -197,7 +197,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
               key={`${d.weekday}-${i}`}
               className={`w-11 h-[62px] rounded-[10px] border items-center pt-2${
                 d.is_today
-                  ? ' bg-[#61A6D3] border-[#8FC3E2]'
+                  ? ' bg-brand-gold border-brand-goldSoft'
                   : !d.visited
                   ? ' bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.06)] opacity-[0.55]'
                   : ' bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.06)]'
@@ -225,7 +225,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
 
         {/* Daily nudge row */}
         <View className="mt-6 mx-6 px-4 py-[14px] rounded-[14px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] flex-row items-center">
-          <View className="w-[42px] h-[42px] rounded-full bg-[rgba(97,166,211,0.15)] items-center justify-center mr-3">
+          <View className="w-[42px] h-[42px] rounded-full bg-[rgba(203,168,98,0.15)] items-center justify-center mr-3">
             <Bell color={COLORS.skyLight} size={20} />
           </View>
           <View className="flex-1">

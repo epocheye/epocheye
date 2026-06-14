@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     backgroundColor: COLORS.skyGlow,
     borderWidth: 1,
-    borderColor: 'rgba(97,166,211,0.35)',
+    borderColor: COLORS.borderFocus,
   },
   pillCompact: { paddingHorizontal: 10, paddingVertical: 4, gap: 5 },
   level: { fontFamily: FONTS.sansBold, fontSize: 12, color: COLORS.skyLight },
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 2,
-    backgroundColor: 'rgba(143,195,226,0.6)',
+    backgroundColor: COLORS.goldLight,
   },
   title: { fontFamily: FONTS.sansSemiBold, fontSize: 12, color: COLORS.textPrimary },
 });

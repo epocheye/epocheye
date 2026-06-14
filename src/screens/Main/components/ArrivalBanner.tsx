@@ -53,7 +53,7 @@ const ArrivalBanner: React.FC<ArrivalBannerProps> = ({
       style={[styles.stackedSlot, animatedStyle]}
       pointerEvents={visible ? 'auto' : 'none'}>
       <LinearGradient
-        colors={['#141414', 'rgba(232,160,32,0.14)']}
+        colors={['#141414', 'rgba(203,168,98,0.14)']}
         start={{x: 0, y: 0}}
         end={{x: 1, y: 1}}
         style={styles.banner}>
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.3)',
+    borderColor: 'rgba(203,168,98,0.3)',
     shadowColor: '#000',
     shadowOpacity: 0.35,
     shadowRadius: 16,

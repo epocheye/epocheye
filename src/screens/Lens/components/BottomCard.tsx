@@ -79,7 +79,7 @@ const BottomCard: React.FC<BottomCardProps> = ({
       style={{paddingBottom: insets.bottom + 16}}>
       {state === 'searching' ? (
         <View className="flex-row items-center">
-          <ActivityIndicator color="#E8A020" size="small" />
+          <ActivityIndicator color="#CBA862" size="small" />
           <Text
             className="ml-[10px] text-[14px] text-grey-muted"
             style={{fontFamily: FONTS.regular}}>
@@ -146,7 +146,7 @@ const BottomCard: React.FC<BottomCardProps> = ({
           <TouchableOpacity
             className="mt-3 h-12 rounded-xl border-[1.5px] border-accent-amber bg-transparent flex-row items-center justify-center gap-x-2"
             onPress={onScanObject}>
-            <ScanSearch size={18} color="#E8A020" />
+            <ScanSearch size={18} color="#CBA862" />
             <Text
               className="text-accent-amber text-[14px]"
               style={{fontFamily: FONTS.semiBold}}>
@@ -185,14 +185,14 @@ const BottomCard: React.FC<BottomCardProps> = ({
 
           {onHDScan && (
             <TouchableOpacity
-              className="mt-2 h-[42px] rounded-xl border-[1.5px] border-[rgba(232,160,32,0.5)] bg-[rgba(232,160,32,0.1)] flex-row items-center justify-center gap-x-2"
+              className="mt-2 h-[42px] rounded-xl border-[1.5px] border-[rgba(203,168,98,0.5)] bg-[rgba(203,168,98,0.1)] flex-row items-center justify-center gap-x-2"
               onPress={onHDScan}
               disabled={hdScanLoading}>
               {hdScanLoading ? (
-                <ActivityIndicator color="#E8A020" size="small" />
+                <ActivityIndicator color="#CBA862" size="small" />
               ) : (
                 <>
-                  <Layers size={16} color="#E8A020" />
+                  <Layers size={16} color="#CBA862" />
                   <Text
                     className="text-accent-amber text-[13px]"
                     style={{fontFamily: FONTS.semiBold}}>
@@ -216,7 +216,7 @@ const BottomCard: React.FC<BottomCardProps> = ({
               onPress={onExploreArtifacts}
               accessibilityRole="button"
               accessibilityLabel="Explore the artifacts — tap any object">
-              <ScanSearch size={18} color="#E8A020" />
+              <ScanSearch size={18} color="#CBA862" />
               <Text
                 className="text-accent-amber text-[14px]"
                 style={{fontFamily: FONTS.semiBold}}>
@@ -270,7 +270,7 @@ const BottomCard: React.FC<BottomCardProps> = ({
               onPress={onExploreAround}
               accessibilityRole="button"
               accessibilityLabel="Explore what's around you — tap any object">
-              <ScanSearch size={18} color="#E8A020" />
+              <ScanSearch size={18} color="#CBA862" />
               <Text
                 className="text-accent-amber text-[14px]"
                 style={{fontFamily: FONTS.semiBold}}>

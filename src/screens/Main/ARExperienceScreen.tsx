@@ -628,7 +628,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
     return (
       <GestureHandlerRootView className="flex-1">
         <SafeAreaView className="flex-1 bg-ink-deep items-center justify-center px-8">
-          <Camera color="#D4860A" size={56} />
+          <Camera color="#B8923F" size={56} />
           <Text className="text-parchment text-xl text-center font-['MontserratAlternates-Bold'] mt-6 mb-2">
             Camera access needed
           </Text>
@@ -769,7 +769,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
                 </>
               ) : (
                 <>
-                  <Sparkles color="#D4860A" size={11} />
+                  <Sparkles color="#B8923F" size={11} />
                   <Text className="text-brand-amber text-[11px] font-['MontserratAlternates-Medium']">
                     Live AR launching soon
                   </Text>
@@ -803,7 +803,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
                 <TouchableOpacity
                   onPress={handleDescribeAnything}
                   disabled={describeAnythingLoading}
-                  className="px-[10px] py-[6px] rounded-full bg-[rgba(232,160,32,0.18)] border border-[rgba(232,160,32,0.6)]"
+                  className="px-[10px] py-[6px] rounded-full bg-[rgba(203,168,98,0.18)] border border-[rgba(203,168,98,0.6)]"
                   style={describeAnythingLoading ? {opacity: 0.6} : undefined}
                   accessibilityRole="button"
                   accessibilityLabel="Describe anything (dev)"
@@ -828,7 +828,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(200)}
-            className="absolute left-4 right-4 z-[5] flex-row items-center gap-[10px] px-3 py-[10px] rounded-xl bg-[rgba(10,10,10,0.92)] border border-[rgba(232,160,32,0.4)]"
+            className="absolute left-4 right-4 z-[5] flex-row items-center gap-[10px] px-3 py-[10px] rounded-xl bg-[rgba(10,10,10,0.92)] border border-[rgba(203,168,98,0.4)]"
             style={{top: insets.top + 60}}
           >
             <Text className="text-accent-amber text-[9px] tracking-[1.4px] font-montserrat-bold">DEV PROBE</Text>
@@ -893,7 +893,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
             className="bg-[#12121A]/90 rounded-2xl p-4 border border-[#272730] flex-row items-center gap-3"
           >
             <View className="w-10 h-10 rounded-full bg-brand-amber/15 items-center justify-center">
-              <ScanEye color="#D4860A" size={20} />
+              <ScanEye color="#B8923F" size={20} />
             </View>
             <View className="flex-1">
               <Text className="text-parchment text-sm font-['MontserratAlternates-SemiBold']">
@@ -923,7 +923,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Dev-bypass: reconstruction CTA */}
         {(reconstructionReady || reconstructionLoading || reconstructionPending || bypassError) && (
-          <View className="absolute self-center flex-row items-center gap-x-[10px] bg-[rgba(13,13,13,0.92)] rounded-full border border-[rgba(232,160,32,0.3)] px-3 py-2 z-[6] bottom-[420px]">
+          <View className="absolute self-center flex-row items-center gap-x-[10px] bg-[rgba(13,13,13,0.92)] rounded-full border border-[rgba(203,168,98,0.3)] px-3 py-2 z-[6] bottom-[420px]">
             {reconstructionPending ? (
               <Text className="text-parchment text-[12px] font-montserrat-medium px-1">
                 {reconstructionPending.phase === 'cold_start'
@@ -1009,7 +1009,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Text className="text-[rgba(245,240,232,0.8)] font-montserrat-medium text-[12px]">Dismiss</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  className="px-[14px] py-2 rounded-[8px] bg-[#D4860A]"
+                  className="px-[14px] py-2 rounded-[8px] bg-[#B8923F]"
                   style={(unknownSubmitting || !unknownLabel.trim()) ? {opacity: 0.45} : undefined}
                   disabled={unknownSubmitting || !unknownLabel.trim()}
                   onPress={handleHelpAddThis}
@@ -1053,7 +1053,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
             <View className="w-9 h-1 rounded-full bg-[#3A3A44] mb-3" />
             <View className="flex-row items-center justify-between w-full px-5">
               <View className="flex-row items-center gap-2">
-                <Clock color="#D4860A" size={16} />
+                <Clock color="#B8923F" size={16} />
                 <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold']">
                   Historical Insights
                 </Text>

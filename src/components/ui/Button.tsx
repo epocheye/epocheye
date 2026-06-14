@@ -47,7 +47,7 @@ const Button: React.FC<ButtonProps> = ({
       : 'h-14 px-6 py-3';
   const variantClass =
     variant === 'primary'
-      ? 'bg-[#D4860A]'
+      ? 'bg-[#B8923F]'
       : variant === 'secondary'
       ? 'bg-[#2B2520]'
       : variant === 'outline'

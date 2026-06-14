@@ -17,6 +17,8 @@ import {COLORS, FONTS, SKY_GRADIENT} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
 import LevelBadge from '../../components/ui/LevelBadge';
 import XPProgress from '../../components/ui/XPProgress';
+import BadgeGrid from '../../components/ui/BadgeGrid';
+import {deriveBadges, earnedCount, levelProgress} from '../../shared/utils/achievements';
 import {
   usePassportSummary,
   usePassportStamps,
@@ -123,6 +125,12 @@ const Passport: React.FC<Props> = ({navigation}) => {
   const dynastiesCount = summary?.dynasties_count ?? 0;
   const activePasses = summary?.active_passes ?? [];
 
+  const badges = useMemo(
+    () => deriveBadges({sitesVisited, streakDays, dynasties: dynastiesCount}),
+    [sitesVisited, streakDays, dynastiesCount],
+  );
+  const progress = levelProgress(sitesVisited);
+
   return (
     <View className="flex-1 bg-surface-1">
       <StatusBar barStyle="light-content" />
@@ -145,7 +153,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
           </Text>
           <View style={{marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 10}}>
             <Flame color="#FFFFFF" size={30} fill="rgba(255,255,255,0.28)" />
-            <Text style={{fontFamily: FONTS.serif, fontSize: 34, color: '#FFFFFF', letterSpacing: 0.2, lineHeight: 38}}>
+            <Text style={{fontFamily: FONTS.display, fontSize: 36, color: '#FFFFFF', letterSpacing: 0.2, lineHeight: 38}}>
               {streakDays} day streak
             </Text>
           </View>
@@ -157,7 +165,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
         <View className="flex-row p-[3px] rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.04)]">
           <Pressable
             onPress={() => setMode('stamps')}
-            className={`px-[22px] py-[7px] rounded-full${mode === 'stamps' ? ' bg-[#61A6D3]' : ''}`}
+            className={`px-[22px] py-[7px] rounded-full${mode === 'stamps' ? ' bg-brand-gold' : ''}`}
             accessibilityRole="button"
             accessibilityState={{selected: mode === 'stamps'}}>
             <Text style={{fontFamily: FONTS.sansMedium, fontSize: 12, color: mode === 'stamps' ? '#FFFFFF' : 'rgba(255,255,255,0.55)', letterSpacing: 0.3}}>
@@ -166,7 +174,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
           </Pressable>
           <Pressable
             onPress={() => setMode('plan')}
-            className={`px-[22px] py-[7px] rounded-full${mode === 'plan' ? ' bg-[#61A6D3]' : ''}`}
+            className={`px-[22px] py-[7px] rounded-full${mode === 'plan' ? ' bg-brand-gold' : ''}`}
             accessibilityRole="button"
             accessibilityState={{selected: mode === 'plan'}}>
             <Text style={{fontFamily: FONTS.sansMedium, fontSize: 12, color: mode === 'plan' ? '#FFFFFF' : 'rgba(255,255,255,0.55)', letterSpacing: 0.3}}>
@@ -192,12 +200,12 @@ const Passport: React.FC<Props> = ({navigation}) => {
           }>
           {/* Stats card — gamified: explorer rank, XP toward goal, dynasties */}
           <View
-            className="mx-[18px] mt-4 py-[18px] px-5 rounded-2xl bg-[rgba(255,255,255,0.04)] border border-[rgba(97,166,211,0.20)]"
+            className="mx-[18px] mt-4 py-[18px] px-5 rounded-2xl bg-[rgba(255,255,255,0.04)] border border-[rgba(203,168,98,0.20)]"
             style={styles.statsGlow}>
             <View className="flex-row items-center justify-between">
               <LevelBadge sites={sitesVisited} />
               <View className="items-end">
-                <Text style={{fontFamily: FONTS.serif, fontSize: 30, color: '#FFFFFF', lineHeight: 32}}>
+                <Text style={{fontFamily: FONTS.display, fontSize: 32, color: '#FFFFFF', lineHeight: 34}}>
                   {dynastiesCount}
                 </Text>
                 <Text style={{marginTop: 2, fontFamily: FONTS.sansSemiBold, fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.1}}>
@@ -212,6 +220,11 @@ const Passport: React.FC<Props> = ({navigation}) => {
                 label="Sites visited"
                 height={10}
               />
+              <Text style={{marginTop: 8, fontFamily: FONTS.sans, fontSize: 12, color: COLORS.textTertiary}}>
+                {progress.isMax
+                  ? 'Top rank reached'
+                  : `${progress.xpToNext} XP to ${progress.nextTitle}`}
+              </Text>
             </View>
           </View>
 
@@ -230,7 +243,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
                 <Sparkles color="#FFFFFF" size={20} />
               </View>
               <View className="flex-1">
-                <Text style={{fontFamily: FONTS.serif, fontSize: 20, color: '#FFFFFF', lineHeight: 24}}>
+                <Text style={{fontFamily: FONTS.display, fontSize: 20, color: '#FFFFFF', lineHeight: 24}}>
                   Get Your Passport
                 </Text>
                 <Text style={{marginTop: 4, fontFamily: FONTS.sans, fontSize: 12.5, color: 'rgba(255,255,255,0.88)', lineHeight: 17}}>
@@ -248,7 +261,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
             <Pressable
               onPress={onBuyPassport}
               style={({pressed}) => pressed ? {opacity: 0.85} : undefined}
-              className="mx-[18px] mt-[14px] px-4 py-3 rounded-xl bg-[rgba(97,166,211,0.08)] border border-[rgba(97,166,211,0.32)] flex-row items-center justify-between"
+              className="mx-[18px] mt-[14px] px-4 py-3 rounded-xl bg-[rgba(203,168,98,0.08)] border border-[rgba(203,168,98,0.32)] flex-row items-center justify-between"
               accessibilityRole="button"
               accessibilityLabel="Extend your Passport">
               <Text style={{fontFamily: FONTS.sansMedium, fontSize: 13, color: COLORS.sky}}>
@@ -272,7 +285,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
                   <Pressable
                     key={pass.id}
                     style={({pressed}) => pressed ? {opacity: 0.85} : undefined}
-                    className="px-[14px] py-[10px] rounded-xl border border-[rgba(97,166,211,0.4)] bg-[rgba(97,166,211,0.08)] min-w-[140px]"
+                    className="px-[14px] py-[10px] rounded-xl border border-[rgba(203,168,98,0.4)] bg-[rgba(203,168,98,0.08)] min-w-[140px]"
                     onPress={() => onPassPress(pass)}
                     accessibilityRole="button">
                     <Text style={{fontFamily: FONTS.sansMedium, fontSize: 13, color: '#FFFFFF'}} numberOfLines={1}>
@@ -287,8 +300,21 @@ const Passport: React.FC<Props> = ({navigation}) => {
             </View>
           ) : null}
 
+          {/* Achievements */}
+          <View className="px-[18px] mt-[22px] mb-4 flex-row items-center justify-between">
+            <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 12, color: '#FFFFFF', letterSpacing: 1.2}}>
+              ACHIEVEMENTS
+            </Text>
+            <Text style={{fontFamily: FONTS.sansMedium, fontSize: 12, color: COLORS.gold}}>
+              {earnedCount(badges)} of {badges.length}
+            </Text>
+          </View>
+          <View className="px-[18px]">
+            <BadgeGrid badges={badges} />
+          </View>
+
           {/* Stamps header */}
-          <View className="px-[18px] mt-[22px] mb-3 flex-row items-center justify-between">
+          <View className="px-[18px] mt-[26px] mb-3 flex-row items-center justify-between">
             <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 12, color: '#FFFFFF', letterSpacing: 1.2}}>
               STAMPS
             </Text>
@@ -315,11 +341,11 @@ const Passport: React.FC<Props> = ({navigation}) => {
                   styles.stampGlow,
                   pressed && {opacity: 0.85},
                 ]}
-                className="pt-2 px-2 pb-[10px] rounded-xl bg-[rgba(97,166,211,0.06)] border border-[rgba(97,166,211,0.22)]"
+                className="pt-2 px-2 pb-[10px] rounded-xl bg-[rgba(203,168,98,0.06)] border border-[rgba(203,168,98,0.22)]"
                 onPress={() => onStampPress(stamp)}
                 accessibilityRole="button"
                 accessibilityLabel={`${stamp.place_name} stamp`}>
-                <View className="h-[62px] rounded-lg overflow-hidden bg-[rgba(97,166,211,0.18)] items-center justify-center">
+                <View className="h-[62px] rounded-lg overflow-hidden bg-[rgba(203,168,98,0.18)] items-center justify-center">
                   {stamp.image_url ? (
                     <Image
                       source={{uri: stamp.image_url}}
@@ -327,7 +353,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
                       resizeMode="cover"
                     />
                   ) : (
-                    <View className="w-full h-full bg-[rgba(97,166,211,0.22)]" />
+                    <View className="w-full h-full bg-[rgba(203,168,98,0.22)]" />
                   )}
                   <View className="absolute top-1 right-1 w-[18px] h-[18px] rounded-full bg-[#3FB950] items-center justify-center">
                     <Text style={{color: '#FFFFFF', fontSize: 11, fontFamily: FONTS.sansBold, lineHeight: 13}}>

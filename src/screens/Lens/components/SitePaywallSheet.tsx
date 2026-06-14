@@ -98,7 +98,7 @@ export const SitePaywallSheet: React.FC<SitePaywallSheetProps> = ({
 
           <View className="items-center mb-3">
             <View className="h-14 w-14 rounded-full bg-accent-amber/15 items-center justify-center border border-accent-amber/40">
-              <Sparkles size={26} color="#E8A020" />
+              <Sparkles size={26} color="#CBA862" />
             </View>
           </View>
 
@@ -117,7 +117,7 @@ export const SitePaywallSheet: React.FC<SitePaywallSheetProps> = ({
             {VALUE_PROPS.map(label => (
               <View key={label} className="flex-row items-center gap-x-3">
                 <View className="h-6 w-6 rounded-full bg-accent-amber/20 items-center justify-center">
-                  <Check size={14} color="#E8A020" />
+                  <Check size={14} color="#CBA862" />
                 </View>
                 <Text
                   className="text-parchment text-[14px] flex-1"

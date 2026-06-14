@@ -59,7 +59,7 @@ export function usePremiumPurchase(): UsePremiumPurchaseReturn {
             email: init.prefill?.email || '',
             contact: init.prefill?.contact || '',
           },
-          theme: { color: '#D4860A' },
+          theme: { color: '#B8923F' },
         };
 
         const razorpayData = await RazorpayCheckout.open(options);

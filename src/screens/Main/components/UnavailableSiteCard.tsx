@@ -34,7 +34,7 @@ const UnavailableSiteCard: React.FC<UnavailableSiteCardProps> = ({
         </View>
         <View className="flex-1 pr-2">
           <Text
-            style={{fontFamily: FONTS.serif, fontSize: 18, color: '#F5F0E8', lineHeight: 22}}
+            style={{fontFamily: FONTS.display, fontSize: 18, color: '#F5F0E8', lineHeight: 22}}
             numberOfLines={2}>
             Epocheye isn't here yet
           </Text>

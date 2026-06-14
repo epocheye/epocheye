@@ -368,7 +368,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
             className="bg-surface-1 rounded-2xl border border-[rgba(212,134,10,0.25)] p-5 mb-5"
           >
             <View className="flex-row items-center gap-2 mb-2">
-              <Sparkles color="#D4860A" size={16} />
+              <Sparkles color="#B8923F" size={16} />
               <Text className="text-brand-amber text-xs uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
                 {isBundle ? 'Custom Passport' : 'Single Place Access'}
               </Text>
@@ -658,7 +658,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
               className={`py-4 rounded-2xl items-center justify-center flex-row gap-2 ${
                 selectedCount === 0 || !quote ? 'opacity-45' : ''
               }`}
-              style={{ backgroundColor: '#D4860A' }}
+              style={{ backgroundColor: '#B8923F' }}
               accessibilityRole="button"
             >
               {purchasing ? (

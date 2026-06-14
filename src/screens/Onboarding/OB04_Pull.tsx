@@ -102,16 +102,16 @@ const OB04_Pull: React.FC<Props> = ({navigation}) => {
         <Animated.View style={sHead}>
           <Text
             className="text-[22px] text-[rgba(255,255,255,0.78)] leading-[30px]"
-            style={{fontFamily: FONTS.serifItalic}}>
+            style={{fontFamily: FONTS.display}}>
             So,{' '}
-            <Text className="text-brand-lime" style={{fontFamily: FONTS.serifItalic}}>
+            <Text className="text-brand-lime" style={{fontFamily: FONTS.display}}>
               {greetingName}
             </Text>{' '}
             ...
           </Text>
           <Text
             className="text-[30px] text-parchment leading-[38px] mt-3"
-            style={{fontFamily: FONTS.serifItalic}}>
+            style={{fontFamily: FONTS.display}}>
             What pulls you in??
           </Text>
         </Animated.View>
@@ -142,7 +142,7 @@ const OB04_Pull: React.FC<Props> = ({navigation}) => {
                     resizeMode="cover"
                   />
                   {selected ? (
-                    <View className="absolute inset-0 bg-[rgba(97,166,211,0.18)]" />
+                    <View className="absolute inset-0 bg-[rgba(203,168,98,0.18)]" />
                   ) : null}
                 </View>
                 <Text

@@ -22,7 +22,6 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -998,7 +997,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderWidth: 1,
-    borderColor: 'rgba(232,160,32,0.45)',
+    borderColor: 'rgba(203,168,98,0.45)',
   },
   pickerChipActive: {backgroundColor: AMBER, borderColor: AMBER},
   pickerChipText: {
