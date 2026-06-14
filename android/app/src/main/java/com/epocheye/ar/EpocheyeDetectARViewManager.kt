@@ -84,6 +84,7 @@ class EpocheyeDetectARViewManager(
         return MapBuilder.builder<String, Int>()
             .put("placeAtScreenPoint", CMD_PLACE_AT_SCREEN_POINT)
             .put("placeFromDetection", CMD_PLACE_FROM_DETECTION)
+            .put("placeCardsOnly", CMD_PLACE_CARDS_ONLY)
             .put("placeInFront", CMD_PLACE_IN_FRONT)
             .put("clearAnchor", CMD_CLEAR_ANCHOR)
             .put("nudgeYaw", CMD_NUDGE_YAW)
@@ -107,6 +108,12 @@ class EpocheyeDetectARViewManager(
                 val nx = args?.getDouble(0)?.toFloat() ?: return
                 val ny = args?.getDouble(1)?.toFloat() ?: return
                 view.placeFromDetection(nx, ny)
+            }
+            CMD_PLACE_CARDS_ONLY -> {
+                val nx = args?.getDouble(0)?.toFloat() ?: return
+                val ny = args?.getDouble(1)?.toFloat() ?: return
+                val cards = args.getString(2) ?: return
+                view.placeCardsOnly(nx, ny, cards)
             }
             CMD_PLACE_IN_FRONT -> view.placeInFront()
             CMD_CLEAR_ANCHOR -> view.clearAnchor()
@@ -133,6 +140,12 @@ class EpocheyeDetectARViewManager(
                 val nx = args?.getDouble(0)?.toFloat() ?: return
                 val ny = args?.getDouble(1)?.toFloat() ?: return
                 view.placeFromDetection(nx, ny)
+            }
+            "placeCardsOnly" -> {
+                val nx = args?.getDouble(0)?.toFloat() ?: return
+                val ny = args?.getDouble(1)?.toFloat() ?: return
+                val cards = args.getString(2) ?: return
+                view.placeCardsOnly(nx, ny, cards)
             }
             "placeInFront" -> view.placeInFront()
             "clearAnchor" -> view.clearAnchor()
@@ -167,5 +180,6 @@ class EpocheyeDetectARViewManager(
         private const val CMD_NUDGE_YAW = 4
         private const val CMD_CAPTURE_FRAME = 5
         private const val CMD_PLACE_IN_FRONT = 6
+        private const val CMD_PLACE_CARDS_ONLY = 7
     }
 }

@@ -30,8 +30,12 @@ object EpocheyeArCardRenderer {
     private val MUTED = Color.parseColor("#BDB6AC")
 
     /**
-     * cardJson is the grounded card: { display_name, period, dynasty, material,
+     * cardJson is a card object: { display_name, period, dynasty, material,
      * origin, identity_confidence, narrative, iconography }.
+     *
+     * Pass "continuation": true for follow-on pages of long content — those render
+     * body-only (no badge / title / meta), so a long narration can be split across
+     * 2–3 spread placards.
      */
     fun render(cardJson: String): Bitmap? {
         val o = try {
@@ -40,8 +44,9 @@ object EpocheyeArCardRenderer {
             return null
         }
 
+        val continuation = o.optBoolean("continuation", false)
         val inferred = o.optString("identity_confidence") == "inferred"
-        val accent = if (inferred) AMBER else GREEN
+        val accent = if (continuation) MUTED else if (inferred) AMBER else GREEN
         val badge = if (inferred) "INFERRED — NOT PLACARD-CONFIRMED" else "PLACARD-CONFIRMED"
         val name = o.optString("display_name").ifBlank { "Unknown object" }
         val title = if (inferred) "Likely: $name" else name
@@ -67,8 +72,9 @@ object EpocheyeArCardRenderer {
             color = INK; textSize = 34f; typeface = Typeface.SANS_SERIF
         }
 
-        val titleLayout = staticLayout(title, titlePaint, contentW)
-        val metaLayout = if (meta.isNotBlank()) staticLayout(meta, metaPaint, contentW) else null
+        val titleLayout = if (!continuation) staticLayout(title, titlePaint, contentW) else null
+        val metaLayout =
+            if (!continuation && meta.isNotBlank()) staticLayout(meta, metaPaint, contentW) else null
         // Cap the narrative so the panel stays a readable size in 3D.
         val bodyLayout = if (narrative.isNotBlank()) {
             staticLayout(ellipsize(narrative, 360), bodyPaint, contentW)
@@ -77,13 +83,15 @@ object EpocheyeArCardRenderer {
         }
 
         var y = PAD
-        y += 48f // badge row
-        y += 24f
-        y += titleLayout.height
+        if (titleLayout != null) {
+            y += 48f // badge row
+            y += 24f
+            y += titleLayout.height
+        }
         if (metaLayout != null) y += 18f + metaLayout.height
-        if (bodyLayout != null) y += 28f + bodyLayout.height
+        if (bodyLayout != null) y += (if (titleLayout != null) 28f else 0f) + bodyLayout.height
         y += PAD
-        val height = y.toInt().coerceIn(320, 1600)
+        val height = y.toInt().coerceIn(240, 1600)
 
         val bmp = Bitmap.createBitmap(W, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
@@ -99,14 +107,16 @@ object EpocheyeArCardRenderer {
         canvas.drawRoundRect(rect, 40f, 40f, border)
 
         var cy = PAD
-        canvas.drawText(badge, PAD, cy + 30f, badgePaint)
-        cy += 48f + 24f
+        if (titleLayout != null) {
+            canvas.drawText(badge, PAD, cy + 30f, badgePaint)
+            cy += 48f + 24f
 
-        canvas.save()
-        canvas.translate(PAD, cy)
-        titleLayout.draw(canvas)
-        canvas.restore()
-        cy += titleLayout.height
+            canvas.save()
+            canvas.translate(PAD, cy)
+            titleLayout.draw(canvas)
+            canvas.restore()
+            cy += titleLayout.height
+        }
 
         if (metaLayout != null) {
             cy += 18f
@@ -114,7 +124,7 @@ object EpocheyeArCardRenderer {
             cy += metaLayout.height
         }
         if (bodyLayout != null) {
-            cy += 28f
+            if (titleLayout != null) cy += 28f
             canvas.save(); canvas.translate(PAD, cy); bodyLayout.draw(canvas); canvas.restore()
         }
         return bmp

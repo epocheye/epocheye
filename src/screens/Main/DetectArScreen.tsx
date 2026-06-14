@@ -119,9 +119,12 @@ type ResolvedState =
 /** What runResolution decided, so the caller can place the model / route the user. */
 type ResolutionOutcome =
   | {kind: 'grounded' | 'minimal'; classId: string}
-  | {kind: 'ai'}
+  // 'ai' carries the card content so the caller can float it as AR placards.
+  | {kind: 'ai'; label?: string | null; body?: string}
   | {kind: 'paywall'; paywall: {siteId: string; used: number; limit: number}}
   | {kind: 'limit'}
+  // Statue-only gate at a venue refused a non-exhibit — show the polite tip.
+  | {kind: 'rejected'; message?: string}
   | {kind: 'error'; message?: string};
 
 /**
@@ -149,6 +152,47 @@ function extractErrorMessage(err: unknown): string | undefined {
   return body ?? (status ? `HTTP ${status}` : undefined);
 }
 
+/** Split long narration into up to `max` chunks (~`size` chars, on word boundaries). */
+function chunkText(s: string, size: number, max: number): string[] {
+  const text = s.trim();
+  if (!text) return [];
+  const out: string[] = [];
+  let rest = text;
+  while (rest.length > 0 && out.length < max) {
+    if (rest.length <= size) {
+      out.push(rest);
+      break;
+    }
+    let cut = rest.lastIndexOf(' ', size);
+    if (cut < size * 0.5) cut = size;
+    out.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  return out;
+}
+
+/**
+ * Build the JSON cards array for `placeCardsOnly` from an AI interpretation: card 0
+ * carries the label + first chunk (amber "inferred" badge); long text spills into
+ * 1–2 body-only continuation cards spread at other positions.
+ */
+function buildArCards(label: string | null, body: string): string {
+  const chunks = chunkText(body, 300, 3);
+  const cards =
+    chunks.length === 0
+      ? [{display_name: label ?? 'AI interpretation', identity_confidence: 'inferred', narrative: body}]
+      : chunks.map((chunk, i) =>
+          i === 0
+            ? {
+                display_name: label ?? 'AI interpretation',
+                identity_confidence: 'inferred',
+                narrative: chunk,
+              }
+            : {continuation: true, narrative: chunk},
+        );
+  return JSON.stringify(cards);
+}
+
 /**
  * Shared resolution engine. The PRIMARY recognizer is the server-side three-layer
  * agent behind POST /api/v1/recognize:
@@ -169,6 +213,8 @@ function extractErrorMessage(err: unknown): string | undefined {
  */
 function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
   const [resolved, setResolved] = useState<ResolvedState>({kind: 'idle'});
+  // Free scans left at this venue after the latest serve (null when ungated/dev).
+  const [remaining, setRemaining] = useState<number | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
 
   const reset = useCallback(() => {
@@ -263,6 +309,11 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
         return {kind: 'error', message};
       }
 
+      // Surface free scans left at this venue (for the "N scans left" pill).
+      if (typeof result.remaining === 'number') {
+        setRemaining(result.remaining);
+      }
+
       // Per-site free scans spent → caller routes to the Explorer-Pass purchase.
       if (result.match === 'paywall') {
         return {
@@ -274,6 +325,12 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
       // Daily exploration budget reached (a soft circuit breaker) → gentle message.
       if (result.match === 'daily_limit') {
         return {kind: 'limit'};
+      }
+
+      // Statue-only gate refused a non-exhibit at this venue → polite block.
+      if (result.match === 'out_of_scope') {
+        setResolved({kind: 'idle'});
+        return {kind: 'rejected', message: result.message};
       }
 
       // GROUNDED → reuse the grounded data-card lookup so GroundedObjectCard and the
@@ -293,13 +350,10 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
 
       // AI interpretation (the in-venue two-gate fallback) → labelled card, no stream.
       if (result.match === 'ai_interpretation' && result.card) {
-        setResolved({
-          kind: 'ai',
-          label: result.card.title || null,
-          text: result.card.body || '',
-          streaming: false,
-        });
-        return {kind: 'ai'};
+        const label = result.card.title || null;
+        const body = result.card.body || '';
+        setResolved({kind: 'ai', label, text: body, streaming: false});
+        return {kind: 'ai', label, body};
       }
 
       // out_of_venue / unexpected. In dev "scan anything" this is expected (no
@@ -312,7 +366,7 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
     [venueSlug, allowUngrounded, runMuseumFallback],
   );
 
-  return {resolved, runResolution, reset};
+  return {resolved, runResolution, reset, remaining};
 }
 
 const DetectArScreen: React.FC = () => {
@@ -429,7 +483,7 @@ const DetectARNative: React.FC<{
   const [shareOpen, setShareOpen] = useState(false);
   // The model to render — set from the DETECTED class (not a hardcoded marquee).
   const [glbUri, setGlbUri] = useState<string | null>(null);
-  const {resolved, runResolution, reset} = useDetectionResolver(
+  const {resolved, runResolution, reset, remaining} = useDetectionResolver(
     venueSlug,
     allowUngrounded,
   );
@@ -479,14 +533,32 @@ const DetectARNative: React.FC<{
           setErrorMessage(
             'You’ve explored a lot here today — come back tomorrow for more.',
           );
+        } else if (resolution.kind === 'rejected') {
+          // Statue-only gate: calm tip, no card, nothing placed.
+          arRef.current?.clearAnchor();
+          setGlbUri(null);
+          setErrorMessage(
+            resolution.message ??
+              'Point at a museum sculpture or artifact to explore it.',
+          );
         } else if (resolution.kind === 'error') {
           setErrorMessage(
             __DEV__ && resolution.message
               ? `Lens error — ${resolution.message}`
               : 'Couldn’t reach the lens — try again',
           );
-        } else {
-          setErrorMessage(null); // 'ai' — labelled card set by the hook
+        } else if (resolution.kind === 'ai') {
+          // AI interpretation of an allowed statue. In a real venue (not DEV),
+          // float the card(s) in the world beside the statue — no 3D model. DEV
+          // "scan anything" keeps just the on-screen card.
+          if (!allowUngrounded && resolution.body) {
+            arRef.current?.placeCardsOnly(
+              0.5,
+              0.85,
+              buildArCards(resolution.label ?? null, resolution.body),
+            );
+          }
+          setErrorMessage(null); // labelled card also shown on-screen by the hook
           void maybePromptShare(allowUngrounded, setShareOpen);
         }
       } catch {
@@ -570,6 +642,13 @@ const DetectARNative: React.FC<{
             />
           </Pressable>
         </View>
+        {remaining != null ? (
+          <View style={styles.scansPill} pointerEvents="none">
+            <Text style={styles.scansPillText}>
+              {remaining} {remaining === 1 ? 'scan' : 'scans'} left here
+            </Text>
+          </View>
+        ) : null}
       </SafeAreaView>
 
       <SafeAreaView style={styles.bottomOverlay} edges={['bottom']} pointerEvents="box-none">
@@ -642,7 +721,7 @@ const DetectAR2D: React.FC<{
   const [busy, setBusy] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const {resolved, runResolution} = useDetectionResolver(
+  const {resolved, runResolution, remaining} = useDetectionResolver(
     venueSlug,
     allowUngrounded,
   );
@@ -671,6 +750,11 @@ const DetectAR2D: React.FC<{
         navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
       } else if (resolution.kind === 'limit') {
         setMessage('You’ve explored a lot here today — come back tomorrow for more.');
+      } else if (resolution.kind === 'rejected') {
+        setMessage(
+          resolution.message ??
+            'Point at a museum sculpture or artifact to explore it.',
+        );
       } else if (resolution.kind === 'error') {
         setMessage(
           __DEV__ && resolution.message
@@ -726,6 +810,13 @@ const DetectAR2D: React.FC<{
           </View>
           <View style={styles.iconButton} />
         </View>
+        {remaining != null ? (
+          <View style={styles.scansPill} pointerEvents="none">
+            <Text style={styles.scansPillText}>
+              {remaining} {remaining === 1 ? 'scan' : 'scans'} left here
+            </Text>
+          </View>
+        ) : null}
       </SafeAreaView>
 
       <SafeAreaView style={styles.bottomOverlay} edges={['bottom']} pointerEvents="box-none">
@@ -848,6 +939,22 @@ const styles = StyleSheet.create({
     maxWidth: '90%',
   },
   bubbleError: {borderColor: 'rgba(239,68,68,0.55)'},
+  scansPill: {
+    alignSelf: 'center',
+    marginTop: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  scansPillText: {
+    fontFamily: 'MontserratAlternates-Medium',
+    fontSize: 11,
+    color: '#FFFFFF',
+    letterSpacing: 0.4,
+  },
   messageText: {
     fontFamily: 'MontserratAlternates-Medium',
     fontSize: 13,

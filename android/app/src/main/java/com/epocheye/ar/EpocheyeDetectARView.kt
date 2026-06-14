@@ -23,6 +23,7 @@ import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.node.ImageNode
 import io.github.sceneview.node.ModelNode
+import org.json.JSONArray
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.math.atan2
@@ -69,7 +70,19 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
     private var arSceneView: ARSceneView? = null
     private var currentAnchorNode: AnchorNode? = null
     private var currentModelNode: ModelNode? = null
-    private var cardNode: ImageNode? = null
+    // One or more world-anchored card placards. Grounded results use a single card
+    // above the model; allowed-but-ungrounded statues use 1–3 spread placards.
+    private val cardNodes = mutableListOf<ImageNode>()
+
+    // Card-only layout: positions (relative to the anchor at the object's base) for
+    // up to 3 placards — offset to the side so they don't overlap the statue, modest
+    // height ("not too high"), spread in x/y/z. TUNABLE on-device.
+    private val cardLayout = listOf(
+        Position(0.5f, 0.5f, 0f),
+        Position(0.5f, 0.15f, 0.1f),
+        Position(-0.5f, 0.35f, 0f),
+    )
+    private val cardOnlyScale = 0.26f
     private var readyReported = false
     private var planeReported = false
     private var lightingApplied = false
@@ -163,17 +176,19 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
                     // Billboard the data placard to face the camera — Y-axis only,
                     // so it stays upright (never inverted) and +Z (the image face)
                     // points at the viewer.
-                    cardNode?.let { card ->
+                    if (cardNodes.isNotEmpty()) {
                         try {
                             val cam = frame.camera.pose
-                            val p = card.worldPosition
-                            val yaw = Math.toDegrees(
-                                atan2(
-                                    (cam.tx() - p.x).toDouble(),
-                                    (cam.tz() - p.z).toDouble(),
-                                ),
-                            ).toFloat()
-                            card.rotation = Rotation(0f, yaw, 0f)
+                            for (card in cardNodes) {
+                                val p = card.worldPosition
+                                val yaw = Math.toDegrees(
+                                    atan2(
+                                        (cam.tx() - p.x).toDouble(),
+                                        (cam.tz() - p.z).toDouble(),
+                                    ),
+                                ).toFloat()
+                                card.rotation = Rotation(0f, yaw, 0f)
+                            }
                         } catch (_: Throwable) {
                         }
                     }
@@ -287,11 +302,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
         val anchorNode = currentAnchorNode ?: return
         val data = cardData
         if (data == null) {
-            try {
-                cardNode?.let { anchorNode.removeChildNode(it) }
-            } catch (_: Throwable) {
-            }
-            cardNode = null
+            removeCardNodes(anchorNode)
             return
         }
         attachCard(sceneView, anchorNode, data)
@@ -469,6 +480,97 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
         attachModel(sceneView, anchorNode, uri)
     }
 
+    /**
+     * Card-only placement: anchor at the detection point and float 1–3 card placards
+     * BESIDE the object (offset, eye-level-ish, not overlapping) — for allowed-but-
+     * ungrounded statues that have no 3D model. cardsJson is a JSON array of card
+     * objects (first full; the rest carry "continuation": true for long text).
+     */
+    fun placeCardsOnly(imgNormX: Float, imgNormY: Float, cardsJson: String) {
+        val sceneView = arSceneView ?: return
+        val frame = try {
+            sceneView.frame
+        } catch (t: Throwable) {
+            null
+        } ?: return
+        if (frame.camera.trackingState != TrackingState.TRACKING) {
+            post { onARError?.invoke("move phone to scan — not tracking yet") }
+            return
+        }
+        val input = floatArrayOf(imgNormX, imgNormY)
+        val output = FloatArray(2)
+        try {
+            frame.transformCoordinates2d(
+                Coordinates2d.IMAGE_NORMALIZED, input, Coordinates2d.VIEW, output,
+            )
+        } catch (t: Throwable) {
+            Log.w(TAG, "placeCardsOnly transform failed", t)
+            post { onARError?.invoke("coordinate transform failed") }
+            return
+        }
+        doPlaceCards(sceneView, frame, output[0], output[1], cardsJson)
+    }
+
+    private fun doPlaceCards(
+        sceneView: ARSceneView,
+        frame: com.google.ar.core.Frame,
+        viewX: Float,
+        viewY: Float,
+        cardsJson: String,
+    ) {
+        val session = sceneView.session ?: return
+        // Prefer a plane hit at the aimed point; fall back to ~1.5 m ahead so the
+        // cards still appear when no plane is directly under the cursor.
+        val hit = try {
+            frame.hitTest(viewX, viewY).firstOrNull { r ->
+                val tr = r.trackable
+                tr is Plane && tr.trackingState == TrackingState.TRACKING &&
+                    tr.isPoseInPolygon(r.hitPose)
+            }
+        } catch (t: Throwable) {
+            null
+        }
+        val anchor = try {
+            if (hit != null) {
+                hit.createAnchor()
+            } else {
+                val target = frame.camera.pose.compose(Pose.makeTranslation(0f, 0f, -1.5f))
+                session.createAnchor(Pose.makeTranslation(target.tx(), target.ty(), target.tz()))
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "doPlaceCards anchor failed", t)
+            post { onARError?.invoke("anchor creation failed") }
+            return
+        }
+
+        clearCurrentAnchor()
+        val anchorNode = try {
+            AnchorNode(sceneView.engine, anchor).also { sceneView.addChildNode(it) }
+        } catch (t: Throwable) {
+            Log.e(TAG, "card anchor node create failed", t)
+            post { onARError?.invoke("anchor node create failed") }
+            return
+        }
+        currentAnchorNode = anchorNode
+
+        val cards = try {
+            JSONArray(cardsJson)
+        } catch (t: Throwable) {
+            JSONArray()
+        }
+        val n = minOf(cards.length(), cardLayout.size)
+        for (i in 0 until n) {
+            val json = cards.optJSONObject(i)?.toString() ?: continue
+            addCardNode(sceneView, anchorNode, json, cardLayout[i], cardOnlyScale)
+        }
+        if (cardNodes.isEmpty()) {
+            post { onARError?.invoke("could not render the card") }
+            return
+        }
+        setPlaneFinding(false)
+        post { onAnchorPlaced?.invoke("cards_only") }
+    }
+
     /** One-tap yaw alignment nudge (degrees) applied to the placed model. */
     fun nudgeYaw(deltaDeg: Float) {
         val node = currentModelNode ?: return
@@ -520,9 +622,20 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
         }
         currentAnchorNode = null
         currentModelNode = null
-        cardNode = null
+        cardNodes.clear()
         currentYawDeg = 0f
         pending = null
+    }
+
+    /** Detach + forget all card placards (best-effort). */
+    private fun removeCardNodes(anchorNode: AnchorNode) {
+        for (node in cardNodes) {
+            try {
+                anchorNode.removeChildNode(node)
+            } catch (_: Throwable) {
+            }
+        }
+        cardNodes.clear()
     }
 
     private fun attachModel(
@@ -599,22 +712,28 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
      * data and placement is unaffected.
      */
     private fun attachCard(sceneView: ARSceneView, anchorNode: AnchorNode, json: String) {
+        removeCardNodes(anchorNode)
+        addCardNode(sceneView, anchorNode, json, Position(0f, 0.55f, 0f), 0.28f)
+    }
+
+    /** Render one card JSON to a bitmap and add it as a billboarded ImageNode. */
+    private fun addCardNode(
+        sceneView: ARSceneView,
+        anchorNode: AnchorNode,
+        json: String,
+        position: Position,
+        scale: Float,
+    ) {
         try {
             val bitmap = EpocheyeArCardRenderer.render(json) ?: return
-            try {
-                cardNode?.let { anchorNode.removeChildNode(it) }
-            } catch (_: Throwable) {
-            }
-            cardNode = null
-
             val node = ImageNode(sceneView.materialLoader, bitmap).apply {
-                position = Position(0f, 0.55f, 0f) // float above the model
-                setScale(0.28f)                    // small label (~0.28 m)
+                this.position = position
+                setScale(scale)
             }
             anchorNode.addChildNode(node)
-            cardNode = node
+            cardNodes.add(node)
         } catch (t: Throwable) {
-            Log.w(TAG, "attachCard failed — placard skipped (RN card still shows data)", t)
+            Log.w(TAG, "addCardNode failed — placard skipped (RN card still shows data)", t)
         }
     }
 

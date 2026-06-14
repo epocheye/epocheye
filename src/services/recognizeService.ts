@@ -30,6 +30,7 @@ export type RecognizeMatch =
   | 'grounded'
   | 'ai_interpretation'
   | 'out_of_venue'
+  | 'out_of_scope'
   | 'paywall'
   | 'daily_limit';
 
@@ -49,6 +50,8 @@ export interface RecognizeCard {
 
 export interface RecognizeResult {
   match: RecognizeMatch;
+  /** Human-readable note (e.g. the polite "not an exhibit here" tip). */
+  message?: string;
   source?: string;
   card?: RecognizeCard;
   class_id?: string;

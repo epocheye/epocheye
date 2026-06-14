@@ -54,6 +54,15 @@ export interface EpocheyeDetectARHandle {
   placeAtScreenPoint: (screenX: number, screenY: number) => void;
   /** Place from a detector bbox base-center in IMAGE_NORMALIZED coords (0..1). */
   placeFromDetection: (imgNormX: number, imgNormY: number) => void;
+  /**
+   * Card-only placement (no 3D model): anchor at an IMAGE_NORMALIZED point and
+   * float 1–3 card placards beside it. `cardsJson` is a JSON array of card objects.
+   */
+  placeCardsOnly: (
+    imgNormX: number,
+    imgNormY: number,
+    cardsJson: string,
+  ) => void;
   /** Auto-place the model ~1.2 m in front of the camera (dev model-picker). */
   placeInFront: () => void;
   clearAnchor: () => void;
@@ -106,6 +115,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       return {
         placeAtScreenPoint: commands.placeAtScreenPoint,
         placeFromDetection: commands.placeFromDetection,
+        placeCardsOnly: commands.placeCardsOnly,
         placeInFront: commands.placeInFront,
         clearAnchor: commands.clearAnchor,
         nudgeYaw: commands.nudgeYaw,
@@ -115,7 +125,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
 
     const dispatch = (
       commandId: number | string | undefined,
-      args: Array<number>,
+      args: Array<number | string>,
     ) => {
       const handle = findNodeHandle(viewRef.current as never);
       if (handle == null || commandId == null) return;
@@ -129,6 +139,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           dispatch(commandIds?.placeAtScreenPoint, [screenX, screenY]),
         placeFromDetection: (imgNormX, imgNormY) =>
           dispatch(commandIds?.placeFromDetection, [imgNormX, imgNormY]),
+        placeCardsOnly: (imgNormX, imgNormY, cardsJson) =>
+          dispatch(commandIds?.placeCardsOnly, [imgNormX, imgNormY, cardsJson]),
         placeInFront: () => dispatch(commandIds?.placeInFront, []),
         clearAnchor: () => dispatch(commandIds?.clearAnchor, []),
         nudgeYaw: deg => dispatch(commandIds?.nudgeYaw, [deg]),
