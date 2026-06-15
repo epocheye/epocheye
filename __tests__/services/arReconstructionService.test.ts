@@ -46,7 +46,7 @@ describe('reconstructForLens — success path', () => {
   it('returns kind=success with mapped fields', async () => {
     mockReconstructObject.mockResolvedValueOnce({
       success: true,
-      data: successPayload,
+      data: { kind: 'success', data: successPayload },
     });
 
     const res = await reconstructForLens({
@@ -68,7 +68,7 @@ describe('reconstructForLens — success path', () => {
   it('updates the quota store on non-cached success', async () => {
     mockReconstructObject.mockResolvedValueOnce({
       success: true,
-      data: successPayload,
+      data: { kind: 'success', data: successPayload },
     });
 
     await reconstructForLens({
@@ -85,7 +85,7 @@ describe('reconstructForLens — success path', () => {
   it('does NOT update quota store when cached', async () => {
     mockReconstructObject.mockResolvedValueOnce({
       success: true,
-      data: { ...successPayload, cached: true, quota_remaining: 0 },
+      data: { kind: 'success', data: { ...successPayload, cached: true, quota_remaining: 0 } },
     });
 
     await reconstructForLens({
@@ -101,7 +101,7 @@ describe('reconstructForLens — success path', () => {
   it('fires contributeScan on cached hit when imageBase64 is provided', async () => {
     mockReconstructObject.mockResolvedValueOnce({
       success: true,
-      data: { ...successPayload, cached: true },
+      data: { kind: 'success', data: { ...successPayload, cached: true } },
     });
     mockContributeScan.mockResolvedValueOnce({ success: true, data: {} });
 
@@ -121,7 +121,7 @@ describe('reconstructForLens — success path', () => {
   it('does NOT fire contributeScan when not cached', async () => {
     mockReconstructObject.mockResolvedValueOnce({
       success: true,
-      data: successPayload,
+      data: { kind: 'success', data: successPayload },
     });
 
     await reconstructForLens({

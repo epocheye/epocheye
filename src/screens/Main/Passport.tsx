@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   Image,
   Pressable,
@@ -18,7 +18,15 @@ import {ROUTES} from '../../core/constants/routes';
 import LevelBadge from '../../components/ui/LevelBadge';
 import XPProgress from '../../components/ui/XPProgress';
 import BadgeGrid from '../../components/ui/BadgeGrid';
-import {deriveBadges, earnedCount, levelProgress} from '../../shared/utils/achievements';
+import LevelUpCelebration from '../../components/ui/LevelUpCelebration';
+import XPGainToast from '../../components/ui/XPGainToast';
+import {
+  earnedCount,
+  resolveBadges,
+  resolveLevelProgress,
+  resolveXp,
+  type ServerProgress,
+} from '../../shared/utils/achievements';
 import {
   usePassportSummary,
   usePassportStamps,
@@ -125,15 +133,92 @@ const Passport: React.FC<Props> = ({navigation}) => {
   const dynastiesCount = summary?.dynasties_count ?? 0;
   const activePasses = summary?.active_passes ?? [];
 
+  // Server-authoritative gamification when the backend ships it; client-derived
+  // otherwise (resolve* helpers degrade field-by-field).
+  const serverProgress: ServerProgress | undefined = summary
+    ? {
+        xp: summary.xp,
+        level: summary.level,
+        rankTitle: summary.rank_title,
+        xpIntoLevel: summary.xp_into_level,
+        xpForLevel: summary.xp_for_level,
+      }
+    : undefined;
+
   const badges = useMemo(
-    () => deriveBadges({sitesVisited, streakDays, dynasties: dynastiesCount}),
-    [sitesVisited, streakDays, dynastiesCount],
+    () =>
+      resolveBadges(
+        {sitesVisited, streakDays, dynasties: dynastiesCount},
+        summary?.badges,
+      ),
+    [sitesVisited, streakDays, dynastiesCount, summary?.badges],
   );
-  const progress = levelProgress(sitesVisited);
+  const progress = resolveLevelProgress(sitesVisited, serverProgress);
+
+  // Gamification triggers: detect XP gains and rank-ups across data refreshes.
+  const [levelUp, setLevelUp] = useState<{
+    level: number;
+    title: string;
+    xpEarned: number;
+  } | null>(null);
+  const [xpGain, setXpGain] = useState(0);
+  const [xpVisible, setXpVisible] = useState(false);
+  const prevRef = useRef<{level: number; xp: number} | null>(null);
+
+  useEffect(() => {
+    const xp = resolveXp(
+      {sitesVisited, streakDays, dynasties: dynastiesCount},
+      summary?.xp,
+    );
+    const lp = resolveLevelProgress(sitesVisited, {
+      level: summary?.level,
+      rankTitle: summary?.rank_title,
+      xpIntoLevel: summary?.xp_into_level,
+      xpForLevel: summary?.xp_for_level,
+    });
+    const prev = prevRef.current;
+    if (prev) {
+      const delta = xp - prev.xp;
+      if (lp.level > prev.level) {
+        setLevelUp({level: lp.level, title: lp.title, xpEarned: Math.max(delta, 0)});
+      } else if (delta > 0) {
+        setXpGain(delta);
+        setXpVisible(true);
+      }
+    }
+    prevRef.current = {level: lp.level, xp};
+  }, [
+    sitesVisited,
+    streakDays,
+    dynastiesCount,
+    summary?.xp,
+    summary?.level,
+    summary?.rank_title,
+    summary?.xp_into_level,
+    summary?.xp_for_level,
+  ]);
 
   return (
     <View className="flex-1 bg-surface-1">
       <StatusBar barStyle="light-content" />
+      <View
+        pointerEvents="box-none"
+        style={{position: 'absolute', top: 64, left: 0, right: 0, zIndex: 50}}>
+        <XPGainToast
+          amount={xpGain}
+          visible={xpVisible}
+          onDone={() => setXpVisible(false)}
+        />
+      </View>
+      <LevelUpCelebration
+        visible={!!levelUp}
+        level={levelUp?.level ?? 1}
+        title={levelUp?.title ?? ''}
+        message={`You've explored ${sitesVisited} heritage sites and earned your place among the keepers of history.`}
+        xpEarned={levelUp?.xpEarned}
+        perks={2}
+        onClose={() => setLevelUp(null)}
+      />
       <SafeAreaView edges={['top']} style={{backgroundColor: COLORS.sky}}>
         <LinearGradient
           colors={SKY_GRADIENT}

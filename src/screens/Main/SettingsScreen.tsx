@@ -284,7 +284,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
     <SafeAreaView className="flex-1 bg-ink-deep">
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#050505', '#0A0A0A', '#050505']}
+        colors={['#0A0A0C', '#100E15', '#0A0A0C']}
         locations={[0, 0.5, 1]}
         className="flex-1"
       >
@@ -594,7 +594,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   </TouchableOpacity>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-parchment text-xl font-['InstrumentSerif-Regular']">
+                  <Text className="text-parchment text-2xl font-display">
                     {fullName || 'User'}
                   </Text>
                   <Text className="text-parchment-dim text-sm font-['InstrumentSans-Regular'] mt-0.5">
@@ -665,7 +665,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   ) : (
                     <>
                       <Save size={16} color="#0A0A0A" />
-                      <Text className="text-ink text-sm font-['InstrumentSerif-Regular'] ml-2">
+                      <Text className="text-ink text-sm font-ui-medium ml-2">
                         Save Changes
                       </Text>
                     </>
@@ -679,7 +679,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           {!explorerPassLoading && !hasAnyActivePass && (
             <Animated.View entering={FadeInDown.delay(220).duration(350)}>
               <TouchableOpacity
-                className="mx-5 mb-5 flex-row items-center rounded-2xl border border-[rgba(203,168,98,0.25)] bg-[rgba(10,18,26,0.8)] p-4"
+                className="mx-5 mb-5 flex-row items-center rounded-2xl border border-[rgba(203,168,98,0.25)] bg-[rgba(26,24,34,0.85)] p-4"
                 onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
                 activeOpacity={0.85}
                 accessibilityRole="button"

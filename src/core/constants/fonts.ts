@@ -1,41 +1,38 @@
 /**
  * Display + UI font families for the onboarding v2 design system.
  *
- * The design brief asks for Playfair Display (display) + Inter (UI).
- * Those TTFs are not bundled in this app and cannot be fetched at runtime,
- * so we substitute with already-bundled families:
+ * Premium heritage-gold pairing (bundled in `src/assets/fonts/`, linked via
+ * `npx react-native-asset`):
  *
- *   Display → Cormorant Garamond (Regular, SemiBold)
- *   UI      → DM Sans (Regular, Medium)
+ *   Display → Fraunces (Regular, SemiBold, Bold)
+ *   UI      → Plus Jakarta Sans (Regular, Medium, SemiBold)
  *
- * Heavier display weights collapse to SemiBold; italic is expressed via
- * `fontStyle: 'italic'` on the Regular family because no italic TTF is
- * bundled. When Playfair/Inter TTFs are later added to
- * `src/assets/fonts/` and linked via `npx react-native-asset`, flip the
- * family names here and the entire system swaps.
+ * File names == PostScript names so the same family resolves on Android
+ * (filename) and iOS (Info.plist UIAppFonts / PostScript name). No italic TTF
+ * is bundled, so italic is expressed via `fontStyle: 'italic'` on Regular.
  *
  * MontserratAlternates continues to drive the brand mark (AnimatedLogo)
  * via `FONTS` in `./theme`.
  */
 
 export const DISPLAY_FONTS = {
-  regular: 'CormorantGaramond-Regular',
-  semiBold: 'CormorantGaramond-SemiBold',
-  // No bundled Bold/ExtraBold — fall back to SemiBold.
-  bold: 'CormorantGaramond-SemiBold',
-  extraBold: 'CormorantGaramond-SemiBold',
+  regular: 'Fraunces-Regular',
+  semiBold: 'Fraunces-SemiBold',
+  bold: 'Fraunces-Bold',
+  // No bundled ExtraBold — fall back to Bold.
+  extraBold: 'Fraunces-Bold',
   // No bundled italic — consumers must also set `fontStyle: 'italic'`.
-  italic: 'CormorantGaramond-Regular',
-  boldItalic: 'CormorantGaramond-SemiBold',
+  italic: 'Fraunces-Regular',
+  boldItalic: 'Fraunces-Bold',
 } as const;
 
 export const UI_FONTS = {
-  light: 'DMSans-Regular',
-  regular: 'DMSans-Regular',
-  medium: 'DMSans-Medium',
-  // DM Sans SemiBold/Bold not bundled — fall back to Medium.
-  semiBold: 'DMSans-Medium',
-  bold: 'DMSans-Medium',
+  light: 'PlusJakartaSans-Regular',
+  regular: 'PlusJakartaSans-Regular',
+  medium: 'PlusJakartaSans-Medium',
+  semiBold: 'PlusJakartaSans-SemiBold',
+  // No bundled Bold — fall back to SemiBold.
+  bold: 'PlusJakartaSans-SemiBold',
 } as const;
 
 export type DisplayFont = (typeof DISPLAY_FONTS)[keyof typeof DISPLAY_FONTS];

@@ -12,6 +12,13 @@ jest.mock('../../src/services/glbCache', () => ({
 jest.mock('../../src/services/localGlbAssets', () => ({
   getBundledGlbUri: (...a: unknown[]) => mockGetBundledGlbUri(...a),
 }));
+// Force the bundled-resolver path deterministically (the project's .env now
+// provisions a real GLB CDN, which would otherwise route prefetch through the
+// remote cache). marqueeModelsForVenue stays real via requireActual.
+jest.mock('../../src/config/glbDelivery', () => ({
+  ...jest.requireActual('../../src/config/glbDelivery'),
+  buildGlbUrl: () => null,
+}));
 
 import { marqueeModelsForVenue } from '../../src/config/glbDelivery';
 import { prefetchVenueMarquee } from '../../src/services/glbSource';

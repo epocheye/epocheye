@@ -64,7 +64,7 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
           resizeMode="cover"
         />
         <LinearGradient
-          colors={['transparent', 'rgba(17,17,17,0.6)', '#111111']}
+          colors={['transparent', 'rgba(10,10,12,0.6)', '#131218']}
           locations={[0, 0.7, 1]}
           style={{
             position: 'absolute',
@@ -97,14 +97,14 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
             }
             accessibilityRole="button"
             accessibilityLabel="Get Started">
-            <Text className="font-montserrat-medium text-[17px] text-parchment tracking-[0.3px]">
+            <Text className="font-ui-medium text-[17px] text-ink tracking-[0.3px]">
               Get Started
             </Text>
           </Pressable>
         </Animated.View>
 
         <Text
-          className="mt-[18px] font-montserrat text-[11px] text-parchment-dim tracking-[0.4px]"
+          className="mt-[18px] font-ui text-[11px] text-parchment-dim tracking-[0.4px]"
           style={{marginBottom: insets.bottom + 12}}>
           Copyright @ epocheye 2026
         </Text>

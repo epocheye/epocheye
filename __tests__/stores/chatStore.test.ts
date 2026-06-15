@@ -7,6 +7,7 @@ const mockListSessions = jest.fn();
 const mockCreateSession = jest.fn();
 const mockListMessages = jest.fn();
 const mockSendMessage = jest.fn();
+const mockStreamMessage = jest.fn();
 const mockDeleteSession = jest.fn();
 
 jest.mock('../../src/utils/api/chat', () => ({
@@ -14,10 +15,18 @@ jest.mock('../../src/utils/api/chat', () => ({
   createSession: (...args: unknown[]) => mockCreateSession(...args),
   listMessages: (...args: unknown[]) => mockListMessages(...args),
   sendMessage: (...args: unknown[]) => mockSendMessage(...args),
+  streamMessage: (...args: unknown[]) => mockStreamMessage(...args),
   deleteSession: (...args: unknown[]) => mockDeleteSession(...args),
 }));
 
 import { useChatStore } from '../../src/stores/chatStore';
+
+type StreamCb = {
+  onUserMessage: (m: unknown) => void;
+  onChunk: (t: string) => void;
+  onDone: (d: { assistantMessage: unknown }) => void;
+  onError: (m: string) => void;
+};
 
 beforeEach(() => {
   useChatStore.getState().clear();
@@ -25,6 +34,7 @@ beforeEach(() => {
   mockCreateSession.mockReset();
   mockListMessages.mockReset();
   mockSendMessage.mockReset();
+  mockStreamMessage.mockReset();
   mockDeleteSession.mockReset();
 });
 
@@ -104,12 +114,16 @@ describe('sendUserMessage', () => {
       content: 'hello',
       created_at: '',
     };
-    mockSendMessage.mockResolvedValueOnce({
-      success: true,
-      data: { user_message: serverUser, assistant_message: serverAssistant },
-    });
-    // loadSessions is called after send — stub it out
+    // streamMessage replaces the optimistic user via onUserMessage, then
+    // delivers the assistant reply via onDone. loadSessions runs after onDone.
     mockListSessions.mockResolvedValueOnce({ success: true, data: [] });
+    mockStreamMessage.mockImplementationOnce(
+      async (_id: string, _text: string, cb: StreamCb) => {
+        cb.onUserMessage(serverUser);
+        cb.onDone({ assistantMessage: serverAssistant });
+        return () => {};
+      },
+    );
 
     await useChatStore.getState().sendUserMessage('hi');
 
@@ -127,10 +141,12 @@ describe('sendUserMessage', () => {
     });
     await useChatStore.getState().startNewSession();
 
-    mockSendMessage.mockResolvedValueOnce({
-      success: false,
-      error: { message: 'send failed', statusCode: 500 },
-    });
+    mockStreamMessage.mockImplementationOnce(
+      async (_id: string, _text: string, cb: StreamCb) => {
+        cb.onError('send failed');
+        return () => {};
+      },
+    );
 
     await useChatStore.getState().sendUserMessage('hi');
 
@@ -141,20 +157,22 @@ describe('sendUserMessage', () => {
 
   it('skips empty/whitespace messages', async () => {
     await useChatStore.getState().sendUserMessage('   ');
-    expect(mockSendMessage).not.toHaveBeenCalled();
+    expect(mockStreamMessage).not.toHaveBeenCalled();
   });
 
   it('creates a session if none is active before sending', async () => {
     const newSession = { id: 'auto', title: '', created_at: '' };
     mockCreateSession.mockResolvedValueOnce({ success: true, data: newSession });
-    mockSendMessage.mockResolvedValueOnce({
-      success: true,
-      data: {
-        user_message: { id: 'u1', session_id: 'auto', role: 'user', content: 'yo', created_at: '' },
-        assistant_message: { id: 'a1', session_id: 'auto', role: 'assistant', content: 'hey', created_at: '' },
-      },
-    });
     mockListSessions.mockResolvedValueOnce({ success: true, data: [] });
+    mockStreamMessage.mockImplementationOnce(
+      async (_id: string, _text: string, cb: StreamCb) => {
+        cb.onUserMessage({ id: 'u1', session_id: 'auto', role: 'user', content: 'yo', created_at: '' });
+        cb.onDone({
+          assistantMessage: { id: 'a1', session_id: 'auto', role: 'assistant', content: 'hey', created_at: '' },
+        });
+        return () => {};
+      },
+    );
 
     await useChatStore.getState().sendUserMessage('yo');
 

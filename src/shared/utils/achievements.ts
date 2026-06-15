@@ -148,3 +148,71 @@ export function deriveBadges(input: AchievementInput): Badge[] {
 export function earnedCount(badges: Badge[]): number {
   return badges.reduce((n, b) => n + (b.earned ? 1 : 0), 0);
 }
+
+// ── Server-authoritative resolution ──────────────────────────────────────────
+// The functions above are the client fallback. When the backend ships XP/level/
+// badges on `PassportSummary`, the resolve* helpers below prefer those values so
+// the UI becomes server-authoritative with no screen changes — they degrade to
+// the client derivation field-by-field when a server value is absent.
+
+/** Optional server-authoritative gamification values (camelCased). */
+export interface ServerProgress {
+  xp?: number;
+  level?: number;
+  rankTitle?: string;
+  xpIntoLevel?: number;
+  xpForLevel?: number;
+}
+
+/** Total XP — server value when present, else client-derived. */
+export function resolveXp(input: AchievementInput, serverXp?: number): number {
+  return typeof serverXp === 'number' ? serverXp : computeXp(input);
+}
+
+/**
+ * Level + intra-rank progress. Prefers server-authoritative fields, falling back
+ * to the client `levelProgress(sitesVisited)` derivation field by field.
+ */
+export function resolveLevelProgress(
+  sitesVisited: number,
+  server?: ServerProgress,
+): LevelProgress {
+  const client = levelProgress(sitesVisited);
+  if (!server || server.level == null) return client;
+
+  const rank = RANKS.find(r => r.level === server.level);
+  const next = RANKS.find(r => r.level === (server.level as number) + 1) ?? null;
+  const isMax = !next;
+  const xpForLevel = server.xpForLevel ?? client.xpForLevel;
+  const xpIntoLevel = server.xpIntoLevel ?? client.xpIntoLevel;
+  const ratio = isMax
+    ? 1
+    : xpForLevel > 0
+    ? Math.min(1, Math.max(0, xpIntoLevel / xpForLevel))
+    : client.ratio;
+
+  return {
+    level: server.level,
+    title: server.rankTitle ?? rank?.title ?? client.title,
+    nextTitle: isMax ? null : (next as Rank).title,
+    xpIntoLevel,
+    xpForLevel,
+    xpToNext: Math.max(0, xpForLevel - xpIntoLevel),
+    ratio,
+    isMax,
+  };
+}
+
+/**
+ * Badge set. When the server sends earned badge ids those are authoritative
+ * (each known badge's `earned` reflects membership); otherwise client-derived.
+ */
+export function resolveBadges(
+  input: AchievementInput,
+  earnedIds?: string[] | null,
+): Badge[] {
+  const all = deriveBadges(input);
+  if (!earnedIds) return all;
+  const set = new Set(earnedIds);
+  return all.map(b => ({ ...b, earned: set.has(b.id) }));
+}

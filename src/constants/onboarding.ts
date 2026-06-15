@@ -84,9 +84,8 @@ export const SPACING = {
 } as const;
 
 // ─── Typography presets ───────────────────────────────
-// Display fonts collapse to CormorantGaramond-SemiBold where the brief
-// called for Bold/ExtraBold (no heavier weight is bundled). Italic is
-// rendered by applying fontStyle:'italic' on the Regular family.
+// Display = Fraunces (Regular/SemiBold/Bold); ExtraBold collapses to Bold (no
+// heavier weight bundled). Italic is rendered via fontStyle:'italic' on Regular.
 export const TYPE = {
   displayHero: {
     fontFamily: DISPLAY_FONTS.semiBold,

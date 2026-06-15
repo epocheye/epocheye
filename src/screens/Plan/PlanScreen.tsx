@@ -102,12 +102,12 @@ const PlanScreen: React.FC = () => {
         className={`max-w-[88%] px-[14px] py-[10px] rounded-2xl ${
           isUser
             ? 'self-end bg-accent-amber'
-            : 'self-start bg-[#121212]'
+            : 'self-start bg-card'
         }`}
         style={isUser ? undefined : {borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.06)'}}>
         <Text
-          className={`font-montserrat text-[14px] leading-5 ${
-            isUser ? 'text-surface-1 font-montserrat-medium' : 'text-[#E8DFD1]'
+          className={`font-ui text-[14px] leading-5 ${
+            isUser ? 'text-surface-1 font-ui-medium' : 'text-[#E8DFD1]'
           }`}>
           {item.content}
         </Text>
@@ -132,7 +132,7 @@ const PlanScreen: React.FC = () => {
         </TouchableOpacity>
         <View className="flex-1 flex-row items-center justify-center gap-x-[6px]">
           <Sparkles size={16} color="#C9A84C" />
-          <Text className="text-parchment font-montserrat-semibold text-[17px]">Plan</Text>
+          <Text className="text-parchment font-ui-medium text-[17px]">Plan</Text>
         </View>
         <TouchableOpacity
           onPress={handleNewChat}
@@ -147,7 +147,7 @@ const PlanScreen: React.FC = () => {
           className="px-4 py-[10px] gap-y-2 bg-[#101010]"
           style={{borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)'}}>
           {sessions.length === 0 ? (
-            <Text className="text-[#6E6A60] font-montserrat text-[13px] py-1">
+            <Text className="text-[#6E6A60] font-ui text-[13px] py-1">
               No past conversations yet
             </Text>
           ) : (
@@ -159,7 +159,7 @@ const PlanScreen: React.FC = () => {
                     void selectSession(s.id);
                     setShowHistory(false);
                   }}>
-                  <Text className="text-[#E8DFD1] font-montserrat-medium text-[13px]" numberOfLines={1}>
+                  <Text className="text-[#E8DFD1] font-ui-medium text-[13px]" numberOfLines={1}>
                     {s.title}
                   </Text>
                 </Pressable>
@@ -180,20 +180,20 @@ const PlanScreen: React.FC = () => {
         {empty ? (
           <View className="flex-1 items-center justify-center px-7 gap-y-[10px]">
             <Sparkles size={34} color="#C9A84C" />
-            <Text className="text-parchment font-montserrat-semibold text-[18px] text-center mt-[6px]">
+            <Text className="text-parchment font-display text-[28px] leading-tight text-center mt-[6px]">
               Where shall we wander through history?
             </Text>
-            <Text className="text-[#8C8578] font-montserrat text-[14px] text-center mb-3">
+            <Text className="text-[#8C8578] font-ui text-[14px] text-center mb-3">
               Ask about monuments, build a custom tour, or trace an era.
             </Text>
             <View className="w-full gap-y-2 mt-1">
               {suggestions.map(s => (
                 <TouchableOpacity
                   key={s}
-                  className="px-[14px] py-3 bg-[#121212] rounded-[14px]"
+                  className="px-[14px] py-3 bg-card rounded-[14px]"
                   style={{borderWidth: 0.5, borderColor: 'rgba(203,168,98,0.18)'}}
                   onPress={() => void handleSend(s)}>
-                  <Text className="text-[#E8DFD1] font-montserrat text-[13px]">{s}</Text>
+                  <Text className="text-[#E8DFD1] font-ui text-[13px]">{s}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -219,7 +219,7 @@ const PlanScreen: React.FC = () => {
         )}
 
         {error ? (
-          <Text className="text-[#FF6B6B] font-montserrat text-[13px] px-4 pb-1">
+          <Text className="text-[#FF6B6B] font-ui text-[13px] px-4 pb-1">
             {error}
           </Text>
         ) : null}
@@ -232,7 +232,7 @@ const PlanScreen: React.FC = () => {
             onChangeText={setInput}
             placeholder="Ask or plan…"
             placeholderTextColor="#6E6A60"
-            className="flex-1 text-parchment font-montserrat text-[14px] px-[14px] pt-[10px] pb-[10px] bg-[#121212] rounded-[18px] max-h-[120px]"
+            className="flex-1 text-parchment font-ui text-[14px] px-[14px] pt-[10px] pb-[10px] bg-card rounded-[18px] max-h-[120px]"
             multiline
             editable={!sending}
             onSubmitEditing={() => void handleSend()}

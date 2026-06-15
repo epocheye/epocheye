@@ -1,12 +1,17 @@
 /**
  * A modal popup that nudges the user to get a Passport.
  * Shown once per session on the Home screen (if the user has no active pass).
+ *
+ * Premium redesign: dark glass card, gold-gradient medallion + CTA, Cormorant
+ * display title, hairline border — matching the Explorer Pass paywall mockup.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { Modal, Text, TouchableOpacity, View } from 'react-native';
-import { MapPin, Sparkles, X } from 'lucide-react-native';
+import React, {useCallback, useEffect, useState} from 'react';
+import {Modal, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import {Crown, X} from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {COLORS, FONTS, GOLD_GRADIENT} from '../core/constants/theme';
 
 const SESSION_KEY = '@epocheye/explorer_pass_popup_shown';
 
@@ -55,49 +60,49 @@ const ExplorerPassPopup: React.FC<ExplorerPassPopupProps> = ({
   if (hasActivePass) return null;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={dismiss}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={dismiss}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.headerRow}>
-            <View style={styles.iconCircle}>
-              <MapPin color="#B8923F" size={22} />
-            </View>
+            <LinearGradient
+              colors={GOLD_GRADIENT}
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 1}}
+              style={styles.iconCircle}>
+              <Crown color={COLORS.bg} size={24} fill={COLORS.bg} />
+            </LinearGradient>
             <TouchableOpacity
               onPress={dismiss}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
               accessibilityRole="button"
-              accessibilityLabel="Close"
-            >
-              <X color="#6B6357" size={20} />
+              accessibilityLabel="Close">
+              <X color={COLORS.textTertiary} size={20} />
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.title}>Get Your Passport</Text>
+          <Text style={styles.eyebrow}>EXPLORER PASS</Text>
+          <Text style={styles.title}>Unlock every era</Text>
           <Text style={styles.body}>
-            Unlock heritage sites near you with a one-time Passport. The more
+            Get a one-time Passport to the heritage sites near you. The more
             places you pick, the less you pay per site.
           </Text>
 
-          <TouchableOpacity
-            onPress={handleGetPass}
-            style={styles.cta}
-            accessibilityRole="button"
-          >
-            <Sparkles color="#0A0A0A" size={18} />
-            <Text style={styles.ctaText}>Choose Places</Text>
+          <TouchableOpacity onPress={handleGetPass} accessibilityRole="button">
+            <LinearGradient
+              colors={GOLD_GRADIENT}
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 0}}
+              style={styles.cta}>
+              <Crown color={COLORS.bg} size={18} fill={COLORS.bg} />
+              <Text style={styles.ctaText}>Choose places</Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={dismiss}
             style={styles.dismiss}
-            accessibilityRole="button"
-          >
-            <Text style={styles.dismissText}>Maybe Later</Text>
+            accessibilityRole="button">
+            <Text style={styles.dismissText}>Maybe later</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -105,49 +110,55 @@ const ExplorerPassPopup: React.FC<ExplorerPassPopupProps> = ({
   );
 };
 
-const styles = {
+const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(10,10,12,0.85)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
-  } as const,
+  },
   card: {
     width: '100%',
-    backgroundColor: '#141414',
-    borderRadius: 24,
+    backgroundColor: COLORS.cardElevated,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: 'rgba(212,134,10,0.25)',
+    borderColor: COLORS.glassBorder,
     padding: 24,
-  } as const,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 16,
-  } as const,
+    marginBottom: 20,
+  },
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(212,134,10,0.15)',
+    width: 52,
+    height: 52,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-  } as const,
+  },
+  eyebrow: {
+    fontFamily: FONTS.uiMedium,
+    fontSize: 11,
+    letterSpacing: 2.6,
+    color: COLORS.gold,
+    marginBottom: 8,
+  },
   title: {
-    color: '#F5F0E8',
-    fontSize: 20,
-    fontFamily: 'MontserratAlternates-Bold',
-    lineHeight: 28,
-  } as const,
+    color: COLORS.textPrimary,
+    fontSize: 30,
+    fontFamily: FONTS.display,
+    lineHeight: 34,
+  },
   body: {
-    color: '#B8AF9E',
+    color: COLORS.textTertiary,
     fontSize: 14,
-    lineHeight: 20,
-    marginTop: 8,
-    fontFamily: 'MontserratAlternates-Regular',
-  } as const,
+    lineHeight: 21,
+    marginTop: 10,
+    fontFamily: FONTS.ui,
+  },
   cta: {
     marginTop: 24,
     paddingVertical: 16,
@@ -156,24 +167,23 @@ const styles = {
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
-    backgroundColor: '#B8923F',
-  } as const,
+  },
   ctaText: {
-    color: '#0A0A0A',
+    color: COLORS.bg,
     fontSize: 16,
-    fontFamily: 'MontserratAlternates-Bold',
-  } as const,
+    fontFamily: FONTS.uiMedium,
+  },
   dismiss: {
     marginTop: 8,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-  } as const,
+  },
   dismissText: {
-    color: '#6B6357',
+    color: COLORS.textTertiary,
     fontSize: 14,
-    fontFamily: 'MontserratAlternates-Medium',
-  } as const,
-};
+    fontFamily: FONTS.ui,
+  },
+});
 
 export default ExplorerPassPopup;

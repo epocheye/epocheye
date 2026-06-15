@@ -6,6 +6,24 @@ export interface PassportSummary {
   sites_goal: number;
   dynasties_count: number;
   active_passes: ExplorerPass[];
+
+  /**
+   * Server-authoritative gamification (all optional). When the backend ships
+   * these, the UI uses them verbatim; until then the client derives equivalents
+   * from the counters above via `src/shared/utils/achievements.ts`.
+   */
+  /** Total lifetime XP. */
+  xp?: number;
+  /** Explorer level (1–5). */
+  level?: number;
+  /** Rank title for the level (e.g. "Historian"). */
+  rank_title?: string;
+  /** XP accrued within the current rank band (for the XP bar fill). */
+  xp_into_level?: number;
+  /** Total XP span of the current rank band. */
+  xp_for_level?: number;
+  /** Earned badge ids matching achievements.ts `BadgeId` values. */
+  badges?: string[];
 }
 
 export interface PassportStamp {

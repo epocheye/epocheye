@@ -59,6 +59,7 @@ describe('reconstructObject', () => {
     expect(mockPost).toHaveBeenCalledWith(
       '/api/lens/reconstruct',
       { monument_id: 'konark', object_label: 'charioteer', image_base64: 'abc' },
+      undefined,
     );
   });
 

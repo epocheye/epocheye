@@ -5,6 +5,7 @@
  * exercises the unset path; the "set" path is covered via the pure joinGlbUrl.
  */
 import { buildGlbUrl, joinGlbUrl } from '../../src/config/glbDelivery';
+import { GLB_BASE_URL } from '@env';
 
 describe('joinGlbUrl', () => {
   it('builds {base}/{id}.glb', () => {
@@ -39,8 +40,13 @@ describe('joinGlbUrl', () => {
   });
 });
 
-describe('buildGlbUrl (env unset in tests → local fallback)', () => {
-  it('returns null so the resolver falls back to the bundled GLB', () => {
-    expect(buildGlbUrl('konark_vimana')).toBeNull();
+describe('buildGlbUrl (delegates to joinGlbUrl with the configured base)', () => {
+  // Env-agnostic: when a CDN base is configured (.env GLB_BASE_URL) buildGlbUrl
+  // returns the joined URL; when it's empty it returns null so the resolver
+  // falls back to the bundled GLB. Either way it must equal the pure join.
+  it('matches joinGlbUrl(GLB_BASE_URL, id)', () => {
+    expect(buildGlbUrl('konark_vimana')).toBe(
+      joinGlbUrl(GLB_BASE_URL, 'konark_vimana'),
+    );
   });
 });

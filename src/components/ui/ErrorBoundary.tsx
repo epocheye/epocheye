@@ -55,10 +55,10 @@ class ErrorBoundary extends React.Component<Props, State> {
 
     return (
       <View className="flex-1 bg-warm-deep items-center justify-center px-7">
-        <View className="w-16 h-16 rounded-full bg-[rgba(184,85,26,0.15)] items-center justify-center mb-5">
-          <AlertTriangle color="#B8551A" size={30} />
+        <View className="w-16 h-16 rounded-full bg-[rgba(203,168,98,0.15)] items-center justify-center mb-5">
+          <AlertTriangle color="#CBA862" size={30} />
         </View>
-        <Text className="text-parchment text-[24px] text-center font-['InstrumentSerif-Regular']">
+        <Text className="text-parchment text-[26px] text-center font-display">
           Something went wrong
         </Text>
         <Text className="text-parchment-muted text-sm text-center mt-2 leading-5 font-['InstrumentSans-Regular']">
@@ -68,11 +68,11 @@ class ErrorBoundary extends React.Component<Props, State> {
         <TouchableOpacity
           onPress={this.handleReset}
           activeOpacity={0.9}
-          className="mt-7 h-[50px] px-8 rounded-[28px] bg-terracotta flex-row items-center justify-center gap-2"
+          className="mt-7 h-[50px] px-8 rounded-[28px] bg-brand-gold flex-row items-center justify-center gap-2"
           accessibilityRole="button"
           accessibilityLabel={this.props.resetLabel ?? 'Go back'}>
-          <RotateCcw color="#FFFFFF" size={17} />
-          <Text className="text-white text-[18px] font-['InstrumentSerif-Regular']">
+          <RotateCcw color="#0A0A0C" size={17} />
+          <Text className="text-ink text-[18px] font-ui-medium">
             {this.props.resetLabel ?? 'Go back'}
           </Text>
         </TouchableOpacity>

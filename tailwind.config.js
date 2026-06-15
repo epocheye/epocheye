@@ -128,11 +128,13 @@ module.exports = {
         'lime-glow': '0 0 24px rgba(203,168,98,0.28)',
       },
       fontFamily: {
-        // Premium pairing (heritage-gold redesign).
-        'display': ['CormorantGaramond-SemiBold'],
-        'display-regular': ['CormorantGaramond-Regular'],
-        'ui': ['DMSans-Regular'],
-        'ui-medium': ['DMSans-Medium'],
+        // Premium pairing (heritage-gold redesign): Fraunces + Plus Jakarta Sans.
+        'display': ['Fraunces-SemiBold'],
+        'display-regular': ['Fraunces-Regular'],
+        'display-bold': ['Fraunces-Bold'],
+        'ui': ['PlusJakartaSans-Regular'],
+        'ui-medium': ['PlusJakartaSans-Medium'],
+        'ui-semibold': ['PlusJakartaSans-SemiBold'],
         'handwritten': ['NothingYouCouldDo-Regular'],
         'serif-italic': ['InstrumentSerif-Italic'],
         // Instrument family — primary for redesigned screens (serif for

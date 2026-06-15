@@ -15,7 +15,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import {Bell, ChevronRight, Menu} from 'lucide-react-native';
 import {COLORS, FONTS, SKY_GRADIENT} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
-import StreakFlame from '../../components/ui/StreakFlame';
+import StreakModule from '../../components/ui/StreakModule';
 import {useDailyToday, useDailyNudge} from '../../shared/hooks';
 import type {DailyStreakDay} from '../../utils/api/daily';
 import type {TabScreenProps} from '../../core/types/navigation.types';
@@ -90,18 +90,26 @@ const Daily: React.FC<Props> = ({navigation}) => {
           </Pressable>
         </View>
         {/* Header */}
-        <View className="px-6 pt-1 pb-4 flex-row items-end justify-between">
-          <View className="flex-1">
-            <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.4}}>
-              {dateLabel}
-            </Text>
-            <Text style={{marginTop: 6, fontFamily: FONTS.display, fontSize: 32, color: '#FFFFFF', lineHeight: 38}}>
-              On this day
-            </Text>
-          </View>
-          <View className="px-[14px] py-2 rounded-full bg-[rgba(203,168,98,0.12)] border border-[rgba(203,168,98,0.35)]">
-            <StreakFlame days={streakCount} size={16} />
-          </View>
+        <View className="px-6 pt-1 pb-4">
+          <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: 'rgba(255,255,255,0.55)', letterSpacing: 1.4}}>
+            {dateLabel}
+          </Text>
+          <Text style={{marginTop: 6, fontFamily: FONTS.display, fontSize: 32, color: '#FFFFFF', lineHeight: 38}}>
+            On this day
+          </Text>
+        </View>
+
+        {/* Streak hero */}
+        <View className="px-6 mb-5">
+          <StreakModule
+            days={streakCount}
+            week={
+              weeklyStreak.length
+                ? weeklyStreak.map(d => d.is_today || d.visited)
+                : undefined
+            }
+            subtitle="Read today's story to keep it alive"
+          />
         </View>
 
         {/* Hero card */}

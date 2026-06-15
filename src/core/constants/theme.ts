@@ -24,14 +24,18 @@ export const FONTS = {
   sansBold: 'InstrumentSans-Bold',
 
   /**
-   * Premium pairing (heritage-gold redesign): Cormorant Garamond display serif
-   * for headlines/numerals + DM Sans grotesk for UI/body. Both already bundled
-   * and natively linked — no rebuild required.
+   * Premium pairing (heritage-gold redesign): Fraunces editorial display serif
+   * for headlines/numerals + Plus Jakarta Sans grotesk for UI/body. TTFs bundled
+   * in src/assets/fonts and linked via react-native-asset (Android assets/fonts +
+   * iOS Info.plist UIAppFonts). File names == PostScript names so the same family
+   * resolves on both platforms.
    */
-  display: 'CormorantGaramond-SemiBold',
-  displayRegular: 'CormorantGaramond-Regular',
-  ui: 'DMSans-Regular',
-  uiMedium: 'DMSans-Medium',
+  display: 'Fraunces-SemiBold',
+  displayRegular: 'Fraunces-Regular',
+  displayBold: 'Fraunces-Bold',
+  ui: 'PlusJakartaSans-Regular',
+  uiMedium: 'PlusJakartaSans-Medium',
+  uiSemiBold: 'PlusJakartaSans-SemiBold',
 } as const;
 
 export const COLORS = {

@@ -29,7 +29,7 @@ function buildStyles(theme: Theme) {
   const isLight = theme === 'light';
   const text = isLight ? '#1F1611' : '#F2EBE0';
   const muted = isLight ? '#6B5D4F' : 'rgba(242,235,224,0.7)';
-  const accent = '#B8551A';
+  const accent = '#CBA862';
   const codeBg = isLight ? 'rgba(31,22,17,0.06)' : 'rgba(255,255,255,0.08)';
   const rule = isLight ? 'rgba(31,22,17,0.12)' : 'rgba(255,255,255,0.12)';
 

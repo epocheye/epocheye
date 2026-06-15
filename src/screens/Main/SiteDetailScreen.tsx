@@ -317,9 +317,9 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           {arReady && (
             <View
               style={{ top: insets.top + 10 }}
-              className="absolute self-center rounded-[15px] bg-arready-bg px-4 py-1"
+              className="absolute self-center rounded-[15px] bg-[rgba(203,168,98,0.16)] border border-[rgba(203,168,98,0.4)] px-4 py-1"
             >
-              <Text className="text-arready-fg text-[11px] tracking-[0.4px] font-['MontserratAlternates-SemiBold']">
+              <Text className="text-brand-gold text-[11px] tracking-[0.4px] font-ui-medium">
                 AR Ready
               </Text>
             </View>
@@ -327,7 +327,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         {/* Title (Figma 238:62) */}
-        <Text className="text-parchment text-[40px] leading-[44px] text-center mt-3 px-6 font-['InstrumentSerif-Regular']">
+        <Text className="text-parchment text-[40px] leading-[44px] text-center mt-3 px-6 font-display">
           {site.name}
         </Text>
 
@@ -335,26 +335,26 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         {(builtValue || dynastyValue) && (
           <View className="flex-row gap-3 px-5 mt-5">
             {builtValue && (
-              <View className="flex-1 bg-cream border border-cream-border rounded-[10px] px-3.5 py-3">
-                <Text className="text-stone-label text-[9px] tracking-[0.9px] font-['InstrumentSans-Bold']">
+              <View className="flex-1 bg-surface-1 border border-white/10 rounded-[10px] px-3.5 py-3">
+                <Text className="text-parchment-dim text-[9px] tracking-[0.9px] font-['InstrumentSans-Bold']">
                   BUILT
                 </Text>
                 <Text
                   numberOfLines={1}
-                  className="text-stone-ink text-[24px] leading-[30px] mt-0.5 font-['InstrumentSerif-Regular']"
+                  className="text-parchment text-[24px] leading-[30px] mt-0.5 font-display"
                 >
                   {builtValue}
                 </Text>
               </View>
             )}
             {dynastyValue && (
-              <View className="flex-1 bg-cream border border-cream-border rounded-[10px] px-3.5 py-3">
-                <Text className="text-stone-label text-[9px] tracking-[0.9px] font-['InstrumentSans-Bold']">
+              <View className="flex-1 bg-surface-1 border border-white/10 rounded-[10px] px-3.5 py-3">
+                <Text className="text-parchment-dim text-[9px] tracking-[0.9px] font-['InstrumentSans-Bold']">
                   DYNASTY
                 </Text>
                 <Text
                   numberOfLines={1}
-                  className="text-stone-ink text-[22px] leading-[28px] mt-0.5 font-['InstrumentSerif-Regular']"
+                  className="text-parchment text-[22px] leading-[28px] mt-0.5 font-display"
                 >
                   {dynastyValue}
                 </Text>
@@ -365,7 +365,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Italic tagline (Figma 238:71) */}
         {tagline && (
-          <Text className="text-stone-desc text-[18px] leading-[24px] text-center px-7 mt-5 font-['InstrumentSerif-Italic']">
+          <Text className="text-parchment-muted text-[18px] leading-[24px] text-center px-7 mt-5 font-['InstrumentSerif-Italic']">
             {tagline}
           </Text>
         )}
@@ -375,12 +375,12 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           <TouchableOpacity
             onPress={handleStartARExperience}
             activeOpacity={0.9}
-            className="h-[53px] rounded-[30px] bg-terracotta flex-row items-center justify-center gap-2"
+            className="h-[53px] rounded-[30px] bg-brand-gold flex-row items-center justify-center gap-2"
             accessibilityRole="button"
             accessibilityLabel="View in AR"
           >
-            <Camera color="#FFFFFF" size={18} />
-            <Text className="text-white text-[22px] font-['InstrumentSerif-Regular']">
+            <Camera color="#0A0A0C" size={18} />
+            <Text className="text-ink text-[22px] font-display">
               View in AR
             </Text>
           </TouchableOpacity>
@@ -388,11 +388,11 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           <TouchableOpacity
             onPress={handleAskGuide}
             activeOpacity={0.85}
-            className="h-[53px] rounded-[30px] bg-peach border border-terracotta items-center justify-center"
+            className="h-[53px] rounded-[30px] bg-surface-1 border border-white/12 items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel="Learn About It"
           >
-            <Text className="text-terracotta text-[22px] font-['InstrumentSerif-Regular']">
+            <Text className="text-brand-gold text-[22px] font-display">
               Learn About It
             </Text>
           </TouchableOpacity>
@@ -433,13 +433,13 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 className="mt-2.5 flex-row items-center gap-1 self-start"
                 accessibilityRole="button"
               >
-                <Text className="text-terracotta text-xs uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
+                <Text className="text-brand-gold text-xs uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
                   {isDescriptionExpanded ? 'Show Less' : 'Read More'}
                 </Text>
                 {isDescriptionExpanded ? (
-                  <ChevronUp color="#B8551A" size={16} />
+                  <ChevronUp color="#CBA862" size={16} />
                 ) : (
-                  <ChevronDown color="#B8551A" size={16} />
+                  <ChevronDown color="#CBA862" size={16} />
                 )}
               </TouchableOpacity>
             )}
@@ -452,8 +452,8 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4 gap-3"
             >
               {siteDetail.unesco_status && (
-                <View className="self-start rounded-full bg-[rgba(184,85,26,0.18)] px-2.5 py-1">
-                  <Text className="text-terracotta text-[11px] uppercase tracking-[0.6px] font-['InstrumentSans-SemiBold']">
+                <View className="self-start rounded-full bg-[rgba(203,168,98,0.18)] px-2.5 py-1">
+                  <Text className="text-brand-gold text-[11px] uppercase tracking-[0.6px] font-['InstrumentSans-SemiBold']">
                     {siteDetail.unesco_status}
                   </Text>
                 </View>
@@ -508,7 +508,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     key={fact.id}
                     onPress={() => handleElaborateFact(fact)}
                     activeOpacity={0.86}
-                    className="w-[240px] rounded-2xl bg-surface-1 border border-[rgba(184,85,26,0.28)] p-3.5"
+                    className="w-[240px] rounded-2xl bg-surface-1 border border-[rgba(203,168,98,0.28)] p-3.5"
                   >
                     <Text className="text-parchment text-[15px] leading-[22px] font-['InstrumentSans-SemiBold'] mb-1.5">
                       {fact.headline}
@@ -536,7 +536,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                       </View>
                     )}
 
-                    <Text className="text-terracotta text-[11px] mt-2 font-['InstrumentSans-SemiBold']">
+                    <Text className="text-brand-gold text-[11px] mt-2 font-['InstrumentSans-SemiBold']">
                       {expandedFactId === fact.id ? 'Collapse' : 'Learn more'}
                     </Text>
                   </TouchableOpacity>

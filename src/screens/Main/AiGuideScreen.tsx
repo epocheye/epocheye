@@ -67,7 +67,7 @@ interface ChatBubble {
 }
 
 const MAX_SUGGESTIONS = 6;
-const FLAME = '#D4691F';
+const FLAME = '#CBA862';
 
 // Decorative audio waveform (Figma 240:31-39). Purely visual — no playback.
 const WAVE_BARS = [6, 8, 10, 6, 8, 10, 6, 8];
@@ -271,7 +271,7 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
               <Sparkles size={11} color={FLAME} />
               <Text style={styles.assistantLabel}>EPOCHEYE AI</Text>
             </View>
-            <MarkdownText theme="light">{item.content}</MarkdownText>
+            <MarkdownText theme="dark">{item.content}</MarkdownText>
             <Waveform />
           </View>
         </View>
@@ -427,9 +427,9 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
               {voice.isListening ? (
                 <Square size={16} color="#FFFFFF" fill="#FFFFFF" />
               ) : hasText ? (
-                <Send size={18} color="#FFFFFF" />
+                <Send size={18} color="#0A0A0C" />
               ) : (
-                <Mic size={20} color="#FFFFFF" />
+                <Mic size={20} color="#0A0A0C" />
               )}
             </Pressable>
           </View>
@@ -466,7 +466,7 @@ const FooterArea: React.FC<{
     return (
       <View style={styles.assistantWrap}>
         <View style={styles.assistantBubble}>
-          <MarkdownText theme="light">{streamingText}</MarkdownText>
+          <MarkdownText theme="dark">{streamingText}</MarkdownText>
         </View>
       </View>
     );
@@ -530,7 +530,7 @@ function defaultWelcome(siteName: string): string {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0F0A05',
+    backgroundColor: '#0A0A0C',
   },
   flexFill: {
     flex: 1,
@@ -564,8 +564,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontFamily: 'InstrumentSerif-Regular',
-    fontSize: 22,
+    fontFamily: 'Fraunces-SemiBold',
+    fontSize: 24,
     color: '#F2EBE0',
   },
   statusRow: {
@@ -607,7 +607,9 @@ const styles = StyleSheet.create({
     maxWidth: '94%',
   },
   assistantBubble: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#131218',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -622,7 +624,7 @@ const styles = StyleSheet.create({
   assistantLabel: {
     fontFamily: 'InstrumentSans-Bold',
     fontSize: 10,
-    color: '#1F1611',
+    color: '#CBA862',
     letterSpacing: 0.8,
   },
   wave: {
@@ -631,7 +633,7 @@ const styles = StyleSheet.create({
     gap: 4,
     alignSelf: 'flex-start',
     marginTop: 10,
-    backgroundColor: '#1F1611',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 7,
     paddingHorizontal: 8,
     paddingVertical: 5,
@@ -703,7 +705,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(212,105,31,0.4)',
+    borderColor: 'rgba(203,168,98,0.4)',
   },
   retryText: {
     fontFamily: 'InstrumentSans-SemiBold',
@@ -746,7 +748,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   inputBarOuter: {
-    backgroundColor: '#0F0A05',
+    backgroundColor: '#0A0A0C',
     borderTopWidth: 1,
     borderTopColor: '#2D2218',
   },
@@ -761,14 +763,16 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 48,
     maxHeight: 120,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#131218',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
     borderRadius: 24,
     paddingHorizontal: 18,
     paddingTop: 12,
     paddingBottom: 12,
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 14,
-    color: '#1F1611',
+    color: '#F4EFE7',
   },
   primaryButton: {
     width: 48,

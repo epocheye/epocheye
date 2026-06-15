@@ -113,6 +113,11 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
     return out;
   }, [history]);
 
+  const stats = useMemo(() => {
+    const visits = history?.visits ?? [];
+    return {visits: visits.length, tours: history?.tours.length ?? 0, xp: visits.length * 50};
+  }, [history]);
+
   return (
     <SafeAreaView className="flex-1 bg-ink-deep">
       <StatusBar barStyle="light-content" />
@@ -120,8 +125,8 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} className="p-1">
           <ArrowLeft color="#F5F0E8" size={22} />
         </TouchableOpacity>
-        <Text className="ml-3 text-parchment text-lg font-['MontserratAlternates-SemiBold']">
-          Your Journey
+        <Text className="ml-3 text-parchment text-2xl font-display">
+          Your journey
         </Text>
       </View>
 
@@ -137,16 +142,35 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C9A84C" />
           }
         >
+          {groupings.length > 0 ? (
+            <View className="flex-row items-center justify-between rounded-2xl border border-white/8 bg-card px-5 py-5 mb-6">
+              <View className="items-center">
+                <Text className="text-parchment text-2xl font-display leading-none">{stats.visits}</Text>
+                <Text className="text-parchment-dim text-[10px] uppercase tracking-wider mt-1 font-ui-medium">Visits</Text>
+              </View>
+              <View className="w-px h-9 bg-white/10" />
+              <View className="items-center">
+                <Text className="text-parchment text-2xl font-display leading-none">{stats.tours}</Text>
+                <Text className="text-parchment-dim text-[10px] uppercase tracking-wider mt-1 font-ui-medium">Tours</Text>
+              </View>
+              <View className="w-px h-9 bg-white/10" />
+              <View className="items-center">
+                <Text className="text-brand-gold text-2xl font-display leading-none">{stats.xp}</Text>
+                <Text className="text-parchment-dim text-[10px] uppercase tracking-wider mt-1 font-ui-medium">XP earned</Text>
+              </View>
+            </View>
+          ) : null}
+
           {current?.active && current.place_name ? (
             <View className="rounded-xl border border-[rgba(201,168,76,0.4)] bg-[rgba(201,168,76,0.08)] px-4 py-3 mb-5">
-              <Text className="text-[10px] uppercase tracking-wider text-gold-400/70 font-['MontserratAlternates-SemiBold']">
+              <Text className="text-[10px] uppercase tracking-wider text-gold-400/70 font-ui-medium">
                 Now at
               </Text>
-              <Text className="text-parchment text-base font-['MontserratAlternates-SemiBold'] mt-1">
+              <Text className="text-parchment text-base font-ui-medium mt-1">
                 {current.place_name}
               </Text>
               {current.pass_expires_at && (
-                <Text className="text-parchment-muted text-xs mt-1 font-['MontserratAlternates-Regular']">
+                <Text className="text-parchment-muted text-xs mt-1 font-ui">
                   Pass {formatExpiry(current.pass_expires_at)}
                 </Text>
               )}
@@ -156,7 +180,7 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
           {groupings.length === 0 ? (
             <View className="items-center py-20">
               <MapPin color="#6B6357" size={32} />
-              <Text className="text-parchment-muted text-sm mt-3 font-['MontserratAlternates-Regular']">
+              <Text className="text-parchment-muted text-sm mt-3 font-ui">
                 No visits yet. Activate a Passport and start exploring.
               </Text>
             </View>
@@ -165,11 +189,11 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
               <View key={g.tour?.id || g.visits[0]?.id || idx} className="mb-4">
                 {g.tour && (
                   <View className="mb-2 flex-row items-center justify-between">
-                    <Text className="text-parchment-muted text-xs uppercase tracking-wider font-['MontserratAlternates-SemiBold']">
+                    <Text className="text-parchment-muted text-xs uppercase tracking-wider font-ui-medium">
                       Tour · {g.tour.place_ids.length} places
                     </Text>
                     <Text
-                      className={`text-[10px] font-['MontserratAlternates-SemiBold'] ${
+                      className={`text-[10px] font-ui-medium ${
                         g.tour.active ? 'text-emerald-300' : 'text-parchment-muted'
                       }`}
                     >
@@ -177,7 +201,7 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
                     </Text>
                   </View>
                 )}
-                <View className="rounded-xl bg-surface-2 border border-white/[0.06] overflow-hidden">
+                <View className="rounded-2xl bg-card border border-white/8 overflow-hidden">
                   {g.visits.map((v, i) => (
                     <View
                       key={v.id}
@@ -186,7 +210,7 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
                       }`}
                     >
                       <View className="flex-row items-center justify-between">
-                        <Text className="text-parchment text-sm flex-1 pr-2 font-['MontserratAlternates-SemiBold']">
+                        <Text className="text-parchment text-sm flex-1 pr-2 font-ui-medium">
                           {v.place_name}
                         </Text>
                         <View
@@ -197,7 +221,7 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
                           }`}
                         >
                           <Text
-                            className={`text-[9px] uppercase tracking-wider font-['MontserratAlternates-SemiBold'] ${
+                            className={`text-[9px] uppercase tracking-wider font-ui-medium ${
                               v.pass_active ? 'text-emerald-300' : 'text-parchment-muted'
                             }`}
                           >
@@ -207,7 +231,7 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
                       </View>
                       <View className="flex-row items-center mt-1.5">
                         <Clock color="#6B6357" size={12} />
-                        <Text className="text-parchment-muted text-xs ml-1.5 font-['MontserratAlternates-Regular']">
+                        <Text className="text-parchment-muted text-xs ml-1.5 font-ui">
                           {formatClock(v.arrived_at)}
                           {v.left_at ? ` → ${formatClock(v.left_at)}` : ' · ongoing'}
                         </Text>

@@ -901,7 +901,7 @@ const Home: React.FC<Props> = ({navigation}) => {
           </View>
           <View className="flex-1 py-[10px] px-3">
             <Text
-              style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: '#D24A2C', letterSpacing: 0.4}}
+              style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: COLORS.goldDeep, letterSpacing: 0.6, textTransform: 'uppercase'}}
               numberOfLines={1}>
               {activeSupportedSite.ar_ready
                 ? 'Epocheye site · AR ready'
