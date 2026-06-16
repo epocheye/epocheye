@@ -59,7 +59,7 @@ const GhostButton: React.FC<GhostButtonProps> = ({
 
   const backgroundColor = bgAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(212,134,10,0)', 'rgba(212,134,10,0.2)'],
+    outputRange: ['rgba(203,168,98,0)', 'rgba(203,168,98,0.2)'],
   });
 
   return (
@@ -74,7 +74,7 @@ const GhostButton: React.FC<GhostButtonProps> = ({
         style={[style, { transform: [{ scale: scaleAnim }], backgroundColor }]}
       >
         <Text
-          className="font-['MontserratAlternates-Medium'] text-lg tracking-[0.3px] text-[#F5E9D8]"
+          className="font-ui-medium text-lg tracking-[0.3px] text-[#F5E9D8]"
           style={textStyle}
         >
           {title}

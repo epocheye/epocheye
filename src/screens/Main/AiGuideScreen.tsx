@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
   },
   status: {
     flex: 1,
-    fontFamily: 'InstrumentSans-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 12,
     color: '#A89685',
   },
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   assistantLabel: {
-    fontFamily: 'InstrumentSans-Bold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 10,
     color: '#CBA862',
     letterSpacing: 0.8,
@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
     maxWidth: '90%',
   },
   userText: {
-    fontFamily: 'InstrumentSans-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 14,
     color: '#F2EBE0',
     lineHeight: 20,
@@ -690,7 +690,7 @@ const styles = StyleSheet.create({
     maxWidth: '94%',
   },
   errorText: {
-    fontFamily: 'InstrumentSans-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 13,
     color: '#FCA5A5',
     lineHeight: 20,
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(203,168,98,0.4)',
   },
   retryText: {
-    fontFamily: 'InstrumentSans-SemiBold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 12,
     color: FLAME,
   },
@@ -717,7 +717,7 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   tryAsking: {
-    fontFamily: 'InstrumentSerif-Regular',
+    fontFamily: 'Fraunces-Regular',
     fontSize: 14,
     letterSpacing: 1.6,
     color: '#DEDEDE',
@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipText: {
-    fontFamily: 'InstrumentSerif-Regular',
+    fontFamily: 'Fraunces-Regular',
     fontSize: 13,
     color: '#F2EBE0',
     textAlign: 'center',

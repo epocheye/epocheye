@@ -99,7 +99,7 @@ const AppNavigator: React.FC = () => {
     return (
       <View className="flex-1 items-center justify-center bg-[#000000]">
         <AnimatedLogo size={92} motion="pulse" variant="white" showRing={false} />
-        <Text className="mt-5 font-['MontserratAlternates-Regular'] text-sm text-[#B8AF9E]">
+        <Text className="mt-5 font-ui text-sm text-[#B8AF9E]">
           Preparing your journey...
         </Text>
       </View>

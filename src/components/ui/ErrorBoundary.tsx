@@ -61,7 +61,7 @@ class ErrorBoundary extends React.Component<Props, State> {
         <Text className="text-parchment text-[26px] text-center font-display">
           Something went wrong
         </Text>
-        <Text className="text-parchment-muted text-sm text-center mt-2 leading-5 font-['InstrumentSans-Regular']">
+        <Text className="text-parchment-muted text-sm text-center mt-2 leading-5 font-ui">
           This screen hit an unexpected error. You can head back and try again.
         </Text>
 
@@ -83,18 +83,18 @@ class ErrorBoundary extends React.Component<Props, State> {
             className="mt-5"
             accessibilityRole="button"
             accessibilityLabel="Show error details">
-            <Text className="text-parchment-dim text-xs uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
+            <Text className="text-parchment-dim text-xs uppercase tracking-[0.8px] font-ui-semibold">
               Show details
             </Text>
           </TouchableOpacity>
         ) : (
           <View className="mt-5 w-full max-h-[240px] rounded-xl bg-surface-1 border border-white/[0.08] p-3">
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text className="text-red-400 text-[12px] font-['InstrumentSans-SemiBold'] mb-1.5">
+              <Text className="text-red-400 text-[12px] font-ui-semibold mb-1.5">
                 {error.name}: {error.message}
               </Text>
               {error.stack ? (
-                <Text className="text-parchment-dim text-[11px] leading-[16px] font-['InstrumentSans-Regular']">
+                <Text className="text-parchment-dim text-[11px] leading-[16px] font-ui">
                   {error.stack}
                 </Text>
               ) : null}

@@ -74,7 +74,7 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
       <View className="flex-1 bg-[rgba(0,0,0,0.7)] justify-center px-6">
         <View className="bg-[#0E0E10] rounded-[20px] p-5 border border-[rgba(255,255,255,0.08)]">
           <View className="flex-row justify-between items-center mb-[14px]">
-            <Text className="text-parchment text-[17px] font-montserrat-semibold">
+            <Text className="text-parchment text-[17px] font-ui-semibold">
               {submitted ? 'Reported' : 'Report this scan'}
             </Text>
             <Pressable onPress={handleClose} hitSlop={12}>
@@ -84,23 +84,23 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
 
           {submitted ? (
             <View className="items-center gap-y-[14px]">
-              <View className="w-12 h-12 rounded-full bg-[#C9A84C] items-center justify-center mt-1">
+              <View className="w-12 h-12 rounded-full bg-[#CBA862] items-center justify-center mt-1">
                 <Check color="#0A0A0A" size={22} />
               </View>
-              <Text className="text-[#D8D2C4] text-center text-[13px] leading-[19px] font-montserrat mb-1">
+              <Text className="text-[#D8D2C4] text-center text-[13px] leading-[19px] font-ui mb-1">
                 Thanks — we'll review this and restore your scan if it was our mistake.
               </Text>
               <TouchableOpacity
                 onPress={handleClose}
                 className="bg-[#B8923F] rounded-[14px] py-[14px] items-center justify-center w-full">
-                <Text className="text-surface-1 text-[14px] font-montserrat-semibold">
+                <Text className="text-surface-1 text-[14px] font-ui-semibold">
                   Close
                 </Text>
               </TouchableOpacity>
             </View>
           ) : (
             <>
-              <Text className="text-[rgba(245,240,232,0.65)] text-[13px] font-montserrat mb-[10px]">
+              <Text className="text-[rgba(245,240,232,0.65)] text-[13px] font-ui mb-[10px]">
                 What went wrong?
               </Text>
               <View className="flex-row flex-wrap gap-2 mb-3">
@@ -112,12 +112,12 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
                       onPress={() => setSelectedReason(reason)}
                       className={`border rounded-xl px-3 py-2 ${
                         active
-                          ? 'border-[#C9A84C] bg-[rgba(201,168,76,0.1)]'
+                          ? 'border-[#CBA862] bg-[rgba(203,168,98,0.1)]'
                           : 'border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)]'
                       }`}>
                       <Text
-                        className={`text-[12px] font-montserrat-medium ${
-                          active ? 'text-[#C9A84C]' : 'text-[#D8D2C4]'
+                        className={`text-[12px] font-ui-medium ${
+                          active ? 'text-[#CBA862]' : 'text-[#D8D2C4]'
                         }`}>
                         {reason}
                       </Text>
@@ -140,7 +140,7 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
                   paddingHorizontal: 12,
                   paddingVertical: 10,
                   color: '#F5F0E8',
-                  fontFamily: 'MontserratAlternates-Regular',
+                  fontFamily: 'PlusJakartaSans-Regular',
                   fontSize: 13,
                   minHeight: 72,
                   textAlignVertical: 'top',
@@ -157,7 +157,7 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
                 {submitting ? (
                   <ActivityIndicator color="#0A0A0A" size="small" />
                 ) : (
-                  <Text className="text-surface-1 text-[14px] font-montserrat-semibold">
+                  <Text className="text-surface-1 text-[14px] font-ui-semibold">
                     Submit report
                   </Text>
                 )}

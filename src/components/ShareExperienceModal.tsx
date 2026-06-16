@@ -101,10 +101,10 @@ const ShareExperienceModal: React.FC<ShareExperienceModalProps> = ({
               <Share2 size={20} color="#CBA862" />
             </View>
             <View className="flex-1">
-              <Text className="text-parchment font-instrument-semibold text-[18px]">
+              <Text className="text-parchment font-ui-semibold text-[18px]">
                 Share this discovery
               </Text>
-              <Text className="text-[#B8B0A0] font-instrument text-[14px] leading-5 mt-1">
+              <Text className="text-[#B8B0A0] font-ui text-[14px] leading-5 mt-1">
                 Send a link that opens Epocheye right at this place — perfect for
                 friends who'd love to walk where they walked.
               </Text>
@@ -120,7 +120,7 @@ const ShareExperienceModal: React.FC<ShareExperienceModalProps> = ({
           </View>
 
           {error ? (
-            <Text className="text-[#FF6B6B] font-instrument text-[13px] mt-3">
+            <Text className="text-[#FF6B6B] font-ui text-[13px] mt-3">
               {error}
             </Text>
           ) : null}
@@ -138,7 +138,7 @@ const ShareExperienceModal: React.FC<ShareExperienceModalProps> = ({
             ) : (
               <>
                 <Share2 size={18} color="#1A0F00" />
-                <Text className="text-[#1A0F00] font-instrument-semibold text-[15px]">
+                <Text className="text-[#1A0F00] font-ui-semibold text-[15px]">
                   Share
                 </Text>
               </>
@@ -150,7 +150,7 @@ const ShareExperienceModal: React.FC<ShareExperienceModalProps> = ({
             className="mt-2 py-3 items-center"
             accessibilityRole="button"
             accessibilityLabel="Maybe later">
-            <Text className="text-[#8C8578] font-instrument text-[13px]">
+            <Text className="text-[#8C8578] font-ui text-[13px]">
               Maybe later
             </Text>
           </Pressable>

@@ -86,7 +86,7 @@ const ThinkingIndicator: React.FC = () => {
         <Animated.View className="w-[6px] h-[6px] rounded-[3px] bg-accent-amber" style={dot2Style} />
         <Animated.View className="w-[6px] h-[6px] rounded-[3px] bg-accent-amber" style={dot3Style} />
       </View>
-      <Text className="text-[#C9A84C] font-montserrat-medium text-[13px]">{PHRASES[phraseIndex]}</Text>
+      <Text className="text-[#CBA862] font-ui-medium text-[13px]">{PHRASES[phraseIndex]}</Text>
     </Animated.View>
   );
 };

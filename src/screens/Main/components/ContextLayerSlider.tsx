@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: HINT_WIDTH,
     textAlign: 'center',
-    fontFamily: 'InstrumentSans-Medium',
+    fontFamily: 'PlusJakartaSans-Medium',
     fontSize: 11,
     lineHeight: 14,
     color: AMBER,
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   labelText: {
-    fontFamily: 'InstrumentSans-Medium',
+    fontFamily: 'PlusJakartaSans-Medium',
     fontSize: 11.5,
     lineHeight: 14,
     textAlign: 'center',

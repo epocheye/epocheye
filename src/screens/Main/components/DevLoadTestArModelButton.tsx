@@ -34,10 +34,10 @@ const DevLoadTestArModelButton: React.FC = () => {
         accessibilityLabel="DEV: Scan anything"
         className="rounded-2xl border border-[rgba(203,168,98,0.45)] bg-[rgba(203,168,98,0.08)] px-4 py-3"
       >
-        <Text className="text-accent-amber font-montserrat-bold text-[13px] tracking-[1.6px]">
+        <Text className="text-accent-amber font-ui-semibold text-[13px] tracking-[1.6px]">
           DEV: SCAN ANYTHING
         </Text>
-        <Text className="text-[rgba(255,255,255,0.55)] font-montserrat text-[11px] mt-1">
+        <Text className="text-[rgba(255,255,255,0.55)] font-ui text-[11px] mt-1">
           Run the recognition agent on any object at home · AR or on-screen card
         </Text>
       </Pressable>

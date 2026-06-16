@@ -118,7 +118,7 @@ const PlanScreen: React.FC = () => {
   const empty = messages.length === 0 && !loadingMessages;
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-1" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
 
       <View
@@ -131,7 +131,7 @@ const PlanScreen: React.FC = () => {
           <History size={20} color="#CBA862" />
         </TouchableOpacity>
         <View className="flex-1 flex-row items-center justify-center gap-x-[6px]">
-          <Sparkles size={16} color="#C9A84C" />
+          <Sparkles size={16} color="#CBA862" />
           <Text className="text-parchment font-ui-medium text-[17px]">Plan</Text>
         </View>
         <TouchableOpacity
@@ -179,7 +179,7 @@ const PlanScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {empty ? (
           <View className="flex-1 items-center justify-center px-7 gap-y-[10px]">
-            <Sparkles size={34} color="#C9A84C" />
+            <Sparkles size={34} color="#CBA862" />
             <Text className="text-parchment font-display text-[28px] leading-tight text-center mt-[6px]">
               Where shall we wander through history?
             </Text>

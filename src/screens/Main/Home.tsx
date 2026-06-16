@@ -14,10 +14,11 @@ import {
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import MapView, {Marker, PROVIDER_GOOGLE, type Region} from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
+import LinearGradient from 'react-native-linear-gradient';
 import {GOOGLE_MAPS_API_KEY} from '@env';
-import {Bell, Menu, Navigation, Search, X} from 'lucide-react-native';
+import {Bell, Navigation, Search, X} from 'lucide-react-native';
 import mapStyle from '../../content/mapstyle.json';
-import {COLORS, FONTS} from '../../core/constants/theme';
+import {COLORS, FONTS, GOLD_GRADIENT} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
 import {usePlaces} from '../../context';
 import {PermissionService} from '../../shared/services/permission.service';
@@ -637,28 +638,16 @@ const Home: React.FC<Props> = ({navigation}) => {
     typeof activeSite?.longitude === 'number';
 
   return (
-    <View className="flex-1 bg-surface-1">
+    <View className="flex-1 bg-background">
       <StatusBar barStyle="light-content" />
-      <SafeAreaView edges={['top']} className="bg-surface-1" />
-
-      {/* Menu */}
-      <View className="px-5 pt-1 flex-row items-center">
-        <Pressable
-          onPress={() => navigation.openDrawer()}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel="Open menu"
-          className="w-9 h-9 items-center justify-center">
-          <Menu color="#FFFFFF" size={22} />
-        </Pressable>
-      </View>
+      <SafeAreaView edges={['top']} className="bg-background" />
 
       {/* Header */}
       <View className="px-6 pt-1 pb-2">
         <Text
           numberOfLines={1}
           ellipsizeMode="tail"
-          style={{fontFamily: FONTS.sans, fontSize: 12, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, alignSelf: 'stretch'}}>
+          style={{fontFamily: FONTS.ui, fontSize: 12, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, alignSelf: 'stretch'}}>
           Heritage Near You
         </Text>
         <Text
@@ -684,7 +673,7 @@ const Home: React.FC<Props> = ({navigation}) => {
           <Pressable
             onPress={() => setNotifOpen(true)}
             hitSlop={10}
-            className="w-9 h-9 rounded-full bg-[rgba(255,255,255,0.06)] items-center justify-center"
+            className="w-10 h-10 rounded-full border border-white/10 bg-card items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={
               unreadCount > 0
@@ -694,7 +683,7 @@ const Home: React.FC<Props> = ({navigation}) => {
             <Bell color="#FFFFFF" size={19} />
             {unreadCount > 0 ? (
               <View className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#E05C5C] items-center justify-center">
-                <Text style={{fontFamily: FONTS.sansBold, fontSize: 9, color: '#FFFFFF'}}>
+                <Text style={{fontFamily: FONTS.uiSemiBold, fontSize: 9, color: '#FFFFFF'}}>
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </Text>
               </View>
@@ -703,7 +692,7 @@ const Home: React.FC<Props> = ({navigation}) => {
           <Pressable
             onPress={() => setSearchOpen(prev => !prev)}
             hitSlop={10}
-            className="w-9 h-9 rounded-full bg-[rgba(255,255,255,0.06)] items-center justify-center"
+            className="w-10 h-10 rounded-full border border-white/10 bg-card items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={searchOpen ? 'Close search' : 'Open search'}>
             {searchOpen ? (
@@ -721,28 +710,40 @@ const Home: React.FC<Props> = ({navigation}) => {
       {!inVenue && nearestVenue ? (
         <Pressable
           onPress={() => openVenueDirections(nearestVenue.zone)}
-          style={({pressed}) => [
-            styles.nudge,
-            pressed ? {opacity: 0.9} : undefined,
-          ]}
+          style={({pressed}) => (pressed ? {opacity: 0.92} : undefined)}
+          className="mx-6 mt-1 mb-2 flex-row items-center rounded-2xl border border-white/10 bg-card px-3.5 py-3"
           accessibilityRole="button"
           accessibilityLabel={`Get directions to ${nearestVenue.zone.name}, ${formatVenueDistance(
             nearestVenue.distance,
           )}`}>
-          <View style={styles.nudgeIcon}>
-            <Navigation color={COLORS.sky} size={15} />
+          <View
+            className="w-9 h-9 rounded-full items-center justify-center mr-3"
+            style={{backgroundColor: 'rgba(203,168,98,0.14)'}}>
+            <Navigation color={COLORS.gold} size={16} />
           </View>
-          <View style={{flex: 1}}>
-            <Text style={styles.nudgeEyebrow} numberOfLines={1}>
-              Nearest Epocheye site
+          <View className="flex-1">
+            <Text
+              numberOfLines={1}
+              style={{fontFamily: FONTS.uiSemiBold}}
+              className="text-[10px] tracking-[0.18em] uppercase text-muted-foreground">
+              Nearest site
             </Text>
-            <Text style={styles.nudgeTitle} numberOfLines={1}>
+            <Text
+              numberOfLines={1}
+              style={{fontFamily: FONTS.uiSemiBold}}
+              className="text-sm text-foreground mt-0.5">
               {nearestVenue.zone.name} · {formatVenueDistance(nearestVenue.distance)}
             </Text>
           </View>
-          <View style={styles.nudgeCta}>
-            <Text style={styles.nudgeCtaText}>Directions</Text>
-          </View>
+          <LinearGradient
+            colors={GOLD_GRADIENT}
+            start={{x: 0, y: 0}}
+            end={{x: 1, y: 1}}
+            style={{borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, marginLeft: 10}}>
+            <Text style={{fontFamily: FONTS.uiSemiBold, fontSize: 12, color: '#0A0A0C'}}>
+              Directions
+            </Text>
+          </LinearGradient>
         </Pressable>
       ) : null}
 
@@ -755,7 +756,7 @@ const Home: React.FC<Props> = ({navigation}) => {
             onChangeText={setSearchText}
             placeholder="Search any place"
             placeholderTextColor="rgba(255,255,255,0.35)"
-            style={{flex: 1, fontFamily: FONTS.sans, fontSize: 14, color: '#FFFFFF', padding: 0}}
+            style={{flex: 1, fontFamily: FONTS.ui, fontSize: 14, color: '#FFFFFF', padding: 0}}
             autoFocus
             autoCorrect={false}
             returnKeyType="search"
@@ -773,7 +774,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       ) : null}
 
       {/* Map — padded rounded container */}
-      <View className="flex-1 mx-4 mt-2 mb-2 rounded-[18px] overflow-hidden bg-surface-1">
+      <View className="flex-1 mx-4 mt-2 mb-2 rounded-3xl overflow-hidden bg-background">
         <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
@@ -886,7 +887,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       {activePlace && activeSupportedSite ? (
         <View
           className="absolute left-4 right-4 flex-row bg-white rounded-[14px] overflow-hidden"
-          style={[styles.cardShadow, {bottom: insets.bottom + 16}]}
+          style={[styles.cardShadow, {bottom: insets.bottom + 88}]}
           accessibilityRole="summary">
           <View className="w-[132px] h-[132px] bg-[#222]">
             {supportedImageSource ? (
@@ -901,7 +902,7 @@ const Home: React.FC<Props> = ({navigation}) => {
           </View>
           <View className="flex-1 py-[10px] px-3">
             <Text
-              style={{fontFamily: FONTS.sansSemiBold, fontSize: 11, color: COLORS.goldDeep, letterSpacing: 0.6, textTransform: 'uppercase'}}
+              style={{fontFamily: FONTS.uiSemiBold, fontSize: 11, color: COLORS.goldDeep, letterSpacing: 0.6, textTransform: 'uppercase'}}
               numberOfLines={1}>
               {activeSupportedSite.ar_ready
                 ? 'Epocheye site · AR ready'
@@ -913,7 +914,7 @@ const Home: React.FC<Props> = ({navigation}) => {
               {activeSupportedSite.name}
             </Text>
             <Text
-              style={{marginTop: 2, fontFamily: FONTS.sans, fontSize: 11, color: 'rgba(0,0,0,0.55)'}}
+              style={{marginTop: 2, fontFamily: FONTS.ui, fontSize: 11, color: 'rgba(0,0,0,0.55)'}}
               numberOfLines={2}>
               {activeSupportedSite.one_line_description ||
                 [activeSupportedSite.city, activeSupportedSite.state]
@@ -928,7 +929,7 @@ const Home: React.FC<Props> = ({navigation}) => {
                 className="px-[14px] py-[6px] rounded-full bg-[#111111]"
                 accessibilityRole="button"
                 accessibilityLabel={`View details for ${activeSupportedSite.name}`}>
-                <Text style={{fontFamily: FONTS.sansMedium, fontSize: 12, color: '#FFFFFF'}}>
+                <Text style={{fontFamily: FONTS.uiMedium, fontSize: 12, color: '#FFFFFF'}}>
                   View Details
                 </Text>
               </Pressable>
@@ -938,7 +939,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       ) : activePlace ? (
         <UnavailableSiteCard
           placeName={activePlace.name}
-          bottom={insets.bottom + 16}
+          bottom={insets.bottom + 88}
           onDismiss={dismissSelection}
           onExplore={() =>
             // This is an UNAVAILABLE (non-Epocheye) place — the lens only opens at a
@@ -949,7 +950,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       ) : null}
 
       {/* First-run, non-blocking feature tips */}
-      <OnboardingTooltips bottomOffset={insets.bottom + 24} />
+      <OnboardingTooltips bottomOffset={insets.bottom + 96} />
 
       <NotificationsModal
         visible={notifOpen}
@@ -967,51 +968,6 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: {width: 0, height: 8},
     elevation: 8,
-  },
-  nudge: {
-    marginHorizontal: 16,
-    marginTop: 2,
-    marginBottom: 4,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(203,168,98,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(203,168,98,0.28)',
-  },
-  nudgeIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(203,168,98,0.16)',
-  },
-  nudgeEyebrow: {
-    fontFamily: FONTS.sans,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: 0.3,
-  },
-  nudgeTitle: {
-    marginTop: 1,
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 14,
-    color: '#FFFFFF',
-  },
-  nudgeCta: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: COLORS.sky,
-  },
-  nudgeCtaText: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 12,
-    color: '#0A0A0A',
   },
   preArrivalOverlay: {
     position: 'absolute',

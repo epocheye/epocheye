@@ -86,7 +86,7 @@ const Button: React.FC<ButtonProps> = ({
         <>
           {icon && iconPosition === 'left' && icon}
           <Text
-            className={`text-center font-['MontserratAlternates-SemiBold'] ${textSizeClass} ${textColorClass}`}
+            className={`text-center font-ui-semibold ${textSizeClass} ${textColorClass}`}
             style={textStyle}
           >
             {title}

@@ -20,7 +20,7 @@ interface Props {
 const ACCENT: Record<ToastDescriptor['type'], string> = {
   success: '#3FB950',
   error: '#EF4444',
-  info: '#C9A84C',
+  info: '#CBA862',
 };
 
 const Toast: React.FC<Props> = ({ toast, onDismiss }) => {
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   },
   text: {
     flex: 1,
-    fontFamily: 'InstrumentSans-Medium',
+    fontFamily: 'PlusJakartaSans-Medium',
     fontSize: 13.5,
     lineHeight: 19,
     color: '#F5F0E8',

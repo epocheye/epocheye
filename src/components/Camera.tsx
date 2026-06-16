@@ -42,14 +42,14 @@ const Camera = () => {
         className="items-center justify-center overflow-hidden rounded-[20px] bg-[#1a1a1a]"
         style={{ width: width - 40, height: height * 0.65 }}
       >
-        <Text className="text-white text-center font-montserrat-medium">
+        <Text className="text-white text-center font-ui-medium">
           Camera permission is required
         </Text>
         <TouchableOpacity
           onPress={requestPermission}
           className="bg-white px-6 py-3 rounded-full mt-4"
         >
-          <Text className="text-black font-montserrat-semibold">
+          <Text className="text-black font-ui-semibold">
             Grant Permission
           </Text>
         </TouchableOpacity>
@@ -63,7 +63,7 @@ const Camera = () => {
         className="items-center justify-center overflow-hidden rounded-[20px] bg-[#1a1a1a]"
         style={{ width: width - 40, height: height * 0.65 }}
       >
-        <Text className="text-white text-center font-montserrat-medium">
+        <Text className="text-white text-center font-ui-medium">
           No camera device found
         </Text>
       </View>
@@ -86,10 +86,10 @@ const Camera = () => {
         />
       ) : (
         <View className="justify-center items-center">
-          <Text className="text-white text-2xl font-montserrat-semibold text-center">
+          <Text className="text-white text-2xl font-ui-semibold text-center">
             Camera's taking a nap
           </Text>
-          <Text className="text-white/60 text-base font-montserrat-medium text-center mt-2">
+          <Text className="text-white/60 text-base font-ui-medium text-center mt-2">
             Hit the power button to wake it up!
           </Text>
         </View>

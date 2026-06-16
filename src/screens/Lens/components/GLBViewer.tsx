@@ -143,7 +143,7 @@ const GLBViewer: React.FC<GLBViewerProps> = ({
   if (failed) {
     return (
       <View className="flex-1 items-center justify-center">
-        <Text className="text-grey-muted text-[13px] font-montserrat-medium">
+        <Text className="text-grey-muted text-[13px] font-ui-medium">
           3D preview unavailable
         </Text>
       </View>
@@ -212,7 +212,7 @@ const LoadingFallback: React.FC<{ onTimeout: () => void }> = ({ onTimeout }) => 
   return (
     <View className="absolute inset-0 items-center justify-center gap-y-2" pointerEvents="none">
       <ActivityIndicator color="#CBA862" />
-      <Text className="text-accent-amber text-[13px] font-montserrat-medium">
+      <Text className="text-accent-amber text-[13px] font-ui-medium">
         Loading 3D model…
       </Text>
     </View>

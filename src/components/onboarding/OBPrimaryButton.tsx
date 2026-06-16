@@ -9,6 +9,7 @@ import Animated, {
 import LinearGradient from 'react-native-linear-gradient';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {GOLD, RADIUS, TYPE} from '../../constants/onboarding';
+import {GOLD_GRADIENT} from '../../core/constants/theme';
 
 interface Props {
   label: string;
@@ -70,12 +71,12 @@ const OBPrimaryButton: React.FC<Props> = ({
         </View>
       ) : (
         <LinearGradient
-          colors={['#D4B044', '#9A7828']}
+          colors={GOLD_GRADIENT}
           start={{x: 0, y: 0}}
           end={{x: 1, y: 1}}
           style={styles.gradient}>
           <Text
-            className="text-base leading-5 text-parchment"
+            className="text-base leading-5 text-[#0A0A0C]"
             style={{fontFamily: TYPE.button.fontFamily}}>
             {label}
           </Text>

@@ -134,14 +134,14 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 18,
     // Gold glow instead of drop shadow on dark backgrounds.
-    shadowColor: '#C9A84C',
+    shadowColor: '#CBA862',
     shadowOpacity: 0.18,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 0 },
     elevation: 16,
   },
   title: {
-    fontFamily: 'InstrumentSerif-Regular',
+    fontFamily: 'Fraunces-Regular',
     fontSize: 24,
     lineHeight: 28,
     color: '#F5F0E8',
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   },
   message: {
     marginTop: 10,
-    fontFamily: 'InstrumentSans-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 14,
     lineHeight: 21,
     color: 'rgba(255,255,255,0.66)',
@@ -179,11 +179,11 @@ const styles = StyleSheet.create({
     opacity: 0.82,
   },
   btnText: {
-    fontFamily: 'InstrumentSans-SemiBold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 15,
   },
   btnDefault: {
-    backgroundColor: '#C9A84C',
+    backgroundColor: '#CBA862',
   },
   btnDefaultText: {
     color: '#0A0A0A',

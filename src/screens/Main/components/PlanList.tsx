@@ -134,9 +134,9 @@ const SiteCard: React.FC<SiteCardProps> = React.memo(
               className="flex-1 rounded-2xl p-3 justify-between"
               style={{borderRadius: 16}}>
               <View className="flex-row items-start justify-between">
-                <View className="rounded-full bg-[rgba(10,10,10,0.8)] border border-[rgba(201,168,76,0.35)] px-2 py-1">
+                <View className="rounded-full bg-[rgba(10,10,10,0.8)] border border-[rgba(203,168,98,0.35)] px-2 py-1">
                   <Text
-                    className="text-parchment text-[10px] font-['InstrumentSans-SemiBold']"
+                    className="text-parchment text-[10px] font-ui-semibold"
                     numberOfLines={1}>
                     {tag}
                   </Text>
@@ -145,7 +145,7 @@ const SiteCard: React.FC<SiteCardProps> = React.memo(
 
               <View>
                 <Text
-                  className="text-parchment text-[18px] font-['InstrumentSerif-Regular'] leading-6"
+                  className="text-parchment text-[18px] font-display-regular leading-6"
                   numberOfLines={2}>
                   {site.name}
                 </Text>
@@ -153,7 +153,7 @@ const SiteCard: React.FC<SiteCardProps> = React.memo(
                   <View className="flex-row items-center gap-1 mt-1">
                     <MapPin color="#B8AF9E" size={11} />
                     <Text
-                      className="text-parchment-muted text-[11px] font-['InstrumentSans-Medium'] flex-shrink"
+                      className="text-parchment-muted text-[11px] font-ui-medium flex-shrink"
                       numberOfLines={1}>
                       {subtitle}
                       {subtitle.length > 0 && distanceLabel ? ' · ' : ''}
@@ -276,7 +276,7 @@ const PlanList: React.FC<PlanListProps> = ({onPlacePress}) => {
   return (
     <View className="flex-1">
       <View className="px-5 pt-2 pb-3 flex-row items-center justify-between">
-        <Text className="text-parchment-dim text-xs font-['InstrumentSans-Regular']">
+        <Text className="text-parchment-dim text-xs font-ui">
           {sortedSites.length}{' '}
           {sortedSites.length === 1 ? 'site' : 'sites'} available
         </Text>
@@ -286,10 +286,10 @@ const PlanList: React.FC<PlanListProps> = ({onPlacePress}) => {
           accessibilityRole="button"
           accessibilityLabel={`Sort by ${SORT_LABELS[sortMode]}`}>
           <ArrowUpDown
-            color={sortMode === 'distance' ? '#C9A84C' : '#6B6357'}
+            color={sortMode === 'distance' ? '#CBA862' : '#6B6357'}
             size={13}
           />
-          <Text className="text-parchment-muted text-[11px] font-['InstrumentSans-Medium']">
+          <Text className="text-parchment-muted text-[11px] font-ui-medium">
             {SORT_LABELS[sortMode]}
           </Text>
         </TouchableOpacity>
@@ -297,7 +297,7 @@ const PlanList: React.FC<PlanListProps> = ({onPlacePress}) => {
 
       {error && (
         <View className="mx-5 mb-3 bg-red-500/10 border border-red-500/20 rounded-2xl p-3">
-          <Text className="text-red-400 text-xs font-['InstrumentSans-Medium']">
+          <Text className="text-red-400 text-xs font-ui-medium">
             {error}
           </Text>
         </View>
@@ -312,13 +312,13 @@ const PlanList: React.FC<PlanListProps> = ({onPlacePress}) => {
         </View>
       ) : sortedSites.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8 pb-12">
-          <View className="w-20 h-20 rounded-full bg-surface-1 border border-[rgba(201,168,76,0.2)] items-center justify-center mb-5">
+          <View className="w-20 h-20 rounded-full bg-surface-1 border border-[rgba(203,168,98,0.2)] items-center justify-center mb-5">
             <Bookmark color="#B8923F" size={32} />
           </View>
-          <Text className="text-parchment text-lg text-center font-['InstrumentSerif-Regular']">
+          <Text className="text-parchment text-lg text-center font-display-regular">
             No sites available yet
           </Text>
-          <Text className="mt-2 text-parchment-muted text-sm text-center font-['InstrumentSans-Regular'] leading-5">
+          <Text className="mt-2 text-parchment-muted text-sm text-center font-ui leading-5">
             New heritage sites are being added. Pull down to refresh.
           </Text>
         </View>

@@ -117,7 +117,7 @@ const ResolvedSubjectImage: React.FC<ResolvedSubjectImageProps> = ({
             motion="pulse"
             showRing={false}
           />
-          <Text className="text-[#B8AF9E] font-montserrat text-[12px] text-center">
+          <Text className="text-[#B8AF9E] font-ui text-[12px] text-center">
             {loadingLabel}
           </Text>
           <View className="w-[86%] h-[10px] rounded-[5px] bg-[#2A2A2A]" />

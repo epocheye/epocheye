@@ -154,7 +154,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const renderForm = () => (
     <View className="gap-5">
       <TextInput
-        className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
+        className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-ui text-lg text-[#F5E9D8]"
         placeholder="Your name"
         placeholderTextColor={COLORS.textTertiary}
         value={name}
@@ -163,7 +163,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         autoCorrect={false}
       />
       <TextInput
-        className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
+        className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-ui text-lg text-[#F5E9D8]"
         placeholder="Email"
         placeholderTextColor={COLORS.textTertiary}
         value={email}
@@ -173,7 +173,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         autoCorrect={false}
       />
       <TextInput
-        className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-['MontserratAlternates-Regular'] text-lg text-[#F5E9D8]"
+        className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-ui text-lg text-[#F5E9D8]"
         placeholder="Password"
         placeholderTextColor={COLORS.textTertiary}
         value={password}
@@ -189,7 +189,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
             motion="pulse"
             showRing={false}
           />
-          <Text className="font-['MontserratAlternates-Regular'] text-sm text-parchment-muted">
+          <Text className="font-ui text-sm text-parchment-muted">
             Creating account...
           </Text>
         </View>
@@ -201,7 +201,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         onPress={() => setShowEmailForm(false)}
         className="mt-2 items-center"
       >
-        <Text className="font-['MontserratAlternates-Medium'] text-sm text-parchment-faint">
+        <Text className="font-ui-medium text-sm text-parchment-faint">
           Back to options
         </Text>
       </TouchableOpacity>
@@ -239,11 +239,11 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
               source={require('../../assets/images/logo-white.png')}
               className="size-20 my-5"
             />
-            <Text className="font-['MontserratAlternates-Regular'] text-[18px] text-parchment-muted">
+            <Text className="font-ui text-[18px] text-parchment-muted">
               {headingText}
             </Text>
             {fromOnboarding && (
-              <Text className="mt-2 font-['MontserratAlternates-Regular'] text-sm text-[#8C93A0]">
+              <Text className="mt-2 font-ui text-sm text-[#8C93A0]">
                 Create a free account to keep your ancestor.
               </Text>
             )}
@@ -256,9 +256,9 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
               onPress={() => navigation.navigate('OB10_Login')}
               className="mt-8 items-center"
             >
-              <Text className="font-['MontserratAlternates-Regular'] text-sm text-parchment-faint">
+              <Text className="font-ui text-sm text-parchment-faint">
                 Already have an account?{' '}
-                <Text className="font-['MontserratAlternates-SemiBold'] text-brand-amber">
+                <Text className="font-ui-semibold text-brand-amber">
                   Log in
                 </Text>
               </Text>
@@ -266,12 +266,12 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
 
           {fromOnboarding && (
-            <Text className="mt-4 text-center font-['MontserratAlternates-Regular'] text-[11px] text-[#8C93A0]">
+            <Text className="mt-4 text-center font-ui text-[11px] text-[#8C93A0]">
               Takes 10 seconds. No spam. Your data is never sold.
             </Text>
           )}
 
-          <Text className="mb-8 mt-10 text-center font-['MontserratAlternates-Regular'] text-xs text-parchment-dim">
+          <Text className="mb-8 mt-10 text-center font-ui text-xs text-parchment-dim">
             By continuing, you agree to our Terms & Privacy Policy
           </Text>
         </ScrollView>

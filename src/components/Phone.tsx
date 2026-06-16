@@ -4,7 +4,7 @@ import { Text, TextInput, View } from 'react-native';
 const Phone: React.FC = () => {
   return (
     <View className="my-10">
-      <Text className="text-gray-300 font-montserrat-semibold text-lg">
+      <Text className="text-gray-300 font-ui-semibold text-lg">
         Phone Number
       </Text>
       <TextInput

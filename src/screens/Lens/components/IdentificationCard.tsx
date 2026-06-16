@@ -78,7 +78,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
       {isOffline && (
         <View className="absolute top-3 left-4 flex-row items-center gap-x-1 bg-accent-amber rounded-lg px-2 py-[3px]">
           <WifiOff size={10} color="#0D0D0D" />
-          <Text className="text-[#0D0D0D] text-[10px] font-montserrat-bold">
+          <Text className="text-[#0D0D0D] text-[10px] font-ui-semibold">
             Saved offline
           </Text>
         </View>
@@ -87,7 +87,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
       {isLoading && (
         <View className="flex-row items-center gap-x-[10px]">
           <ActivityIndicator color="#CBA862" size="small" />
-          <Text className="text-grey-muted text-[14px] font-montserrat">
+          <Text className="text-grey-muted text-[14px] font-ui">
             Identifying this heritage site...
           </Text>
         </View>
@@ -95,15 +95,15 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
 
       {!isLoading && error && (
         <>
-          <Text className="text-grey-muted text-[14px] font-montserrat text-center">
+          <Text className="text-grey-muted text-[14px] font-ui text-center">
             {error}
           </Text>
           <TouchableOpacity
             onPress={() => setReportOpen(true)}
-            className="mt-[10px] self-center flex-row items-center gap-x-[6px] py-[6px] px-[10px] rounded-[10px] border border-[rgba(201,168,76,0.3)] bg-ob-goldSubtle"
+            className="mt-[10px] self-center flex-row items-center gap-x-[6px] py-[6px] px-[10px] rounded-[10px] border border-[rgba(203,168,98,0.3)] bg-ob-goldSubtle"
             hitSlop={6}>
-            <AlertTriangle color="#C9A84C" size={12} />
-            <Text className="text-ob-gold text-[11px] font-montserrat-medium">
+            <AlertTriangle color="#CBA862" size={12} />
+            <Text className="text-ob-gold text-[11px] font-ui-medium">
               Report issue
             </Text>
           </TouchableOpacity>
@@ -116,27 +116,27 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
 
       {!isLoading && identification && (
         <Pressable onPress={onExpand}>
-          <Text className="text-parchment text-[20px] font-montserrat-bold mb-0.5">
+          <Text className="text-parchment text-[20px] font-ui-semibold mb-0.5">
             {identification.name}
           </Text>
 
           {locationContext ? (
             <Text
-              className="text-[rgba(255,255,255,0.6)] text-[12px] leading-[17px] font-montserrat mb-2"
+              className="text-[rgba(255,255,255,0.6)] text-[12px] leading-[17px] font-ui mb-2"
               numberOfLines={2}>
               {locationContext}
             </Text>
           ) : null}
 
           {identification.period ? (
-            <Text className="text-accent-amber text-[13px] font-montserrat-medium mb-[10px]">
+            <Text className="text-accent-amber text-[13px] font-ui-medium mb-[10px]">
               {identification.period}
             </Text>
           ) : null}
 
           {isPremium ? (
             <Text
-              className="text-[#C5C9D1] text-[13px] font-montserrat leading-5 mb-2"
+              className="text-[#C5C9D1] text-[13px] font-ui leading-5 mb-2"
               numberOfLines={2}>
               {identification.significance}
             </Text>
@@ -147,7 +147,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
               className="flex-row items-center gap-x-[6px] my-2"
               onPress={onUpgrade}>
               <Lock size={12} color="#CBA862" />
-              <Text className="text-accent-amber text-[12px] font-montserrat-semibold">
+              <Text className="text-accent-amber text-[12px] font-ui-semibold">
                 Unlock full details with Passport
               </Text>
             </Pressable>
@@ -164,7 +164,7 @@ const IdentificationCard: React.FC<IdentificationCardProps> = ({
             </Text>
           ) : null}
 
-          <Text className="text-[#5A5F6B] text-[11px] font-montserrat mt-1">
+          <Text className="text-[#5A5F6B] text-[11px] font-ui mt-1">
             Tap for more details
           </Text>
         </Pressable>

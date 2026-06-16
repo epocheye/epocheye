@@ -130,19 +130,19 @@ const PlaceSelectCard: React.FC<PlaceSelectCardProps> = React.memo(
           activeOpacity={0.85}
           className={`flex-row items-center rounded-2xl p-3 mb-2 border ${
             isSelected
-              ? 'border-[rgba(201,168,76,0.45)] bg-[rgba(201,168,76,0.06)]'
+              ? 'border-[rgba(203,168,98,0.45)] bg-[rgba(203,168,98,0.06)]'
               : 'border-white/[0.08] bg-surface-1'
           }`}
         >
           <View className="flex-1">
             <Text
-              className="text-parchment text-sm font-['InstrumentSans-SemiBold']"
+              className="text-parchment text-sm font-ui-semibold"
               numberOfLines={1}
             >
               {place.name}
             </Text>
             <Text
-              className="text-parchment-dim text-xs font-['InstrumentSans-Regular'] mt-0.5"
+              className="text-parchment-dim text-xs font-ui mt-0.5"
               numberOfLines={1}
             >
               {place.place_type
@@ -153,7 +153,7 @@ const PlaceSelectCard: React.FC<PlaceSelectCardProps> = React.memo(
 
           <View className="flex-row items-center gap-1 mr-3">
             <Compass color="#6B6357" size={11} />
-            <Text className="text-parchment-dim text-[11px] font-['InstrumentSans-Medium']">
+            <Text className="text-parchment-dim text-[11px] font-ui-medium">
               {distanceKm} km
             </Text>
           </View>
@@ -336,7 +336,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
   const accessHours = quote?.access_hours ?? (isSingle ? 12 : durationHours);
 
   return (
-    <SafeAreaView className="flex-1 bg-ink-deep">
+    <SafeAreaView className="flex-1 bg-background">
       <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={['#000000', '#0C0A07', '#000000']}
@@ -352,7 +352,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
           >
             <ArrowLeft color="#F5F0E8" size={20} />
           </TouchableOpacity>
-          <Text className="text-parchment text-xl font-['InstrumentSerif-Regular']">
+          <Text className="text-parchment text-xl font-display-regular">
             {isBundle ? 'Build Your Pass' : 'Get Access'}
           </Text>
         </View>
@@ -365,22 +365,22 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Hero */}
           <Animated.View
             entering={FadeIn.duration(400)}
-            className="bg-surface-1 rounded-2xl border border-[rgba(212,134,10,0.25)] p-5 mb-5"
+            className="bg-surface-1 rounded-2xl border border-[rgba(203,168,98,0.25)] p-5 mb-5"
           >
             <View className="flex-row items-center gap-2 mb-2">
               <Sparkles color="#B8923F" size={16} />
-              <Text className="text-brand-amber text-xs uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
+              <Text className="text-brand-amber text-xs uppercase tracking-[0.8px] font-ui-semibold">
                 {isBundle ? 'Custom Passport' : 'Single Place Access'}
               </Text>
             </View>
-            <Text className="text-parchment text-[22px] leading-7 font-['InstrumentSerif-Regular']">
+            <Text className="text-parchment text-[22px] leading-7 font-display-regular">
               {isBundle
                 ? 'Unlock multiple heritage sites'
                 : isSingle
                 ? 'Unlock this heritage site'
                 : 'Pick places to unlock'}
             </Text>
-            <Text className="text-parchment-muted text-sm leading-5 mt-2 font-['InstrumentSans-Regular']">
+            <Text className="text-parchment-muted text-sm leading-5 mt-2 font-ui">
               {isBundle
                 ? `Your pass is built from the places you select. Default 24 hours; extendable up to 3 days. We'll notify you before access ends.`
                 : `Every place has 12 hours of access from the moment you buy it. Pick two or more to build a custom Passport and save time.`}
@@ -389,7 +389,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Place selection — sourced from our curated Epocheye sites only. */}
           <Animated.View entering={FadeInDown.delay(100).duration(350)}>
-            <Text className="text-parchment text-base font-['InstrumentSans-SemiBold'] mb-3">
+            <Text className="text-parchment text-base font-ui-semibold mb-3">
               {isFocused ? 'Your Selection' : 'Select Places'}
             </Text>
 
@@ -402,7 +402,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                   placeholder="Search Epocheye sites"
                   placeholderTextColor="rgba(245,240,232,0.25)"
                   autoCorrect={false}
-                  className="flex-1 py-2.5 px-2 text-parchment text-sm font-['InstrumentSans-Regular']"
+                  className="flex-1 py-2.5 px-2 text-parchment text-sm font-ui"
                 />
                 {siteSearch.length > 0 ? (
                   <TouchableOpacity onPress={() => setSiteSearch('')} hitSlop={8}>
@@ -414,12 +414,12 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
 
             {sitesLoading ? (
               <View className="items-center py-8">
-                <ActivityIndicator color="#C9A84C" size="small" />
+                <ActivityIndicator color="#CBA862" size="small" />
               </View>
             ) : visiblePlaces.length === 0 ? (
               <View className="items-center py-8 gap-2">
                 <MapPin color="#6B6357" size={24} />
-                <Text className="text-parchment-dim text-sm text-center font-['InstrumentSans-Regular']">
+                <Text className="text-parchment-dim text-sm text-center font-ui">
                   {siteSearch.trim()
                     ? 'No Epocheye sites match your search.'
                     : 'No Epocheye sites are available yet.'}
@@ -445,8 +445,8 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
               className="bg-surface-1 rounded-2xl border border-white/[0.08] p-4 mt-3 mb-4"
             >
               <View className="flex-row items-center gap-2 mb-3">
-                <Clock3 color="#C9A84C" size={14} />
-                <Text className="text-parchment text-sm font-['InstrumentSans-SemiBold']">
+                <Clock3 color="#CBA862" size={14} />
+                <Text className="text-parchment text-sm font-ui-semibold">
                   Pass Duration
                 </Text>
               </View>
@@ -457,12 +457,12 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                     onPress={() => setDurationHours(h)}
                     className={`flex-1 py-3 rounded-xl border items-center ${
                       durationHours === h
-                        ? 'border-brand-gold bg-[rgba(201,168,76,0.1)]'
+                        ? 'border-brand-gold bg-[rgba(203,168,98,0.1)]'
                         : 'border-white/[0.08] bg-surface-2'
                     }`}
                   >
                     <Text
-                      className={`text-sm font-['InstrumentSans-SemiBold'] ${
+                      className={`text-sm font-ui-semibold ${
                         durationHours === h
                           ? 'text-brand-gold'
                           : 'text-parchment'
@@ -474,7 +474,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                 ))}
               </View>
               {durationHours > 24 && (
-                <Text className="text-parchment-dim text-xs mt-2 font-['InstrumentSans-Regular']">
+                <Text className="text-parchment-dim text-xs mt-2 font-ui">
                   Extension fee applies — see summary below.
                 </Text>
               )}
@@ -488,12 +488,12 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
               className="bg-surface-1 rounded-2xl border border-white/[0.08] p-4 mt-3 mb-4"
             >
               <View className="flex-row items-center gap-2 mb-1.5">
-                <Clock3 color="#C9A84C" size={14} />
-                <Text className="text-parchment text-sm font-['InstrumentSans-SemiBold']">
+                <Clock3 color="#CBA862" size={14} />
+                <Text className="text-parchment text-sm font-ui-semibold">
                   12 hours of access
                 </Text>
               </View>
-              <Text className="text-parchment-dim text-xs leading-[18px] font-['InstrumentSans-Regular']">
+              <Text className="text-parchment-dim text-xs leading-[18px] font-ui">
                 You'll have 12 hours to explore. We'll remind you 1 hour and 15
                 minutes before it ends.
               </Text>
@@ -506,7 +506,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
               entering={FadeInDown.duration(300)}
               className="bg-surface-1 rounded-2xl border border-white/[0.08] p-4 mb-4"
             >
-              <Text className="text-parchment text-base font-['InstrumentSans-SemiBold'] mb-3">
+              <Text className="text-parchment text-base font-ui-semibold mb-3">
                 Price Summary
               </Text>
 
@@ -516,50 +516,50 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                   className="flex-row justify-between mb-2"
                 >
                   <Text
-                    className="text-parchment-muted text-sm font-['InstrumentSans-Regular'] flex-1 pr-3"
+                    className="text-parchment-muted text-sm font-ui flex-1 pr-3"
                     numberOfLines={1}
                   >
                     {li.place_name ||
                       placeNameById[li.place_id] ||
                       'Selected place'}
                   </Text>
-                  <Text className="text-parchment text-sm font-['InstrumentSans-SemiBold']">
+                  <Text className="text-parchment text-sm font-ui-semibold">
                     {formatInr(li.price_paise)}
                   </Text>
                 </View>
               ))}
 
               <View className="flex-row justify-between mt-1 pt-2 border-t border-white/[0.05]">
-                <Text className="text-parchment-muted text-sm font-['InstrumentSans-Regular']">
+                <Text className="text-parchment-muted text-sm font-ui">
                   Access Duration
                 </Text>
-                <Text className="text-parchment text-sm font-['InstrumentSans-SemiBold']">
+                <Text className="text-parchment text-sm font-ui-semibold">
                   {formatDuration(accessHours)}
                 </Text>
               </View>
 
               {discountPaise > 0 && (
                 <View className="flex-row justify-between mb-1 mt-1">
-                  <Text className="text-status-success text-sm font-['InstrumentSans-Regular']">
+                  <Text className="text-status-success text-sm font-ui">
                     Coupon ({quote.discount_percent ?? 0}% off)
                   </Text>
-                  <Text className="text-status-success text-sm font-['InstrumentSans-SemiBold']">
+                  <Text className="text-status-success text-sm font-ui-semibold">
                     -{formatInr(discountPaise)}
                   </Text>
                 </View>
               )}
 
               <View className="flex-row justify-between mt-2 pt-3 border-t border-white/[0.08]">
-                <Text className="text-parchment text-base font-['InstrumentSerif-Regular']">
+                <Text className="text-parchment text-base font-display-regular">
                   Total
                 </Text>
-                <Text className="text-parchment text-xl font-['InstrumentSerif-Regular']">
+                <Text className="text-parchment text-xl font-display-regular">
                   {formatInr(totalPaise)}
                 </Text>
               </View>
 
               {extensionPaise === 0 && subtotalPaise > 0 && isBundle && (
-                <Text className="text-parchment-dim text-[11px] mt-2 font-['InstrumentSans-Regular']">
+                <Text className="text-parchment-dim text-[11px] mt-2 font-ui">
                   Subtotal {formatInr(subtotalPaise)}
                 </Text>
               )}
@@ -568,13 +568,13 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {selectedCount > 0 && quoteLoading && !quote && (
             <View className="items-center py-4 mb-4">
-              <ActivityIndicator color="#C9A84C" size="small" />
+              <ActivityIndicator color="#CBA862" size="small" />
             </View>
           )}
 
           {quoteError && (
             <View className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mb-4">
-              <Text className="text-red-400 text-xs font-['InstrumentSans-Regular']">
+              <Text className="text-red-400 text-xs font-ui">
                 {quoteError}
               </Text>
             </View>
@@ -586,8 +586,8 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
             className="bg-surface-1 border border-white/[0.08] rounded-2xl p-4 mb-4"
           >
             <View className="flex-row items-center gap-2 mb-2">
-              <Tag color="#C9A84C" size={13} />
-              <Text className="text-parchment-muted text-xs font-['InstrumentSans-Medium']">
+              <Tag color="#CBA862" size={13} />
+              <Text className="text-parchment-muted text-xs font-ui-medium">
                 Have a promo code?
               </Text>
             </View>
@@ -596,7 +596,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
               <View className="flex-row items-center justify-between bg-status-success/10 border border-status-success/20 rounded-xl px-3 py-2.5">
                 <View className="flex-row items-center gap-2">
                   <Check color="#10B981" size={14} />
-                  <Text className="text-status-success text-sm font-['InstrumentSans-SemiBold']">
+                  <Text className="text-status-success text-sm font-ui-semibold">
                     {couponResult.code} · {couponResult.discount_percent}% off
                   </Text>
                 </View>
@@ -621,7 +621,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                   autoCorrect={false}
                   returnKeyType="done"
                   onSubmitEditing={handleApplyCoupon}
-                  className="flex-1 bg-surface-2 border border-white/10 rounded-xl px-3 py-2.5 text-parchment text-sm font-['InstrumentSans-Regular']"
+                  className="flex-1 bg-surface-2 border border-white/10 rounded-xl px-3 py-2.5 text-parchment text-sm font-ui"
                 />
                 <TouchableOpacity
                   onPress={handleApplyCoupon}
@@ -629,9 +629,9 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
                   className="bg-brand-gold/20 border border-brand-gold/30 rounded-xl px-4 items-center justify-center"
                 >
                   {couponValidating ? (
-                    <ActivityIndicator color="#C9A84C" size="small" />
+                    <ActivityIndicator color="#CBA862" size="small" />
                   ) : (
-                    <Text className="text-brand-gold text-sm font-['InstrumentSans-SemiBold']">
+                    <Text className="text-brand-gold text-sm font-ui-semibold">
                       Apply
                     </Text>
                   )}
@@ -640,7 +640,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
             )}
 
             {couponResult && !couponResult.is_valid && (
-              <Text className="text-red-400 text-xs mt-2 font-['InstrumentSans-Regular']">
+              <Text className="text-red-400 text-xs mt-2 font-ui">
                 {couponResult.reason === 'expired'
                   ? 'This code has expired.'
                   : couponResult.reason === 'exhausted'
@@ -666,7 +666,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
               ) : (
                 <>
                   <Sparkles color="#0A0A0A" size={18} />
-                  <Text className="text-ink text-base font-['InstrumentSerif-Regular']">
+                  <Text className="text-ink text-base font-display-regular">
                     {selectedCount === 0
                       ? 'Select a place to continue'
                       : quote
@@ -679,7 +679,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
 
             <View className="flex-row items-center justify-center gap-1.5 mt-3 mb-2">
               <Shield color="#6B6357" size={12} />
-              <Text className="text-parchment-dim text-xs font-['InstrumentSans-Regular']">
+              <Text className="text-parchment-dim text-xs font-ui">
                 Secure checkout via Razorpay · One-time payment
               </Text>
             </View>

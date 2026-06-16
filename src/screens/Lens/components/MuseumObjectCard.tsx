@@ -102,25 +102,25 @@ const MuseumObjectCard: React.FC<MuseumObjectCardProps> = ({
       {identifying ? (
         <View className="flex-row items-center gap-x-[10px]">
           <ActivityIndicator color="#CBA862" size="small" />
-          <Text className="text-grey-muted text-[14px] font-montserrat">
+          <Text className="text-grey-muted text-[14px] font-ui">
             Looking at this…
           </Text>
         </View>
       ) : (
         <>
           <Text
-            className="text-parchment text-[20px] font-montserrat-bold mb-1 pr-6"
+            className="text-parchment text-[20px] font-ui-semibold mb-1 pr-6"
             numberOfLines={2}
           >
             {label ?? 'This object'}
           </Text>
 
           {error ? (
-            <Text className="text-grey-muted text-[13px] font-montserrat leading-5">
+            <Text className="text-grey-muted text-[13px] font-ui leading-5">
               {error}
             </Text>
           ) : (
-            <Text className="text-[#C5C9D1] text-[13px] font-montserrat leading-5">
+            <Text className="text-[#C5C9D1] text-[13px] font-ui leading-5">
               {narration}
               {streaming && narration.length === 0
                 ? 'Composing a short note…'
@@ -129,7 +129,7 @@ const MuseumObjectCard: React.FC<MuseumObjectCardProps> = ({
           )}
 
           {!error ? (
-            <Text className="text-[#5A5F6B] text-[10px] font-montserrat mt-3 tracking-[0.4px]">
+            <Text className="text-[#5A5F6B] text-[10px] font-ui mt-3 tracking-[0.4px]">
               AI impression · point and tap anything
             </Text>
           ) : null}

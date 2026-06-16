@@ -114,11 +114,11 @@ const NearbyAnchorsList: React.FC<Props> = ({
           accessibilityLabel={`${asset.object_label}, ${Math.round(distance)} meters away`}
         >
           <ArrowUpRight color="#CBA862" size={12} />
-          <Text className="text-parchment font-montserrat-semibold text-[12px] shrink" numberOfLines={1}>
+          <Text className="text-parchment font-ui-semibold text-[12px] shrink" numberOfLines={1}>
             {asset.object_label}
           </Text>
           <View className="w-[3px] h-[3px] rounded-[2px] bg-[rgba(245,240,232,0.4)]" />
-          <Text className="text-accent-amber font-montserrat-medium text-[11px]">
+          <Text className="text-accent-amber font-ui-medium text-[11px]">
             {Math.round(distance)}m
           </Text>
         </TouchableOpacity>

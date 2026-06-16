@@ -99,7 +99,7 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
             <Text
               numberOfLines={1}
               style={{
-                fontFamily: FONTS.sansSemiBold,
+                fontFamily: FONTS.uiSemiBold,
                 fontSize: 16,
                 color: '#FFFFFF',
               }}>
@@ -109,7 +109,7 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
               numberOfLines={1}
               style={{
                 marginTop: 4,
-                fontFamily: FONTS.sans,
+                fontFamily: FONTS.ui,
                 fontSize: 12,
                 color: 'rgba(255,255,255,0.55)',
               }}>
@@ -121,7 +121,7 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
                 <Text
                   style={{
                     marginLeft: 6,
-                    fontFamily: FONTS.sans,
+                    fontFamily: FONTS.ui,
                     fontSize: 12,
                     color: 'rgba(255,255,255,0.72)',
                   }}>
@@ -132,7 +132,7 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
               <View className="mt-2 flex-row items-center flex-wrap">
                 <Text
                   style={{
-                    fontFamily: FONTS.sans,
+                    fontFamily: FONTS.ui,
                     fontSize: 12,
                     color: 'rgba(255,255,255,0.72)',
                   }}>
@@ -145,7 +145,7 @@ const ApproachCard: React.FC<ApproachCardProps> = ({
                   hitSlop={6}>
                   <Text
                     style={{
-                      fontFamily: FONTS.sansSemiBold,
+                      fontFamily: FONTS.uiSemiBold,
                       fontSize: 12,
                       color: '#B8923F',
                       textDecorationLine: 'underline',

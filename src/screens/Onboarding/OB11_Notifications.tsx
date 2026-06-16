@@ -18,6 +18,7 @@ import {getValidAccessToken} from '../../utils/api/auth';
 import OBProgressBar from '../../components/onboarding/OBProgressBar';
 import OBPrimaryButton from '../../components/onboarding/OBPrimaryButton';
 import OBSkipLink from '../../components/onboarding/OBSkipLink';
+import {AmbientGlow} from '../../components/ui/premium';
 import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB11_Notifications'>;
@@ -94,12 +95,13 @@ const OB11_Notifications: React.FC<Props> = () => {
   }, [finishOnboarding]);
 
   return (
-    <View className="flex-1 bg-ob-bgDeep">
+    <View className="flex-1 bg-background">
       <StatusBar
         barStyle="light-content"
         translucent
         backgroundColor="transparent"
       />
+      <AmbientGlow height={360} />
       <OBProgressBar current={9} total={10} />
 
       <View
@@ -115,10 +117,13 @@ const OB11_Notifications: React.FC<Props> = () => {
           </Animated.View>
 
           <Animated.View className="mt-9 items-center" style={sBody}>
-            <Text className="text-[26px] leading-[34px] text-center text-parchment font-montserrat-extrabold">
-              Stay close to{'\n'}history.
+            <Text className="text-[11px] tracking-[0.22em] uppercase text-brand-gold font-ui-semibold">
+              One last thing
             </Text>
-            <Text className="mt-3 text-[14px] leading-[21px] text-center text-grey-muted font-montserrat">
+            <Text className="mt-3 text-[30px] leading-[38px] text-center text-parchment font-display">
+              Stay close to{'\n'}history
+            </Text>
+            <Text className="mt-3 text-[14px] leading-[21px] text-center text-muted-foreground font-ui px-2">
               Turn on notifications and we'll let you know the moment a heritage
               site is near.
             </Text>
@@ -127,11 +132,11 @@ const OB11_Notifications: React.FC<Props> = () => {
               {BENEFITS.map(({icon: Icon, text}) => (
                 <View
                   key={text}
-                  className="flex-row items-center px-4 py-3 rounded-2xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)]">
-                  <View className="w-9 h-9 rounded-full items-center justify-center bg-[rgba(203,168,98,0.10)]">
+                  className="flex-row items-center px-4 py-3.5 rounded-2xl bg-card border border-white/10">
+                  <View className="w-10 h-10 rounded-full items-center justify-center bg-[rgba(203,168,98,0.12)]">
                     <Icon size={18} color="#CBA862" />
                   </View>
-                  <Text className="ml-3 flex-1 text-[13px] leading-[19px] text-parchment/90 font-montserrat">
+                  <Text className="ml-3 flex-1 text-[13px] leading-[19px] text-foreground/90 font-ui">
                     {text}
                   </Text>
                 </View>

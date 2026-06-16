@@ -62,9 +62,9 @@ export function Skeleton({
       <Animated.View style={[{ flex: 1, width: '60%' }, animatedStyle]}>
         <LinearGradient
           colors={[
-            'rgba(201,168,76,0)',
-            'rgba(201,168,76,0.12)',
-            'rgba(201,168,76,0)',
+            'rgba(203,168,98,0)',
+            'rgba(203,168,98,0.12)',
+            'rgba(203,168,98,0)',
           ]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}

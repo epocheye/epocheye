@@ -92,6 +92,7 @@ import { useArQuotaStore } from '../../stores/arQuotaStore';
 import EpocheyeARView from '../../native/EpocheyeARView';
 import IdentificationCard from '../Lens/components/IdentificationCard';
 import HDScanOverlay from '../Lens/components/HDScanOverlay';
+import ARActivationOverlay from '../../components/ui/ARActivationOverlay';
 import ObjectPickerOverlay from '../Lens/components/ObjectPickerOverlay';
 import NearbyAnchorsList from './components/NearbyAnchorsList';
 import type {
@@ -114,6 +115,8 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
   const { arAvailable } = useARCore();
   const isFocused = useIsFocused();
   const [cameraError, setCameraError] = useState<string | null>(null);
+  // Plays the cinematic AR takeover once, the first time the live camera mounts.
+  const [activationDone, setActivationDone] = useState(false);
 
   // Geofence state
   const [activeZone, setActiveZone] = useState<HeritageZone | null>(null);
@@ -627,7 +630,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
   if (!hasPermission) {
     return (
       <GestureHandlerRootView className="flex-1">
-        <SafeAreaView className="flex-1 bg-ink-deep items-center justify-center px-8">
+        <SafeAreaView className="flex-1 bg-background items-center justify-center px-8">
           <Camera color="#B8923F" size={56} />
           <Text className="text-parchment text-xl text-center font-ui-medium mt-6 mb-2">
             Camera access needed
@@ -665,7 +668,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
   // ── Main AR view ─────────────────────────────────────────────────
   return (
     <GestureHandlerRootView className="flex-1">
-      <View className="flex-1 bg-ink-deep">
+      <View className="flex-1 bg-background">
         {/* Camera layer */}
         {device && !cameraError && (
           <VisionCamera
@@ -700,6 +703,13 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
+        {/* Cinematic AR activation takeover — plays once when the live feed mounts */}
+        <ARActivationOverlay
+          visible={!!device && !cameraError && isFocused && !activationDone}
+          subtitle={site.name}
+          onDone={() => setActivationDone(true)}
+        />
+
         {/* AR overlay — native ARCore view if available + has identification */}
         {arAvailable && geminiResult && (
           <EpocheyeARView
@@ -723,7 +733,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Subtle amber AR tint */}
         <View
           className="absolute inset-0"
-          style={{ backgroundColor: 'rgba(212,134,10,0.06)' }}
+          style={{ backgroundColor: 'rgba(203,168,98,0.06)' }}
           pointerEvents="none"
         />
 
@@ -742,7 +752,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
                 position: 'absolute',
                 width: 22,
                 height: 22,
-                borderColor: 'rgba(212,134,10,0.6)',
+                borderColor: 'rgba(203,168,98,0.6)',
                 borderTopWidth: i < 2 ? 2 : 0,
                 borderBottomWidth: i >= 2 ? 2 : 0,
                 borderLeftWidth: i % 2 === 0 ? 2 : 0,
@@ -759,7 +769,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
           pointerEvents="none"
         >
           <View className="items-center mt-16">
-            <View className="flex-row items-center gap-1.5 bg-black/50 rounded-full px-3 py-1.5 border border-[rgba(212,134,10,0.3)]">
+            <View className="flex-row items-center gap-1.5 bg-black/50 rounded-full px-3 py-1.5 border border-[rgba(203,168,98,0.3)]">
               {arAvailable ? (
                 <>
                   <View className="w-2 h-2 rounded-full bg-status-success" />

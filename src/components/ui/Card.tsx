@@ -45,7 +45,7 @@ export function PressableCard(props: PressProps) {
   return (
     <Pressable
       className={cardClass({ tone, glow, bordered, className })}
-      android_ripple={{ color: 'rgba(201,168,76,0.12)' }}
+      android_ripple={{ color: 'rgba(203,168,98,0.12)' }}
       {...rest}
     >
       {children}

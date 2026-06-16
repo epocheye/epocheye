@@ -24,25 +24,25 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    icon: <MapPin color="#C9A84C" size={22} />,
+    icon: <MapPin color="#CBA862" size={22} />,
     title: 'Explore the map',
     description:
       'Heritage sites near you appear on the map. Tap a marker to see its details and story.',
   },
   {
-    icon: <Bell color="#C9A84C" size={22} />,
+    icon: <Bell color="#CBA862" size={22} />,
     title: 'Stay in the loop',
     description:
       'Tap the bell at the top for updates, reminders, and news about the places you follow.',
   },
   {
-    icon: <Ticket color="#C9A84C" size={22} />,
+    icon: <Ticket color="#CBA862" size={22} />,
     title: 'Unlock with a Passport',
     description:
       'Get a Passport to unlock the full augmented-reality experience at the sites you visit.',
   },
   {
-    icon: <Sparkles color="#C9A84C" size={22} />,
+    icon: <Sparkles color="#CBA862" size={22} />,
     title: 'Come back daily',
     description:
       'The Daily tab shows an “on this day” heritage moment and tracks your visit streak.',
@@ -104,7 +104,7 @@ const OnboardingTooltips: React.FC<OnboardingTooltipsProps> = ({
       <Animated.View
         entering={FadeInDown.duration(260)}
         exiting={FadeOutDown.duration(180)}
-        className="mx-4 rounded-2xl bg-[#141414] border border-[rgba(201,168,76,0.35)] p-4"
+        className="mx-4 rounded-2xl bg-[#141414] border border-[rgba(203,168,98,0.35)] p-4"
         style={{
           shadowColor: '#000',
           shadowOpacity: 0.35,
@@ -113,7 +113,7 @@ const OnboardingTooltips: React.FC<OnboardingTooltipsProps> = ({
           elevation: 12,
         }}>
         <View className="flex-row items-start">
-          <View className="w-10 h-10 rounded-full bg-[rgba(201,168,76,0.12)] items-center justify-center mr-3">
+          <View className="w-10 h-10 rounded-full bg-[rgba(203,168,98,0.12)] items-center justify-center mr-3">
             {current.icon}
           </View>
           <View className="flex-1 pr-2">
@@ -122,7 +122,7 @@ const OnboardingTooltips: React.FC<OnboardingTooltipsProps> = ({
               {current.title}
             </Text>
             <Text
-              style={{marginTop: 3, fontFamily: FONTS.sans, fontSize: 12, color: 'rgba(245,240,232,0.62)', lineHeight: 17}}>
+              style={{marginTop: 3, fontFamily: FONTS.ui, fontSize: 12, color: 'rgba(245,240,232,0.62)', lineHeight: 17}}>
               {current.description}
             </Text>
           </View>
@@ -146,7 +146,7 @@ const OnboardingTooltips: React.FC<OnboardingTooltipsProps> = ({
                   height: 7,
                   borderRadius: 4,
                   backgroundColor:
-                    i === step ? '#C9A84C' : 'rgba(255,255,255,0.18)',
+                    i === step ? '#CBA862' : 'rgba(255,255,255,0.18)',
                 }}
               />
             ))}
@@ -155,8 +155,8 @@ const OnboardingTooltips: React.FC<OnboardingTooltipsProps> = ({
             onPress={handleNext}
             accessibilityRole="button"
             accessibilityLabel={isLast ? 'Got it' : 'Next tip'}
-            className="px-4 py-2 rounded-full bg-[#C9A84C]">
-            <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 13, color: '#0A0A0A'}}>
+            className="px-4 py-2 rounded-full bg-[#CBA862]">
+            <Text style={{fontFamily: FONTS.uiSemiBold, fontSize: 13, color: '#0A0A0A'}}>
               {isLast ? 'Got it' : 'Next'}
             </Text>
           </Pressable>

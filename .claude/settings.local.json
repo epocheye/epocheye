@@ -65,7 +65,8 @@
       "Bash(find *)",
       "Bash(cd E:\\\\epocheye *)",
       "Bash(grep -E \"\\\\.tsx$\")",
-      "Bash(Remove-Item *)"
+      "Bash(Remove-Item *)",
+      "Bash(npx tailwindcss *)"
     ]
   },
   "worktree": {

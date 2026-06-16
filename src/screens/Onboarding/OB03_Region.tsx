@@ -165,7 +165,7 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
           }
           accessibilityRole="button"
           accessibilityLabel="Continue">
-          <Text className="font-montserrat-medium text-[17px] text-parchment tracking-[0.3px]">
+          <Text className="font-ui-medium text-[17px] text-parchment tracking-[0.3px]">
             Continue
           </Text>
         </Pressable>

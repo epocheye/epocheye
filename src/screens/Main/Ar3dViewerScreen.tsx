@@ -344,13 +344,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontFamily: 'MontserratAlternates-SemiBold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 16,
     color: '#FFFFFF',
   },
   subtitle: {
     marginTop: 2,
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 11,
     color: 'rgba(255,255,255,0.6)',
     letterSpacing: 0.6,
@@ -362,20 +362,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   errorText: {
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 14,
     color: 'rgba(255,255,255,0.6)',
     textAlign: 'center',
   },
   comingSoonEra: {
-    fontFamily: 'MontserratAlternates-SemiBold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 22,
     color: AMBER,
     letterSpacing: 1.2,
   },
   comingSoonBody: {
     marginTop: 8,
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 13,
     color: 'rgba(255,255,255,0.55)',
     letterSpacing: 0.4,
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   sheetTitle: {
-    fontFamily: 'MontserratAlternates-SemiBold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 12,
     color: 'rgba(255,255,255,0.55)',
     letterSpacing: 1.6,
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   sheetBody: {
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 14,
     color: '#FFFFFF',
     lineHeight: 22,

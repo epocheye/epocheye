@@ -132,13 +132,13 @@ export default function AnchorCaptureScreen({ navigation }: Props): React.ReactE
       className="flex-1 bg-surface-1"
       contentContainerStyle={{padding: 24, paddingTop: 60}}
     >
-      <Text className="text-parchment text-[24px] font-montserrat-bold mb-2">Anchor Capture</Text>
-      <Text className="text-grey-muted text-[13px] font-montserrat mb-6 leading-[18px]">
+      <Text className="text-parchment text-[24px] font-ui-semibold mb-2">Anchor Capture</Text>
+      <Text className="text-grey-muted text-[13px] font-ui mb-6 leading-[18px]">
         Stand at the object, point the phone at it, and tap Read pose. Walk
         between captures.
       </Text>
 
-      <Text className="text-grey-muted text-[12px] font-montserrat-medium mt-4 mb-[6px] uppercase tracking-[1px]">
+      <Text className="text-grey-muted text-[12px] font-ui-medium mt-4 mb-[6px] uppercase tracking-[1px]">
         Monument ID
       </Text>
       <TextInput
@@ -160,7 +160,7 @@ export default function AnchorCaptureScreen({ navigation }: Props): React.ReactE
         }}
       />
 
-      <Text className="text-grey-muted text-[12px] font-montserrat-medium mt-4 mb-[6px] uppercase tracking-[1px]">
+      <Text className="text-grey-muted text-[12px] font-ui-medium mt-4 mb-[6px] uppercase tracking-[1px]">
         Object label
       </Text>
       <TextInput
@@ -189,7 +189,7 @@ export default function AnchorCaptureScreen({ navigation }: Props): React.ReactE
         {reading ? (
           <ActivityIndicator color="#F5F0E8" />
         ) : (
-          <Text className="text-parchment text-[14px] font-montserrat-semibold tracking-[0.5px]">
+          <Text className="text-parchment text-[14px] font-ui-semibold tracking-[0.5px]">
             Read pose
           </Text>
         )}
@@ -197,15 +197,15 @@ export default function AnchorCaptureScreen({ navigation }: Props): React.ReactE
 
       {pose && (
         <View className="bg-[rgba(72,187,120,0.08)] border border-[rgba(72,187,120,0.3)] rounded-[8px] p-[14px] mt-4">
-          <Text className="text-[#48BB78] text-[12px] font-montserrat leading-[18px]">lat: {pose.lat.toFixed(6)}</Text>
-          <Text className="text-[#48BB78] text-[12px] font-montserrat leading-[18px]">lng: {pose.lng.toFixed(6)}</Text>
-          <Text className="text-[#48BB78] text-[12px] font-montserrat leading-[18px]">
+          <Text className="text-[#48BB78] text-[12px] font-ui leading-[18px]">lat: {pose.lat.toFixed(6)}</Text>
+          <Text className="text-[#48BB78] text-[12px] font-ui leading-[18px]">lng: {pose.lng.toFixed(6)}</Text>
+          <Text className="text-[#48BB78] text-[12px] font-ui leading-[18px]">
             altitude: {pose.altitude != null ? `${pose.altitude.toFixed(2)} m` : '—'}
           </Text>
-          <Text className="text-[#48BB78] text-[12px] font-montserrat leading-[18px]">
+          <Text className="text-[#48BB78] text-[12px] font-ui leading-[18px]">
             heading: {pose.heading != null ? `${pose.heading.toFixed(1)}°` : '—'}
           </Text>
-          <Text className="text-[#48BB78] text-[12px] font-montserrat leading-[18px]">accuracy: ±{pose.accuracy.toFixed(1)} m</Text>
+          <Text className="text-[#48BB78] text-[12px] font-ui leading-[18px]">accuracy: ±{pose.accuracy.toFixed(1)} m</Text>
         </View>
       )}
 
@@ -216,12 +216,12 @@ export default function AnchorCaptureScreen({ navigation }: Props): React.ReactE
         {submitting ? (
           <ActivityIndicator color="#000" />
         ) : (
-          <Text className="text-black text-[14px] font-montserrat-semibold tracking-[0.5px]">Save anchor</Text>
+          <Text className="text-black text-[14px] font-ui-semibold tracking-[0.5px]">Save anchor</Text>
         )}
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text className="text-grey-muted text-[13px] font-montserrat-medium text-center mt-6">Cancel</Text>
+        <Text className="text-grey-muted text-[13px] font-ui-medium text-center mt-6">Cancel</Text>
       </TouchableOpacity>
     </ScrollView>
   );

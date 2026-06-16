@@ -105,7 +105,7 @@ const PreArrivalCard: React.FC<PreArrivalCardProps> = ({
           accessibilityRole="summary">
           <Text
             style={{
-              fontFamily: FONTS.sans,
+              fontFamily: FONTS.ui,
               fontSize: 13,
               color: 'rgba(255,255,255,0.72)',
               lineHeight: 18,
@@ -120,7 +120,7 @@ const PreArrivalCard: React.FC<PreArrivalCardProps> = ({
             className="mt-3 self-start px-4 py-2 rounded-xl bg-[#B8923F]">
             <Text
               style={{
-                fontFamily: FONTS.sansSemiBold,
+                fontFamily: FONTS.uiSemiBold,
                 fontSize: 13,
                 color: '#1A1612',
               }}>
@@ -166,7 +166,7 @@ const PreArrivalCard: React.FC<PreArrivalCardProps> = ({
             <Text
               numberOfLines={1}
               style={{
-                fontFamily: FONTS.sansSemiBold,
+                fontFamily: FONTS.uiSemiBold,
                 fontSize: 16,
                 color: '#FFFFFF',
               }}>
@@ -177,7 +177,7 @@ const PreArrivalCard: React.FC<PreArrivalCardProps> = ({
                 numberOfLines={1}
                 style={{
                   marginTop: 2,
-                  fontFamily: FONTS.sans,
+                  fontFamily: FONTS.ui,
                   fontSize: 12,
                   color: 'rgba(255,255,255,0.72)',
                 }}>
@@ -188,7 +188,7 @@ const PreArrivalCard: React.FC<PreArrivalCardProps> = ({
               numberOfLines={1}
               style={{
                 marginTop: 4,
-                fontFamily: FONTS.sans,
+                fontFamily: FONTS.ui,
                 fontSize: 12,
                 color: 'rgba(255,255,255,0.45)',
               }}>

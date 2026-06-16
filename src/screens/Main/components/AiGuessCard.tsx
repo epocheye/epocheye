@@ -72,20 +72,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   headerText: {
-    fontFamily: 'InstrumentSans-Bold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 11,
     letterSpacing: 1.2,
     color: SLATE,
   },
   title: {
-    fontFamily: 'InstrumentSerif-Regular',
+    fontFamily: 'Fraunces-Regular',
     fontSize: 22,
     lineHeight: 26,
     color: '#E8EEF3',
     marginBottom: 6,
   },
   disclaimer: {
-    fontFamily: 'InstrumentSans-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 12,
     lineHeight: 17,
     color: 'rgba(232,238,243,0.62)',
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   scroll: {maxHeight: 200},
   scrollContent: {paddingBottom: 4},
   body: {
-    fontFamily: 'InstrumentSans-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 14,
     lineHeight: 21,
     color: 'rgba(232,238,243,0.9)',
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   streamingText: {
-    fontFamily: 'InstrumentSans-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 12,
     color: 'rgba(232,238,243,0.6)',
   },

@@ -118,21 +118,21 @@ const MonumentCard: React.FC<MonumentCardProps> = ({
 
       {/* Monument name — top left */}
       <View className="absolute left-4 top-4 rounded-md bg-[rgba(0,0,0,0.45)] px-2.5 py-1">
-        <Text className="font-['MontserratAlternates-SemiBold'] text-[12px] uppercase tracking-[1.5px] text-[#B8923F]">
+        <Text className="font-ui-semibold text-[12px] uppercase tracking-[1.5px] text-[#B8923F]">
           {monumentName}
         </Text>
       </View>
 
       {/* Year badge — top right */}
       <View className="absolute right-4 top-4 rounded-md bg-[rgba(0,0,0,0.45)] px-2.5 py-1">
-        <Text className="font-['MontserratAlternates-SemiBold'] text-[12px] tracking-[1.5px] text-[#B8923F]">
+        <Text className="font-ui-semibold text-[12px] tracking-[1.5px] text-[#B8923F]">
           {year}
         </Text>
       </View>
 
       {/* Typewriter story text — bottom */}
       <View className="absolute bottom-0 left-0 right-0 p-5">
-        <Text className="font-['MontserratAlternates-Regular'] text-[18px] leading-7 text-[#F5E9D8]">
+        <Text className="font-ui text-[18px] leading-7 text-[#F5E9D8]">
           {displayedText}
         </Text>
       </View>

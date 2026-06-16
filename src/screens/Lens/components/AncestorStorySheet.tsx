@@ -159,7 +159,7 @@ const AncestorStorySheet = forwardRef<
         <BottomSheetScrollView
           contentContainerStyle={{paddingHorizontal: 20, paddingBottom: 24}}
           showsVerticalScrollIndicator={false}>
-          <Text className="mb-3 text-grey-muted text-[11px] tracking-[2px] uppercase font-montserrat-medium">
+          <Text className="mb-3 text-grey-muted text-[11px] tracking-[2px] uppercase font-ui-medium">
             YOUR ANCESTOR AT {monumentName.toUpperCase()}
           </Text>
 
@@ -187,7 +187,7 @@ const AncestorStorySheet = forwardRef<
               className="self-start flex-row items-center bg-grey-subtle rounded-[20px] px-[10px] py-[4px] mb-[10px] gap-x-[6px]"
               style={{opacity: chipOpacity}}>
               <Landmark size={14} color="#CBA862" />
-              <Text className="text-grey-muted text-[12px] font-montserrat-medium">
+              <Text className="text-grey-muted text-[12px] font-ui-medium">
                 {identifiedObject.name} · {identifiedObject.era}
               </Text>
             </Animated.View>
@@ -196,7 +196,7 @@ const AncestorStorySheet = forwardRef<
           {isLoading && storyText.length === 0 ? (
             <View className="mt-1 gap-[10px]">
               <ActivityIndicator color="#CBA862" size="small" />
-              <Text className="text-grey-muted text-[13px] font-montserrat">
+              <Text className="text-grey-muted text-[13px] font-ui">
                 Crafting your ancestor's story...
               </Text>
               <View className="h-[13px] rounded-[6px] bg-grey-border w-full" />
@@ -229,11 +229,11 @@ const AncestorStorySheet = forwardRef<
           <View className="mt-[22px] rounded-xl border border-grey-border bg-grey-subtle p-4" style={{borderStyle: 'dashed'}}>
             <View className="flex-row items-center">
               <Lock size={16} color="#8C93A0" />
-              <Text className="ml-2 text-grey-muted text-[13px] font-montserrat-semibold">
+              <Text className="ml-2 text-grey-muted text-[13px] font-ui-semibold">
                 AR Timeline · Coming Soon
               </Text>
             </View>
-            <Text className="mt-1 text-[#666666] text-[12px] leading-[18px] font-montserrat">
+            <Text className="mt-1 text-[#666666] text-[12px] leading-[18px] font-ui">
               Walk through centuries of this monument in augmented reality.
             </Text>
           </View>

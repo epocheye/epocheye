@@ -63,6 +63,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import GroundedObjectCard from './components/GroundedObjectCard';
 import AiGuessCard from './components/AiGuessCard';
 import AnalyzingOverlay from './components/AnalyzingOverlay';
+import ARActivationOverlay from '../../components/ui/ARActivationOverlay';
 import ShareExperienceModal from '../../components/ShareExperienceModal';
 import {ROUTES} from '../../core/constants';
 import {COLORS} from '../../core/constants/theme';
@@ -476,6 +477,7 @@ const DetectARNative: React.FC<{
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const arRef = useRef<EpocheyeDetectARHandle>(null);
   const [status, setStatus] = useState<ARStatus>('initializing');
+  const [activationDone, setActivationDone] = useState(false);
   const [tracking, setTracking] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [detecting, setDetecting] = useState(false);
@@ -641,6 +643,11 @@ const DetectARNative: React.FC<{
         onFrameCaptured={handleFrameCaptured}
       />
 
+      <ARActivationOverlay
+        visible={!activationDone}
+        onDone={() => setActivationDone(true)}
+      />
+
       <AnalyzingOverlay visible={detecting} />
 
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
@@ -741,6 +748,7 @@ const DetectAR2D: React.FC<{
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const cameraRef = useRef<VisionCamera | null>(null);
   const device = useCameraDevice('back');
+  const [activationDone, setActivationDone] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -817,6 +825,11 @@ const DetectAR2D: React.FC<{
         device={device}
         isActive
         photo
+      />
+
+      <ARActivationOverlay
+        visible={!!device && !activationDone}
+        onDone={() => setActivationDone(true)}
       />
 
       <AnalyzingOverlay visible={busy} />
@@ -917,13 +930,13 @@ const styles = StyleSheet.create({
   iconButtonDisabled: {backgroundColor: 'rgba(0,0,0,0.3)'},
   titleBlock: {flex: 1, alignItems: 'center'},
   title: {
-    fontFamily: 'MontserratAlternates-SemiBold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 15,
     color: '#FFFFFF',
   },
   subtitle: {
     marginTop: 2,
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 11,
     color: 'rgba(255,255,255,0.7)',
     letterSpacing: 0.6,
@@ -948,7 +961,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(138,160,180,0.4)',
   },
   arNoticeText: {
-    fontFamily: 'InstrumentSans-Medium',
+    fontFamily: 'PlusJakartaSans-Medium',
     fontSize: 12,
     color: '#C7D4DF',
     textAlign: 'center',
@@ -974,13 +987,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.14)',
   },
   scansPillText: {
-    fontFamily: 'MontserratAlternates-Medium',
+    fontFamily: 'PlusJakartaSans-Medium',
     fontSize: 11,
     color: '#FFFFFF',
     letterSpacing: 0.4,
   },
   messageText: {
-    fontFamily: 'MontserratAlternates-Medium',
+    fontFamily: 'PlusJakartaSans-Medium',
     fontSize: 13,
     color: '#FFFFFF',
     textAlign: 'center',
@@ -1001,7 +1014,7 @@ const styles = StyleSheet.create({
   },
   pickerChipActive: {backgroundColor: AMBER, borderColor: AMBER},
   pickerChipText: {
-    fontFamily: 'MontserratAlternates-SemiBold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 13,
     color: AMBER,
   },
@@ -1025,7 +1038,7 @@ const styles = StyleSheet.create({
   },
   detectButtonBusy: {opacity: 0.7},
   detectButtonText: {
-    fontFamily: 'MontserratAlternates-Bold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 15,
     color: '#1A0F00',
   },
@@ -1045,13 +1058,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   fallbackHeading: {
-    fontFamily: 'MontserratAlternates-SemiBold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 18,
     color: '#FFFFFF',
     marginBottom: 12,
   },
   fallbackBody: {
-    fontFamily: 'MontserratAlternates-Regular',
+    fontFamily: 'PlusJakartaSans-Regular',
     fontSize: 13,
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
@@ -1068,13 +1081,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   fallbackButtonText: {
-    fontFamily: 'MontserratAlternates-Bold',
+    fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 13,
     color: '#1A0F00',
   },
   fallbackDismiss: {
     marginTop: 18,
-    fontFamily: 'MontserratAlternates-Medium',
+    fontFamily: 'PlusJakartaSans-Medium',
     fontSize: 12,
     color: 'rgba(255,255,255,0.55)',
     paddingVertical: 6,

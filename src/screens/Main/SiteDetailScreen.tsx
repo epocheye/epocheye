@@ -259,7 +259,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 
   return (
-    <View className="flex-1 bg-warm-deep">
+    <View className="flex-1 bg-background">
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       <ScrollView
@@ -278,7 +278,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             />
           ) : (
             <LinearGradient
-              colors={['#1A1410', '#0F0A05']}
+              colors={['#16151C', '#0A0A0C']}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
               style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
@@ -287,7 +287,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Soft blend into the page background at the bottom edge. */}
           <LinearGradient
-            colors={['transparent', 'rgba(15,10,5,0.85)', '#0F0A05']}
+            colors={['transparent', 'rgba(10,10,12,0.85)', '#0A0A0C']}
             style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 120 }}
           />
 
@@ -336,7 +336,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           <View className="flex-row gap-3 px-5 mt-5">
             {builtValue && (
               <View className="flex-1 bg-surface-1 border border-white/10 rounded-[10px] px-3.5 py-3">
-                <Text className="text-parchment-dim text-[9px] tracking-[0.9px] font-['InstrumentSans-Bold']">
+                <Text className="text-parchment-dim text-[9px] tracking-[0.9px] font-ui-semibold">
                   BUILT
                 </Text>
                 <Text
@@ -349,7 +349,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             )}
             {dynastyValue && (
               <View className="flex-1 bg-surface-1 border border-white/10 rounded-[10px] px-3.5 py-3">
-                <Text className="text-parchment-dim text-[9px] tracking-[0.9px] font-['InstrumentSans-Bold']">
+                <Text className="text-parchment-dim text-[9px] tracking-[0.9px] font-ui-semibold">
                   DYNASTY
                 </Text>
                 <Text
@@ -365,7 +365,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Italic tagline (Figma 238:71) */}
         {tagline && (
-          <Text className="text-parchment-muted text-[18px] leading-[24px] text-center px-7 mt-5 font-['InstrumentSerif-Italic']">
+          <Text className="text-parchment-muted text-[18px] leading-[24px] text-center px-7 mt-5 italic font-display-regular">
             {tagline}
           </Text>
         )}
@@ -407,7 +407,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               className="flex-row items-center gap-2 bg-status-success/10 border border-status-success/20 rounded-xl px-4 py-3"
             >
               <Shield color="#10B981" size={16} />
-              <Text className="text-status-success text-sm font-['InstrumentSans-SemiBold']">
+              <Text className="text-status-success text-sm font-ui-semibold">
                 Passport Active
               </Text>
             </Animated.View>
@@ -418,11 +418,11 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             entering={FadeInDown.delay(150).duration(400)}
             className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4"
           >
-            <Text className="text-parchment text-lg font-['InstrumentSans-SemiBold'] mb-2">
+            <Text className="text-parchment text-lg font-ui-semibold mb-2">
               Historical Overview
             </Text>
             <Text
-              className="text-parchment-muted text-sm leading-[22px] font-['InstrumentSans-Regular']"
+              className="text-parchment-muted text-sm leading-[22px] font-ui"
               numberOfLines={isDescriptionExpanded ? undefined : 3}
             >
               {description}
@@ -433,7 +433,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 className="mt-2.5 flex-row items-center gap-1 self-start"
                 accessibilityRole="button"
               >
-                <Text className="text-brand-gold text-xs uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
+                <Text className="text-brand-gold text-xs uppercase tracking-[0.8px] font-ui-semibold">
                   {isDescriptionExpanded ? 'Show Less' : 'Read More'}
                 </Text>
                 {isDescriptionExpanded ? (
@@ -453,7 +453,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             >
               {siteDetail.unesco_status && (
                 <View className="self-start rounded-full bg-[rgba(203,168,98,0.18)] px-2.5 py-1">
-                  <Text className="text-brand-gold text-[11px] uppercase tracking-[0.6px] font-['InstrumentSans-SemiBold']">
+                  <Text className="text-brand-gold text-[11px] uppercase tracking-[0.6px] font-ui-semibold">
                     {siteDetail.unesco_status}
                   </Text>
                 </View>
@@ -472,10 +472,10 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   .filter(([, value]) => Boolean(value))
                   .map(([label, value]) => (
                     <View key={label} className="w-1/2 pr-2 mb-3">
-                      <Text className="text-parchment-dim text-[10px] uppercase tracking-[0.8px] font-['InstrumentSans-SemiBold']">
+                      <Text className="text-parchment-dim text-[10px] uppercase tracking-[0.8px] font-ui-semibold">
                         {label}
                       </Text>
-                      <Text className="text-parchment text-[13px] leading-[18px] mt-0.5 font-['InstrumentSans-Medium']">
+                      <Text className="text-parchment text-[13px] leading-[18px] mt-0.5 font-ui-medium">
                         {value}
                       </Text>
                     </View>
@@ -487,15 +487,15 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Personalized Insights */}
           <Animated.View entering={FadeInDown.delay(250).duration(400)}>
             <View className="flex-row items-center gap-1.5 mb-3">
-              <Sparkles color="#C9A84C" size={18} />
-              <Text className="text-parchment text-lg font-['InstrumentSans-SemiBold']">
+              <Sparkles color="#CBA862" size={18} />
+              <Text className="text-parchment text-lg font-ui-semibold">
                 Insights
               </Text>
             </View>
 
             {factsLoading ? (
               <View className="rounded-2xl bg-surface-1 border border-white/[0.08] p-5 items-center">
-                <ThinkingDots messages={FACT_LOADING_LINES} color="#C9A84C" />
+                <ThinkingDots messages={FACT_LOADING_LINES} color="#CBA862" />
               </View>
             ) : facts.length > 0 ? (
               <ScrollView
@@ -510,10 +510,10 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     activeOpacity={0.86}
                     className="w-[240px] rounded-2xl bg-surface-1 border border-[rgba(203,168,98,0.28)] p-3.5"
                   >
-                    <Text className="text-parchment text-[15px] leading-[22px] font-['InstrumentSans-SemiBold'] mb-1.5">
+                    <Text className="text-parchment text-[15px] leading-[22px] font-ui-semibold mb-1.5">
                       {fact.headline}
                     </Text>
-                    <Text className="text-parchment-muted text-[13px] leading-[18px] font-['InstrumentSans-Regular']">
+                    <Text className="text-parchment-muted text-[13px] leading-[18px] font-ui">
                       {fact.summary}
                     </Text>
 
@@ -529,14 +529,14 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                             />
                           </View>
                         ) : fact.detail ? (
-                          <Text className="text-brand-goldSoft text-[13px] leading-[20px] font-['InstrumentSans-Regular']">
+                          <Text className="text-brand-goldSoft text-[13px] leading-[20px] font-ui">
                             {fact.detail}
                           </Text>
                         ) : null}
                       </View>
                     )}
 
-                    <Text className="text-brand-gold text-[11px] mt-2 font-['InstrumentSans-SemiBold']">
+                    <Text className="text-brand-gold text-[11px] mt-2 font-ui-semibold">
                       {expandedFactId === fact.id ? 'Collapse' : 'Learn more'}
                     </Text>
                   </TouchableOpacity>
@@ -544,7 +544,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </ScrollView>
             ) : (
               <View className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4">
-                <Text className="text-parchment-dim text-sm text-center font-['InstrumentSans-Regular']">
+                <Text className="text-parchment-dim text-sm text-center font-ui">
                   Insights will appear as you explore nearby monuments
                 </Text>
               </View>
@@ -561,11 +561,11 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 accessibilityRole="button"
                 accessibilityLabel="Get Passport for this site"
               >
-                <Sparkles color="#C9A84C" size={14} />
-                <Text className="text-brand-gold text-[13px] font-['InstrumentSans-SemiBold']">
+                <Sparkles color="#CBA862" size={14} />
+                <Text className="text-brand-gold text-[13px] font-ui-semibold">
                   Get Passport for this site
                 </Text>
-                <ChevronRight color="#C9A84C" size={14} />
+                <ChevronRight color="#CBA862" size={14} />
               </TouchableOpacity>
             </Animated.View>
           )}

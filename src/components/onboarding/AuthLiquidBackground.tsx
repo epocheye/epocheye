@@ -6,7 +6,7 @@ const AuthLiquidBackground: React.FC<PropsWithChildren> = ({children}) => {
   return (
     <View className="flex-1 overflow-hidden bg-black">
       <LinearGradient
-        colors={['#000000', '#070707', '#000000']}
+        colors={['#0A0A0C', '#100E15', '#0A0A0C']}
         locations={[0, 0.52, 1]}
         start={{x: 0.12, y: 0}}
         end={{x: 0.9, y: 1}}
@@ -18,7 +18,7 @@ const AuthLiquidBackground: React.FC<PropsWithChildren> = ({children}) => {
         style={{top: -40, right: -30}}
       />
       <View
-        className="absolute w-[260px] h-[260px] rounded-full bg-[rgba(212,134,10,0.08)]"
+        className="absolute w-[260px] h-[260px] rounded-full bg-[rgba(203,168,98,0.12)]"
         style={{bottom: -60, left: -40}}
       />
 

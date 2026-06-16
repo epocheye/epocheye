@@ -23,7 +23,6 @@ import {
   Languages,
   LogOut,
   MapPin,
-  Menu,
   MessageCircle,
   Save,
   Shield,
@@ -290,7 +289,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 28 }}
+          contentContainerStyle={{ paddingBottom: 120 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -300,19 +299,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             />
           }
         >
-          {/* Menu */}
-          <View className="px-5 pt-2 flex-row items-center">
-            <Pressable
-              onPress={() => navigation.openDrawer()}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Open menu"
-              className="w-9 h-9 items-center justify-center">
-              <Menu color="#FFFFFF" size={22} />
-            </Pressable>
+          {/* ── Header ── */}
+          <View className="px-6 pt-3">
+            <Text style={{ fontFamily: FONTS.display }} className="text-[28px] text-foreground tracking-tight">
+              Account
+            </Text>
           </View>
-
-          {/* ── Profile hero header ── */}
 
           {/* ── Explorer rank + stat cards ── */}
           <Animated.View
@@ -348,7 +340,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   <Text
                     style={{
                       marginTop: 4,
-                      fontFamily: FONTS.sansSemiBold,
+                      fontFamily: FONTS.uiSemiBold,
                       fontSize: 10,
                       color: 'rgba(255,255,255,0.55)',
                       letterSpacing: 1.1,
@@ -369,7 +361,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             <Text
               style={{
                 marginTop: 24,
-                fontFamily: FONTS.sansSemiBold,
+                fontFamily: FONTS.uiSemiBold,
                 fontSize: 11,
                 color: 'rgba(255,255,255,0.55)',
                 letterSpacing: 1.2,
@@ -391,7 +383,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             >
               <Text
                 style={{
-                  fontFamily: FONTS.sansSemiBold,
+                  fontFamily: FONTS.uiSemiBold,
                   fontSize: 10,
                   color: 'rgba(255,255,255,0.78)',
                   letterSpacing: 1.4,
@@ -405,7 +397,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     <Text
                       style={{
                         marginTop: 6,
-                        fontFamily: FONTS.sans,
+                        fontFamily: FONTS.ui,
                         fontSize: 15,
                         color: 'rgba(255,255,255,0.92)',
                       }}
@@ -435,7 +427,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                         >
                           <Text
                             style={{
-                              fontFamily: FONTS.sansMedium,
+                              fontFamily: FONTS.uiMedium,
                               fontSize: 11,
                               color: '#FFFFFF',
                             }}
@@ -451,7 +443,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 <Text
                   style={{
                     marginTop: 6,
-                    fontFamily: FONTS.sans,
+                    fontFamily: FONTS.ui,
                     fontSize: 14,
                     color: 'rgba(255,255,255,0.85)',
                   }}
@@ -470,7 +462,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             <View className="mb-[10px] flex-row justify-between items-center">
               <Text
                 style={{
-                  fontFamily: FONTS.sansSemiBold,
+                  fontFamily: FONTS.uiSemiBold,
                   fontSize: 11,
                   color: 'rgba(255,255,255,0.55)',
                   letterSpacing: 1.2,
@@ -486,7 +478,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               >
                 <Text
                   style={{
-                    fontFamily: FONTS.sansMedium,
+                    fontFamily: FONTS.uiMedium,
                     fontSize: 13,
                     color: COLORS.sky,
                   }}
@@ -511,7 +503,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   <View className="flex-1">
                     <Text
                       style={{
-                        fontFamily: FONTS.sansSemiBold,
+                        fontFamily: FONTS.uiSemiBold,
                         fontSize: 14,
                         color: '#FFFFFF',
                       }}
@@ -522,7 +514,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     <Text
                       style={{
                         marginTop: 2,
-                        fontFamily: FONTS.sans,
+                        fontFamily: FONTS.ui,
                         fontSize: 11,
                         color: 'rgba(255,255,255,0.55)',
                       }}
@@ -538,7 +530,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               <View className="py-6 items-center">
                 <Text
                   style={{
-                    fontFamily: FONTS.sans,
+                    fontFamily: FONTS.ui,
                     fontSize: 13,
                     color: 'rgba(255,255,255,0.55)',
                     textAlign: 'center',
@@ -557,7 +549,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               style={{ height: 180 }}
             >
               <AnimatedLogo size={48} variant="white" motion="orbit" />
-              <Text className="text-parchment-dim text-sm font-['InstrumentSans-Regular'] mt-3">
+              <Text className="text-parchment-dim text-sm font-ui mt-3">
                 Loading profile...
               </Text>
             </View>
@@ -566,7 +558,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               entering={FadeInDown.delay(180).duration(350)}
               className="mx-5 mt-6 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-5"
             >
-              <Text className="text-xs uppercase tracking-[1px] text-brand-gold font-['InstrumentSans-SemiBold'] mb-4">
+              <Text className="text-xs uppercase tracking-[1px] text-brand-gold font-ui-semibold mb-4">
                 EDIT PROFILE
               </Text>
               <View className="flex-row items-center mb-5">
@@ -597,14 +589,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   <Text className="text-parchment text-2xl font-display">
                     {fullName || 'User'}
                   </Text>
-                  <Text className="text-parchment-dim text-sm font-['InstrumentSans-Regular'] mt-0.5">
+                  <Text className="text-parchment-dim text-sm font-ui mt-0.5">
                     {email || 'No email'}
                   </Text>
                 </View>
               </View>
 
               <View className="mb-3">
-                <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['InstrumentSans-SemiBold'] mb-2">
+                <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-ui-semibold mb-2">
                   Full name
                 </Text>
                 <TextInput
@@ -612,13 +604,13 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   onChangeText={setFullName}
                   placeholder="Full name"
                   placeholderTextColor="rgba(245,240,232,0.25)"
-                  className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['InstrumentSans-Medium'] px-4 py-3 text-sm"
+                  className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-ui-medium px-4 py-3 text-sm"
                   accessibilityLabel="Full name"
                 />
               </View>
               <View className="flex-row gap-3">
                 <View className="flex-1">
-                  <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['InstrumentSans-SemiBold'] mb-2">
+                  <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-ui-semibold mb-2">
                     Email
                   </Text>
                   <TextInput
@@ -627,12 +619,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     keyboardType="email-address"
                     placeholder="Email"
                     placeholderTextColor="rgba(245,240,232,0.25)"
-                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['InstrumentSans-Medium'] px-4 py-3 text-sm"
+                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-ui-medium px-4 py-3 text-sm"
                     accessibilityLabel="Email address"
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-['InstrumentSans-SemiBold'] mb-2">
+                  <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-ui-semibold mb-2">
                     Phone
                   </Text>
                   <TextInput
@@ -641,7 +633,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     keyboardType="phone-pad"
                     placeholder="Phone"
                     placeholderTextColor="rgba(245,240,232,0.25)"
-                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-['InstrumentSans-Medium'] px-4 py-3 text-sm"
+                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-ui-medium px-4 py-3 text-sm"
                     accessibilityLabel="Phone number"
                   />
                 </View>
@@ -689,10 +681,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   <Sparkles size={18} color={COLORS.sky} />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-parchment text-base font-['InstrumentSans-SemiBold']">
+                  <Text className="text-parchment text-base font-ui-semibold">
                     Get Passport
                   </Text>
-                  <Text className="text-parchment-dim text-xs font-['InstrumentSans-Regular'] mt-0.5">
+                  <Text className="text-parchment-dim text-xs font-ui mt-0.5">
                     Unlock heritage sites near you
                   </Text>
                 </View>
@@ -715,10 +707,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   <MapPin size={18} color="#48BB78" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-parchment text-base font-['InstrumentSans-SemiBold']">
+                  <Text className="text-parchment text-base font-ui-semibold">
                     Capture Anchor
                   </Text>
-                  <Text className="text-parchment-dim text-xs font-['InstrumentSans-Regular'] mt-0.5">
+                  <Text className="text-parchment-dim text-xs font-ui mt-0.5">
                     Admin only · Record an object's geo position on-site
                   </Text>
                 </View>
@@ -734,13 +726,13 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           >
             <View className="flex-row items-center gap-2.5 mb-3">
               <View className="w-9 h-9 rounded-full bg-surface-2 items-center justify-center">
-                <Languages size={16} color="#C9A84C" />
+                <Languages size={16} color="#CBA862" />
               </View>
               <View className="flex-1">
-                <Text className="text-parchment text-base font-['InstrumentSans-SemiBold']">
+                <Text className="text-parchment text-base font-ui-semibold">
                   Narration language
                 </Text>
-                <Text className="text-parchment-dim text-xs font-['InstrumentSans-Regular'] mt-0.5">
+                <Text className="text-parchment-dim text-xs font-ui mt-0.5">
                   Language for AI narration when you explore objects
                 </Text>
               </View>
@@ -762,7 +754,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     }`}
                   >
                     <Text
-                      className={`text-sm font-['InstrumentSans-SemiBold'] ${
+                      className={`text-sm font-ui-semibold ${
                         active ? 'text-[#0D0D0D]' : 'text-parchment'
                       }`}
                     >
@@ -781,9 +773,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           >
             <View className="flex-row items-center gap-2.5 mb-4">
               <View className="w-9 h-9 rounded-full bg-surface-2 items-center justify-center">
-                <Shield size={16} color="#C9A84C" />
+                <Shield size={16} color="#CBA862" />
               </View>
-              <Text className="text-parchment text-base font-['InstrumentSans-SemiBold']">
+              <Text className="text-parchment text-base font-ui-semibold">
                 Permissions
               </Text>
             </View>
@@ -799,14 +791,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   ) : (
                     <MapPin size={16} color="#6B6357" />
                   )}
-                  <Text className="text-parchment text-sm font-['InstrumentSans-Medium']">
+                  <Text className="text-parchment text-sm font-ui-medium">
                     {item.label}
                   </Text>
                 </View>
 
                 {item.granted ? (
                   <View className="bg-status-success/15 border border-status-success/30 rounded-full px-2.5 py-1">
-                    <Text className="text-status-success text-[10px] font-['InstrumentSans-SemiBold']">
+                    <Text className="text-status-success text-[10px] font-ui-semibold">
                       Granted
                     </Text>
                   </View>
@@ -817,7 +809,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     accessibilityRole="button"
                     accessibilityLabel={`Grant ${item.label} permission`}
                   >
-                    <Text className="text-brand-amber text-[10px] font-['InstrumentSans-SemiBold']">
+                    <Text className="text-brand-amber text-[10px] font-ui-semibold">
                       Grant
                     </Text>
                   </TouchableOpacity>
@@ -832,7 +824,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessibilityLabel="Open device settings"
             >
               <Shield size={14} color="#6B6357" />
-              <Text className="text-parchment-muted text-xs font-['InstrumentSans-Medium'] ml-1.5">
+              <Text className="text-parchment-muted text-xs font-ui-medium ml-1.5">
                 Open Device Settings
               </Text>
             </TouchableOpacity>
@@ -843,7 +835,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessibilityLabel="Open device settings"
             >
               <MessageCircle size={14} color="#B8AF9E" />
-              <Text className="text-parchment-muted text-xs font-['InstrumentSans-Medium'] ml-1.5">
+              <Text className="text-parchment-muted text-xs font-ui-medium ml-1.5">
                 Get Support
               </Text>
             </TouchableOpacity>
@@ -871,12 +863,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessibilityRole="none"
               accessible={false}
             >
-              <Text className="text-parchment-dim text-xs font-['InstrumentSans-Medium']">
+              <Text className="text-parchment-dim text-xs font-ui-medium">
                 Version {APP_CONFIG.APP.VERSION}
                 {useDevSettingsStore(s => s.devBypass) ? ' · dev' : ''}
               </Text>
             </TouchableOpacity>
-            <Text className="text-parchment-dim/60 text-[10px] font-['InstrumentSans-Regular'] mt-1">
+            <Text className="text-parchment-dim/60 text-[10px] font-ui mt-1">
               Made with care for India's heritage
             </Text>
           </Animated.View>
@@ -893,7 +885,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessibilityLabel="Log out"
             >
               <LogOut size={16} color="#B8AF9E" />
-              <Text className="text-parchment-muted text-sm font-['InstrumentSans-SemiBold'] ml-2">
+              <Text className="text-parchment-muted text-sm font-ui-semibold ml-2">
                 Log Out
               </Text>
             </TouchableOpacity>
@@ -909,7 +901,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessibilityLabel="Delete account"
             >
               <Trash2 size={16} color="#EF4444" />
-              <Text className="text-status-danger text-sm font-['InstrumentSans-SemiBold'] ml-2">
+              <Text className="text-status-danger text-sm font-ui-semibold ml-2">
                 Delete Account
               </Text>
             </TouchableOpacity>

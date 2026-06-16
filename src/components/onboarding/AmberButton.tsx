@@ -6,6 +6,8 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import { GOLD_GRADIENT } from '../../core/constants/theme';
 
 interface AmberButtonProps {
   title: string;
@@ -16,7 +18,8 @@ interface AmberButtonProps {
 }
 
 /**
- * Primary filled amber CTA button with press animation.
+ * Primary gold-gradient CTA button with press animation (premium heritage-gold
+ * system: brand gradient fill + dark Plus Jakarta label).
  */
 const AmberButton: React.FC<AmberButtonProps> = ({
   title,
@@ -67,19 +70,30 @@ const AmberButton: React.FC<AmberButtonProps> = ({
       disabled={disabled}
     >
       <Animated.View
-        className="h-14 items-center justify-center rounded-full bg-[#ffffff]"
         style={[
           style,
           disabled && { opacity: 0.5 },
           { transform: [{ scale: scaleAnim }], opacity: opacityAnim },
         ]}
       >
-        <Text
-          className="font-['MontserratAlternates-SemiBold'] text-lg tracking-[0.3px] "
-          style={textStyle}
+        <LinearGradient
+          colors={GOLD_GRADIENT}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            height: 56,
+            borderRadius: 999,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
-          {title}
-        </Text>
+          <Text
+            className="font-ui-semibold text-lg tracking-[0.3px] text-[#0A0A0C]"
+            style={textStyle}
+          >
+            {title}
+          </Text>
+        </LinearGradient>
       </Animated.View>
     </TouchableOpacity>
   );

@@ -76,7 +76,7 @@ const Checkbox: React.FC<CheckboxProps> = ({
       >
         {checked && (
           <Text
-            className="font-['MontserratAlternates-Bold'] text-[#F5E9D8]"
+            className="font-ui-semibold text-[#F5E9D8]"
             style={{ fontSize: checkboxSize * 0.7 }}
           >
             ✓
@@ -86,7 +86,7 @@ const Checkbox: React.FC<CheckboxProps> = ({
       {label &&
         (typeof label === 'string' ? (
           <Text
-            className={`ml-4 flex-1 font-['MontserratAlternates-Regular'] text-[#F5E9D8] ${
+            className={`ml-4 flex-1 font-ui text-[#F5E9D8] ${
               size === 'small'
                 ? 'text-sm'
                 : size === 'large'

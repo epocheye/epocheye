@@ -20,7 +20,7 @@ interface Particle {
   delay: number;
 }
 
-const GOLD_COLOR = 'rgba(201,168,76,0.20)';
+const GOLD_COLOR = 'rgba(203,168,98,0.20)';
 const INDIGO_COLOR = 'rgba(139,159,232,0.12)';
 
 function generate(): Particle[] {

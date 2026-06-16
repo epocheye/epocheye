@@ -90,7 +90,7 @@ const ARViewfinder: React.FC<Props> = ({size = 220, children}) => {
           width: size * 0.72,
           height: size * 0.72,
           borderRadius: (size * 0.72) / 2,
-          borderColor: 'rgba(201,168,76,0.18)',
+          borderColor: 'rgba(203,168,98,0.18)',
         }}
       />
       {/* 4 L-brackets */}

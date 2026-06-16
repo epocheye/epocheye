@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   },
   brandRow: {flexDirection: 'row', alignItems: 'center', gap: SPACING.sm},
   brand: {
-    fontFamily: FONTS.sansSemiBold,
+    fontFamily: FONTS.uiSemiBold,
     fontSize: FONT_SIZES.caption,
     letterSpacing: 2,
     color: COLORS.textSecondary,
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   closeBtn: {padding: SPACING.xs},
   scroll: {paddingHorizontal: SPACING.xl, paddingTop: SPACING.section, paddingBottom: SPACING.section},
   kicker: {
-    fontFamily: FONTS.sansMedium,
+    fontFamily: FONTS.uiMedium,
     fontSize: FONT_SIZES.caption,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   subtitle: {
-    fontFamily: FONTS.sans,
+    fontFamily: FONTS.ui,
     fontSize: FONT_SIZES.body,
     lineHeight: FONT_SIZES.body * 1.5,
     color: COLORS.textSecondary,
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
   },
   cardTopRow: {flexDirection: 'row', alignItems: 'center', gap: SPACING.sm},
   cardLabel: {
-    fontFamily: FONTS.sansSemiBold,
+    fontFamily: FONTS.uiSemiBold,
     fontSize: FONT_SIZES.caption,
     letterSpacing: 1.5,
     color: COLORS.textTertiary,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   venueMeta: {
-    fontFamily: FONTS.sans,
+    fontFamily: FONTS.ui,
     fontSize: FONT_SIZES.body,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
@@ -259,13 +259,13 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xl,
   },
   primaryBtnText: {
-    fontFamily: FONTS.sansSemiBold,
+    fontFamily: FONTS.uiSemiBold,
     fontSize: FONT_SIZES.button,
     color: COLORS.bg,
   },
   listBlock: {marginTop: SPACING.section},
   listHeading: {
-    fontFamily: FONTS.sansMedium,
+    fontFamily: FONTS.uiMedium,
     fontSize: FONT_SIZES.caption,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
@@ -282,12 +282,12 @@ const styles = StyleSheet.create({
   },
   listRowText: {flex: 1},
   listName: {
-    fontFamily: FONTS.sansMedium,
+    fontFamily: FONTS.uiMedium,
     fontSize: FONT_SIZES.subtitle,
     color: COLORS.textPrimary,
   },
   listEpoch: {
-    fontFamily: FONTS.sans,
+    fontFamily: FONTS.ui,
     fontSize: FONT_SIZES.small,
     color: COLORS.textTertiary,
     marginTop: 2,

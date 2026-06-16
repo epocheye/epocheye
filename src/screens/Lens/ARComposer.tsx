@@ -71,7 +71,7 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
         className="px-4 pb-3 flex-row items-center justify-between"
         style={{paddingTop: insets.top + 10}}
       >
-        <Text className="text-parchment font-montserrat-bold text-[13px] tracking-[2.5px]">
+        <Text className="text-parchment font-ui-semibold text-[13px] tracking-[2.5px]">
           {objectLabel.toUpperCase()}
         </Text>
         <Pressable
@@ -94,7 +94,7 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
             />
           ) : (
             <View className="items-center gap-y-3">
-              <Text className="text-accent-amber font-montserrat-semibold text-[14px]">
+              <Text className="text-accent-amber font-ui-semibold text-[14px]">
                 3D model ready
               </Text>
             </View>
@@ -114,25 +114,25 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
         <View className="absolute top-5 self-center flex-row gap-x-2">
           <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(203,168,98,0.14)] rounded-full border border-[rgba(203,168,98,0.35)]">
             <Box size={12} color="#CBA862" />
-            <Text className="text-accent-amber font-montserrat-semibold text-[11px]">
+            <Text className="text-accent-amber font-ui-semibold text-[11px]">
               {cached ? 'Cached' : 'Generated'} · {provider}
             </Text>
           </View>
           {quality === 'multi_view' && (
             <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(76,175,80,0.14)] rounded-full border border-[rgba(76,175,80,0.35)]">
-              <Text className="text-[#4CAF50] font-montserrat-semibold text-[11px]">
+              <Text className="text-[#4CAF50] font-ui-semibold text-[11px]">
                 Community 3D
               </Text>
             </View>
           )}
           {quality === 'single_view' && (
             <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(203,168,98,0.14)] rounded-full border border-[rgba(203,168,98,0.35)]">
-              <Text className="text-accent-amber font-montserrat-semibold text-[11px]">Basic 3D</Text>
+              <Text className="text-accent-amber font-ui-semibold text-[11px]">Basic 3D</Text>
             </View>
           )}
           {scanCount > 0 && (
             <View className="flex-row items-center gap-x-[6px] px-[10px] py-1 bg-[rgba(203,168,98,0.14)] rounded-full border border-[rgba(203,168,98,0.35)]">
-              <Text className="text-accent-amber font-montserrat-semibold text-[11px]">
+              <Text className="text-accent-amber font-ui-semibold text-[11px]">
                 {scanCount} {scanCount === 1 ? 'scan' : 'scans'}
               </Text>
             </View>
@@ -146,15 +146,15 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
       >
         {isTestMode ? (
           <>
-            <Text className="text-parchment font-montserrat-bold text-[18px]">{monumentId}</Text>
+            <Text className="text-parchment font-ui-semibold text-[18px]">{monumentId}</Text>
             {testObjectDescription ? (
-              <Text className="text-[#B8AF9E] font-montserrat text-[13px] text-center px-2">
+              <Text className="text-[#B8AF9E] font-ui text-[13px] text-center px-2">
                 {testObjectDescription}
               </Text>
             ) : null}
           </>
         ) : (
-          <Text className="text-grey-muted font-montserrat-medium text-[12px]">
+          <Text className="text-grey-muted font-ui-medium text-[12px]">
             From {monumentId}
           </Text>
         )}
@@ -164,9 +164,9 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
           accessibilityRole="button"
         >
           <ExternalLink size={16} color="#0D0D0D" />
-          <Text className="text-[#0D0D0D] font-montserrat-bold text-[15px]">Open 3D model</Text>
+          <Text className="text-[#0D0D0D] font-ui-semibold text-[15px]">Open 3D model</Text>
         </Pressable>
-        <Text className="text-grey-muted font-montserrat text-[11px] text-center px-3">
+        <Text className="text-grey-muted font-ui text-[11px] text-center px-3">
           Opens in your device's AR / 3D viewer. Pinch to zoom, drag to rotate.
         </Text>
       </View>

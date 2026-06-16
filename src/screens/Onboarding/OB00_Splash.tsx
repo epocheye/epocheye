@@ -47,7 +47,7 @@ const OB00_Splash: React.FC<Props> = ({navigation}) => {
       </Animated.View>
 
       <Animated.View className="absolute bottom-[88px] items-center" style={wordmarkStyle}>
-        <Text className="font-montserrat-medium text-[36px] text-parchment tracking-[0.5px]">
+        <Text className="font-ui-medium text-[36px] text-parchment tracking-[0.5px]">
           epocheye
         </Text>
       </Animated.View>

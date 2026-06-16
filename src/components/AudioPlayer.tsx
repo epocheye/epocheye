@@ -123,7 +123,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri, title }) => {
   }));
 
   return (
-    <View className="bg-[#141414] border border-[rgba(201,168,76,0.2)] rounded-2xl p-4">
+    <View className="bg-[#141414] border border-[rgba(203,168,98,0.2)] rounded-2xl p-4">
       {/* Hidden video — audio only */}
       <Video
         ref={videoRef}
@@ -141,7 +141,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri, title }) => {
 
       {/* Title */}
       {title && (
-        <Text className="text-[#F5F0E8] text-sm font-['MontserratAlternates-SemiBold'] mb-3">
+        <Text className="text-[#F5F0E8] text-sm font-ui-semibold mb-3">
           {title}
         </Text>
       )}
@@ -160,10 +160,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri, title }) => {
 
       {/* Time labels */}
       <View className="flex-row items-center justify-between mb-4">
-        <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
+        <Text className="text-[#6B6357] text-xs font-ui">
           {formatTime(currentTime)}
         </Text>
-        <Text className="text-[#6B6357] text-xs font-['MontserratAlternates-Regular']">
+        <Text className="text-[#6B6357] text-xs font-ui">
           -{formatTime(remaining)}
         </Text>
       </View>
@@ -177,7 +177,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri, title }) => {
           accessibilityRole="button"
           accessibilityLabel={`Playback speed ${rate}x`}
         >
-          <Text className="text-[#B8AF9E] text-xs font-['MontserratAlternates-SemiBold']">
+          <Text className="text-[#B8AF9E] text-xs font-ui-semibold">
             {rate}x
           </Text>
         </TouchableOpacity>

@@ -11,27 +11,27 @@ import {DISPLAY_FONTS, UI_FONTS} from '../core/constants/fonts';
 
 // ─── Backgrounds ──────────────────────────────────────
 export const BG = {
-  deep: '#07060C',
-  warm: '#0C0906',
+  deep: '#0A0A0C',
+  warm: '#131218',
   glass: 'rgba(255,255,255,0.055)',
   glassHover: 'rgba(255,255,255,0.085)',
   glassStrong: 'rgba(255,255,255,0.11)',
-  glassWarm: 'rgba(201,168,76,0.06)',
+  glassWarm: 'rgba(203,168,98,0.06)',
   stone: '#1A1714',
   stoneLight: '#242017',
 } as const;
 
 // ─── Brand — Heritage Gold ────────────────────────────
 export const GOLD = {
-  primary: '#C9A84C',
-  light: '#E0C06A',
-  dark: '#9A7828',
-  glow: 'rgba(201,168,76,0.35)',
-  glowStrong: 'rgba(201,168,76,0.55)',
-  subtle: 'rgba(201,168,76,0.09)',
-  border: 'rgba(201,168,76,0.35)',
-  borderStrong: 'rgba(201,168,76,0.70)',
-  text: '#D4B05A',
+  primary: '#CBA862',
+  light: '#E6C88B',
+  dark: '#B8923F',
+  glow: 'rgba(203,168,98,0.35)',
+  glowStrong: 'rgba(203,168,98,0.55)',
+  subtle: 'rgba(203,168,98,0.09)',
+  border: 'rgba(203,168,98,0.35)',
+  borderStrong: 'rgba(203,168,98,0.70)',
+  text: '#CBA862',
 } as const;
 
 // ─── Secondary accents ────────────────────────────────
@@ -48,7 +48,7 @@ export const TEXT = {
   secondary: 'rgba(244,239,232,0.65)',
   muted: 'rgba(244,239,232,0.40)',
   dim: 'rgba(244,239,232,0.22)',
-  gold: '#D4B05A',
+  gold: '#CBA862',
   dark: '#0A0808',
 } as const;
 
@@ -168,7 +168,7 @@ export const TYPE = {
     fontFamily: UI_FONTS.bold,
     fontSize: 16,
     lineHeight: 20,
-    color: '#FFFFFF',
+    color: '#0A0A0C',
   },
 } as const;
 

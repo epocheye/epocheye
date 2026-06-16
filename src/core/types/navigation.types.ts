@@ -4,7 +4,7 @@
  */
 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RouteProp, CompositeNavigationProp } from '@react-navigation/native';
 
 /**
@@ -131,13 +131,12 @@ export type OnboardingNavigationProp =
 export type MainNavigationProp =
   NativeStackNavigationProp<MainStackParamList>;
 
-// Drawer-backed: the persistent bottom-tab bar was replaced by a side drawer.
-// The `Tab*` names are kept so the destination screens' prop types don't churn;
-// `navigation.openDrawer()` is available through these composite props.
-export type TabNavigationProp = DrawerNavigationProp<TabParamList>;
+// Bottom-tab shell with the custom floating gold-pill tab bar (FloatingTabBar).
+// Composite props let tab screens also push onto the parent native stack.
+export type TabNavigationProp = BottomTabNavigationProp<TabParamList>;
 
 export type TabMainNavigationProp = CompositeNavigationProp<
-  DrawerNavigationProp<TabParamList>,
+  BottomTabNavigationProp<TabParamList>,
   NativeStackNavigationProp<MainStackParamList>
 >;
 

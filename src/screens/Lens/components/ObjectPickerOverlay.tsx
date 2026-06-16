@@ -71,7 +71,7 @@ const ObjectPickerOverlay: React.FC<Props> = ({
                 accessibilityLabel={`Select ${obj.name}`}
               >
                 <View className="absolute -top-[22px] left-0 bg-[#D4AF37] px-2 py-[2px] rounded-[4px] max-w-[160px]">
-                  <Text numberOfLines={1} className="text-[#0A0A0A] text-[11px] font-montserrat-semibold">
+                  <Text numberOfLines={1} className="text-[#0A0A0A] text-[11px] font-ui-semibold">
                     {obj.name}
                   </Text>
                 </View>
@@ -91,7 +91,7 @@ const ObjectPickerOverlay: React.FC<Props> = ({
 
       {objects.length === 0 && (
         <View className="absolute top-[100px] left-6 right-6 p-[14px] rounded-xl bg-[rgba(26,20,16,0.92)] border border-[rgba(212,175,55,0.3)]">
-          <Text className="text-parchment text-[13px] font-montserrat-medium text-center">
+          <Text className="text-parchment text-[13px] font-ui-medium text-center">
             Nothing recognised — try another angle or closer to a single object.
           </Text>
         </View>
@@ -99,13 +99,13 @@ const ObjectPickerOverlay: React.FC<Props> = ({
 
       {selected && (
         <Animated.View entering={FadeIn.duration(160)} className="absolute left-4 right-4 bottom-10 p-[18px] rounded-2xl bg-[rgba(14,10,8,0.98)] border border-[rgba(212,175,55,0.4)]">
-          <Text className="text-[#B8AF9E] text-[11px] tracking-[1px] uppercase font-montserrat-semibold mb-[6px]">
+          <Text className="text-[#B8AF9E] text-[11px] tracking-[1px] uppercase font-ui-semibold mb-[6px]">
             What we see
           </Text>
-          <Text className="text-parchment text-[18px] font-montserrat-bold mb-1">
+          <Text className="text-parchment text-[18px] font-ui-semibold mb-1">
             {selected.name}
           </Text>
-          <Text className="text-[#B8AF9E] text-[13px] font-montserrat mb-[14px]">
+          <Text className="text-[#B8AF9E] text-[13px] font-ui mb-[14px]">
             {selected.description}
           </Text>
           <View className="flex-row gap-[10px]">
@@ -115,7 +115,7 @@ const ObjectPickerOverlay: React.FC<Props> = ({
               accessibilityRole="button"
               accessibilityLabel="Back to objects"
             >
-              <Text className="text-[#B8AF9E] text-[14px] font-montserrat-semibold">Back</Text>
+              <Text className="text-[#B8AF9E] text-[14px] font-ui-semibold">Back</Text>
             </Pressable>
             <Pressable
               className="flex-1 py-3 rounded-[10px] items-center justify-center bg-[#D4AF37]"
@@ -127,7 +127,7 @@ const ObjectPickerOverlay: React.FC<Props> = ({
               accessibilityRole="button"
               accessibilityLabel="View in 3D"
             >
-              <Text className="text-[#0A0A0A] text-[14px] font-montserrat-bold">View in 3D</Text>
+              <Text className="text-[#0A0A0A] text-[14px] font-ui-semibold">View in 3D</Text>
             </Pressable>
           </View>
         </Animated.View>

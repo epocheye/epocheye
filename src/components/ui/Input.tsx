@@ -56,7 +56,7 @@ const Input: React.FC<InputProps> = ({
     <View className="mb-4" style={containerStyle}>
       {label && (
         <Text
-          className="mb-2 text-base font-['MontserratAlternates-Medium'] text-[#F5E9D8]"
+          className="mb-2 text-base font-ui-medium text-[#F5E9D8]"
           style={labelStyle}
           accessibilityLabel={label}
         >
@@ -73,7 +73,7 @@ const Input: React.FC<InputProps> = ({
         )}
 
         <TextInput
-          className={`h-14 flex-1 text-base font-['MontserratAlternates-Regular'] text-[#F5E9D8] ${
+          className={`h-14 flex-1 text-base font-ui text-[#F5E9D8] ${
             leftIcon ? 'ml-2' : ''
           }`}
           style={inputStyle}
@@ -107,7 +107,7 @@ const Input: React.FC<InputProps> = ({
 
       {error && (
         <Text
-          className="mt-1 text-sm font-['MontserratAlternates-Regular'] text-[#D9534F]"
+          className="mt-1 text-sm font-ui text-[#D9534F]"
           accessibilityLiveRegion="polite"
         >
           {error}
@@ -115,7 +115,7 @@ const Input: React.FC<InputProps> = ({
       )}
 
       {helperText && !error && (
-        <Text className="mt-1 text-sm font-['MontserratAlternates-Regular'] text-[#B8AF9E]">
+        <Text className="mt-1 text-sm font-ui text-[#B8AF9E]">
           {helperText}
         </Text>
       )}

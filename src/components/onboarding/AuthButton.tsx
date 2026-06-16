@@ -69,7 +69,7 @@ const AuthButton: React.FC<AuthButtonProps> = ({
     variant === 'email'
       ? bgAnim.interpolate({
           inputRange: [0, 1],
-          outputRange: ['rgba(212,134,10,0)', 'rgba(212,134,10,0.15)'],
+          outputRange: ['rgba(203,168,98,0)', 'rgba(203,168,98,0.15)'],
         })
       : variant === 'google'
       ? COLORS.google
@@ -111,13 +111,13 @@ const AuthButton: React.FC<AuthButtonProps> = ({
         )}
         {variant === 'email' && (
           <View className="mr-3 h-6 w-6 items-center justify-center">
-            <Text className="font-['MontserratAlternates-Medium'] text-lg text-[#F5E9D8]">
+            <Text className="font-ui-medium text-lg text-[#F5E9D8]">
               @
             </Text>
           </View>
         )}
         <Text
-          className={`font-['MontserratAlternates-Medium'] text-lg ${
+          className={`font-ui-medium text-lg ${
             variant === 'google' ? 'text-[#1A1612]' : 'text-[#F5E9D8]'
           }`}
         >

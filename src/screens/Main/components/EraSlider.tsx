@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   labelText: {
-    fontFamily: 'MontserratAlternates-Medium',
+    fontFamily: 'PlusJakartaSans-Medium',
     fontSize: 12,
   },
   labelActive: {

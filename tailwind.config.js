@@ -6,6 +6,28 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // ── Efecto semantic tokens (shadcn-style) ──────────────────────────
+        // The premium designs are authored against these. Values mirror the
+        // theme in src/core/constants/theme.ts so `bg-card`, `text-foreground`,
+        // `text-primary`, `text-muted-foreground`, `border-border`, etc. resolve.
+        background: '#0A0A0C',
+        foreground: '#F4EFE7',
+        card: '#131218',
+        'card-foreground': '#F4EFE7',
+        popover: '#131218',
+        'popover-foreground': '#F4EFE7',
+        primary: '#CBA862',
+        'primary-foreground': '#0A0A0C',
+        secondary: '#1B1A21',
+        'secondary-foreground': '#F4EFE7',
+        muted: '#1B1A21',
+        'muted-foreground': '#98928A',
+        destructive: '#C2553F',
+        'destructive-foreground': '#F4EFE7',
+        border: 'rgba(255,255,255,0.10)',
+        input: 'rgba(255,255,255,0.10)',
+        ring: '#CBA862',
+
         // Heritage-dark brand surfaces. Use these instead of hardcoded hex.
         ink: {
           DEFAULT: '#0A0A0C', // page background (premium warm-black)
@@ -43,6 +65,10 @@ module.exports = {
           warning: '#E05C5C',
         },
         accent: {
+          // DEFAULT/foreground added for the Efecto `bg-accent` / `text-accent`
+          // semantic usage; amber* kept for existing screens.
+          DEFAULT: '#E6C88B',
+          foreground: '#0A0A0C',
           amber: '#CBA862',
           amberDark: '#B8923F',
           amberSoft: 'rgba(203,168,98,0.14)',
@@ -91,27 +117,27 @@ module.exports = {
         },
         // Onboarding "Through the Lens" design system tokens
         ob: {
-          bgDeep: '#07060C',
-          bgWarm: '#0C0906',
+          bgDeep: '#0A0A0C',
+          bgWarm: '#131218',
           bgStone: '#1A1714',
           bgDisabled: '#1E1C17',
           glass: 'rgba(255,255,255,0.055)',
           glassHover: 'rgba(255,255,255,0.085)',
           glassStrong: 'rgba(255,255,255,0.11)',
-          glassWarm: 'rgba(201,168,76,0.06)',
+          glassWarm: 'rgba(203,168,98,0.06)',
           borderSubtle: 'rgba(255,255,255,0.07)',
           borderMedium: 'rgba(255,255,255,0.12)',
           borderStrong: 'rgba(255,255,255,0.20)',
-          gold: '#C9A84C',
-          goldLight: '#E0C06A',
-          goldDark: '#9A7828',
-          goldText: '#D4B05A',
-          goldGlow: 'rgba(201,168,76,0.35)',
-          goldSubtle: 'rgba(201,168,76,0.09)',
-          goldSoft: 'rgba(201,168,76,0.15)',
-          goldFaint: 'rgba(201,168,76,0.04)',
-          goldBorder: 'rgba(201,168,76,0.35)',
-          goldBorderStrong: 'rgba(201,168,76,0.70)',
+          gold: '#CBA862',
+          goldLight: '#E6C88B',
+          goldDark: '#B8923F',
+          goldText: '#CBA862',
+          goldGlow: 'rgba(203,168,98,0.35)',
+          goldSubtle: 'rgba(203,168,98,0.09)',
+          goldSoft: 'rgba(203,168,98,0.15)',
+          goldFaint: 'rgba(203,168,98,0.04)',
+          goldBorder: 'rgba(203,168,98,0.35)',
+          goldBorderStrong: 'rgba(203,168,98,0.70)',
           warm: '#F4EFE8',
           warmSoft: 'rgba(244,239,232,0.65)',
           warmMuted: 'rgba(244,239,232,0.40)',

@@ -51,7 +51,7 @@ const MonumentInfoSheet = forwardRef<
       handleIndicatorStyle={styles.handle}>
       <BottomSheetScrollView
         contentContainerStyle={{paddingHorizontal: 20, paddingBottom: 24}}>
-        <Text className="text-parchment text-[20px] leading-7 font-montserrat-bold">
+        <Text className="text-parchment text-[20px] leading-7 font-ui-semibold">
           {place?.name ?? 'Monument'}
         </Text>
 
@@ -67,7 +67,7 @@ const MonumentInfoSheet = forwardRef<
           />
         ) : null}
 
-        <Text className="mt-[10px] text-grey-muted text-[14px] leading-5 font-montserrat">
+        <Text className="mt-[10px] text-grey-muted text-[14px] leading-5 font-ui">
           {fullAddress}
         </Text>
 
@@ -75,8 +75,8 @@ const MonumentInfoSheet = forwardRef<
           {(place?.categories ?? []).map(category => (
             <View
               key={category}
-              className="rounded-[20px] border border-[rgba(201,168,76,0.3)] px-[10px] py-[5px]">
-              <Text className="text-accent-amber text-[12px] font-montserrat-medium capitalize">
+              className="rounded-[20px] border border-[rgba(203,168,98,0.3)] px-[10px] py-[5px]">
+              <Text className="text-accent-amber text-[12px] font-ui-medium capitalize">
                 {category}
               </Text>
             </View>
@@ -85,7 +85,7 @@ const MonumentInfoSheet = forwardRef<
 
         <View className="mt-5 flex-row items-center">
           <MapPin size={16} color="#CBA862" />
-          <Text className="ml-2 text-parchment text-[14px] font-montserrat-medium">
+          <Text className="ml-2 text-parchment text-[14px] font-ui-medium">
             {distanceKm}
           </Text>
         </View>

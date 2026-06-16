@@ -119,7 +119,7 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
   }, [history]);
 
   return (
-    <SafeAreaView className="flex-1 bg-ink-deep">
+    <SafeAreaView className="flex-1 bg-background">
       <StatusBar barStyle="light-content" />
       <View className="flex-row items-center px-5 py-3 border-b border-white/5">
         <TouchableOpacity onPress={() => navigation.goBack()} className="p-1">
@@ -132,14 +132,14 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#C9A84C" />
+          <ActivityIndicator color="#CBA862" />
         </View>
       ) : (
         <ScrollView
           className="flex-1"
           contentContainerStyle={{ paddingVertical: 16, paddingHorizontal: 20 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C9A84C" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#CBA862" />
           }
         >
           {groupings.length > 0 ? (
@@ -162,7 +162,7 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
           ) : null}
 
           {current?.active && current.place_name ? (
-            <View className="rounded-xl border border-[rgba(201,168,76,0.4)] bg-[rgba(201,168,76,0.08)] px-4 py-3 mb-5">
+            <View className="rounded-xl border border-[rgba(203,168,98,0.4)] bg-[rgba(203,168,98,0.08)] px-4 py-3 mb-5">
               <Text className="text-[10px] uppercase tracking-wider text-gold-400/70 font-ui-medium">
                 Now at
               </Text>

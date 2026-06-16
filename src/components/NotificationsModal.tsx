@@ -138,7 +138,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
           }}>
           <View className="flex-row items-center gap-x-2 mb-[6px]">
             <Text
-              className="flex-1 text-parchment font-instrument-semibold text-[15px]"
+              className="flex-1 text-parchment font-ui-semibold text-[15px]"
               numberOfLines={1}>
               {item.title}
             </Text>
@@ -147,18 +147,18 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
             ) : null}
           </View>
           <Text
-            className="text-[#B8B0A0] font-instrument text-[14px] leading-5"
+            className="text-[#B8B0A0] font-ui text-[14px] leading-5"
             numberOfLines={3}>
             {item.message}
           </Text>
           <View className="mt-[10px] flex-row justify-between items-center">
-            <Text className="text-[#6E6A60] font-instrument text-[12px]">
+            <Text className="text-[#6E6A60] font-ui text-[12px]">
               {formatRelative(item.created_at)}
             </Text>
             {unread ? (
               <View className="flex-row items-center gap-x-1">
                 <Check size={12} color="#CBA862" />
-                <Text className="text-accent-amber font-instrument-medium text-[11px]">
+                <Text className="text-accent-amber font-ui-medium text-[11px]">
                   Tap to mark read
                 </Text>
               </View>
@@ -191,7 +191,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
           style={{ maxHeight: '60%' }}>
           {/* Header */}
           <View className="flex-row items-center px-5 pt-4 pb-3">
-            <Text className="flex-1 text-parchment font-instrument-semibold text-[18px]">
+            <Text className="flex-1 text-parchment font-ui-semibold text-[18px]">
               Notifications
             </Text>
             <TouchableOpacity
@@ -222,17 +222,17 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({
             </View>
           ) : error ? (
             <View className="py-10 justify-center items-center px-8">
-              <Text className="text-[#FF6B6B] font-instrument text-[14px] text-center">
+              <Text className="text-[#FF6B6B] font-ui text-[14px] text-center">
                 {error}
               </Text>
             </View>
           ) : items.length === 0 ? (
             <View className="py-10 justify-center items-center px-8 gap-y-3">
               <BellOff size={36} color="#4A4A4A" />
-              <Text className="text-parchment font-instrument-semibold text-[16px]">
+              <Text className="text-parchment font-ui-semibold text-[16px]">
                 No notifications yet
               </Text>
-              <Text className="text-[#8C8578] font-instrument text-[14px] text-center">
+              <Text className="text-[#8C8578] font-ui text-[14px] text-center">
                 We'll let you know when history is near.
               </Text>
             </View>

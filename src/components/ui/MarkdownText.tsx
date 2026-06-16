@@ -20,10 +20,10 @@ interface Props {
   theme?: Theme;
 }
 
-const FONT_BODY = 'InstrumentSans-Regular';
-const FONT_BOLD = 'InstrumentSans-SemiBold';
-const FONT_SERIF = 'InstrumentSerif-Regular';
-const FONT_MONO = 'InstrumentSans-Regular';
+const FONT_BODY = 'PlusJakartaSans-Regular';
+const FONT_BOLD = 'PlusJakartaSans-SemiBold';
+const FONT_SERIF = 'Fraunces-Regular';
+const FONT_MONO = 'PlusJakartaSans-Regular';
 
 function buildStyles(theme: Theme) {
   const isLight = theme === 'light';

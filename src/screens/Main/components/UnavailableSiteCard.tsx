@@ -25,12 +25,12 @@ const UnavailableSiteCard: React.FC<UnavailableSiteCardProps> = ({
 }) => {
   return (
     <View
-      className="absolute left-4 right-4 rounded-[14px] overflow-hidden bg-[#141414] border border-[rgba(201,168,76,0.35)]"
+      className="absolute left-4 right-4 rounded-[14px] overflow-hidden bg-[#141414] border border-[rgba(203,168,98,0.35)]"
       style={[styles.cardShadow, {bottom}]}
       accessibilityRole="summary">
       <View className="flex-row items-start p-4">
-        <View className="w-11 h-11 rounded-full bg-[rgba(201,168,76,0.12)] items-center justify-center mr-3">
-          <Compass color="#C9A84C" size={20} />
+        <View className="w-11 h-11 rounded-full bg-[rgba(203,168,98,0.12)] items-center justify-center mr-3">
+          <Compass color="#CBA862" size={20} />
         </View>
         <View className="flex-1 pr-2">
           <Text
@@ -39,7 +39,7 @@ const UnavailableSiteCard: React.FC<UnavailableSiteCardProps> = ({
             Epocheye isn't here yet
           </Text>
           <Text
-            style={{marginTop: 4, fontFamily: FONTS.sans, fontSize: 12, color: 'rgba(245,240,232,0.6)', lineHeight: 17}}
+            style={{marginTop: 4, fontFamily: FONTS.ui, fontSize: 12, color: 'rgba(245,240,232,0.6)', lineHeight: 17}}
             numberOfLines={3}>
             Heritage sites near you aren't live in Epocheye yet.
           </Text>
@@ -48,9 +48,9 @@ const UnavailableSiteCard: React.FC<UnavailableSiteCardProps> = ({
               onPress={onExplore}
               accessibilityRole="button"
               accessibilityLabel="Explore what's around you — tap any object"
-              className="mt-3 self-start px-[14px] py-2 rounded-full bg-[#C9A84C]"
+              className="mt-3 self-start px-[14px] py-2 rounded-full bg-[#CBA862]"
               style={({pressed}) => (pressed ? {opacity: 0.85} : undefined)}>
-              <Text style={{fontFamily: FONTS.sansSemiBold, fontSize: 12, color: '#0D0D0D'}}>
+              <Text style={{fontFamily: FONTS.uiSemiBold, fontSize: 12, color: '#0D0D0D'}}>
                 Explore what's around you →
               </Text>
             </Pressable>

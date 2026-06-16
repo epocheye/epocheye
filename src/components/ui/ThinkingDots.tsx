@@ -20,7 +20,7 @@ const MESSAGE_CYCLE_MS = DOT_CYCLE_MS * 4; // 4 steps: 1 dot, 2 dots, 3 dots, pa
 
 const ThinkingDots: React.FC<ThinkingDotsProps> = ({
   messages,
-  color = '#C9A84C',
+  color = '#CBA862',
 }) => {
   const [messageIndex, setMessageIndex] = useState(0);
 
@@ -79,7 +79,7 @@ const ThinkingDots: React.FC<ThinkingDotsProps> = ({
         />
       </View>
       <Text
-        style={{ color, fontFamily: 'MontserratAlternates-Medium', fontSize: 13, lineHeight: 18 }}
+        style={{ color, fontFamily: 'PlusJakartaSans-Medium', fontSize: 13, lineHeight: 18 }}
       >
         {messages[messageIndex]}
       </Text>

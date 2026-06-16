@@ -120,13 +120,13 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   heading: {
-    fontFamily: FONTS.sansSemiBold,
+    fontFamily: FONTS.uiSemiBold,
     fontSize: 18,
     color: '#FFFFFF',
   },
   body: {
     marginTop: 4,
-    fontFamily: FONTS.sans,
+    fontFamily: FONTS.ui,
     fontSize: 13,
     color: 'rgba(255,255,255,0.72)',
   },
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   maybeLaterText: {
-    fontFamily: FONTS.sans,
+    fontFamily: FONTS.ui,
     fontSize: 13,
     color: 'rgba(255,255,255,0.55)',
   },
