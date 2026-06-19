@@ -74,7 +74,7 @@ const ExploreButton: React.FC<{label: string; onPress: () => void}> = ({label, o
 );
 
 const Daily: React.FC<Props> = ({navigation}) => {
-  const {daily, refresh: refreshDaily} = useDailyToday();
+  const {daily, loading, refresh: refreshDaily} = useDailyToday();
   const {state: nudge, toggle: toggleNudge} = useDailyNudge();
   const [refreshing, setRefreshing] = useState(false);
   // Bumped on pull-to-refresh to replay the staggered entrance animations.
@@ -155,6 +155,10 @@ const Daily: React.FC<Props> = ({navigation}) => {
 
   const streakCount = daily?.streak_count ?? 0;
   const weeklyStreak: DailyStreakDay[] = daily?.weekly_streak ?? [];
+  // A story is only renderable once the payload carries body text. A loaded-but-empty
+  // payload (or a failed fetch) must fall back to an empty state, never a blank `0` card.
+  const hasStory = !!daily && !!daily.body && daily.body.trim().length > 0;
+  const hasYear = !!daily && daily.year > 0;
   const hasCta = !!daily && (!!daily.cta_place_id || !!daily.cta_url) && !!daily.cta_label;
 
   return (
@@ -201,7 +205,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
 
         {/* Story hero — dark, image-led editorial card */}
         <Animated.View style={sHero} className="px-5">
-          {daily?.image_url ? (
+          {hasStory && daily?.image_url ? (
             <View style={styles.heroCard}>
               <Image source={{uri: daily.image_url}} style={StyleSheet.absoluteFill} resizeMode="cover" />
               <ImageScrim
@@ -217,29 +221,29 @@ const Daily: React.FC<Props> = ({navigation}) => {
                 />
               </Animated.View>
               <View style={styles.heroContent}>
-                {daily ? (
-                  <>
-                    <Animated.Text
-                      style={[{fontFamily: FONTS.display, color: HERO_TEXT, fontSize: 68, lineHeight: 74, letterSpacing: -1}, sYear]}>
-                      {daily.year}
-                    </Animated.Text>
-                    <Text
-                      style={{fontFamily: FONTS.uiSemiBold, color: COLORS.goldLight}}
-                      className="mt-1 text-[11px] tracking-[0.2em] uppercase">
-                      {daily.location}
-                    </Text>
-                    <Text
-                      style={{fontFamily: FONTS.ui, color: 'rgba(251,246,236,0.9)'}}
-                      className="mt-3 text-sm leading-[21px]"
-                      numberOfLines={4}>
-                      {daily.body}
-                    </Text>
-                    {hasCta ? (
-                      <View className="mt-5">
-                        <ExploreButton label={daily.cta_label as string} onPress={onCtaPress} />
-                      </View>
-                    ) : null}
-                  </>
+                {hasYear ? (
+                  <Animated.Text
+                    style={[{fontFamily: FONTS.display, color: HERO_TEXT, fontSize: 68, lineHeight: 74, letterSpacing: -1}, sYear]}>
+                    {daily!.year}
+                  </Animated.Text>
+                ) : null}
+                {daily?.location ? (
+                  <Text
+                    style={{fontFamily: FONTS.uiSemiBold, color: COLORS.goldLight}}
+                    className="mt-1 text-[11px] tracking-[0.2em] uppercase">
+                    {daily.location}
+                  </Text>
+                ) : null}
+                <Text
+                  style={{fontFamily: FONTS.ui, color: 'rgba(251,246,236,0.9)'}}
+                  className="mt-3 text-sm leading-[21px]"
+                  numberOfLines={4}>
+                  {daily!.body}
+                </Text>
+                {hasCta ? (
+                  <View className="mt-5">
+                    <ExploreButton label={daily!.cta_label as string} onPress={onCtaPress} />
+                  </View>
                 ) : null}
               </View>
             </View>
@@ -247,34 +251,52 @@ const Daily: React.FC<Props> = ({navigation}) => {
             <View style={[styles.heroCard, styles.heroFallback]}>
               <AmbientGlow height={HERO_MIN_H} />
               <View style={styles.heroContent}>
-                {daily ? (
+                {hasStory ? (
                   <>
-                    <Animated.Text
-                      style={[{fontFamily: FONTS.display, color: COLORS.gold, fontSize: 68, lineHeight: 74, letterSpacing: -1}, sYear]}>
-                      {daily.year}
-                    </Animated.Text>
+                    {hasYear ? (
+                      <Animated.Text
+                        style={[{fontFamily: FONTS.display, color: COLORS.gold, fontSize: 68, lineHeight: 74, letterSpacing: -1}, sYear]}>
+                        {daily!.year}
+                      </Animated.Text>
+                    ) : null}
                     <View style={styles.goldRule} />
-                    <Text
-                      style={{fontFamily: FONTS.uiSemiBold, color: COLORS.goldLight}}
-                      className="mt-3 text-[11px] tracking-[0.2em] uppercase">
-                      {daily.location}
-                    </Text>
+                    {daily?.location ? (
+                      <Text
+                        style={{fontFamily: FONTS.uiSemiBold, color: COLORS.goldLight}}
+                        className="mt-3 text-[11px] tracking-[0.2em] uppercase">
+                        {daily.location}
+                      </Text>
+                    ) : null}
                     <Text
                       style={{fontFamily: FONTS.ui}}
                       className="mt-3 text-sm leading-[21px] text-foreground/90"
                       numberOfLines={5}>
-                      {daily.body}
+                      {daily!.body}
                     </Text>
                     {hasCta ? (
                       <View className="mt-5">
-                        <ExploreButton label={daily.cta_label as string} onPress={onCtaPress} />
+                        <ExploreButton label={daily!.cta_label as string} onPress={onCtaPress} />
                       </View>
                     ) : null}
                   </>
-                ) : (
+                ) : loading ? (
                   <Text style={{fontFamily: FONTS.ui, fontSize: 14, color: 'rgba(244,239,231,0.6)'}}>
                     Loading today's story…
                   </Text>
+                ) : (
+                  <>
+                    <View style={styles.goldRule} />
+                    <Text
+                      style={{fontFamily: FONTS.display, color: COLORS.gold}}
+                      className="mt-3 text-2xl leading-tight">
+                      A story is on its way
+                    </Text>
+                    <Text
+                      style={{fontFamily: FONTS.ui}}
+                      className="mt-2 text-sm leading-[21px] text-foreground/80">
+                      Today's moment in history is being prepared. Pull to refresh, or check back soon.
+                    </Text>
+                  </>
                 )}
               </View>
             </View>
