@@ -2,10 +2,9 @@
  * GroundedObjectCard — the verified data card for a detected artifact.
  *
  * Renders the grounded DB record resolved by class_id. Honesty is the contract:
- *  - identity_confidence === 'placard_confirmed' → stated as fact, "Placard-confirmed".
- *  - identity_confidence === 'inferred'          → hedged: a clear "Inferred — not
- *    placard-confirmed" banner, and the name is presented as a likely reading,
- *    never as confirmed fact.
+ *  - identity_confidence === 'grounded'  → stated as fact, "Grounded record".
+ *  - identity_confidence === 'inferred'  → hedged: a clear "Inferred — not confirmed"
+ *    banner, and the name is presented as a likely reading, never as confirmed fact.
  *
  * This card NEVER shares the screen with the AI-guess fallback — a grounded match
  * wins unconditionally (truth beats fluency). See AiGuessCard for the fallback.
@@ -67,7 +66,7 @@ const GroundedObjectCard: React.FC<Props> = ({card, minimal}) => {
           <BadgeCheck size={13} color={GREEN} />
         )}
         <Text style={[styles.badgeText, {color: inferred ? AMBER : GREEN}]}>
-          {inferred ? 'Inferred — not placard-confirmed' : 'Placard-confirmed'}
+          {inferred ? 'Inferred — not confirmed' : 'Grounded record'}
         </Text>
       </View>
 
@@ -144,7 +143,7 @@ const LayeredObjectCard: React.FC<{
           <BadgeCheck size={13} color={GREEN} />
         )}
         <Text style={[styles.badgeText, {color: inferred ? AMBER : GREEN}]}>
-          {inferred ? 'Inferred — not placard-confirmed' : 'Placard-confirmed'}
+          {inferred ? 'Inferred — not confirmed' : 'Grounded record'}
         </Text>
       </View>
 

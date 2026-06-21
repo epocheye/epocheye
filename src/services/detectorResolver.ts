@@ -38,7 +38,7 @@ export interface ContextLayer {
   label: string;
   period_hint?: string | null;
   body: string;
-  confidence: 'inferred' | 'placard_confirmed' | string;
+  confidence: 'inferred' | 'grounded' | string;
 }
 
 /** Grounded data card returned by GET /api/v1/vision/object/{class_id}. */
@@ -49,8 +49,8 @@ export interface ObjectCard {
   dynasty: string;
   material: string;
   origin: string;
-  /** 'inferred' → render hedged; 'placard_confirmed' → state as fact. */
-  identity_confidence: 'inferred' | 'placard_confirmed' | string;
+  /** 'inferred' → render hedged; 'grounded' → state as fact. */
+  identity_confidence: 'inferred' | 'grounded' | string;
   narrative: string;
   iconography: string;
   has_reconstruction: boolean;
