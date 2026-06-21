@@ -118,7 +118,9 @@ type ResolvedState =
 
 /** What runResolution decided, so the caller can place the model / route the user. */
 type ResolutionOutcome =
-  | {kind: 'grounded' | 'minimal'; classId: string}
+  // grounded/minimal carry the resolved card so the caller can float it as an AR
+  // placard when the class has no 3D model (heritage places).
+  | {kind: 'grounded' | 'minimal'; classId: string; card: ObjectCard}
   // 'ai' carries the card content so the caller can float it as AR placards.
   | {kind: 'ai'; label?: string | null; body?: string}
   | {kind: 'paywall'; paywall: {siteId: string; used: number; limit: number}}
@@ -191,6 +193,30 @@ function buildArCards(label: string | null, body: string): string {
             : {continuation: true, narrative: chunk},
         );
   return JSON.stringify(cards);
+}
+
+/**
+ * Build the `placeCardsOnly` JSON for a GROUNDED card that has no 3D model (e.g. a
+ * heritage place like Bahin Rajbari). Mirrors buildArCards, but carries the real
+ * grounded fields so the native renderer shows the verified styling (no "Likely:"
+ * prefix): card 0 holds the identity (name + confidence + meta) and the first
+ * narration chunk; longer text spills into body-only continuation cards. The rich
+ * flat card (with its layer slider) still renders on-screen — this is the
+ * world-anchored placard floated beside the structure.
+ */
+function buildGroundedArCards(card: ObjectCard): string {
+  const chunks = chunkText(card.narrative ?? '', 300, 3);
+  const head = {
+    display_name: card.display_name,
+    identity_confidence: card.identity_confidence,
+    period: card.period,
+    dynasty: card.dynasty,
+    material: card.material,
+    origin: card.origin,
+    narrative: chunks[0] ?? '',
+  };
+  const rest = chunks.slice(1).map(chunk => ({continuation: true, narrative: chunk}));
+  return JSON.stringify([head, ...rest]);
 }
 
 /**
@@ -341,7 +367,11 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
           if (card) {
             const minimal = !card.narrative || card.narrative.trim().length === 0;
             setResolved({kind: 'grounded', card, minimal});
-            return {kind: minimal ? 'minimal' : 'grounded', classId: result.class_id};
+            return {
+              kind: minimal ? 'minimal' : 'grounded',
+              classId: result.class_id,
+              card,
+            };
           }
         } catch {
           // fall through to the AI card / error
@@ -526,12 +556,23 @@ const DetectARNative: React.FC<{
         const resolution = await runResolution(base64, uri);
         if (resolution.kind === 'grounded' || resolution.kind === 'minimal') {
           const modelUri = await resolveModelGlb(resolution.classId);
-          if (modelUri) setGlbUri(modelUri);
-          // The recognizer no longer returns a detector bounding box. The user aimed
-          // at the artifact, so anchor near the screen centre; native defers
-          // placement until the model + TRACKING are both ready. (Precise hit-test
-          // placement / AR placard UI is a later step.)
-          arRef.current?.placeFromDetection(0.5, 0.85);
+          if (modelUri) {
+            // Has a 3D reconstruction → anchor the model near the screen centre; native
+            // defers placement until the model + TRACKING are both ready, and the
+            // grounded placard rides along on the model's anchor (see cardData prop).
+            setGlbUri(modelUri);
+            arRef.current?.placeFromDetection(0.5, 0.85);
+          } else {
+            // No reconstruction (e.g. a heritage place like Bahin Rajbari) → float the
+            // grounded card itself as a world-anchored placard, mirroring the AI
+            // card-only path. placeCardsOnly creates its OWN anchor, so no GLB is
+            // needed. The rich flat card (with its layer slider) still shows on-screen.
+            arRef.current?.placeCardsOnly(
+              0.5,
+              0.85,
+              buildGroundedArCards(resolution.card),
+            );
+          }
           setErrorMessage(null);
           void maybePromptShare(allowUngrounded, setShareOpen);
         } else if (resolution.kind === 'paywall') {
