@@ -101,6 +101,19 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
     }
     private var pending: Pending? = null
 
+    // Card-only placement state (no-GLB heritage places). The placard is deferred and
+    // retried each frame like the model: if camera tracking locks within TRACK_WAIT it
+    // world-anchors ~cardDistance in front (walk-around-able); otherwise it falls back to
+    // a camera-locked "headlocked" float so the card ALWAYS appears — a flat façade can
+    // starve ARCore world tracking, which used to leave the user with no AR card at all.
+    private var pendingCards: String? = null
+    private var pendingCardX: Float = 0f
+    private var pendingCardY: Float = 0f
+    private var pendingCardsDeadlineNanos: Long = 0L
+    private var cardsCameraLocked: Boolean = false
+    private val trackWaitNanos = 1_500L * 1_000_000L
+    private val cardDistance = 1.2f
+
     init {
         // Do NOT build the ARSceneView here. SceneView's onLayout reads the
         // View's own Display rotation, which is null until the view is attached
@@ -178,15 +191,35 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
                     if (cardNodes.isNotEmpty()) {
                         try {
                             val cam = frame.camera.pose
-                            for (card in cardNodes) {
-                                val p = card.worldPosition
-                                val yaw = Math.toDegrees(
-                                    atan2(
-                                        (cam.tx() - p.x).toDouble(),
-                                        (cam.tz() - p.z).toDouble(),
-                                    ),
-                                ).toFloat()
-                                card.rotation = Rotation(0f, yaw, 0f)
+                            if (cardsCameraLocked) {
+                                // Headlocked float: re-pose each card ~cardDistance in
+                                // front of the camera every frame (no world anchor), so it
+                                // stays in view even when ARCore never reaches full tracking.
+                                for ((i, card) in cardNodes.withIndex()) {
+                                    val o = cardLayout[i.coerceAtMost(cardLayout.lastIndex)]
+                                    val t = cam.compose(
+                                        Pose.makeTranslation(o.x, o.y, o.z - cardDistance),
+                                    )
+                                    card.worldPosition = Position(t.tx(), t.ty(), t.tz())
+                                    val yaw = Math.toDegrees(
+                                        atan2(
+                                            (cam.tx() - t.tx()).toDouble(),
+                                            (cam.tz() - t.tz()).toDouble(),
+                                        ),
+                                    ).toFloat()
+                                    card.rotation = Rotation(0f, yaw, 0f)
+                                }
+                            } else {
+                                for (card in cardNodes) {
+                                    val p = card.worldPosition
+                                    val yaw = Math.toDegrees(
+                                        atan2(
+                                            (cam.tx() - p.x).toDouble(),
+                                            (cam.tz() - p.z).toDouble(),
+                                        ),
+                                    ).toFloat()
+                                    card.rotation = Rotation(0f, yaw, 0f)
+                                }
                             }
                         } catch (_: Throwable) {
                         }
@@ -194,10 +227,14 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
                     // Retry any deferred placement now that a fresh (possibly
                     // TRACKING) frame is available.
                     if (pending != null) tryPlacePending()
+                    if (pendingCards != null) tryPlaceCardsPending()
                 }
 
                 onTrackingFailureChanged = { reason ->
-                    if (reason != null) {
+                    // While a card placement is pending, stay quiet — the headlock
+                    // fallback will float the card within TRACK_WAIT, so surfacing a raw
+                    // INSUFFICIENT_FEATURES here would read as a scary "no surface" error.
+                    if (reason != null && pendingCards == null) {
                         post { onARError?.invoke(reason.name) }
                     }
                 }
@@ -486,28 +523,59 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
      * objects (first full; the rest carry "continuation": true for long text).
      */
     fun placeCardsOnly(imgNormX: Float, imgNormY: Float, cardsJson: String) {
+        arSceneView ?: return
+        // Defer-and-retry (mirrors the model's pending/tryPlacePending): world-anchor the
+        // card when tracking locks, else headlock-float it after TRACK_WAIT. No hard
+        // not-tracking failure — a no-GLB heritage card must ALWAYS appear.
+        pendingCardX = imgNormX
+        pendingCardY = imgNormY
+        pendingCards = cardsJson
+        pendingCardsDeadlineNanos = System.nanoTime() + trackWaitNanos
+        tryPlaceCardsPending()
+    }
+
+    /**
+     * Resolve a pending card placement. Called from placeCardsOnly and every frame in
+     * onSessionUpdated. World-anchors in front once the camera is TRACKING (so the user
+     * can walk around it); if tracking hasn't locked by the deadline, falls back to a
+     * camera-locked headlocked float so the card is guaranteed to show.
+     */
+    private fun tryPlaceCardsPending() {
+        val cardsJson = pendingCards ?: return
         val sceneView = arSceneView ?: return
         val frame = try {
             sceneView.frame
         } catch (t: Throwable) {
             null
         } ?: return
-        if (frame.camera.trackingState != TrackingState.TRACKING) {
-            post { onARError?.invoke("move phone to scan — not tracking yet") }
+
+        if (frame.camera.trackingState == TrackingState.TRACKING) {
+            val input = floatArrayOf(pendingCardX, pendingCardY)
+            val output = FloatArray(2)
+            val transformed = try {
+                frame.transformCoordinates2d(
+                    Coordinates2d.IMAGE_NORMALIZED, input, Coordinates2d.VIEW, output,
+                )
+                true
+            } catch (t: Throwable) {
+                Log.w(TAG, "placeCardsOnly transform failed", t)
+                false
+            }
+            pendingCards = null
+            if (transformed) {
+                doPlaceCards(sceneView, frame, output[0], output[1], cardsJson)
+            } else {
+                doPlaceCardsHeadlocked(cardsJson)
+            }
             return
         }
-        val input = floatArrayOf(imgNormX, imgNormY)
-        val output = FloatArray(2)
-        try {
-            frame.transformCoordinates2d(
-                Coordinates2d.IMAGE_NORMALIZED, input, Coordinates2d.VIEW, output,
-            )
-        } catch (t: Throwable) {
-            Log.w(TAG, "placeCardsOnly transform failed", t)
-            post { onARError?.invoke("coordinate transform failed") }
-            return
+
+        if (System.nanoTime() >= pendingCardsDeadlineNanos) {
+            pendingCards = null
+            doPlaceCardsHeadlocked(cardsJson)
         }
-        doPlaceCards(sceneView, frame, output[0], output[1], cardsJson)
+        // else: not tracking yet and still within the wait window — onSessionUpdated
+        // will call us again on the next frame.
     }
 
     private fun doPlaceCards(
@@ -567,7 +635,49 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
             return
         }
         setPlaneFinding(false)
+        cardsCameraLocked = false
         post { onAnchorPlaced?.invoke("cards_only") }
+    }
+
+    /**
+     * Headlock fallback: float the card(s) fixed in front of the camera with NO world
+     * anchor — used when ARCore can't establish world tracking (e.g. a flat distant
+     * façade). The per-frame pose is set in onSessionUpdated while cardsCameraLocked.
+     */
+    private fun doPlaceCardsHeadlocked(cardsJson: String) {
+        val sceneView = arSceneView ?: return
+        clearCurrentAnchor()
+        val cards = try {
+            JSONArray(cardsJson)
+        } catch (t: Throwable) {
+            JSONArray()
+        }
+        val n = minOf(cards.length(), cardLayout.size)
+        for (i in 0 until n) {
+            val json = cards.optJSONObject(i)?.toString() ?: continue
+            addCardNodeToScene(sceneView, json, cardOnlyScale)
+        }
+        if (cardNodes.isEmpty()) {
+            post { onARError?.invoke("could not render the card") }
+            return
+        }
+        cardsCameraLocked = true
+        setPlaneFinding(false)
+        post { onAnchorPlaced?.invoke("cards_only_headlocked") }
+    }
+
+    /** Add a card placard parented to the SCENE (headlocked); pose set per-frame. */
+    private fun addCardNodeToScene(sceneView: ARSceneView, json: String, scale: Float) {
+        try {
+            val bitmap = EpocheyeArCardRenderer.render(json) ?: return
+            val node = ImageNode(sceneView.materialLoader, bitmap).apply {
+                setScale(scale)
+            }
+            sceneView.addChildNode(node)
+            cardNodes.add(node)
+        } catch (t: Throwable) {
+            Log.w(TAG, "addCardNodeToScene failed — placard skipped (RN card still shows data)", t)
+        }
     }
 
     /** One-tap yaw alignment nudge (degrees) applied to the placed model. */
@@ -582,6 +692,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
     }
 
     fun clearAnchor() {
+        pendingCards = null
         clearCurrentAnchor()
         // Re-scan: detection is needed again to hit-test the next placement.
         setPlaneFinding(true)
@@ -608,22 +719,47 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
 
     private fun clearCurrentAnchor() {
         val sceneView = arSceneView ?: return
-        val node = currentAnchorNode ?: return
-        try {
-            sceneView.removeChildNode(node)
-        } catch (t: Throwable) {
-            Log.w(TAG, "removeChildNode failed", t)
+        // Headlocked cards are parented to the scene (no anchor), so this must NOT
+        // early-return on a null anchor — clean up cards explicitly in both cases.
+        currentAnchorNode?.let { node ->
+            try {
+                sceneView.removeChildNode(node)
+            } catch (t: Throwable) {
+                Log.w(TAG, "removeChildNode failed", t)
+            }
+            try {
+                node.anchor.detach()
+            } catch (t: Throwable) {
+                Log.w(TAG, "anchor.detach failed", t)
+            }
         }
-        try {
-            node.anchor.detach()
-        } catch (t: Throwable) {
-            Log.w(TAG, "anchor.detach failed", t)
-        }
+        removeAllCardNodes()
         currentAnchorNode = null
         currentModelNode = null
-        cardNodes.clear()
         currentYawDeg = 0f
         pending = null
+        cardsCameraLocked = false
+    }
+
+    /**
+     * Detach every card placard from its actual parent — the anchor node (world-anchored
+     * cards) or the scene (headlocked cards). Best-effort; a wrong-parent removeChildNode
+     * is a harmless no-op/throw we swallow.
+     */
+    private fun removeAllCardNodes() {
+        val sceneView = arSceneView
+        val anchorNode = currentAnchorNode
+        for (node in cardNodes) {
+            try {
+                anchorNode?.removeChildNode(node)
+            } catch (_: Throwable) {
+            }
+            try {
+                sceneView?.removeChildNode(node)
+            } catch (_: Throwable) {
+            }
+        }
+        cardNodes.clear()
     }
 
     /** Detach + forget all card placards (best-effort). */

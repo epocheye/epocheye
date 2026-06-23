@@ -514,6 +514,11 @@ const DetectARNative: React.FC<{
   const [shareOpen, setShareOpen] = useState(false);
   // The model to render — set from the DETECTED class (not a hardcoded marquee).
   const [glbUri, setGlbUri] = useState<string | null>(null);
+  // True once an AR placard/model is in flight or anchored. On an AR device the
+  // floating AR card IS the surface, so we hide the on-screen info card while one
+  // is up — showing both would let the on-screen card block the AR view. Reset on
+  // every fresh Detect / manual reset so the next scan re-evaluates.
+  const [arCardShown, setArCardShown] = useState(false);
   const {resolved, runResolution, reset, remaining} = useDetectionResolver(
     venueSlug,
     allowUngrounded,
@@ -541,6 +546,7 @@ const DetectARNative: React.FC<{
     }
     setDetecting(true);
     setErrorMessage('Scanning…');
+    setArCardShown(false); // re-show on-screen card until this scan anchors an AR one
     placedAiTextRef.current = null; // a new scan may anchor a fresh AR card
     arRef.current?.captureFrame();
   }, [detecting]);
@@ -566,13 +572,16 @@ const DetectARNative: React.FC<{
             // No reconstruction (e.g. a heritage place like Bahin Rajbari) → float the
             // grounded card itself as a world-anchored placard, mirroring the AI
             // card-only path. placeCardsOnly creates its OWN anchor, so no GLB is
-            // needed. The rich flat card (with its layer slider) still shows on-screen.
+            // needed.
             arRef.current?.placeCardsOnly(
               0.5,
               0.85,
               buildGroundedArCards(resolution.card),
             );
           }
+          // Either branch puts a card/model in the air → hide the on-screen card so
+          // it can't overlap and block the AR view.
+          setArCardShown(true);
           setErrorMessage(null);
           void maybePromptShare(allowUngrounded, setShareOpen);
         } else if (resolution.kind === 'paywall') {
@@ -605,8 +614,11 @@ const DetectARNative: React.FC<{
               0.85,
               buildArCards(resolution.label ?? null, resolution.body),
             );
+            setArCardShown(true); // AR placard is up → hide the on-screen card
           }
-          setErrorMessage(null); // labelled card also shown on-screen by the hook
+          // DEV "scan anything" anchors its AR cards later (after the stream
+          // completes) via the effect below, which hides the on-screen card then.
+          setErrorMessage(null);
           void maybePromptShare(allowUngrounded, setShareOpen);
         }
       } catch {
@@ -636,6 +648,7 @@ const DetectARNative: React.FC<{
   const handleReset = useCallback(() => {
     arRef.current?.clearAnchor();
     setGlbUri(null);
+    setArCardShown(false); // AR card cleared → on-screen card may show again
     placedAiTextRef.current = null;
     reset();
     setStatus(prev => (prev === 'placed' ? 'ready' : prev));
@@ -659,6 +672,7 @@ const DetectARNative: React.FC<{
       0.85,
       buildArCards(resolved.label ?? null, body),
     );
+    setArCardShown(true); // AR cards now anchored → hide the on-screen card
   }, [allowUngrounded, resolved]);
 
   const hint = !tracking
@@ -724,12 +738,12 @@ const DetectARNative: React.FC<{
       </SafeAreaView>
 
       <SafeAreaView style={styles.bottomOverlay} edges={['bottom']} pointerEvents="box-none">
-        {resolved.kind === 'grounded' && (
+        {resolved.kind === 'grounded' && !arCardShown && (
           <View style={styles.cardWrap}>
             <GroundedObjectCard card={resolved.card} minimal={resolved.minimal} />
           </View>
         )}
-        {resolved.kind === 'ai' && (
+        {resolved.kind === 'ai' && !arCardShown && (
           <View style={styles.cardWrap}>
             <AiGuessCard
               label={resolved.label}
