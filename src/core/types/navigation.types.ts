@@ -100,6 +100,8 @@ export type MainStackParamList = {
   };
   /** Away-from-venue gate: shown when the user tries to scan outside any venue. */
   GoToVenue: undefined;
+  /** Suggest-a-place: shown after login when no Epocheye site is within 5km. */
+  SuggestSite: undefined;
 };
 
 /**

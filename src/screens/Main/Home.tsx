@@ -54,6 +54,11 @@ const DEFAULT_REGION: Region = {
   longitudeDelta: 12,
 };
 
+// Curated sites within this distance count as "near you" — beyond it we offer the
+// suggest-a-place screen. Module-level guard so we prompt at most once per app launch.
+const SUGGEST_NEARBY_RADIUS_M = 5000;
+let suggestShownThisSession = false;
+
 // Returns a place label from the nearest known place, or '' when nothing is
 // known — the caller supplies a distinct evergreen title so the big heading never
 // duplicates the "Heritage Near You" eyebrow.
@@ -269,6 +274,27 @@ const Home: React.FC<Props> = ({navigation}) => {
         : null,
     [currentLocation],
   );
+
+  // After login, if no curated Epocheye site is within 5km of the user, offer the
+  // suggest-a-place screen — once per app launch. Reuses the already-loaded
+  // supportedSites + distanceMeters; skips until both a location and the sites
+  // list are available (an empty list = not loaded yet, not "nothing nearby").
+  useEffect(() => {
+    if (suggestShownThisSession || !userLatLng || supportedSites.length === 0) {
+      return;
+    }
+    const hasNearbySite = supportedSites.some(
+      s =>
+        typeof s.latitude === 'number' &&
+        typeof s.longitude === 'number' &&
+        distanceMeters(userLatLng.lat, userLatLng.lng, s.latitude, s.longitude) <=
+          SUGGEST_NEARBY_RADIUS_M,
+    );
+    if (!hasNearbySite) {
+      suggestShownThisSession = true;
+      navigation.navigate(ROUTES.MAIN.SUGGEST_SITE);
+    }
+  }, [userLatLng, supportedSites, navigation]);
 
   const activeCoords = useMemo(
     () =>

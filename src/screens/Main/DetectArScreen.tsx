@@ -199,7 +199,7 @@ function buildArCards(label: string | null, body: string): string {
 
 /**
  * Build the `placeCardsOnly` JSON for a GROUNDED card that has no 3D model (e.g. a
- * heritage place like Bahin Rajbari). Mirrors buildArCards, but carries the real
+ * heritage place with no 3D model). Mirrors buildArCards, but carries the real
  * grounded fields so the native renderer shows the verified styling (no "Likely:"
  * prefix): card 0 holds the identity (name + confidence + meta) and the first
  * narration chunk; longer text spills into body-only continuation cards. The rich
@@ -619,7 +619,7 @@ const DetectARNative: React.FC<{
             setGlbUri(modelUri);
             arRef.current?.placeFromDetection(0.5, 0.85);
           } else {
-            // No reconstruction (e.g. a heritage place like Bahin Rajbari) → float the
+            // No reconstruction (e.g. a heritage place with no 3D model) → float the
             // grounded card itself as a world-anchored placard, mirroring the AI
             // card-only path. placeCardsOnly creates its OWN anchor, so no GLB is
             // needed.

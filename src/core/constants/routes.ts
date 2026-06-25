@@ -38,6 +38,7 @@ export const ROUTES = {
     AI_GUIDE: 'AiGuide',
     DETECT_AR: 'DetectAr',
     GO_TO_VENUE: 'GoToVenue',
+    SUGGEST_SITE: 'SuggestSite',
   },
 
   /**

@@ -12,6 +12,7 @@ import Ar3dViewerScreen from '../screens/Main/Ar3dViewerScreen';
 import AiGuideScreen from '../screens/Main/AiGuideScreen';
 import DetectArScreen from '../screens/Main/DetectArScreen';
 import GoToVenueScreen from '../screens/Main/GoToVenueScreen';
+import SuggestSiteScreen from '../screens/Main/SuggestSiteScreen';
 import VenueActivationBanner from '../components/VenueActivationBanner';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
@@ -99,6 +100,11 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
       <Stack.Screen
         name={ROUTES.MAIN.GO_TO_VENUE}
         component={GoToVenueScreen}
+        options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}
+      />
+      <Stack.Screen
+        name={ROUTES.MAIN.SUGGEST_SITE}
+        component={SuggestSiteScreen}
         options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}
       />
     </Stack.Navigator>
