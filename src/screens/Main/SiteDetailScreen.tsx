@@ -35,6 +35,7 @@ import { getSite } from '../../utils/api/places';
 import type { SiteDetail } from '../../utils/api/places';
 import { resolveSiteImageSource } from '../../shared/utils/localSiteImages';
 import { ROUTES } from '../../core/constants';
+import { analytics } from '../../services/analytics';
 import type {
   MainScreenProps,
   PlaceNavParam,
@@ -208,6 +209,11 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     navigation.navigate(ROUTES.MAIN.DETECT_AR, {venueSlug: slug});
   }, [navigation, siteDetail, site]);
 
+  // Record a site view once per opened site (the auto screen_view carries no slug).
+  useEffect(() => {
+    analytics.track('site_viewed', {slug: site.id});
+  }, [site.id]);
+
   const handleGetPassport = useCallback(() => {
     navigation.navigate(ROUTES.MAIN.PURCHASE, {
       preSelectedPlaceId: site.id,
@@ -217,6 +223,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   // "Ask about this site" — open the AI Guide chat for this monument.
   const handleAskGuide = useCallback(() => {
     const guideSlug = siteDetail?.slug ?? site.id;
+    analytics.track('ai_guide_opened', {slug: guideSlug});
     navigation.navigate(ROUTES.MAIN.AI_GUIDE, {
       slug: guideSlug,
       siteName: siteDetail?.name ?? site.name,

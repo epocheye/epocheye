@@ -55,6 +55,7 @@ import type { GuideHistoryTurn } from '../../utils/api/guide';
 import { useBackConfirm, useVoiceInput } from '../../shared/hooks';
 import { AppAlert } from '../../shared/ui/appAlert';
 import MarkdownText from '../../components/ui/MarkdownText';
+import { analytics } from '../../services/analytics';
 
 type Props = MainScreenProps<'AiGuide'>;
 
@@ -146,6 +147,8 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
     (text: string) => {
       const question = text.trim();
       if (!question || isStreaming) return;
+
+      analytics.track('ai_guide_question_asked', {slug, chars: question.length});
 
       if (voice.isListening) {
         void voice.stop();

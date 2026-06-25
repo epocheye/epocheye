@@ -29,10 +29,11 @@ let lastFailed = false;
 
 /**
  * Client-side floor for a venue's radius. Backend-seeded radii (200–500m) are
- * too tight once normal GPS drift is added; this guarantees a generous minimum
- * (museum footprint + buffer) regardless of the stored value.
+ * too tight once normal GPS drift is added, and we want the app/Lens usable
+ * within ~1 km of any site. This floors every zone to 1 km regardless of the
+ * stored value (GPS slack in geofenceService is added on top of this).
  */
-const MIN_VENUE_RADIUS_M = 300;
+const MIN_VENUE_RADIUS_M = 1000;
 
 function normalizeZone(raw: RawZone): HeritageZone {
   return {

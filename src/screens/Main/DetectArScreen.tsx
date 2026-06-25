@@ -59,6 +59,8 @@ import {streamMuseumNarration} from '../../services/museumModeService';
 // repo behind ROBOFLOW_ENABLED for a possible future cheap pre-filter.
 import {fetchObjectCard, type ObjectCard} from '../../services/detectorResolver';
 import {useVenueGate} from '../../shared/hooks/useVenueGate';
+import {usePlacesStore} from '../../stores/placesStore';
+import {analytics} from '../../services/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GroundedObjectCard from './components/GroundedObjectCard';
 import AiGuessCard from './components/AiGuessCard';
@@ -329,11 +331,21 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
         if (__DEV__) {
           console.warn('[detect] recognize failed:', message ?? err);
         }
+        analytics.track('scan_error', {venue: venueSlug});
         // Agent endpoint unreachable/errored — in dev "scan anything", still try the
         // deployed universal identify so the test isn't blocked on a deploy.
         if (allowUngrounded && imageUri) return runMuseumFallback(imageUri, message);
         return {kind: 'error', message};
       }
+
+      // One event covers every recognition outcome (grounded/ai/paywall/
+      // out_of_scope/out_of_venue/daily_limit) for the scan funnel + breakdowns.
+      analytics.track('scan_result', {
+        venue: venueSlug,
+        match: result.match,
+        class_id: result.class_id,
+        allow_ungrounded: allowUngrounded,
+      });
 
       // Surface free scans left at this venue (for the "N scans left" pill).
       if (typeof result.remaining === 'number') {
@@ -409,8 +421,11 @@ const DetectArScreen: React.FC = () => {
   const {hasPermission, requestPermission} = useCameraPermission();
   const {arAvailable, arChecked} = useARCore();
   const {inVenue} = useVenueGate();
+  const currentLocation = usePlacesStore(s => s.currentLocation);
+  const ensureLocationTracking = usePlacesStore(s => s.ensureLocationTracking);
   const permissionRequestedRef = useRef(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [gateTimedOut, setGateTimedOut] = useState(false);
 
   useEffect(() => {
     if (hasPermission || permissionRequestedRef.current) return;
@@ -420,18 +435,52 @@ const DetectArScreen: React.FC = () => {
     });
   }, [hasPermission, requestPermission]);
 
-  // Venue lock: the live scan/AR experience only runs inside a curated venue.
-  // Away from one, redirect to the "go to your nearest venue" screen. The dev
-  // picker is a home-testing harness and intentionally bypasses the gate.
+  // Make sure GPS is actually being acquired the moment the screen opens, so the
+  // venue gate below can decide on a real fix instead of a stale/empty location.
   useEffect(() => {
-    if (!devPicker && !inVenue) {
+    if (devPicker) return;
+    void ensureLocationTracking();
+  }, [devPicker, ensureLocationTracking]);
+
+  // Stop waiting for a fix after a grace period so a GPS-less device still
+  // reaches the "go to your nearest venue" screen instead of hanging.
+  useEffect(() => {
+    if (devPicker || inVenue) return;
+    const t = setTimeout(() => setGateTimedOut(true), 12000);
+    return () => clearTimeout(t);
+  }, [devPicker, inVenue]);
+
+  // Venue lock: the live scan/AR experience only runs inside a curated venue.
+  // CRITICAL: do NOT bounce the user the instant the screen mounts — the active
+  // zone is only set after the first GPS fix evaluates the geofence, so an
+  // immediate redirect tells someone standing AT the site to "reach the site".
+  // Wait until we actually have a location (zone evaluated) or the grace period
+  // elapses; only then redirect if still outside. Dev picker bypasses the gate.
+  const locating =
+    !devPicker && !inVenue && currentLocation == null && !gateTimedOut;
+  useEffect(() => {
+    if (devPicker || inVenue) return;
+    if (currentLocation != null || gateTimedOut) {
       navigation.replace(ROUTES.MAIN.GO_TO_VENUE);
     }
-  }, [devPicker, inVenue, navigation]);
+  }, [devPicker, inVenue, currentLocation, gateTimedOut, navigation]);
 
   const handleClose = useCallback(() => navigation.goBack(), [navigation]);
 
   if (!devPicker && !inVenue) {
+    if (locating) {
+      return (
+        <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+          <View style={styles.fallbackBlock}>
+            <ActivityIndicator color={AMBER} />
+            <Text style={styles.fallbackHeading}>Locating you…</Text>
+            <Text style={styles.fallbackBody}>
+              Finding the nearest heritage site. This only takes a moment.
+            </Text>
+          </View>
+        </SafeAreaView>
+      );
+    }
     return <View style={styles.root} />; // redirecting to GoToVenue
   }
 
@@ -548,8 +597,9 @@ const DetectARNative: React.FC<{
     setErrorMessage('Scanning…');
     setArCardShown(false); // re-show on-screen card until this scan anchors an AR one
     placedAiTextRef.current = null; // a new scan may anchor a fresh AR card
+    analytics.track('scan_started', {venue: venueSlug, mode: 'ar'});
     arRef.current?.captureFrame();
-  }, [detecting]);
+  }, [detecting, venueSlug]);
 
   const handleFrameCaptured = useCallback(
     async (uri: string) => {
@@ -817,6 +867,7 @@ const DetectAR2D: React.FC<{
     if (busy) return;
     setBusy(true);
     setMessage(null);
+    analytics.track('scan_started', {venue: venueSlug, mode: '2d'});
     try {
       const photo = await cameraRef.current?.takePhoto();
       if (!photo?.path) {

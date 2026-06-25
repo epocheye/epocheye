@@ -71,6 +71,14 @@ export const STORAGE_KEYS = {
     GEMINI_DAILY_USAGE: `${STORAGE_PREFIX}/gemini_daily_usage`,
     GEMINI_CACHE: `${STORAGE_PREFIX}/gemini_cache`,
   },
+
+  /**
+   * Analytics keys
+   */
+  ANALYTICS: {
+    ANON_ID: `${STORAGE_PREFIX}/analytics_anon_id`,
+    QUEUE: `${STORAGE_PREFIX}/analytics_queue`,
+  },
 } as const;
 
 /**
@@ -83,4 +91,5 @@ export type StorageKey =
   | (typeof STORAGE_KEYS.ONBOARDING)[keyof typeof STORAGE_KEYS.ONBOARDING]
   | (typeof STORAGE_KEYS.CACHE)[keyof typeof STORAGE_KEYS.CACHE]
   | (typeof STORAGE_KEYS.TOURS)[keyof typeof STORAGE_KEYS.TOURS]
-  | (typeof STORAGE_KEYS.LENS)[keyof typeof STORAGE_KEYS.LENS];
+  | (typeof STORAGE_KEYS.LENS)[keyof typeof STORAGE_KEYS.LENS]
+  | (typeof STORAGE_KEYS.ANALYTICS)[keyof typeof STORAGE_KEYS.ANALYTICS];

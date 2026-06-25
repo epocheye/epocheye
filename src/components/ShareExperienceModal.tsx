@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import {Share2, X} from 'lucide-react-native';
 import {createShareLink} from '../utils/api/share';
+import {analytics} from '../services/analytics';
 
 export interface ShareExperienceModalProps {
   visible: boolean;
@@ -61,6 +62,8 @@ const ShareExperienceModal: React.FC<ShareExperienceModalProps> = ({
       setError('Could not create a link just now. Try again.');
       return;
     }
+
+    analytics.track('share_created', {site: siteSlug, object: objectClassId});
 
     try {
       const headline = title ? `${title} — on Epocheye` : 'My discovery on Epocheye';

@@ -47,11 +47,6 @@ import ArrivalBanner from './components/ArrivalBanner';
 
 type Props = TabScreenProps<'Home'>;
 
-// Curated sites within this radius of the user are pinned on the map. Keeps the
-// map focused on the visitor's city (e.g. Kolkata → Victoria Memorial + Indian
-// Museum) without dropping a pin for far-away sites (e.g. Konark in Odisha).
-const CURATED_NEARBY_RADIUS_M = 150000;
-
 const DEFAULT_REGION: Region = {
   latitude: 20.5937,
   longitude: 78.9629,
@@ -204,6 +199,7 @@ const Home: React.FC<Props> = ({navigation}) => {
   const [locationDenied, setLocationDenied] = useState(false);
   const [arrivalDismissed, setArrivalDismissed] = useState(false);
   const [supportedSites, setSupportedSites] = useState<SiteDetail[]>([]);
+  const [mapReady, setMapReady] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<ActivePlace | null>(null);
   const [routeActive, setRouteActive] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -328,24 +324,16 @@ const Home: React.FC<Props> = ({navigation}) => {
 
   const featuredPlace: Place | null = filteredPlaces[0] ?? null;
 
-  // Curated Epocheye sites to pin on the map: those with coordinates, filtered
-  // to the user's vicinity when we have a location (all of them otherwise, so
-  // the map isn't empty before location permission is granted).
-  const nearbyCuratedSites = useMemo(() => {
-    const withCoords = supportedSites.filter(
-      s => typeof s.latitude === 'number' && typeof s.longitude === 'number',
-    );
-    if (!userLatLng) return withCoords;
-    return withCoords.filter(
-      s =>
-        distanceMeters(
-          userLatLng.lat,
-          userLatLng.lng,
-          s.latitude as number,
-          s.longitude as number,
-        ) <= CURATED_NEARBY_RADIUS_M,
-    );
-  }, [supportedSites, userLatLng]);
+  // Curated Epocheye sites to pin on the map: every site that has coordinates,
+  // regardless of distance, so all curated sites are always discoverable (the
+  // map auto-fits to them below). Sites without coordinates are skipped.
+  const nearbyCuratedSites = useMemo(
+    () =>
+      supportedSites.filter(
+        s => typeof s.latitude === 'number' && typeof s.longitude === 'number',
+      ),
+    [supportedSites],
+  );
 
   // First curated heritage site with coordinates — the map's fallback focus when
   // there's no device location and no nearby places (e.g. GPS-less tablet), so it
@@ -466,6 +454,34 @@ const Home: React.FC<Props> = ({navigation}) => {
     hasCuratedCenteredRef.current = true;
     mapRef.current?.animateToRegion(curatedFallbackRegion, 600);
   }, [currentLocation, curatedFallbackRegion]);
+
+  // Frame the map so EVERY curated pin is visible at once. Curated sites can be
+  // far apart (e.g. different states), so a single-city window would hide all
+  // but the nearest. Fires once after the sites load and the map is ready, and
+  // supersedes the one-time recenters above so they don't later crop the view.
+  const hasFitCuratedRef = useRef(false);
+  useEffect(() => {
+    if (hasFitCuratedRef.current || !mapReady || selectedPlace) return;
+    if (nearbyCuratedSites.length === 0) return;
+    hasFitCuratedRef.current = true;
+    hasCenteredRef.current = true;
+    hasCuratedCenteredRef.current = true;
+    const coords = nearbyCuratedSites.map(s => ({
+      latitude: s.latitude as number,
+      longitude: s.longitude as number,
+    }));
+    if (coords.length === 1) {
+      mapRef.current?.animateToRegion(
+        {...coords[0], latitudeDelta: 0.2, longitudeDelta: 0.2},
+        600,
+      );
+    } else {
+      mapRef.current?.fitToCoordinates(coords, {
+        edgePadding: {top: 80, right: 80, bottom: 80, left: 80},
+        animated: true,
+      });
+    }
+  }, [mapReady, nearbyCuratedSites, selectedPlace]);
 
   const handleViewSupported = useCallback(
     (site: SiteDetail) => {
@@ -781,6 +797,7 @@ const Home: React.FC<Props> = ({navigation}) => {
             style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}
             initialRegion={initialRegion}
             customMapStyle={mapStyle}
+            onMapReady={() => setMapReady(true)}
             showsUserLocation
             showsMyLocationButton={false}
             toolbarEnabled={false}

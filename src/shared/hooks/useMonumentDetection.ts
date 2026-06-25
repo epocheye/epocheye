@@ -72,9 +72,11 @@ export function useMonumentDetection(
       Geolocation.getCurrentPosition(
         async position => {
           try {
-            const { latitude, longitude } = position.coords;
+            const { latitude, longitude, accuracy } = position.coords;
 
-            const zone = getActiveZone(latitude, longitude);
+            // Pass the fix's reported accuracy so edge-of-range fixes still
+            // count as inside (geofenceService caps the slack it applies).
+            const zone = getActiveZone(latitude, longitude, accuracy ?? 0);
             if (mountedRef.current) {
               setActiveZone(zone);
             }

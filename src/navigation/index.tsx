@@ -1,5 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  NavigationContainer,
+  useNavigationContainerRef,
+} from '@react-navigation/native';
 import { View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OnboardingNavigator from './OnboardingNavigator';
@@ -13,6 +16,7 @@ import { OnboardingCallbackProvider } from '../context/OnboardingCallbackContext
 import { useSessionStore } from '../stores/sessionStore';
 import { useUserStore } from '../stores/userStore';
 import { usePlacesStore } from '../stores/placesStore';
+import { analytics } from '../services/analytics';
 
 type AppState = 'loading' | 'onboarding' | 'login' | 'main';
 
@@ -34,6 +38,41 @@ const AppNavigator: React.FC = () => {
   const setSessionAuthenticated = useSessionStore(
     state => state.setAuthenticated,
   );
+
+  // Analytics: boot the pipeline once, and auto-capture a screen_view on every
+  // route change (covers both the onboarding and main navigators).
+  const navigationRef = useNavigationContainerRef<MainStackParamList>();
+  const routeNameRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    void analytics.init();
+  }, []);
+
+  // The login screen renders outside the NavigationContainer, so capture its
+  // view explicitly (the onStateChange listener only covers in-container routes).
+  useEffect(() => {
+    if (appState === 'login') {
+      analytics.setScreen('Login');
+      analytics.track('screen_view', { screen: 'Login' });
+    }
+  }, [appState]);
+
+  const handleNavReady = useCallback(() => {
+    const current = navigationRef.getCurrentRoute()?.name;
+    routeNameRef.current = current;
+    analytics.setScreen(current);
+    if (current) analytics.track('screen_view', { screen: current });
+  }, [navigationRef]);
+
+  const handleNavStateChange = useCallback(() => {
+    const previous = routeNameRef.current;
+    const current = navigationRef.getCurrentRoute()?.name;
+    if (current && current !== previous) {
+      routeNameRef.current = current;
+      analytics.setScreen(current);
+      analytics.track('screen_view', { screen: current, prev: previous });
+    }
+  }, [navigationRef]);
 
   const clearAuthenticatedState = useCallback(() => {
     useUserStore.getState().clearUserData();
@@ -78,18 +117,24 @@ const AppNavigator: React.FC = () => {
   }, [checkAppState]);
 
   const handleLogout = useCallback(() => {
+    analytics.track('logout');
+    analytics.flush();
     setSessionAuthenticated(false);
     clearAuthenticatedState();
     setAppState('login');
   }, [clearAuthenticatedState, setSessionAuthenticated]);
 
   const handleOnboardingComplete = useCallback(() => {
+    analytics.track('onboarding_completed');
+    analytics.identify();
     setSessionAuthenticated(true);
     void useUserStore.getState().ensureUserDataLoaded();
     setAppState('main');
   }, [setSessionAuthenticated]);
 
   const handleLoginSuccess = useCallback(() => {
+    analytics.track('login_success');
+    analytics.identify();
     setSessionAuthenticated(true);
     void useUserStore.getState().ensureUserDataLoaded();
     setAppState('main');
@@ -111,7 +156,11 @@ const AppNavigator: React.FC = () => {
   }
 
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer
+      ref={navigationRef}
+      linking={linking}
+      onReady={handleNavReady}
+      onStateChange={handleNavStateChange}>
       {appState === 'onboarding' ? (
         <OnboardingCallbackProvider
           value={{ onOnboardingComplete: handleOnboardingComplete }}
