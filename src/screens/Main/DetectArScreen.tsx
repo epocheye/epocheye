@@ -184,11 +184,11 @@ function buildArCards(label: string | null, body: string): string {
   const chunks = chunkText(body, 300, 3);
   const cards =
     chunks.length === 0
-      ? [{display_name: label ?? 'AI interpretation', identity_confidence: 'inferred', narrative: body}]
+      ? [{display_name: label ?? 'This object', identity_confidence: 'inferred', narrative: body}]
       : chunks.map((chunk, i) =>
           i === 0
             ? {
-                display_name: label ?? 'AI interpretation',
+                display_name: label ?? 'This object',
                 identity_confidence: 'inferred',
                 narrative: chunk,
               }

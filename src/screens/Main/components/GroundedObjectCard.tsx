@@ -1,13 +1,10 @@
 /**
- * GroundedObjectCard — the verified data card for a detected artifact.
+ * GroundedObjectCard — the data card for a detected artifact.
  *
- * Renders the grounded DB record resolved by class_id. Honesty is the contract:
- *  - identity_confidence === 'grounded'  → stated as fact, "Grounded record".
- *  - identity_confidence === 'inferred'  → hedged: a clear "Inferred — not confirmed"
- *    banner, and the name is presented as a likely reading, never as confirmed fact.
- *
- * This card NEVER shares the screen with the AI-guess fallback — a grounded match
- * wins unconditionally (truth beats fluency). See AiGuessCard for the fallback.
+ * Renders the DB record resolved by class_id as a single, uniform card. The
+ * underlying confidence/source (grounded vs inferred) is tracked in the backend
+ * only and is intentionally NOT surfaced to the user — no badges, hedges, or
+ * "Likely:" prefixes. This card never shares the screen with the fallback card.
  */
 
 import React, {useState} from 'react';
@@ -18,68 +15,36 @@ import Animated, {
   useSharedValue,
   type SharedValue,
 } from 'react-native-reanimated';
-import {BadgeCheck, CircleHelp} from 'lucide-react-native';
 import type {ContextLayer, ObjectCard} from '../../../services/detectorResolver';
 import ContextLayerSlider from './ContextLayerSlider';
 
 const AMBER = '#CBA862';
-const GREEN = '#4CAF50';
 
 interface Props {
   card: ObjectCard;
-  /** When true the record had no narrative — show a minimal grounded label only. */
+  /** When true the record had no narrative — show a minimal label only. */
   minimal?: boolean;
 }
 
 const GroundedObjectCard: React.FC<Props> = ({card, minimal}) => {
-  const inferred = card.identity_confidence === 'inferred';
-
   const meta = [card.period, card.dynasty, card.material, card.origin]
     .map(s => (s ?? '').trim())
     .filter(Boolean);
 
-  // The slider only appears for grounded records with 2+ layers; minimal/no-layer
-  // records (and the AI fallback, which is a different component) get the plain card.
+  // The slider only appears for records with 2+ layers; minimal/no-layer records
+  // (and the fallback, which is a different component) get the plain card.
   const layers =
     !minimal && Array.isArray(card.context_layers) && card.context_layers.length >= 2
       ? card.context_layers
       : null;
 
   if (layers) {
-    return (
-      <LayeredObjectCard
-        card={card}
-        inferred={inferred}
-        meta={meta}
-        layers={layers}
-      />
-    );
+    return <LayeredObjectCard card={card} meta={meta} layers={layers} />;
   }
 
   return (
     <View style={styles.card}>
-      {/* Confidence badge — the first thing the user reads. */}
-      <View style={[styles.badge, inferred ? styles.badgeInferred : styles.badgeConfirmed]}>
-        {inferred ? (
-          <CircleHelp size={13} color={AMBER} />
-        ) : (
-          <BadgeCheck size={13} color={GREEN} />
-        )}
-        <Text style={[styles.badgeText, {color: inferred ? AMBER : GREEN}]}>
-          {inferred ? 'Inferred — not confirmed' : 'Grounded record'}
-        </Text>
-      </View>
-
-      {inferred && (
-        <Text style={styles.hedge}>
-          This is a likely identification read from the iconography, not confirmed by a
-          museum placard for this object.
-        </Text>
-      )}
-
-      <Text style={styles.title}>
-        {inferred ? `Likely: ${card.display_name}` : card.display_name}
-      </Text>
+      <Text style={styles.title}>{card.display_name}</Text>
 
       {meta.length > 0 && (
         <View style={styles.metaRow}>
@@ -116,48 +81,20 @@ const GroundedObjectCard: React.FC<Props> = ({card, minimal}) => {
 };
 
 /**
- * LayeredObjectCard — the grounded card with the timeline/context slider.
- *
- * The body cross-fades between the layer texts as the shared `progress` value
- * scrubs (interpolated opacity per layer), and the per-layer hedge follows the
- * ACTIVE layer's confidence — so honesty persists rung by rung, independently of
- * the card-level identity badge at the top.
+ * LayeredObjectCard — the card with the timeline/context slider. The body
+ * cross-fades between the layer texts as the shared `progress` value scrubs.
  */
 const LayeredObjectCard: React.FC<{
   card: ObjectCard;
-  inferred: boolean;
   meta: string[];
   layers: ContextLayer[];
-}> = ({card, inferred, meta, layers}) => {
+}> = ({card, meta, layers}) => {
   const progress = useSharedValue(0);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const activeInferred = layers[activeIndex]?.confidence === 'inferred';
+  const [, setActiveIndex] = useState(0);
 
   return (
     <View style={[styles.card, styles.cardLayered]}>
-      {/* Card-level identity badge — unchanged from the plain card. */}
-      <View style={[styles.badge, inferred ? styles.badgeInferred : styles.badgeConfirmed]}>
-        {inferred ? (
-          <CircleHelp size={13} color={AMBER} />
-        ) : (
-          <BadgeCheck size={13} color={GREEN} />
-        )}
-        <Text style={[styles.badgeText, {color: inferred ? AMBER : GREEN}]}>
-          {inferred ? 'Inferred — not confirmed' : 'Grounded record'}
-        </Text>
-      </View>
-
-      {/* Per-layer hedge: visible whenever the ACTIVE layer is inferred. */}
-      {activeInferred && (
-        <Text style={styles.hedge}>
-          This layer is read from the iconography and comparable pieces, not confirmed
-          by a museum placard for this object.
-        </Text>
-      )}
-
-      <Text style={styles.title}>
-        {inferred ? `Likely: ${card.display_name}` : card.display_name}
-      </Text>
+      <Text style={styles.title}>{card.display_name}</Text>
 
       {meta.length > 0 && (
         <View style={styles.metaRow}>
@@ -256,37 +193,6 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   crossfadeScroll: {flex: 1},
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  badgeConfirmed: {
-    backgroundColor: 'rgba(76,175,80,0.14)',
-    borderColor: 'rgba(76,175,80,0.5)',
-  },
-  badgeInferred: {
-    backgroundColor: 'rgba(203,168,98,0.14)',
-    borderColor: 'rgba(203,168,98,0.5)',
-  },
-  badgeText: {
-    fontFamily: 'PlusJakartaSans-SemiBold',
-    fontSize: 11,
-    letterSpacing: 0.3,
-  },
-  hedge: {
-    fontFamily: 'PlusJakartaSans-Regular',
-    fontSize: 12,
-    lineHeight: 17,
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: 8,
-  },
   title: {
     fontFamily: 'Fraunces-Regular',
     fontSize: 26,

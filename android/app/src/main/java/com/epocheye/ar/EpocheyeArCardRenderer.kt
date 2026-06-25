@@ -16,15 +16,13 @@ import org.json.JSONObject
  *
  * Uses only stable Android 2D graphics (Canvas / Paint / StaticLayout) — no
  * SceneView types — so this part is build-safe regardless of the SceneView
- * version. Honesty contract mirrors the RN GroundedObjectCard:
- *   identity_confidence == 'inferred' → amber "INFERRED — NOT PLACARD-CONFIRMED"
- *   else                              → green "PLACARD-CONFIRMED", stated as fact.
+ * version. Source/confidence (grounded vs inferred) is backend-only and is never
+ * drawn on the card — every card renders uniformly.
  */
 object EpocheyeArCardRenderer {
 
     private const val W = 1024
     private const val PAD = 56f
-    private val AMBER = Color.parseColor("#E8A020")
     private val GREEN = Color.parseColor("#4CAF50")
     private val INK = Color.parseColor("#F5F0E8")
     private val MUTED = Color.parseColor("#BDB6AC")
@@ -45,11 +43,10 @@ object EpocheyeArCardRenderer {
         }
 
         val continuation = o.optBoolean("continuation", false)
-        val inferred = o.optString("identity_confidence") == "inferred"
-        val accent = if (continuation) MUTED else if (inferred) AMBER else GREEN
-        val badge = if (inferred) "INFERRED — NOT PLACARD-CONFIRMED" else "PLACARD-CONFIRMED"
-        val name = o.optString("display_name").ifBlank { "Unknown object" }
-        val title = if (inferred) "Likely: $name" else name
+        // Source/confidence (grounded vs inferred) is backend-only — never shown to
+        // the user. The card renders uniformly with no badge and no "Likely:" prefix.
+        val accent = if (continuation) MUTED else GREEN
+        val title = o.optString("display_name").ifBlank { "Unknown object" }
         val meta = listOf(
             o.optString("period"), o.optString("dynasty"),
             o.optString("material"), o.optString("origin"),
@@ -58,10 +55,6 @@ object EpocheyeArCardRenderer {
 
         val contentW = (W - PAD * 2).toInt()
 
-        val badgePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = accent; textSize = 30f; typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-            letterSpacing = 0.08f
-        }
         val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = INK; textSize = 64f; typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
         }
@@ -84,8 +77,6 @@ object EpocheyeArCardRenderer {
 
         var y = PAD
         if (titleLayout != null) {
-            y += 48f // badge row
-            y += 24f
             y += titleLayout.height
         }
         if (metaLayout != null) y += 18f + metaLayout.height
@@ -108,9 +99,6 @@ object EpocheyeArCardRenderer {
 
         var cy = PAD
         if (titleLayout != null) {
-            canvas.drawText(badge, PAD, cy + 30f, badgePaint)
-            cy += 48f + 24f
-
             canvas.save()
             canvas.translate(PAD, cy)
             titleLayout.draw(canvas)
