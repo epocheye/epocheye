@@ -55,6 +55,7 @@ import {
 
 import { useGeminiIdentification } from '../../shared/hooks/useGeminiIdentification';
 import { useARCore } from '../../shared/hooks/useARCore';
+import { useSafeBackHandler } from '../../shared/hooks/useSafeGoBack';
 import { getActiveZone } from '../../services/geofenceService';
 import { fetchZones } from '../../services/zoneService';
 import { prefetchSiteForMonument } from '../../services/sitePrefetchService';
@@ -486,6 +487,27 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
     setUnknownLabel('');
   }, [unknownSubmitting]);
 
+  // Exiting the AR session (button OR hardware back) must never fall through to
+  // closing the whole app. Hardware back first closes any open overlay (these are
+  // plain views, not native <Modal>s, so they don't intercept back themselves).
+  const safeGoBack = useSafeBackHandler(
+    useCallback(() => {
+      if (unknownPrompt) {
+        dismissUnknownPrompt();
+        return true;
+      }
+      if (objectPicker) {
+        setObjectPicker(null);
+        return true;
+      }
+      if (showInfo) {
+        setShowInfo(false);
+        return true;
+      }
+      return false;
+    }, [unknownPrompt, objectPicker, showInfo, dismissUnknownPrompt]),
+  );
+
   const handleNearbyAnchorTap = useCallback(
     (asset: SiteBundleAsset, placement: SiteBundlePlacement) => {
       // User explicitly picked a curated asset from the nearby-anchors overlay.
@@ -655,7 +677,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
               Open Settings
             </Text>
           </Pressable>
-          <Pressable onPress={() => navigation.goBack()} className="mt-2">
+          <Pressable onPress={safeGoBack} className="mt-2">
             <Text className="text-parchment-dim text-sm font-ui-medium">
               Back
             </Text>
@@ -793,7 +815,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
         <SafeAreaView className="absolute top-0 left-0 right-0">
           <View className="flex-row items-center justify-between px-5 py-4">
             <TouchableOpacity
-              onPress={() => navigation.goBack()}
+              onPress={safeGoBack}
               className="w-11 h-11 rounded-full bg-black/50 items-center justify-center"
             >
               <ArrowLeft color="#FFFFFF" size={22} />
@@ -1131,7 +1153,7 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Exit button */}
           {!timelineExpanded && (
             <TouchableOpacity
-              onPress={() => navigation.goBack()}
+              onPress={safeGoBack}
               className="mx-5 mt-1 bg-[#1F1F2A] rounded-2xl py-3 items-center justify-center border border-[#272730]"
             >
               <Text className="text-white text-sm font-ui-medium">

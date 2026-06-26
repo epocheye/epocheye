@@ -52,8 +52,17 @@ export function useBackConfirm({
             text: confirmText,
             style: 'destructive',
             onPress: () => {
+              // Dismiss the dialog and leave deterministically — pop exactly
+              // this screen. Guarding with `canGoBack` ensures "Leave" can never
+              // fall through to finishing the activity (which would close the
+              // whole app) if the original action was broader than a single pop.
+              useDialogStore.getState().hideDialog();
               allowNext.current = true;
-              navigation.dispatch(e.data.action);
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.dispatch(e.data.action);
+              }
             },
           },
         ],

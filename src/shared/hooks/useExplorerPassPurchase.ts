@@ -100,6 +100,7 @@ export function useExplorerPassPurchase(): UseExplorerPassPurchaseReturn {
             couponCode: init.coupon_code,
             razorpayOrderId: razorpayData.razorpay_order_id,
             razorpayPaymentId: razorpayData.razorpay_payment_id,
+            razorpaySignature: razorpayData.razorpay_signature,
             originalAmount: init.original_amount_paise,
             discountedAmount: init.amount_paise,
             itemDescription: description,
@@ -127,6 +128,7 @@ async function recordCouponOrder(params: {
   couponCode: string;
   razorpayOrderId: string;
   razorpayPaymentId: string;
+  razorpaySignature: string;
   originalAmount: number;
   discountedAmount: number;
   itemDescription?: string;
@@ -136,6 +138,7 @@ async function recordCouponOrder(params: {
     coupon_code: params.couponCode,
     razorpay_order_id: params.razorpayOrderId,
     razorpay_payment_id: params.razorpayPaymentId,
+    razorpay_signature: params.razorpaySignature,
     original_amount: params.originalAmount,
     discounted_amount: params.discountedAmount,
     item_description: params.itemDescription,

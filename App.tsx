@@ -8,6 +8,7 @@ import AppNavigator from './src/navigation';
 import { NetworkProvider, useNetwork } from './src/context';
 import NoInternetScreen from './src/screens/NoInternetScreen';
 import DialogHost from './src/components/ui/DialogHost';
+import ErrorBoundary from './src/components/ui/ErrorBoundary';
 import { fcmInit, fcmRegisterAfterPermission } from './src/services/fcmService';
 import {
   startNotificationsRealtime,
@@ -77,7 +78,11 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider style={{ backgroundColor: '#000000' }}>
         <NetworkProvider>
-          <AppContent />
+          {/* Root boundary: convert an uncaught render/lifecycle error from a
+              silent app close into a calm, recoverable screen (logs to logcat). */}
+          <ErrorBoundary resetLabel="Try again">
+            <AppContent />
+          </ErrorBoundary>
         </NetworkProvider>
         {/* Global heritage-styled dialog + toast host — overlays every screen. */}
         <DialogHost />

@@ -59,6 +59,7 @@ import {streamMuseumNarration} from '../../services/museumModeService';
 // repo behind ROBOFLOW_ENABLED for a possible future cheap pre-filter.
 import {fetchObjectCard, type ObjectCard} from '../../services/detectorResolver';
 import {useVenueGate} from '../../shared/hooks/useVenueGate';
+import {useSafeBackHandler} from '../../shared/hooks/useSafeGoBack';
 import {usePlacesStore} from '../../stores/placesStore';
 import {analytics} from '../../services/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -465,7 +466,10 @@ const DetectArScreen: React.FC = () => {
     }
   }, [devPicker, inVenue, currentLocation, gateTimedOut, navigation]);
 
-  const handleClose = useCallback(() => navigation.goBack(), [navigation]);
+  // Route both the in-screen close button AND the Android hardware back button
+  // through the safe-back path so exiting the camera can never fall through to
+  // finishing the activity (which would close the whole app).
+  const handleClose = useSafeBackHandler();
 
   if (!devPicker && !inVenue) {
     if (locating) {

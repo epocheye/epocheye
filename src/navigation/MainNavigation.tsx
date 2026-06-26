@@ -50,20 +50,30 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
       </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.AR_EXPERIENCE}
-        component={ARExperienceScreen}
         options={{
           animation: 'fade',
           presentation: 'fullScreenModal',
         }}
-      />
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <ARExperienceScreen {...props} />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.AR_COMPOSER}
-        component={ARComposer}
         options={{
           animation: 'fade',
           presentation: 'fullScreenModal',
         }}
-      />
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <ARComposer {...props} />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.PURCHASE}
         component={PurchaseScreen}
@@ -84,19 +94,34 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
       />
       <Stack.Screen
         name={ROUTES.MAIN.AR_3D_VIEWER}
-        component={Ar3dViewerScreen}
         options={{ animation: 'fade', presentation: 'fullScreenModal' }}
-      />
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <Ar3dViewerScreen />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.AI_GUIDE}
-        component={AiGuideScreen}
         options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
-      />
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <AiGuideScreen {...props} />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.DETECT_AR}
-        component={DetectArScreen}
         options={{ animation: 'fade', presentation: 'fullScreenModal' }}
-      />
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <DetectArScreen />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.GO_TO_VENUE}
         component={GoToVenueScreen}

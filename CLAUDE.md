@@ -125,15 +125,22 @@ OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region → OB04_Pull
 
 A native stack containing `TabNavigation` (4 tabs) plus full-screen-modal and push screens:
 
-| Screen               | Route key                   | Presentation          |
-| -------------------- | --------------------------- | --------------------- |
-| `TabNavigation`      | `ROUTES.MAIN.TABS`          | default               |
-| `LensScreen`         | `ROUTES.MAIN.LENS`          | fullScreenModal, fade |
-| `SiteDetailScreen`   | `ROUTES.MAIN.SITE_DETAIL`   | slide_from_right      |
-| `ARExperienceScreen` | `ROUTES.MAIN.AR_EXPERIENCE` | fullScreenModal, fade |
-| `PermissionsScreen`  | `ROUTES.MAIN.PERMISSIONS`   | fullScreenModal       |
+| Screen                | Route key                    | Presentation             |
+| --------------------- | ---------------------------- | ------------------------ |
+| `TabNavigation`       | `ROUTES.MAIN.TABS`           | default                  |
+| `SiteDetailScreen`    | `ROUTES.MAIN.SITE_DETAIL`    | slide_from_right         |
+| `DetectArScreen`      | `ROUTES.MAIN.DETECT_AR`      | fullScreenModal, fade    |
+| `ARExperienceScreen`  | `ROUTES.MAIN.AR_EXPERIENCE`  | fullScreenModal, fade    |
+| `ARComposer`          | `ROUTES.MAIN.AR_COMPOSER`    | fullScreenModal, fade    |
+| `Ar3dViewerScreen`    | `ROUTES.MAIN.AR_3D_VIEWER`   | fullScreenModal, fade    |
+| `AiGuideScreen`       | `ROUTES.MAIN.AI_GUIDE`       | modal, slide_from_bottom |
+| `PurchaseScreen`      | `ROUTES.MAIN.PURCHASE`       | modal, slide_from_bottom |
+| `HistoryScreen`       | `ROUTES.MAIN.HISTORY`        | slide_from_right         |
+| `GoToVenueScreen`     | `ROUTES.MAIN.GO_TO_VENUE`    | fullScreenModal          |
+| `SuggestSiteScreen`   | `ROUTES.MAIN.SUGGEST_SITE`   | fullScreenModal          |
+| `AnchorCaptureScreen` | `ROUTES.MAIN.ANCHOR_CAPTURE` | modal (admin only)       |
 
-**Tabs** (Home, Passport, Daily, Account). `Saved.tsx` and `Explore.tsx` exist under `src/screens/Main/` but are **orphaned — not mounted** in `TabNavigation`.
+**Tabs** (Home, Passport, Daily, Account). The AR/3D/guide screens above are each wrapped in `ErrorBoundary` so a render crash recovers to the previous screen instead of closing the app. There is **no** `LensScreen`/`PermissionsScreen` route — those were removed.
 
 ---
 
@@ -160,25 +167,25 @@ An extended token set lives in `src/design-system/tokens/` (`typography.ts`, `co
 
 ---
 
-## Lens Screen (`src/screens/Lens/LensScreen.tsx`)
+## Scan / AR screens
 
-The Lens screen is a live camera view that:
+There is **no** `src/screens/Lens/LensScreen.tsx` and no `LENS` route. The live
+"point the camera at an object" experience is two mounted screens:
 
-1. On open, runs GPS monument detection — queries the places API at cascading radii (500 → 1000 → 2000 m) with an 8-second timeout
-2. On match, shows `BottomCard` with two actions: **Story** and **Scan Object**
-3. **Story mode**: takes a photo with `react-native-vision-camera`, sends it + monument name to `POST /api/lens/identify` (SSE stream), renders streamed text in `AncestorStorySheet`
-4. **Object scan mode**: same photo capture path but sends `mode: 'object_scan'` and `motivation`; the `done` event includes an `object` payload (`LensIdentifiedObject`)
-5. Both modes fall back to `getFallbackStory()` on any error
+- `src/screens/Main/DetectArScreen.tsx` (`ROUTES.MAIN.DETECT_AR`) — the production
+  object-scan/recognition surface. Runs the venue gate, captures a frame with
+  `react-native-vision-camera`, calls `POST /api/v1/recognize` (async poll → `/recognize/result`),
+  and renders the resolved card (native world-anchored AR card on ARCore devices; on-screen card
+  otherwise).
+- `src/screens/Main/ARExperienceScreen.tsx` (`ROUTES.MAIN.AR_EXPERIENCE`) — the monument AR shell
+  (Gemini identify, timeline, HD scan, native `EpocheyeARView`).
 
-Service: `src/services/lensStoryService.ts` (`streamLensStory`). User context (firstName, regions, motivation) is read from `useOnboardingStore` with a fallback to `useUser().profile`.
+Both route every back/exit affordance — **including the Android hardware back button** — through
+`useSafeBackHandler()` (`src/shared/hooks/useSafeGoBack.ts`), which pops when it can and otherwise
+lands on the tabs, so exiting the camera can never fall through to closing the app.
 
-**Lens components** (`src/screens/Lens/components/`):
-
-- `BottomCard`, `IdentificationCard`, `MonumentInfoSheet` — surface identification results and actions
-- `AncestorStorySheet` — renders the streaming story with typewriter effect
-- `HDScanOverlay`, `SegmentationOverlay`, `PulsingRing` — scan-state UI over the camera feed
-- `GLBViewer` — renders reconstructed 3D models (AR pipeline output)
-- `EpochChips`, `SearchSheet` — era filtering and manual monument search
+`src/screens/Lens/` holds shared AR/scan building blocks (e.g. `ARComposer`, `GLBViewer`,
+identification/overlay components) — not a screen named `LensScreen`.
 
 ---
 
@@ -188,7 +195,6 @@ Beyond SSE, a set of services back the Lens/AR experience:
 
 - `geminiVisionService.ts` / `geminiImageService.ts` / `geminiCacheService.ts` — Gemini-backed vision calls for identification and image generation, with a local response cache
 - `hdScanService.ts` — orchestrates the HD scan flow shown by `HDScanOverlay`
-- `segmentationService.ts` — subject segmentation used by `SegmentationOverlay`
 - `arReconstructionService.ts` — 3D reconstruction driving `GLBViewer`
 - `geofenceService.ts` / `zoneService.ts` — geofencing and heritage-zone detection
 - `usageTracker.ts` / `usageTelemetryService.ts` — client-side usage counters and telemetry emission
@@ -305,8 +311,7 @@ type Props = TabScreenProps<'Home'>;
 
 - **Jest + CSS**: `App.tsx` imports `global.css` — Jest needs CSS mocking/transform support or tests on `App.tsx` will fail.
 - **Android NDK**: Build expects a pinned NDK version in `android/build.gradle`. Missing NDK causes native build failures.
-- **Orphaned screens**: `Saved.tsx` and `Explore.tsx` are kept under `src/screens/Main/` for possible re-introduction but are not mounted in `TabNavigation`. Don't link to them from new code.
-- **SSE cleanup**: Lens and onboarding story streams use XHR-based SSE. Always call the abort function on component unmount.
+- **SSE cleanup**: onboarding/guide story streams use XHR-based SSE. Always call the abort function on component unmount.
 - **Peer deps**: If `npm install` fails on `@gorhom/bottom-sheet` constraints, use `--legacy-peer-deps`.
 
 ---
