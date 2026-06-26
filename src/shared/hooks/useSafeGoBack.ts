@@ -9,7 +9,7 @@
  * on the main tabs rather than exiting.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { BackHandler } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { ROUTES } from '../../core/constants';
@@ -48,17 +48,23 @@ export function useSafeGoBack(): () => void {
 export function useSafeBackHandler(onIntercept?: () => boolean): () => void {
   const safeGoBack = useSafeGoBack();
 
+  // Keep the latest intercept in a ref so the focus effect registers the
+  // hardware-back listener ONCE per focus, instead of re-subscribing every time
+  // the caller's intercept identity changes (e.g. on each overlay-state update).
+  const interceptRef = useRef(onIntercept);
+  interceptRef.current = onIntercept;
+
   useFocusEffect(
     useCallback(() => {
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-        if (onIntercept?.()) {
+        if (interceptRef.current?.()) {
           return true;
         }
         safeGoBack();
         return true;
       });
       return () => sub.remove();
-    }, [safeGoBack, onIntercept]),
+    }, [safeGoBack]),
   );
 
   return safeGoBack;

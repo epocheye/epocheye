@@ -112,19 +112,25 @@ const sleep = (ms: number) =>
 async function pollResult(
   jobId: string,
   token: string | null,
+  signal?: AbortSignal,
 ): Promise<RecognizeResult> {
   const deadline = Date.now() + POLL_DEADLINE_MS;
   while (Date.now() < deadline) {
+    if (signal?.aborted) throw new Error('recognition aborted');
     await sleep(POLL_INTERVAL_MS);
+    if (signal?.aborted) throw new Error('recognition aborted');
     let data: RecognizeWire;
     try {
       const res = await axios.get<RecognizeWire>(RECOGNIZE_RESULT_URL, {
         params: {id: jobId},
         timeout: POLL_TIMEOUT_MS,
         headers: token ? {Authorization: `Bearer ${token}`} : undefined,
+        signal,
       });
       data = res.data;
     } catch {
+      // Stop immediately if we were aborted; otherwise treat as a transient blip.
+      if (signal?.aborted) throw new Error('recognition aborted');
       continue; // transient poll error — keep trying until the deadline
     }
     if (data.match === 'processing') continue;
@@ -136,7 +142,10 @@ async function pollResult(
   throw new Error('recognition timed out');
 }
 
-export async function recognize(params: RecognizeParams): Promise<RecognizeResult> {
+export async function recognize(
+  params: RecognizeParams,
+  signal?: AbortSignal,
+): Promise<RecognizeResult> {
   const token = await getValidAccessToken();
   try {
     const res = await axios.post<RecognizeWire>(
@@ -152,12 +161,13 @@ export async function recognize(params: RecognizeParams): Promise<RecognizeResul
       {
         timeout: SUBMIT_TIMEOUT_MS,
         headers: token ? {Authorization: `Bearer ${token}`} : undefined,
+        signal,
       },
     );
     // Cache miss → the backend queued the agent and returned a job handle. Poll for
     // the final card. Cache hits / gate / out_of_venue come back terminal here.
     if (res.data.match === 'processing' && res.data.job_id) {
-      return await pollResult(res.data.job_id, token);
+      return await pollResult(res.data.job_id, token, signal);
     }
     return res.data as RecognizeResult;
   } catch (err) {

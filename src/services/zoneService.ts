@@ -1,90 +1,82 @@
 /**
- * Dynamic heritage zone fetching from the backend API.
+ * Heritage zones, derived from the curated sites list.
  *
- * On success, caches the server response in memory so `getCachedZones()`
- * returns the latest data without another network call. On failure,
- * falls back to an empty list if the API is unreachable.
+ * The app's single source of curated venues is GET /api/v1/sites (monuments with
+ * status active/published) — the same list the map pins, Home, and Passport use.
+ * We map each curated site that has coordinates into a HeritageZone, so geofencing,
+ * the away-from-venue screen, and venue search all reflect exactly those venues
+ * (and nothing else). The older /api/v1/zones table is no longer read here — it
+ * had drifted from the curated set and surfaced stale, non-curated venues.
+ *
+ * On success, caches the result in memory so getCachedZones() returns the latest
+ * without another network call. On a network failure, returns an empty list and
+ * flags lastFailed so the UI can tell a blip apart from genuinely being outside.
  */
 
 import { createAuthenticatedClient } from '../utils/api/auth';
 import type { HeritageZone } from '../core/config/geofence.types';
-
-interface RawZone {
-  id: string;
-  name: string;
-  monument_id?: string;
-  lat: number;
-  lon: number;
-  radius_meters?: number;
-  radiusMeters?: number;
-  epoch_label?: string;
-  epochLabel?: string;
-}
+import type { SiteDetail } from '../utils/api/places/types';
 
 let cachedZones: HeritageZone[] | null = null;
-// Distinguish "zones fetched successfully" from "fetch failed (network)" so the
+// Distinguish "venues fetched successfully" from "fetch failed (network)" so the
 // UI can tell a network blip apart from genuinely being outside all venues.
 let everLoaded = false;
 let lastFailed = false;
 
 /**
- * Client-side floor for a venue's radius. Backend-seeded radii (200–500m) are
- * too tight once normal GPS drift is added, and we want the app/Lens usable
- * within ~1 km of any site. This floors every zone to 1 km regardless of the
- * stored value (GPS slack in geofenceService is added on top of this).
+ * Client-side floor for a venue's radius so the app/Lens stays usable within ~1 km
+ * of any site (GPS slack in geofenceService is added on top). Curated sites carry
+ * no per-venue radius, so every derived zone uses this.
  */
 const MIN_VENUE_RADIUS_M = 1000;
 
-function normalizeZone(raw: RawZone): HeritageZone {
+/**
+ * Map a curated site to a geofence zone. Returns null for sites without
+ * coordinates — they can't be geofenced or distance-sorted.
+ */
+function siteToZone(site: SiteDetail): HeritageZone | null {
+  if (site.latitude == null || site.longitude == null) {
+    return null;
+  }
+  // monument_id is the slug join key (monument_objects / anchors / AR catalog).
+  const key =
+    site.slug && site.slug.trim().length > 0 ? site.slug.trim() : site.id;
   return {
-    id: raw.id,
-    name: raw.name,
-    monument_id: raw.monument_id ?? slugify(raw.name),
-    lat: raw.lat,
-    lon: raw.lon,
-    radiusMeters: Math.max(
-      raw.radius_meters ?? raw.radiusMeters ?? 500,
-      MIN_VENUE_RADIUS_M,
-    ),
-    epochLabel: raw.epoch_label ?? raw.epochLabel ?? '',
+    id: key,
+    name: site.name,
+    monument_id: key,
+    lat: site.latitude,
+    lon: site.longitude,
+    radiusMeters: MIN_VENUE_RADIUS_M,
+    epochLabel: site.era ?? site.century ?? '',
   };
 }
 
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-}
-
 /**
- * Fetch zones from the backend. Caches the result in memory.
- * Falls back to hardcoded config on any error.
+ * Fetch the curated venues and cache them as heritage zones. The lat/lon args are
+ * accepted for call-site compatibility but unused — the curated list is small and
+ * nearest/within-range is computed client-side (see geofenceService).
  */
 export async function fetchZones(
-  lat?: number,
-  lon?: number,
+  _lat?: number,
+  _lon?: number,
 ): Promise<HeritageZone[]> {
   try {
     const client = createAuthenticatedClient();
-    const params: Record<string, number> = {};
-    if (lat != null && lon != null) {
-      params.lat = lat;
-      params.lon = lon;
-    }
-
-    const resp = await client.get<{ zones: RawZone[] }>(
-      '/api/v1/zones/',
-      { params, timeout: 10000 },
-    );
+    const resp = await client.get<{ sites?: SiteDetail[] }>('/api/v1/sites', {
+      timeout: 10000,
+    });
 
     // Request reached the server (any 2xx) — not a network failure, even if it
-    // returned zero zones (genuinely no venues near the user).
+    // returned zero sites (genuinely no curated venues yet).
     lastFailed = false;
-    if (resp.data.zones && resp.data.zones.length > 0) {
-      cachedZones = resp.data.zones.map(normalizeZone);
+    const zones = (Array.isArray(resp.data?.sites) ? resp.data.sites : [])
+      .map(siteToZone)
+      .filter((z): z is HeritageZone => z !== null);
+    if (zones.length > 0) {
+      cachedZones = zones;
       everLoaded = true;
-      return cachedZones;
+      return zones;
     }
   } catch {
     // Network/transport failure — flag it so the UI doesn't read this as "outside".
@@ -94,10 +86,7 @@ export async function fetchZones(
   return [];
 }
 
-/**
- * Returns the last-fetched zones, or the hardcoded fallback if
- * fetchZones() hasn't succeeded yet.
- */
+/** Returns the last-fetched curated zones (empty until a fetch succeeds). */
 export function getCachedZones(): HeritageZone[] {
   return cachedZones ?? [];
 }

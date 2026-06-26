@@ -130,6 +130,8 @@ type ResolutionOutcome =
   | {kind: 'limit'}
   // Statue-only gate at a venue refused a non-exhibit — show the polite tip.
   | {kind: 'rejected'; message?: string}
+  // Scan was cancelled (screen left or reset) — the caller ignores it.
+  | {kind: 'aborted'}
   | {kind: 'error'; message?: string};
 
 /**
@@ -245,14 +247,25 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
   // Free scans left at this venue after the latest serve (null when ungated/dev).
   const [remaining, setRemaining] = useState<number | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
+  // Aborts an in-flight recognize submit/poll so leaving the screen (or resetting)
+  // doesn't leave the up-to-45s poll loop running in the background.
+  const recognizeAbortRef = useRef<AbortController | null>(null);
 
   const reset = useCallback(() => {
     abortRef.current?.();
     abortRef.current = null;
+    recognizeAbortRef.current?.abort();
+    recognizeAbortRef.current = null;
     setResolved({kind: 'idle'});
   }, []);
 
-  useEffect(() => () => abortRef.current?.(), []);
+  useEffect(
+    () => () => {
+      abortRef.current?.();
+      recognizeAbortRef.current?.abort();
+    },
+    [],
+  );
 
   // Universal identify fallback: streams an "AI interpretation" card for any
   // object via the deployed museum-mode endpoint. Resolves the outcome as soon as
@@ -320,14 +333,27 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
       frameBase64: string,
       imageUri?: string,
     ): Promise<ResolutionOutcome> => {
+      // Cancel any prior in-flight recognize, then run this one under a fresh
+      // controller so reset()/unmount can abort the submit + poll loop.
+      recognizeAbortRef.current?.abort();
+      const controller = new AbortController();
+      recognizeAbortRef.current = controller;
+
       let result;
       try {
-        result = await recognize({
-          imageBase64: frameBase64,
-          venueId: venueSlug,
-          allowUngrounded,
-        });
+        result = await recognize(
+          {
+            imageBase64: frameBase64,
+            venueId: venueSlug,
+            allowUngrounded,
+          },
+          controller.signal,
+        );
       } catch (err) {
+        // Cancelled (screen left / reset) — drop it silently, no error UI.
+        if (controller.signal.aborted) {
+          return {kind: 'aborted'};
+        }
         const message = extractErrorMessage(err);
         if (__DEV__) {
           console.warn('[detect] recognize failed:', message ?? err);
@@ -337,6 +363,11 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
         // deployed universal identify so the test isn't blocked on a deploy.
         if (allowUngrounded && imageUri) return runMuseumFallback(imageUri, message);
         return {kind: 'error', message};
+      } finally {
+        // Done with this controller; clear it if it's still the latest.
+        if (recognizeAbortRef.current === controller) {
+          recognizeAbortRef.current = null;
+        }
       }
 
       // One event covers every recognition outcome (grounded/ai/paywall/
@@ -614,6 +645,7 @@ const DetectARNative: React.FC<{
         // the hook; a spent allowance routes to purchase. `uri` lets the dev
         // "scan anything" path fall back to the universal identify.
         const resolution = await runResolution(base64, uri);
+        if (resolution.kind === 'aborted') return; // scan cancelled — leave UI as-is
         if (resolution.kind === 'grounded' || resolution.kind === 'minimal') {
           const modelUri = await resolveModelGlb(resolution.classId);
           if (modelUri) {
@@ -888,6 +920,7 @@ const DetectAR2D: React.FC<{
       // compressed CDN GLBs aren't decodable by the JS viewer) — the card is the
       // surface. imageUri lets the dev "scan anything" path fall back to identify.
       const resolution = await runResolution(base64, imageUri);
+      if (resolution.kind === 'aborted') return; // scan cancelled — leave UI as-is
       if (resolution.kind === 'paywall') {
         navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
       } else if (resolution.kind === 'limit') {

@@ -40,6 +40,8 @@ interface Props {
 
 const MAX_PILLS = 5;
 const MAX_DISTANCE_METERS = 50;
+// ~5.5m grid (0.00005° ≈ 5.5m at the equator) — gates re-computation to real movement.
+const GPS_GRID_DEG = 0.00005;
 
 function haversineMeters(
   lat1: number,
@@ -63,8 +65,16 @@ const NearbyAnchorsList: React.FC<Props> = ({
   currentLng,
   onSelect,
 }) => {
+  // Snap the live GPS to a ~5m grid so the (assets × placements) distance pass and
+  // the resulting list only recompute when the user actually moves — not on every
+  // minor GPS update/jitter, which would otherwise churn this list on each tick.
+  const gridLat =
+    currentLat == null ? null : Math.round(currentLat / GPS_GRID_DEG) * GPS_GRID_DEG;
+  const gridLng =
+    currentLng == null ? null : Math.round(currentLng / GPS_GRID_DEG) * GPS_GRID_DEG;
+
   const entries = useMemo<NearbyEntry[]>(() => {
-    if (currentLat == null || currentLng == null) return [];
+    if (gridLat == null || gridLng == null) return [];
     const bundle = getActiveSiteBundle();
     if (!bundle || bundle.monument_id !== monumentId) return [];
     const assets = bundle.assets ?? [];
@@ -77,8 +87,8 @@ const NearbyAnchorsList: React.FC<Props> = ({
       for (const placement of asset.placements) {
         if (placement.lat == null || placement.lng == null) continue;
         const d = haversineMeters(
-          currentLat,
-          currentLng,
+          gridLat,
+          gridLng,
           placement.lat,
           placement.lng,
         );
@@ -94,7 +104,7 @@ const NearbyAnchorsList: React.FC<Props> = ({
 
     list.sort((a, b) => a.distance - b.distance);
     return list.slice(0, MAX_PILLS);
-  }, [monumentId, currentLat, currentLng]);
+  }, [monumentId, gridLat, gridLng]);
 
   if (entries.length === 0) return null;
 
