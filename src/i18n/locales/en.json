@@ -139,6 +139,7 @@
     "openDeviceSettingsA11y": "Open device settings",
     "openDeviceSettings": "Open Device Settings",
     "getSupport": "Get Support",
+    "replayTour": "Replay app tour",
     "version": "Version {{version}}",
     "madeWithCare": "Made with care for India's heritage",
     "logOut": "Log Out",
@@ -302,5 +303,76 @@
     "loading": "Loading...",
     "kmAway": "{{distance}} km away",
     "noResults": "No monuments match your search."
+  },
+  "tour": {
+    "progress": "Step {{current}} of {{total}}",
+    "back": "Back",
+    "next": "Next",
+    "done": "Finish",
+    "skip": "Skip tour",
+    "welcome": {
+      "title": "Welcome to Epocheye",
+      "body": "A quick tour to show you around. Tap Next to begin — we'll walk you through every part of the app."
+    },
+    "search": {
+      "title": "Find any place",
+      "body": "Search for heritage sites and places right from here."
+    },
+    "bell": {
+      "title": "Notifications",
+      "body": "Reminders, updates and news about the sites you follow appear here."
+    },
+    "hud": {
+      "title": "Your progress",
+      "body": "Your level, day-streak and XP grow as you visit sites and explore."
+    },
+    "map": {
+      "title": "Discover nearby",
+      "body": "Heritage sites near you show on the map. Tap a marker to open its story."
+    },
+    "nearest": {
+      "title": "Your nearest site",
+      "body": "We point you to the closest Epocheye venue with one-tap directions."
+    },
+    "rank": {
+      "title": "Explorer rank",
+      "body": "Your Passport tracks your rank and XP as a keeper of history."
+    },
+    "stamps": {
+      "title": "Collect stamps",
+      "body": "Earn a stamp for every heritage site you visit — they appear here."
+    },
+    "streak": {
+      "title": "Daily streak",
+      "body": "Open Epocheye each day to keep your streak alive."
+    },
+    "story": {
+      "title": "On this day",
+      "body": "A fresh moment in history every day — tap to explore the site behind it."
+    },
+    "profile": {
+      "title": "Your profile",
+      "body": "Update your name and details, and manage your account here."
+    },
+    "language": {
+      "title": "Choose your language",
+      "body": "Switch the app and AI narration between English, Hindi and Bengali."
+    },
+    "site": {
+      "title": "View in AR",
+      "body": "At a site, open AR to watch its history come alive over the real monument."
+    },
+    "scan": {
+      "title": "Point and scan",
+      "body": "Aim your camera at an artifact and tap Detect to identify it and unlock its story."
+    },
+    "passport": {
+      "title": "Unlock with a Passport",
+      "body": "A Passport unlocks the full AR experience at a site. Pick one when you're ready."
+    },
+    "finish": {
+      "title": "You're all set",
+      "body": "That's the tour! Explore at your own pace — replay it anytime from Account."
+    }
   }
 }

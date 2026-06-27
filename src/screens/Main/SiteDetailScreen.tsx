@@ -25,6 +25,7 @@ import {
   Shield,
 } from 'lucide-react-native';
 import ShareExperienceModal from '../../components/ShareExperienceModal';
+import { TourTarget } from '../../components/tour/useTourTarget';
 import { useUser } from '../../context';
 import { useExplorerPass } from '../../shared/hooks';
 import {
@@ -387,18 +388,20 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* CTAs (Figma 238:72 / 238:75) */}
         <View className="px-7 mt-7 gap-3.5">
-          <TouchableOpacity
-            onPress={handleStartARExperience}
-            activeOpacity={0.9}
-            className="h-[53px] rounded-[30px] bg-brand-gold flex-row items-center justify-center gap-2"
-            accessibilityRole="button"
-            accessibilityLabel={t('siteDetail.viewInAr')}
-          >
-            <Camera color="#0A0A0C" size={18} />
-            <Text className="text-ink text-[22px] font-display">
-              {t('siteDetail.viewInAr')}
-            </Text>
-          </TouchableOpacity>
+          <TourTarget id="siteDetail.viewAr">
+            <TouchableOpacity
+              onPress={handleStartARExperience}
+              activeOpacity={0.9}
+              className="h-[53px] rounded-[30px] bg-brand-gold flex-row items-center justify-center gap-2"
+              accessibilityRole="button"
+              accessibilityLabel={t('siteDetail.viewInAr')}
+            >
+              <Camera color="#0A0A0C" size={18} />
+              <Text className="text-ink text-[22px] font-display">
+                {t('siteDetail.viewInAr')}
+              </Text>
+            </TouchableOpacity>
+          </TourTarget>
 
           <TouchableOpacity
             onPress={handleAskGuide}

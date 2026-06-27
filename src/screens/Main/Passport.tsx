@@ -16,6 +16,7 @@ import {Check, ChevronRight, Compass, Lock, Share2, Sparkles} from 'lucide-react
 import {COLORS, FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
 import BadgeGrid from '../../components/ui/BadgeGrid';
+import {TourTarget} from '../../components/tour/useTourTarget';
 import LevelUpCelebration from '../../components/ui/LevelUpCelebration';
 import XPGainToast from '../../components/ui/XPGainToast';
 import {
@@ -197,6 +198,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
         </View>
 
         {/* Rank hero card */}
+        <TourTarget id="passport.rank">
         <LinearGradient
           colors={HERO_GRADIENT}
           start={{x: 0, y: 0}}
@@ -244,6 +246,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
             <HeroStat value={dynastiesCount} label={t('passport.dynasties')} />
           </View>
         </LinearGradient>
+        </TourTarget>
 
         {/* Passport CTA / active passes */}
         {activePasses.length === 0 ? (
@@ -312,6 +315,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
         </View>
 
         {/* Stamps */}
+        <TourTarget id="passport.stamps">
         <View className="px-6 mt-9 mb-4 flex-row items-baseline justify-between">
           <Text style={{fontFamily: FONTS.display}} className="text-2xl text-foreground tracking-tight">
             {t('passport.stamps')}
@@ -363,6 +367,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
             </View>
           ))}
         </View>
+        </TourTarget>
 
         {stamps.length === 0 && lockedSites.length === 0 ? (
           <View className="mt-14 px-8 items-center">

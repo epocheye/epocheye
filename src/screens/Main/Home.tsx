@@ -37,8 +37,9 @@ import type {HeritageZone} from '../../core/config/geofence.types';
 import type {Place} from '../../utils/api/places/types';
 import type {PlaceNavParam} from '../../core/types/navigation.types';
 import UnavailableSiteCard from './components/UnavailableSiteCard';
-import OnboardingTooltips from '../../components/OnboardingTooltips';
+import TourFirstRun from '../../components/tour/TourFirstRun';
 import NotificationsModal from '../../components/NotificationsModal';
+import {TourTarget} from '../../components/tour/useTourTarget';
 import type {TabScreenProps} from '../../core/types/navigation.types';
 import {useDistanceToSite} from '../../shared/hooks/useDistanceToSite';
 import {useActiveMonument} from '../../shared/hooks/useActiveMonument';
@@ -703,48 +704,54 @@ const Home: React.FC<Props> = ({navigation}) => {
       </View>
 
       {/* Explorer HUD — gamified status: rank, streak, and XP toward the goal */}
-      <View className="mx-6 mt-3 px-4 py-3 rounded-2xl bg-[rgba(203,168,98,0.06)] border border-[rgba(203,168,98,0.20)]">
-        <View className="flex-row items-center justify-between mb-[10px]">
-          <LevelBadge sites={hudSites} />
-          <StreakFlame days={hudStreak} size={18} label={t('home.dayStreak')} />
+      <TourTarget id="home.hud">
+        <View className="mx-6 mt-3 px-4 py-3 rounded-2xl bg-[rgba(203,168,98,0.06)] border border-[rgba(203,168,98,0.20)]">
+          <View className="flex-row items-center justify-between mb-[10px]">
+            <LevelBadge sites={hudSites} />
+            <StreakFlame days={hudStreak} size={18} label={t('home.dayStreak')} />
+          </View>
+          <XPProgress value={hudSites} goal={hudGoal} label={t('home.sitesVisited')} height={8} />
         </View>
-        <XPProgress value={hudSites} goal={hudGoal} label={t('home.sitesVisited')} height={8} />
-      </View>
+      </TourTarget>
 
       {/* Control row: notification + search icons (right) */}
       <View className="px-6 pt-5 pb-3 flex-row items-center justify-end">
         <View className="flex-row items-center gap-x-2">
-          <Pressable
-            onPress={() => setNotifOpen(true)}
-            hitSlop={10}
-            className="w-10 h-10 rounded-full border border-white/10 bg-card items-center justify-center"
-            accessibilityRole="button"
-            accessibilityLabel={
-              unreadCount > 0
-                ? t('home.notificationsUnread', {count: unreadCount})
-                : t('home.notifications')
-            }>
-            <Bell color="#FFFFFF" size={19} />
-            {unreadCount > 0 ? (
-              <View className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#E05C5C] items-center justify-center">
-                <Text style={{fontFamily: FONTS.uiSemiBold, fontSize: 9, color: '#FFFFFF'}}>
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
-          <Pressable
-            onPress={() => setSearchOpen(prev => !prev)}
-            hitSlop={10}
-            className="w-10 h-10 rounded-full border border-white/10 bg-card items-center justify-center"
-            accessibilityRole="button"
-            accessibilityLabel={searchOpen ? t('home.closeSearch') : t('home.openSearch')}>
-            {searchOpen ? (
-              <X color="#FFFFFF" size={20} />
-            ) : (
-              <Search color="#FFFFFF" size={20} />
-            )}
-          </Pressable>
+          <TourTarget id="home.bell">
+            <Pressable
+              onPress={() => setNotifOpen(true)}
+              hitSlop={10}
+              className="w-10 h-10 rounded-full border border-white/10 bg-card items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel={
+                unreadCount > 0
+                  ? t('home.notificationsUnread', {count: unreadCount})
+                  : t('home.notifications')
+              }>
+              <Bell color="#FFFFFF" size={19} />
+              {unreadCount > 0 ? (
+                <View className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#E05C5C] items-center justify-center">
+                  <Text style={{fontFamily: FONTS.uiSemiBold, fontSize: 9, color: '#FFFFFF'}}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          </TourTarget>
+          <TourTarget id="home.search">
+            <Pressable
+              onPress={() => setSearchOpen(prev => !prev)}
+              hitSlop={10}
+              className="w-10 h-10 rounded-full border border-white/10 bg-card items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel={searchOpen ? t('home.closeSearch') : t('home.openSearch')}>
+              {searchOpen ? (
+                <X color="#FFFFFF" size={20} />
+              ) : (
+                <Search color="#FFFFFF" size={20} />
+              )}
+            </Pressable>
+          </TourTarget>
         </View>
       </View>
 
@@ -752,44 +759,46 @@ const Home: React.FC<Props> = ({navigation}) => {
           venue, so when the user is outside one we continuously point them to the
           nearest site with one-tap directions (never static). */}
       {!inVenue && nearestVenue ? (
-        <Pressable
-          onPress={() => openVenueDirections(nearestVenue.zone)}
-          style={({pressed}) => (pressed ? {opacity: 0.92} : undefined)}
-          className="mx-6 mt-1 mb-2 flex-row items-center rounded-2xl border border-white/10 bg-card px-3.5 py-3"
-          accessibilityRole="button"
-          accessibilityLabel={t('home.getDirectionsTo', {
-            name: nearestVenue.zone.name,
-            distance: formatVenueDistance(nearestVenue.distance),
-          })}>
-          <View
-            className="w-9 h-9 rounded-full items-center justify-center mr-3"
-            style={{backgroundColor: 'rgba(203,168,98,0.14)'}}>
-            <Navigation color={COLORS.gold} size={16} />
-          </View>
-          <View className="flex-1">
-            <Text
-              numberOfLines={1}
-              style={{fontFamily: FONTS.uiSemiBold}}
-              className="text-[10px] tracking-[0.18em] uppercase text-muted-foreground">
-              {t('home.nearestSite')}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={{fontFamily: FONTS.uiSemiBold}}
-              className="text-sm text-foreground mt-0.5">
-              {nearestVenue.zone.name} · {formatVenueDistance(nearestVenue.distance)}
-            </Text>
-          </View>
-          <LinearGradient
-            colors={GOLD_GRADIENT}
-            start={{x: 0, y: 0}}
-            end={{x: 1, y: 1}}
-            style={{borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, marginLeft: 10}}>
-            <Text style={{fontFamily: FONTS.uiSemiBold, fontSize: 12, color: '#0A0A0C'}}>
-              {t('home.directions')}
-            </Text>
-          </LinearGradient>
-        </Pressable>
+        <TourTarget id="home.nearest">
+          <Pressable
+            onPress={() => openVenueDirections(nearestVenue.zone)}
+            style={({pressed}) => (pressed ? {opacity: 0.92} : undefined)}
+            className="mx-6 mt-1 mb-2 flex-row items-center rounded-2xl border border-white/10 bg-card px-3.5 py-3"
+            accessibilityRole="button"
+            accessibilityLabel={t('home.getDirectionsTo', {
+              name: nearestVenue.zone.name,
+              distance: formatVenueDistance(nearestVenue.distance),
+            })}>
+            <View
+              className="w-9 h-9 rounded-full items-center justify-center mr-3"
+              style={{backgroundColor: 'rgba(203,168,98,0.14)'}}>
+              <Navigation color={COLORS.gold} size={16} />
+            </View>
+            <View className="flex-1">
+              <Text
+                numberOfLines={1}
+                style={{fontFamily: FONTS.uiSemiBold}}
+                className="text-[10px] tracking-[0.18em] uppercase text-muted-foreground">
+                {t('home.nearestSite')}
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={{fontFamily: FONTS.uiSemiBold}}
+                className="text-sm text-foreground mt-0.5">
+                {nearestVenue.zone.name} · {formatVenueDistance(nearestVenue.distance)}
+              </Text>
+            </View>
+            <LinearGradient
+              colors={GOLD_GRADIENT}
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 1}}
+              style={{borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, marginLeft: 10}}>
+              <Text style={{fontFamily: FONTS.uiSemiBold, fontSize: 12, color: '#0A0A0C'}}>
+                {t('home.directions')}
+              </Text>
+            </LinearGradient>
+          </Pressable>
+        </TourTarget>
       ) : null}
 
       {/* Optional search input */}
@@ -819,6 +828,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       ) : null}
 
       {/* Map — padded rounded container */}
+      <TourTarget id="home.map" style={{flex: 1}}>
       <View className="flex-1 mx-4 mt-2 mb-2 rounded-3xl overflow-hidden bg-background">
         <MapView
             ref={mapRef}
@@ -927,6 +937,7 @@ const Home: React.FC<Props> = ({navigation}) => {
           </View>
         ) : null}
       </View>
+      </TourTarget>
 
       {/* Bottom card — curated Epocheye site shows a details CTA; any other
           place shows the calm "not available here" card. */}
@@ -997,8 +1008,8 @@ const Home: React.FC<Props> = ({navigation}) => {
         />
       ) : null}
 
-      {/* First-run, non-blocking feature tips */}
-      <OnboardingTooltips bottomOffset={insets.bottom + 96} />
+      {/* First-run: kick off the guided product tour (renders nothing). */}
+      <TourFirstRun />
 
       <NotificationsModal
         visible={notifOpen}

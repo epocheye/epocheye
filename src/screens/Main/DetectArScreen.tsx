@@ -456,6 +456,10 @@ const DetectArScreen: React.FC = () => {
   const route = useRoute() as unknown as RouteParam;
   const venueSlug = route.params?.venueSlug ?? DEFAULT_DETECTOR_VENUE;
   const devPicker = route.params?.devPicker === true;
+  // Guided product tour: show the camera as a preview, bypassing the venue/GPS
+  // gate. The tour overlay (TourHost) blocks all touches, so no scan can run.
+  const tour = route.params?.tour === true;
+  const bypassGate = devPicker || tour;
 
   const {hasPermission, requestPermission} = useCameraPermission();
   const {arAvailable, arChecked} = useARCore();
@@ -477,17 +481,17 @@ const DetectArScreen: React.FC = () => {
   // Make sure GPS is actually being acquired the moment the screen opens, so the
   // venue gate below can decide on a real fix instead of a stale/empty location.
   useEffect(() => {
-    if (devPicker) return;
+    if (bypassGate) return;
     void ensureLocationTracking();
-  }, [devPicker, ensureLocationTracking]);
+  }, [bypassGate, ensureLocationTracking]);
 
   // Stop waiting for a fix after a grace period so a GPS-less device still
   // reaches the "go to your nearest venue" screen instead of hanging.
   useEffect(() => {
-    if (devPicker || inVenue) return;
+    if (bypassGate || inVenue) return;
     const t = setTimeout(() => setGateTimedOut(true), 12000);
     return () => clearTimeout(t);
-  }, [devPicker, inVenue]);
+  }, [bypassGate, inVenue]);
 
   // Venue lock: the live scan/AR experience only runs inside a curated venue.
   // CRITICAL: do NOT bounce the user the instant the screen mounts — the active
@@ -496,20 +500,20 @@ const DetectArScreen: React.FC = () => {
   // Wait until we actually have a location (zone evaluated) or the grace period
   // elapses; only then redirect if still outside. Dev picker bypasses the gate.
   const locating =
-    !devPicker && !inVenue && currentLocation == null && !gateTimedOut;
+    !bypassGate && !inVenue && currentLocation == null && !gateTimedOut;
   useEffect(() => {
-    if (devPicker || inVenue) return;
+    if (bypassGate || inVenue) return;
     if (currentLocation != null || gateTimedOut) {
       navigation.replace(ROUTES.MAIN.GO_TO_VENUE);
     }
-  }, [devPicker, inVenue, currentLocation, gateTimedOut, navigation]);
+  }, [bypassGate, inVenue, currentLocation, gateTimedOut, navigation]);
 
   // Route both the in-screen close button AND the Android hardware back button
   // through the safe-back path so exiting the camera can never fall through to
   // finishing the activity (which would close the whole app).
   const handleClose = useSafeBackHandler();
 
-  if (!devPicker && !inVenue) {
+  if (!bypassGate && !inVenue) {
     if (locating) {
       return (
         <SafeAreaView style={styles.root} edges={['top', 'bottom']}>

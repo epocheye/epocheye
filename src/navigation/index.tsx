@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  NavigationContainer,
-  useNavigationContainerRef,
-} from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 import { View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigation from './MainNavigation';
+import { navigationRef } from './navigationRef';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import { ROUTES, STORAGE_KEYS } from '../core/constants';
 import type { LinkingOptions } from '@react-navigation/native';
@@ -40,8 +38,8 @@ const AppNavigator: React.FC = () => {
   );
 
   // Analytics: boot the pipeline once, and auto-capture a screen_view on every
-  // route change (covers both the onboarding and main navigators).
-  const navigationRef = useNavigationContainerRef<MainStackParamList>();
+  // route change (covers both the onboarding and main navigators). The shared
+  // module-level navigationRef is also used by the guided tour (TourHost).
   const routeNameRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -62,7 +60,7 @@ const AppNavigator: React.FC = () => {
     routeNameRef.current = current;
     analytics.setScreen(current);
     if (current) analytics.track('screen_view', { screen: current });
-  }, [navigationRef]);
+  }, []);
 
   const handleNavStateChange = useCallback(() => {
     const previous = routeNameRef.current;
@@ -72,7 +70,7 @@ const AppNavigator: React.FC = () => {
       analytics.setScreen(current);
       analytics.track('screen_view', { screen: current, prev: previous });
     }
-  }, [navigationRef]);
+  }, []);
 
   const clearAuthenticatedState = useCallback(() => {
     useUserStore.getState().clearUserData();

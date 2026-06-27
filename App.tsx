@@ -8,6 +8,7 @@ import AppNavigator from './src/navigation';
 import { NetworkProvider, useNetwork } from './src/context';
 import NoInternetScreen from './src/screens/NoInternetScreen';
 import DialogHost from './src/components/ui/DialogHost';
+import TourHost from './src/components/tour/TourHost';
 import ErrorBoundary from './src/components/ui/ErrorBoundary';
 import { fcmInit, fcmRegisterAfterPermission } from './src/services/fcmService';
 import {
@@ -86,6 +87,8 @@ export default function App() {
         </NetworkProvider>
         {/* Global heritage-styled dialog + toast host — overlays every screen. */}
         <DialogHost />
+        {/* First-run guided product tour — overlays every screen incl. modals. */}
+        <TourHost />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

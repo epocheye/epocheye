@@ -29,6 +29,7 @@ import {COLORS, FONTS, GOLD_GRADIENT} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
 import StreakModule from '../../components/ui/StreakModule';
 import {AmbientGlow, ImageScrim} from '../../components/ui/premium';
+import {TourTarget} from '../../components/tour/useTourTarget';
 import {useDailyToday} from '../../shared/hooks';
 import type {DailyStreakDay} from '../../utils/api/daily';
 import type {TabScreenProps} from '../../core/types/navigation.types';
@@ -191,20 +192,23 @@ const Daily: React.FC<Props> = ({navigation}) => {
         </Animated.View>
 
         {/* Streak hero — the single gold block */}
-        <Animated.View style={sStreak} className="px-5 mb-5">
-          <StreakModule
-            days={streakCount}
-            week={
-              weeklyStreak.length
-                ? weeklyStreak.map(d => d.is_today || d.visited)
-                : undefined
-            }
-            subtitle={t('daily.streakSubtitle')}
-          />
-        </Animated.View>
+        <TourTarget id="daily.streak">
+          <Animated.View style={sStreak} className="px-5 mb-5">
+            <StreakModule
+              days={streakCount}
+              week={
+                weeklyStreak.length
+                  ? weeklyStreak.map(d => d.is_today || d.visited)
+                  : undefined
+              }
+              subtitle={t('daily.streakSubtitle')}
+            />
+          </Animated.View>
+        </TourTarget>
 
         {/* Story hero — dark, image-led editorial card */}
-        <Animated.View style={sHero} className="px-5">
+        <TourTarget id="daily.story">
+          <Animated.View style={sHero} className="px-5">
           {hasStory && daily?.image_url ? (
             <View style={styles.heroCard}>
               <Image source={{uri: daily.image_url}} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -301,7 +305,8 @@ const Daily: React.FC<Props> = ({navigation}) => {
               </View>
             </View>
           )}
-        </Animated.View>
+          </Animated.View>
+        </TourTarget>
 
         {/* Weekly streak strip */}
         <Animated.View style={sWeekly}>

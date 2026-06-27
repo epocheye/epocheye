@@ -45,6 +45,8 @@ export const STORAGE_KEYS = {
   ONBOARDING: {
     COMPLETED: `${STORAGE_PREFIX}/onboarding_complete`,
     QUESTIONNAIRE_ANSWERS: `${STORAGE_PREFIX}/questionnaire_answers`,
+    /** Set once the first-run guided product tour has been completed/skipped. */
+    TOUR_COMPLETED: `${STORAGE_PREFIX}/tour_completed`,
   },
 
   /**

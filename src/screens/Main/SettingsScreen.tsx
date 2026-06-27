@@ -36,6 +36,7 @@ import { useUser } from '../../context';
 import { PermissionService } from '../../shared/services/permission.service';
 import { APP_CONFIG } from '../../core/config';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
+import { TourTarget } from '../../components/tour/useTourTarget';
 import type { TabScreenProps } from '../../core/types/navigation.types';
 import { ENABLE_ANCHOR_CAPTURE } from '@env';
 import { ROUTES } from '../../core/constants';
@@ -50,6 +51,7 @@ import {
   NARRATION_LANGS,
 } from '../../stores/museumPrefsStore';
 import {setAppLanguage} from '../../i18n';
+import {useTourStore} from '../../stores/tourStore';
 import DevLoadTestArModelButton from './components/DevLoadTestArModelButton';
 import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 import { getVisitHistory, type VisitRow } from '../../utils/api/visits';
@@ -557,6 +559,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               </Text>
             </View>
           ) : (
+            <TourTarget id="account.profile">
             <Animated.View
               entering={FadeInDown.delay(180).duration(350)}
               className="mx-5 mt-6 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-5"
@@ -668,6 +671,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 </TouchableOpacity>
               )}
             </Animated.View>
+            </TourTarget>
           )}
 
           {/* ── Passport CTA ── */}
@@ -723,6 +727,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           )}
 
           {/* ── Museum narration language ── */}
+          <TourTarget id="account.language">
           <Animated.View
             entering={FadeInDown.delay(280).duration(350)}
             className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-4"
@@ -773,6 +778,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               })}
             </View>
           </Animated.View>
+          </TourTarget>
 
           {/* ── Permissions ── */}
           <Animated.View
@@ -845,6 +851,17 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               <MessageCircle size={14} color="#B8AF9E" />
               <Text className="text-parchment-muted text-xs font-ui-medium ml-1.5">
                 {t('settings.getSupport')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="mt-3 flex-row items-center justify-center rounded-xl border border-white/[0.08] bg-surface-2 py-2.5"
+              onPress={() => useTourStore.getState().start()}
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.replayTour')}
+            >
+              <Sparkles size={14} color="#B8AF9E" />
+              <Text className="text-parchment-muted text-xs font-ui-medium ml-1.5">
+                {t('settings.replayTour')}
               </Text>
             </TouchableOpacity>
           </Animated.View>

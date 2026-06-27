@@ -84,6 +84,8 @@ export type MainStackParamList = {
         venueSlug?: string;
         /** DEV: open the model-picker test instead of the detector flow. */
         devPicker?: boolean;
+        /** Guided tour: bypass the venue/GPS gate to show the camera as a preview. */
+        tour?: boolean;
       }
     | undefined;
   /** No-ARCore fallback — render an asset in a 3D orbit/zoom viewer. */
