@@ -22,11 +22,6 @@ export interface DailyToday {
   weekly_streak: DailyStreakDay[];
 }
 
-export interface DailyNudgeState {
-  enabled: boolean;
-  time_local: string;
-}
-
 export type ApiResult<T> =
   | {success: true; data: T}
   | {success: false; error: {message: string; statusCode: number}};

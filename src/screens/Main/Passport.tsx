@@ -9,6 +9,8 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useTranslation} from 'react-i18next';
+import type {TFunction} from 'i18next';
 import LinearGradient from 'react-native-linear-gradient';
 import {Check, ChevronRight, Compass, Lock, Share2, Sparkles} from 'lucide-react-native';
 import {COLORS, FONTS} from '../../core/constants/theme';
@@ -36,14 +38,14 @@ const HERO_GRADIENT = ['#D8B978', '#CBA862', '#9C7B3A'];
 const HERO_TEXT = '#FBF6EC';
 const HERO_SUBTLE = 'rgba(255,255,255,0.85)';
 
-function formatPassExpiry(iso: string): string {
+function formatPassExpiry(iso: string, t: TFunction): string {
   const ms = Date.parse(iso) - Date.now();
-  if (Number.isNaN(ms) || ms <= 0) return 'expired';
+  if (Number.isNaN(ms) || ms <= 0) return t('passport.passExpired');
   const minutes = Math.floor(ms / 60000);
-  if (minutes < 60) return `${minutes}m left`;
+  if (minutes < 60) return t('passport.passMinutesLeft', {minutes});
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h left`;
-  return `${Math.floor(hours / 24)}d left`;
+  if (hours < 24) return t('passport.passHoursLeft', {hours});
+  return t('passport.passDaysLeft', {days: Math.floor(hours / 24)});
 }
 
 const HeroStat: React.FC<{value: number; label: string}> = ({value, label}) => (
@@ -58,6 +60,7 @@ const HeroStat: React.FC<{value: number; label: string}> = ({value, label}) => (
 );
 
 const Passport: React.FC<Props> = ({navigation}) => {
+  const {t} = useTranslation();
   const insets = useSafeAreaInsets();
   const {summary, refresh: refreshSummary} = usePassportSummary();
   const {stamps, lockedSites, refresh: refreshStamps} = usePassportStamps();
@@ -171,7 +174,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
         visible={!!levelUp}
         level={levelUp?.level ?? 1}
         title={levelUp?.title ?? ''}
-        message={`You've explored ${sitesVisited} heritage sites and earned your place among the keepers of history.`}
+        message={t('passport.levelUpMessage', {count: sitesVisited})}
         xpEarned={levelUp?.xpEarned}
         perks={2}
         onClose={() => setLevelUp(null)}
@@ -186,7 +189,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
         {/* Header */}
         <View className="flex-row items-center justify-between px-6 pt-3 pb-5">
           <Text style={{fontFamily: FONTS.display}} className="text-[28px] text-foreground tracking-tight">
-            Passport
+            {t('passport.title')}
           </Text>
           <View className="w-10 h-10 rounded-full border border-white/10 bg-card items-center justify-center">
             <Share2 color={COLORS.textPrimary} size={18} />
@@ -209,13 +212,15 @@ const Passport: React.FC<Props> = ({navigation}) => {
               <Text
                 style={{fontFamily: FONTS.uiSemiBold, color: HERO_SUBTLE}}
                 className="text-[11px] tracking-[0.22em] uppercase">
-                Level {progress.level}
+                {t('passport.level', {level: progress.level})}
               </Text>
               <Text style={{fontFamily: FONTS.display, color: HERO_TEXT}} className="text-3xl leading-tight">
                 {progress.title}
               </Text>
               <Text style={{fontFamily: FONTS.ui, color: HERO_SUBTLE}} className="text-xs mt-1">
-                {progress.isMax ? 'Top rank reached' : `${progress.xpToNext} XP to ${progress.nextTitle}`}
+                {progress.isMax
+                  ? t('passport.topRankReached')
+                  : t('passport.xpToNext', {xp: progress.xpToNext, title: progress.nextTitle})}
               </Text>
             </View>
           </View>
@@ -232,11 +237,11 @@ const Passport: React.FC<Props> = ({navigation}) => {
           </View>
 
           <View className="flex-row items-center justify-between">
-            <HeroStat value={sitesVisited} label="Sites" />
+            <HeroStat value={sitesVisited} label={t('passport.sites')} />
             <View style={{width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.25)'}} />
-            <HeroStat value={streakDays} label="Day streak" />
+            <HeroStat value={streakDays} label={t('passport.dayStreak')} />
             <View style={{width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.25)'}} />
-            <HeroStat value={dynastiesCount} label="Dynasties" />
+            <HeroStat value={dynastiesCount} label={t('passport.dynasties')} />
           </View>
         </LinearGradient>
 
@@ -247,7 +252,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
             style={({pressed}) => (pressed ? {opacity: 0.9} : undefined)}
             className="mx-5 mt-5 flex-row items-center gap-3 rounded-2xl border border-white/10 bg-card p-4"
             accessibilityRole="button"
-            accessibilityLabel="Get your Passport">
+            accessibilityLabel={t('passport.getYourPassport')}>
             <View
               className="w-11 h-11 rounded-2xl items-center justify-center"
               style={{backgroundColor: 'rgba(203,168,98,0.15)'}}>
@@ -255,10 +260,10 @@ const Passport: React.FC<Props> = ({navigation}) => {
             </View>
             <View className="flex-1">
               <Text style={{fontFamily: FONTS.uiSemiBold}} className="text-base text-foreground">
-                Get your Passport
+                {t('passport.getYourPassport')}
               </Text>
               <Text style={{fontFamily: FONTS.ui}} className="text-xs text-muted-foreground mt-0.5">
-                Unlock heritage sites near you
+                {t('passport.unlockNearby')}
               </Text>
             </View>
             <ChevronRight color={COLORS.gold} size={20} />
@@ -268,7 +273,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
             <Text
               style={{fontFamily: FONTS.uiSemiBold}}
               className="px-6 text-[11px] tracking-[0.16em] text-muted-foreground uppercase mb-3">
-              Active passes
+              {t('passport.activePasses')}
             </Text>
             <ScrollView
               horizontal
@@ -282,10 +287,10 @@ const Passport: React.FC<Props> = ({navigation}) => {
                   className="rounded-2xl border border-primary/30 bg-card px-4 py-3 min-w-[140px]"
                   accessibilityRole="button">
                   <Text style={{fontFamily: FONTS.uiMedium}} className="text-sm text-foreground" numberOfLines={1}>
-                    {pass.place_count} place{pass.place_count === 1 ? '' : 's'}
+                    {t('passport.placeCount', {count: pass.place_count})}
                   </Text>
                   <Text style={{fontFamily: FONTS.ui}} className="text-xs text-primary mt-0.5">
-                    {formatPassExpiry(pass.expires_at)}
+                    {formatPassExpiry(pass.expires_at, t)}
                   </Text>
                 </Pressable>
               ))}
@@ -296,10 +301,10 @@ const Passport: React.FC<Props> = ({navigation}) => {
         {/* Achievements */}
         <View className="px-6 mt-8 mb-5 flex-row items-baseline justify-between">
           <Text style={{fontFamily: FONTS.display}} className="text-2xl text-foreground tracking-tight">
-            Achievements
+            {t('passport.achievements')}
           </Text>
           <Text style={{fontFamily: FONTS.uiMedium}} className="text-[11px] tracking-[0.12em] text-primary uppercase">
-            {earnedCount(badges)} of {badges.length}
+            {t('passport.earnedOf', {earned: earnedCount(badges), total: badges.length})}
           </Text>
         </View>
         <View className="px-6">
@@ -309,10 +314,10 @@ const Passport: React.FC<Props> = ({navigation}) => {
         {/* Stamps */}
         <View className="px-6 mt-9 mb-4 flex-row items-baseline justify-between">
           <Text style={{fontFamily: FONTS.display}} className="text-2xl text-foreground tracking-tight">
-            Stamps
+            {t('passport.stamps')}
           </Text>
           <Text style={{fontFamily: FONTS.uiMedium}} className="text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
-            {stampCount} collected
+            {t('passport.collected', {count: stampCount})}
           </Text>
         </View>
 
@@ -323,7 +328,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
                 onPress={() => onStampPress(stamp)}
                 style={({pressed}) => (pressed ? {opacity: 0.85} : undefined)}
                 accessibilityRole="button"
-                accessibilityLabel={`${stamp.place_name} stamp`}>
+                accessibilityLabel={t('passport.stampA11y', {name: stamp.place_name})}>
                 <View className="relative w-full h-24 rounded-2xl overflow-hidden border border-white/10">
                   {stamp.image_url ? (
                     <Image source={{uri: stamp.image_url}} className="w-full h-full" resizeMode="cover" />
@@ -353,7 +358,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
                 style={{fontFamily: FONTS.uiMedium}}
                 className="text-[11px] text-muted-foreground mt-2 text-center"
                 numberOfLines={1}>
-                {site.hint ?? 'Locked'}
+                {site.hint ?? t('passport.locked')}
               </Text>
             </View>
           ))}
@@ -362,12 +367,12 @@ const Passport: React.FC<Props> = ({navigation}) => {
         {stamps.length === 0 && lockedSites.length === 0 ? (
           <View className="mt-14 px-8 items-center">
             <Text style={{fontFamily: FONTS.display}} className="text-2xl text-foreground text-center">
-              No stamps yet
+              {t('passport.noStampsYet')}
             </Text>
             <Text
               style={{fontFamily: FONTS.ui}}
               className="text-sm text-muted-foreground text-center mt-2 leading-5">
-              Visit a heritage site and your first stamp will appear here.
+              {t('passport.noStampsBody')}
             </Text>
           </View>
         ) : null}

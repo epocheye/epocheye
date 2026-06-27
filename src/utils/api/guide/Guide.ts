@@ -9,6 +9,7 @@
 
 import {BACKEND_URL} from '../../../constants/onboarding';
 import {createSSEStream} from '../../../services/sseStreamService';
+import {useMuseumPrefsStore} from '../../../stores/museumPrefsStore';
 import {getValidAccessToken} from '../auth';
 import type {GuideHistoryTurn, GuideStreamResult} from './types';
 
@@ -47,6 +48,9 @@ export async function streamGuideAnswer(
     body: {
       question,
       conversation_history: trimmed,
+      // Answer in the user's chosen content language (same source as narration),
+      // so the AI guide is localized like the rest of the app.
+      lang: useMuseumPrefsStore.getState().narrationLang,
     },
     headers: {
       Authorization: `Bearer ${token}`,

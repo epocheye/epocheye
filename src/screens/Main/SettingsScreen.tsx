@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Image,
   Linking,
@@ -48,6 +49,7 @@ import {
   useMuseumPrefsStore,
   NARRATION_LANGS,
 } from '../../stores/museumPrefsStore';
+import {setAppLanguage} from '../../i18n';
 import DevLoadTestArModelButton from './components/DevLoadTestArModelButton';
 import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 import { getVisitHistory, type VisitRow } from '../../utils/api/visits';
@@ -67,6 +69,7 @@ const ANCHOR_CAPTURE_ENABLED =
   ENABLE_ANCHOR_CAPTURE === 'true' || ENABLE_ANCHOR_CAPTURE === '1';
 
 const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
+  const { t } = useTranslation();
   const { hasAnyActivePass, loading: explorerPassLoading } = useExplorerPass();
   const profile = useUser(state => state.profile);
   const narrationLang = useMuseumPrefsStore(s => s.narrationLang);
@@ -174,17 +177,17 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
         preferences: profile?.preferences ?? {},
       });
       if (success) {
-        showToast('Profile updated', { type: 'success' });
+        showToast(t('settings.profileUpdated'), { type: 'success' });
         setHasChanges(false);
       } else {
-        Alert.alert('Error', 'Failed to update profile. Please try again.');
+        Alert.alert(t('settings.error'), t('settings.updateProfileFailed'));
       }
     } catch {
-      Alert.alert('Error', 'An unexpected error occurred');
+      Alert.alert(t('settings.error'), t('settings.unexpectedError'));
     } finally {
       setIsSaving(false);
     }
-  }, [hasChanges, updateProfile, fullName, phone, profile]);
+  }, [hasChanges, updateProfile, fullName, phone, profile, t]);
 
   const handleAvatarUpload = useCallback(async () => {
     // Android 13+ uses the system photo picker, which grants access to the
@@ -223,17 +226,17 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           try {
             const success = await uploadUserAvatar(formData);
             if (success) {
-              showToast('Avatar updated', { type: 'success' });
+              showToast(t('settings.avatarUpdated'), { type: 'success' });
             } else {
-              Alert.alert('Error', 'Failed to upload avatar');
+              Alert.alert(t('settings.error'), t('settings.avatarUploadFailed'));
             }
           } catch {
-            Alert.alert('Error', 'Failed to upload avatar');
+            Alert.alert(t('settings.error'), t('settings.avatarUploadFailed'));
           }
         }
       },
     );
-  }, [uploadUserAvatar]);
+  }, [uploadUserAvatar, t]);
 
   const handleRequestPermission = useCallback(
     async (name: 'camera' | 'location') => {
@@ -248,10 +251,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   );
 
   const handleLogout = useCallback(() => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('settings.logoutTitle'), t('settings.logoutConfirm'), [
+      { text: t('settings.cancel'), style: 'cancel' },
       {
-        text: 'Logout',
+        text: t('settings.logoutTitle'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -259,22 +262,22 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             clearUserData();
             if (onLogout) onLogout();
           } catch {
-            Alert.alert('Error', 'Failed to logout. Please try again.');
+            Alert.alert(t('settings.error'), t('settings.logoutFailed'));
           }
         },
       },
     ]);
-  }, [clearUserData, onLogout]);
+  }, [clearUserData, onLogout, t]);
 
   const permissionRows = [
     {
       key: 'camera' as const,
-      label: 'Camera',
+      label: t('settings.camera'),
       granted: permissionStatus.camera,
     },
     {
       key: 'location' as const,
-      label: 'Location',
+      label: t('settings.location'),
       granted: permissionStatus.location,
     },
   ];
@@ -302,7 +305,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           {/* ── Header ── */}
           <View className="px-6 pt-3">
             <Text style={{ fontFamily: FONTS.display }} className="text-[28px] text-foreground tracking-tight">
-              Account
+              {t('settings.account')}
             </Text>
           </View>
 
@@ -313,14 +316,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           >
             <View className="mb-3 flex-row items-center justify-between">
               <LevelBadge sites={sites} />
-              <StreakFlame days={streakDays} size={20} label="day streak" />
+              <StreakFlame days={streakDays} size={20} label={t('settings.dayStreak')} />
             </View>
             <View className="flex-row gap-x-[10px]">
               {(
                 [
-                  { label: 'SITES', value: sites },
-                  { label: 'DYNASTIES', value: dynasties },
-                  { label: 'STREAK', value: streakDays },
+                  { label: t('settings.statSites'), value: sites },
+                  { label: t('settings.statDynasties'), value: dynasties },
+                  { label: t('settings.statStreak'), value: streakDays },
                 ] as const
               ).map(stat => (
                 <View
@@ -367,7 +370,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 letterSpacing: 1.2,
               }}
             >
-              THIS WEEK
+              {t('settings.thisWeek')}
             </Text>
             <LinearGradient
               colors={SKY_GRADIENT}
@@ -389,7 +392,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   letterSpacing: 1.4,
                 }}
               >
-                YOUR DIGEST
+                {t('settings.yourDigest')}
               </Text>
               {digest ? (
                 <>
@@ -448,7 +451,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     color: 'rgba(255,255,255,0.85)',
                   }}
                 >
-                  Visit a site this week to unlock your digest.
+                  {t('settings.digestEmpty')}
                 </Text>
               )}
             </LinearGradient>
@@ -468,13 +471,13 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   letterSpacing: 1.2,
                 }}
               >
-                RECENT JOURNEYS
+                {t('settings.recentJourneys')}
               </Text>
               <Pressable
                 onPress={() => navigation.navigate(ROUTES.MAIN.HISTORY)}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel="View all journeys"
+                accessibilityLabel={t('settings.viewAllJourneys')}
               >
                 <Text
                   style={{
@@ -483,7 +486,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     color: COLORS.sky,
                   }}
                 >
-                  View all
+                  {t('settings.viewAll')}
                 </Text>
               </Pressable>
             </View>
@@ -497,7 +500,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   }
                   className="flex-row items-center py-[10px] px-[10px] rounded-xl bg-white/[0.04] border border-white/[0.06] mb-2"
                   accessibilityRole="button"
-                  accessibilityLabel={`Visit: ${visit.place_name}`}
+                  accessibilityLabel={t('settings.visitLabel', { name: visit.place_name })}
                 >
                   <View className="w-11 h-11 rounded-lg bg-[rgba(203,168,98,0.22)] mr-3" />
                   <View className="flex-1">
@@ -536,7 +539,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     textAlign: 'center',
                   }}
                 >
-                  No journeys yet. Visit a heritage site to start your timeline.
+                  {t('settings.noJourneys')}
                 </Text>
               </View>
             )}
@@ -550,7 +553,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             >
               <AnimatedLogo size={48} variant="white" motion="orbit" />
               <Text className="text-parchment-dim text-sm font-ui mt-3">
-                Loading profile...
+                {t('settings.loadingProfile')}
               </Text>
             </View>
           ) : (
@@ -559,7 +562,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               className="mx-5 mt-6 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-5"
             >
               <Text className="text-xs uppercase tracking-[1px] text-brand-gold font-ui-semibold mb-4">
-                EDIT PROFILE
+                {t('settings.editProfile')}
               </Text>
               <View className="flex-row items-center mb-5">
                 <View className="w-16 h-16 rounded-full bg-surface-2 items-center justify-center mr-4 relative">
@@ -580,61 +583,61 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brand-amber items-center justify-center"
                     onPress={handleAvatarUpload}
                     accessibilityRole="button"
-                    accessibilityLabel="Change profile picture"
+                    accessibilityLabel={t('settings.changeProfilePicture')}
                   >
                     <Camera size={14} color="#0A0A0A" />
                   </TouchableOpacity>
                 </View>
                 <View className="flex-1">
                   <Text className="text-parchment text-2xl font-display">
-                    {fullName || 'User'}
+                    {fullName || t('settings.user')}
                   </Text>
                   <Text className="text-parchment-dim text-sm font-ui mt-0.5">
-                    {email || 'No email'}
+                    {email || t('settings.noEmail')}
                   </Text>
                 </View>
               </View>
 
               <View className="mb-3">
                 <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-ui-semibold mb-2">
-                  Full name
+                  {t('settings.fullName')}
                 </Text>
                 <TextInput
                   value={fullName}
                   onChangeText={setFullName}
-                  placeholder="Full name"
+                  placeholder={t('settings.fullName')}
                   placeholderTextColor="rgba(245,240,232,0.25)"
                   className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-ui-medium px-4 py-3 text-sm"
-                  accessibilityLabel="Full name"
+                  accessibilityLabel={t('settings.fullName')}
                 />
               </View>
               <View className="flex-row gap-3">
                 <View className="flex-1">
                   <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-ui-semibold mb-2">
-                    Email
+                    {t('settings.email')}
                   </Text>
                   <TextInput
                     value={email}
                     onChangeText={setEmail}
                     keyboardType="email-address"
-                    placeholder="Email"
+                    placeholder={t('settings.email')}
                     placeholderTextColor="rgba(245,240,232,0.25)"
                     className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-ui-medium px-4 py-3 text-sm"
-                    accessibilityLabel="Email address"
+                    accessibilityLabel={t('settings.emailAddress')}
                   />
                 </View>
                 <View className="flex-1">
                   <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-ui-semibold mb-2">
-                    Phone
+                    {t('settings.phone')}
                   </Text>
                   <TextInput
                     value={phone}
                     onChangeText={setPhone}
                     keyboardType="phone-pad"
-                    placeholder="Phone"
+                    placeholder={t('settings.phone')}
                     placeholderTextColor="rgba(245,240,232,0.25)"
                     className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-ui-medium px-4 py-3 text-sm"
-                    accessibilityLabel="Phone number"
+                    accessibilityLabel={t('settings.phoneNumber')}
                   />
                 </View>
               </View>
@@ -645,7 +648,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   onPress={handleSaveChanges}
                   disabled={isSaving}
                   accessibilityRole="button"
-                  accessibilityLabel="Save profile changes"
+                  accessibilityLabel={t('settings.saveProfileChanges')}
                 >
                   {isSaving ? (
                     <AnimatedLogo
@@ -658,7 +661,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     <>
                       <Save size={16} color="#0A0A0A" />
                       <Text className="text-ink text-sm font-ui-medium ml-2">
-                        Save Changes
+                        {t('settings.saveChanges')}
                       </Text>
                     </>
                   )}
@@ -675,17 +678,17 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 onPress={() => navigation.navigate(ROUTES.MAIN.PURCHASE)}
                 activeOpacity={0.85}
                 accessibilityRole="button"
-                accessibilityLabel="Get Passport"
+                accessibilityLabel={t('settings.getPassport')}
               >
                 <View className="w-10 h-10 rounded-full bg-brand-sky/15 items-center justify-center mr-3">
                   <Sparkles size={18} color={COLORS.sky} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-parchment text-base font-ui-semibold">
-                    Get Passport
+                    {t('settings.getPassport')}
                   </Text>
                   <Text className="text-parchment-dim text-xs font-ui mt-0.5">
-                    Unlock heritage sites near you
+                    {t('settings.unlockSites')}
                   </Text>
                 </View>
                 <ChevronRight size={18} color={COLORS.sky} />
@@ -701,17 +704,17 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 onPress={() => navigation.navigate(ROUTES.MAIN.ANCHOR_CAPTURE)}
                 activeOpacity={0.85}
                 accessibilityRole="button"
-                accessibilityLabel="Capture AR anchor at this site"
+                accessibilityLabel={t('settings.captureAnchorA11y')}
               >
                 <View className="w-10 h-10 rounded-full bg-[rgba(72,187,120,0.18)] items-center justify-center mr-3">
                   <MapPin size={18} color="#48BB78" />
                 </View>
                 <View className="flex-1">
                   <Text className="text-parchment text-base font-ui-semibold">
-                    Capture Anchor
+                    {t('settings.captureAnchor')}
                   </Text>
                   <Text className="text-parchment-dim text-xs font-ui mt-0.5">
-                    Admin only · Record an object's geo position on-site
+                    {t('settings.captureAnchorSubtitle')}
                   </Text>
                 </View>
                 <ChevronRight size={18} color="#48BB78" />
@@ -730,10 +733,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               </View>
               <View className="flex-1">
                 <Text className="text-parchment text-base font-ui-semibold">
-                  Narration language
+                  {t('settings.narrationLanguage')}
                 </Text>
                 <Text className="text-parchment-dim text-xs font-ui mt-0.5">
-                  Language for AI narration when you explore objects
+                  {t('settings.narrationLanguageDesc')}
                 </Text>
               </View>
             </View>
@@ -743,9 +746,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 return (
                   <Pressable
                     key={code}
-                    onPress={() => setNarrationLang(code)}
+                    onPress={() => {
+                      // One control drives both the AI-narration language and the
+                      // whole-app UI language (i18n), keeping them in sync.
+                      setNarrationLang(code);
+                      void setAppLanguage(code);
+                    }}
                     accessibilityRole="button"
-                    accessibilityLabel={`Set narration language ${label}`}
+                    accessibilityLabel={t('settings.setNarrationLanguage', { name: label })}
                     accessibilityState={{ selected: active }}
                     className={`flex-1 items-center py-2.5 rounded-xl border ${
                       active
@@ -776,7 +784,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 <Shield size={16} color="#CBA862" />
               </View>
               <Text className="text-parchment text-base font-ui-semibold">
-                Permissions
+                {t('settings.permissions')}
               </Text>
             </View>
 
@@ -799,7 +807,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 {item.granted ? (
                   <View className="bg-status-success/15 border border-status-success/30 rounded-full px-2.5 py-1">
                     <Text className="text-status-success text-[10px] font-ui-semibold">
-                      Granted
+                      {t('settings.granted')}
                     </Text>
                   </View>
                 ) : (
@@ -807,10 +815,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                     onPress={() => handleRequestPermission(item.key)}
                     className="bg-brand-amber/15 border border-brand-amber/30 rounded-full px-2.5 py-1"
                     accessibilityRole="button"
-                    accessibilityLabel={`Grant ${item.label} permission`}
+                    accessibilityLabel={t('settings.grantPermission', { name: item.label })}
                   >
                     <Text className="text-brand-amber text-[10px] font-ui-semibold">
-                      Grant
+                      {t('settings.grant')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -821,22 +829,22 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               className="mt-3 flex-row items-center justify-center rounded-xl border border-white/[0.08] bg-surface-2 py-2.5"
               onPress={() => PermissionService.openAppSettings()}
               accessibilityRole="button"
-              accessibilityLabel="Open device settings"
+              accessibilityLabel={t('settings.openDeviceSettingsA11y')}
             >
               <Shield size={14} color="#6B6357" />
               <Text className="text-parchment-muted text-xs font-ui-medium ml-1.5">
-                Open Device Settings
+                {t('settings.openDeviceSettings')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               className="mt-3 flex-row items-center justify-center rounded-xl border border-white/[0.08] bg-surface-2 py-2.5"
               onPress={() => Linking.openURL('mailto:support@epocheye.app')}
               accessibilityRole="button"
-              accessibilityLabel="Open device settings"
+              accessibilityLabel={t('settings.getSupport')}
             >
               <MessageCircle size={14} color="#B8AF9E" />
               <Text className="text-parchment-muted text-xs font-ui-medium ml-1.5">
-                Get Support
+                {t('settings.getSupport')}
               </Text>
             </TouchableOpacity>
           </Animated.View>
@@ -864,12 +872,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               accessible={false}
             >
               <Text className="text-parchment-dim text-xs font-ui-medium">
-                Version {APP_CONFIG.APP.VERSION}
+                {t('settings.version', { version: APP_CONFIG.APP.VERSION })}
                 {useDevSettingsStore(s => s.devBypass) ? ' · dev' : ''}
               </Text>
             </TouchableOpacity>
             <Text className="text-parchment-dim/60 text-[10px] font-ui mt-1">
-              Made with care for India's heritage
+              {t('settings.madeWithCare')}
             </Text>
           </Animated.View>
 
@@ -882,27 +890,27 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               className="flex-1 flex-row items-center justify-center rounded-xl bg-surface-1 border border-white/[0.08] py-3.5"
               onPress={handleLogout}
               accessibilityRole="button"
-              accessibilityLabel="Log out"
+              accessibilityLabel={t('settings.logOut')}
             >
               <LogOut size={16} color="#B8AF9E" />
               <Text className="text-parchment-muted text-sm font-ui-semibold ml-2">
-                Log Out
+                {t('settings.logOut')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               className="flex-1 flex-row items-center justify-center rounded-xl border border-status-danger/30 bg-status-danger/5 py-3.5"
               onPress={() =>
                 Alert.alert(
-                  'Coming Soon',
-                  'Account deletion will be available in a future update.',
+                  t('settings.comingSoon'),
+                  t('settings.deleteAccountComingSoon'),
                 )
               }
               accessibilityRole="button"
-              accessibilityLabel="Delete account"
+              accessibilityLabel={t('settings.deleteAccount')}
             >
               <Trash2 size={16} color="#EF4444" />
               <Text className="text-status-danger text-sm font-ui-semibold ml-2">
-                Delete Account
+                {t('settings.deleteAccount')}
               </Text>
             </TouchableOpacity>
           </Animated.View>

@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   ActivityIndicator,
   AppState,
@@ -192,6 +193,7 @@ function siteToNavParam(site: SiteDetail): PlaceNavParam {
 }
 
 const Home: React.FC<Props> = ({navigation}) => {
+  const {t} = useTranslation();
   const insets = useSafeAreaInsets();
   const nearbyPlaces = usePlaces(state => state.nearbyPlaces);
   const currentLocation = usePlaces(state => state.currentLocation);
@@ -432,7 +434,7 @@ const Home: React.FC<Props> = ({navigation}) => {
   // (never the "Heritage Near You" eyebrow text, so it can't read as a duplicate
   // when location is unavailable — e.g. on a GPS-less tablet).
   const locationTitle =
-    geoLabel || deriveLocationTitle(allPlaces) || 'Explore Indian heritage';
+    geoLabel || deriveLocationTitle(allPlaces) || t('home.exploreIndianHeritage');
 
   // Nearest Epocheye venue + the in-venue signal, for the persistent "go to your
   // nearest site" nudge (shown only when the user isn't already inside a venue).
@@ -690,7 +692,7 @@ const Home: React.FC<Props> = ({navigation}) => {
           numberOfLines={1}
           ellipsizeMode="tail"
           style={{fontFamily: FONTS.ui, fontSize: 12, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, alignSelf: 'stretch'}}>
-          Heritage Near You
+          {t('home.heritageNearYou')}
         </Text>
         <Text
           style={{marginTop: 2, fontFamily: FONTS.display, fontSize: 28, color: '#FFFFFF', lineHeight: 34, alignSelf: 'stretch'}}
@@ -704,9 +706,9 @@ const Home: React.FC<Props> = ({navigation}) => {
       <View className="mx-6 mt-3 px-4 py-3 rounded-2xl bg-[rgba(203,168,98,0.06)] border border-[rgba(203,168,98,0.20)]">
         <View className="flex-row items-center justify-between mb-[10px]">
           <LevelBadge sites={hudSites} />
-          <StreakFlame days={hudStreak} size={18} label="day streak" />
+          <StreakFlame days={hudStreak} size={18} label={t('home.dayStreak')} />
         </View>
-        <XPProgress value={hudSites} goal={hudGoal} label="Sites visited" height={8} />
+        <XPProgress value={hudSites} goal={hudGoal} label={t('home.sitesVisited')} height={8} />
       </View>
 
       {/* Control row: notification + search icons (right) */}
@@ -719,8 +721,8 @@ const Home: React.FC<Props> = ({navigation}) => {
             accessibilityRole="button"
             accessibilityLabel={
               unreadCount > 0
-                ? `Notifications, ${unreadCount} unread`
-                : 'Notifications'
+                ? t('home.notificationsUnread', {count: unreadCount})
+                : t('home.notifications')
             }>
             <Bell color="#FFFFFF" size={19} />
             {unreadCount > 0 ? (
@@ -736,7 +738,7 @@ const Home: React.FC<Props> = ({navigation}) => {
             hitSlop={10}
             className="w-10 h-10 rounded-full border border-white/10 bg-card items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel={searchOpen ? 'Close search' : 'Open search'}>
+            accessibilityLabel={searchOpen ? t('home.closeSearch') : t('home.openSearch')}>
             {searchOpen ? (
               <X color="#FFFFFF" size={20} />
             ) : (
@@ -755,9 +757,10 @@ const Home: React.FC<Props> = ({navigation}) => {
           style={({pressed}) => (pressed ? {opacity: 0.92} : undefined)}
           className="mx-6 mt-1 mb-2 flex-row items-center rounded-2xl border border-white/10 bg-card px-3.5 py-3"
           accessibilityRole="button"
-          accessibilityLabel={`Get directions to ${nearestVenue.zone.name}, ${formatVenueDistance(
-            nearestVenue.distance,
-          )}`}>
+          accessibilityLabel={t('home.getDirectionsTo', {
+            name: nearestVenue.zone.name,
+            distance: formatVenueDistance(nearestVenue.distance),
+          })}>
           <View
             className="w-9 h-9 rounded-full items-center justify-center mr-3"
             style={{backgroundColor: 'rgba(203,168,98,0.14)'}}>
@@ -768,7 +771,7 @@ const Home: React.FC<Props> = ({navigation}) => {
               numberOfLines={1}
               style={{fontFamily: FONTS.uiSemiBold}}
               className="text-[10px] tracking-[0.18em] uppercase text-muted-foreground">
-              Nearest site
+              {t('home.nearestSite')}
             </Text>
             <Text
               numberOfLines={1}
@@ -783,7 +786,7 @@ const Home: React.FC<Props> = ({navigation}) => {
             end={{x: 1, y: 1}}
             style={{borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, marginLeft: 10}}>
             <Text style={{fontFamily: FONTS.uiSemiBold, fontSize: 12, color: '#0A0A0C'}}>
-              Directions
+              {t('home.directions')}
             </Text>
           </LinearGradient>
         </Pressable>
@@ -796,7 +799,7 @@ const Home: React.FC<Props> = ({navigation}) => {
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
-            placeholder="Search any place"
+            placeholder={t('home.searchPlaceholder')}
             placeholderTextColor="rgba(255,255,255,0.35)"
             style={{flex: 1, fontFamily: FONTS.ui, fontSize: 14, color: '#FFFFFF', padding: 0}}
             autoFocus
@@ -948,8 +951,8 @@ const Home: React.FC<Props> = ({navigation}) => {
               style={{fontFamily: FONTS.uiSemiBold, fontSize: 11, color: COLORS.goldDeep, letterSpacing: 0.6, textTransform: 'uppercase'}}
               numberOfLines={1}>
               {activeSupportedSite.ar_ready
-                ? 'Epocheye site · AR ready'
-                : 'Epocheye site'}
+                ? t('home.epocheyeSiteArReady')
+                : t('home.epocheyeSite')}
             </Text>
             <Text
               style={{marginTop: 2, fontFamily: FONTS.display, fontSize: 22, color: '#111111', lineHeight: 26}}
@@ -963,7 +966,7 @@ const Home: React.FC<Props> = ({navigation}) => {
                 [activeSupportedSite.city, activeSupportedSite.state]
                   .filter(Boolean)
                   .join(', ') ||
-                'Tap to explore'}
+                t('home.tapToExplore')}
             </Text>
             <View className="mt-2 flex-row gap-x-[6px]">
               <Pressable
@@ -971,9 +974,11 @@ const Home: React.FC<Props> = ({navigation}) => {
                 style={({pressed}) => (pressed ? {opacity: 0.85} : undefined)}
                 className="px-[14px] py-[6px] rounded-full bg-[#111111]"
                 accessibilityRole="button"
-                accessibilityLabel={`View details for ${activeSupportedSite.name}`}>
+                accessibilityLabel={t('home.viewDetailsFor', {
+                  name: activeSupportedSite.name,
+                })}>
                 <Text style={{fontFamily: FONTS.uiMedium, fontSize: 12, color: '#FFFFFF'}}>
-                  View Details
+                  {t('home.viewDetails')}
                 </Text>
               </Pressable>
             </View>

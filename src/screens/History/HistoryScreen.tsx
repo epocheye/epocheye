@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Clock, MapPin } from 'lucide-react-native';
 import {
   getCurrentVisit,
@@ -42,22 +43,28 @@ function formatClock(iso?: string | null): string {
   }
 }
 
-function formatExpiry(iso?: string | null): string | null {
+type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
+
+function formatExpiry(
+  iso: string | null | undefined,
+  t: TranslateFn,
+): string | null {
   if (!iso) return null;
   try {
     const d = new Date(iso).getTime();
     const diffMs = d - Date.now();
-    if (diffMs <= 0) return 'expired';
+    if (diffMs <= 0) return t('history.expired');
     const h = Math.floor(diffMs / 3_600_000);
-    if (h >= 24) return `${Math.floor(h / 24)}d left`;
-    if (h >= 1) return `${h}h left`;
-    return `${Math.floor(diffMs / 60_000)}m left`;
+    if (h >= 24) return t('history.daysLeft', { count: Math.floor(h / 24) });
+    if (h >= 1) return t('history.hoursLeft', { count: h });
+    return t('history.minutesLeft', { count: Math.floor(diffMs / 60_000) });
   } catch {
     return null;
   }
 }
 
 const HistoryScreen: React.FC<Props> = ({ navigation }) => {
+  const { t } = useTranslation();
   const [history, setHistory] = useState<HistoryResponse | null>(null);
   const [current, setCurrent] = useState<CurrentVisit | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,7 +133,7 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
           <ArrowLeft color="#F5F0E8" size={22} />
         </TouchableOpacity>
         <Text className="ml-3 text-parchment text-2xl font-display">
-          Your journey
+          {t('history.title')}
         </Text>
       </View>
 
@@ -146,17 +153,17 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
             <View className="flex-row items-center justify-between rounded-2xl border border-white/8 bg-card px-5 py-5 mb-6">
               <View className="items-center">
                 <Text className="text-parchment text-2xl font-display leading-none">{stats.visits}</Text>
-                <Text className="text-parchment-dim text-[10px] uppercase tracking-wider mt-1 font-ui-medium">Visits</Text>
+                <Text className="text-parchment-dim text-[10px] uppercase tracking-wider mt-1 font-ui-medium">{t('history.visits')}</Text>
               </View>
               <View className="w-px h-9 bg-white/10" />
               <View className="items-center">
                 <Text className="text-parchment text-2xl font-display leading-none">{stats.tours}</Text>
-                <Text className="text-parchment-dim text-[10px] uppercase tracking-wider mt-1 font-ui-medium">Tours</Text>
+                <Text className="text-parchment-dim text-[10px] uppercase tracking-wider mt-1 font-ui-medium">{t('history.tours')}</Text>
               </View>
               <View className="w-px h-9 bg-white/10" />
               <View className="items-center">
                 <Text className="text-brand-gold text-2xl font-display leading-none">{stats.xp}</Text>
-                <Text className="text-parchment-dim text-[10px] uppercase tracking-wider mt-1 font-ui-medium">XP earned</Text>
+                <Text className="text-parchment-dim text-[10px] uppercase tracking-wider mt-1 font-ui-medium">{t('history.xpEarned')}</Text>
               </View>
             </View>
           ) : null}
@@ -164,14 +171,16 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
           {current?.active && current.place_name ? (
             <View className="rounded-xl border border-[rgba(203,168,98,0.4)] bg-[rgba(203,168,98,0.08)] px-4 py-3 mb-5">
               <Text className="text-[10px] uppercase tracking-wider text-gold-400/70 font-ui-medium">
-                Now at
+                {t('history.nowAt')}
               </Text>
               <Text className="text-parchment text-base font-ui-medium mt-1">
                 {current.place_name}
               </Text>
               {current.pass_expires_at && (
                 <Text className="text-parchment-muted text-xs mt-1 font-ui">
-                  Pass {formatExpiry(current.pass_expires_at)}
+                  {t('history.passStatus', {
+                    status: formatExpiry(current.pass_expires_at, t),
+                  })}
                 </Text>
               )}
             </View>
@@ -181,7 +190,7 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
             <View className="items-center py-20">
               <MapPin color="#6B6357" size={32} />
               <Text className="text-parchment-muted text-sm mt-3 font-ui">
-                No visits yet. Activate a Passport and start exploring.
+                {t('history.emptyState')}
               </Text>
             </View>
           ) : (
@@ -190,14 +199,16 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
                 {g.tour && (
                   <View className="mb-2 flex-row items-center justify-between">
                     <Text className="text-parchment-muted text-xs uppercase tracking-wider font-ui-medium">
-                      Tour · {g.tour.place_ids.length} places
+                      {t('history.tourPlaces', { count: g.tour.place_ids.length })}
                     </Text>
                     <Text
                       className={`text-[10px] font-ui-medium ${
                         g.tour.active ? 'text-emerald-300' : 'text-parchment-muted'
                       }`}
                     >
-                      {g.tour.active ? formatExpiry(g.tour.expires_at) || 'active' : 'expired'}
+                      {g.tour.active
+                        ? formatExpiry(g.tour.expires_at, t) || t('history.active')
+                        : t('history.expired')}
                     </Text>
                   </View>
                 )}
@@ -225,7 +236,9 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
                               v.pass_active ? 'text-emerald-300' : 'text-parchment-muted'
                             }`}
                           >
-                            {v.pass_active ? 'Pass active' : 'Pass expired'}
+                            {v.pass_active
+                              ? t('history.passActive')
+                              : t('history.passExpired')}
                           </Text>
                         </View>
                       </View>
@@ -233,7 +246,9 @@ const HistoryScreen: React.FC<Props> = ({ navigation }) => {
                         <Clock color="#6B6357" size={12} />
                         <Text className="text-parchment-muted text-xs ml-1.5 font-ui">
                           {formatClock(v.arrived_at)}
-                          {v.left_at ? ` → ${formatClock(v.left_at)}` : ' · ongoing'}
+                          {v.left_at
+                            ? ` → ${formatClock(v.left_at)}`
+                            : ` · ${t('history.ongoing')}`}
                         </Text>
                       </View>
                     </View>

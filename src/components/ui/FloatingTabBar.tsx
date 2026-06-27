@@ -14,20 +14,23 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import type {BottomTabBarProps} from '@react-navigation/bottom-tabs';
+import {useTranslation} from 'react-i18next';
 import {COLORS, FONTS} from '../../core/constants/theme';
 
 const MUTED = '#98928A';
 
-function metaFor(routeName: string): {Icon: LucideIcon; label: string} {
+function metaFor(routeName: string): {Icon: LucideIcon; labelKey: string} {
   const n = routeName.toLowerCase();
-  if (n.includes('passport')) return {Icon: Award, label: 'Passport'};
-  if (n.includes('daily')) return {Icon: Sunrise, label: 'Daily'};
-  if (n.includes('account') || n.includes('setting')) return {Icon: User, label: 'Account'};
-  return {Icon: Home, label: 'Home'};
+  if (n.includes('passport')) return {Icon: Award, labelKey: 'tabs.passport'};
+  if (n.includes('daily')) return {Icon: Sunrise, labelKey: 'tabs.daily'};
+  if (n.includes('account') || n.includes('setting'))
+    return {Icon: User, labelKey: 'tabs.account'};
+  return {Icon: Home, labelKey: 'tabs.home'};
 }
 
 const FloatingTabBar: React.FC<BottomTabBarProps> = ({state, navigation}) => {
   const insets = useSafeAreaInsets();
+  const {t} = useTranslation();
   return (
     <View
       pointerEvents="box-none"
@@ -42,7 +45,8 @@ const FloatingTabBar: React.FC<BottomTabBarProps> = ({state, navigation}) => {
       <View className="flex-row items-center justify-between rounded-full border border-white/10 bg-card px-3 py-3">
         {state.routes.map((route, i) => {
           const focused = state.index === i;
-          const {Icon, label} = metaFor(route.name);
+          const {Icon, labelKey} = metaFor(route.name);
+          const label = t(labelKey);
 
           const onPress = () => {
             const event = navigation.emit({

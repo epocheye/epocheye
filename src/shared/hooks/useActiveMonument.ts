@@ -6,9 +6,9 @@
  * Resolution order (see src/config/monuments.ts for the contract):
  *   1. opts.explicitSlug
  *   2. useCurrentZoneStore().zone.monument_id
- *   3. Nearest curated site within NEAREST_SITE_FALLBACK_KM of
- *      usePlacesStore().currentLocation
- *   4. DEFAULT_MONUMENT_SLUG
+ *   3. Nearest curated site to usePlacesStore().currentLocation (no distance cap —
+ *      always the true nearest, even if far)
+ *   4. DEFAULT_MONUMENT_SLUG (only when there's no location or zero curated sites)
  *
  * Module-level in-memory caches:
  *   - siteCache: slug -> SiteDetail (survives screen unmounts)
@@ -27,10 +27,7 @@ import {useCurrentZoneStore} from '../../stores/currentZoneStore';
 import {usePlacesStore} from '../../stores/placesStore';
 import {resolveSiteImageSource} from '../utils/localSiteImages';
 import {useExplorerPass} from './useExplorerPass';
-import {
-  DEFAULT_MONUMENT_SLUG,
-  NEAREST_SITE_FALLBACK_KM,
-} from '../../config/monuments';
+import {DEFAULT_MONUMENT_SLUG} from '../../config/monuments';
 import {
   parseSiteEras,
   type SiteEraConfig,
@@ -137,7 +134,11 @@ function findNearestSite(
       nearest = s;
     }
   }
-  return nearest && minKm <= NEAREST_SITE_FALLBACK_KM ? nearest : null;
+  // Return the TRUE nearest curated site regardless of distance — even if it's
+  // hundreds of km away the user should be pointed at it (no radius cap, no
+  // hardcoded default). This matches Home's getNearestZone() nudge so the two
+  // no longer disagree (e.g. "Indian Museum" vs the old "Konark 616 km" default).
+  return nearest;
 }
 
 interface ResolvedState {

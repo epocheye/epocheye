@@ -23,6 +23,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import Animated, {FadeIn, FadeInUp} from 'react-native-reanimated';
 import {Compass, MapPin, Navigation, RefreshCw, WifiOff, X} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
+import {useTranslation} from 'react-i18next';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
 import {COLORS, FONTS, FONT_SIZES, RADIUS, SPACING} from '../../core/constants/theme';
@@ -45,6 +46,7 @@ function openDirections(zone: HeritageZone): void {
 }
 
 const GoToVenueScreen: React.FC = () => {
+  const {t} = useTranslation();
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const currentLocation = usePlacesStore(s => s.currentLocation);
@@ -95,28 +97,21 @@ const GoToVenueScreen: React.FC = () => {
             <Animated.View entering={FadeIn.duration(400)} style={styles.card}>
               <View style={styles.cardTopRow}>
                 <WifiOff size={15} color={COLORS.sky} />
-                <Text style={styles.cardLabel}>COULDN'T CHECK YOUR LOCATION</Text>
+                <Text style={styles.cardLabel}>{t('venue.errorLabel')}</Text>
               </View>
-              <Text style={styles.venueName}>Connection issue</Text>
-              <Text style={styles.venueMeta}>
-                We couldn't reach Epocheye to confirm where you are — this looks
-                like a network problem, not that you're away from a venue. Check
-                your connection and try again.
-              </Text>
+              <Text style={styles.venueName}>{t('venue.errorTitle')}</Text>
+              <Text style={styles.venueMeta}>{t('venue.errorBody')}</Text>
               <Pressable onPress={handleRetry} style={styles.primaryBtn}>
                 <RefreshCw size={16} color={COLORS.bg} />
-                <Text style={styles.primaryBtnText}>Retry</Text>
+                <Text style={styles.primaryBtnText}>{t('venue.retry')}</Text>
               </Pressable>
             </Animated.View>
           ) : (
             <>
           <Animated.View entering={FadeIn.duration(400)}>
-            <Text style={styles.kicker}>The lens only opens on site</Text>
-            <Text style={styles.title}>Epocheye comes alive at the venue.</Text>
-            <Text style={styles.subtitle}>
-              Stand before the real piece and watch its history unfold in AR. Travel
-              to your nearest site to begin.
-            </Text>
+            <Text style={styles.kicker}>{t('venue.kicker')}</Text>
+            <Text style={styles.title}>{t('venue.title')}</Text>
+            <Text style={styles.subtitle}>{t('venue.subtitle')}</Text>
           </Animated.View>
 
           {nearest ? (
@@ -125,7 +120,7 @@ const GoToVenueScreen: React.FC = () => {
               style={styles.card}>
               <View style={styles.cardTopRow}>
                 <MapPin size={15} color={COLORS.sky} />
-                <Text style={styles.cardLabel}>YOUR NEAREST VENUE</Text>
+                <Text style={styles.cardLabel}>{t('venue.nearestLabel')}</Text>
               </View>
               <Text style={styles.venueName}>{nearest.zone.name}</Text>
               <Text style={styles.venueMeta}>
@@ -135,27 +130,25 @@ const GoToVenueScreen: React.FC = () => {
                 onPress={() => openDirections(nearest.zone)}
                 style={styles.primaryBtn}>
                 <Navigation size={16} color={COLORS.bg} />
-                <Text style={styles.primaryBtnText}>Get directions</Text>
+                <Text style={styles.primaryBtnText}>{t('venue.getDirections')}</Text>
               </Pressable>
             </Animated.View>
           ) : (
             <Animated.View
               entering={FadeInUp.delay(120).duration(450)}
               style={styles.card}>
-              <Text style={styles.cardLabel}>TURN ON LOCATION</Text>
-              <Text style={styles.venueMeta}>
-                We need your location to point you to the nearest Epocheye venue.
-              </Text>
+              <Text style={styles.cardLabel}>{t('venue.turnOnLocation')}</Text>
+              <Text style={styles.venueMeta}>{t('venue.locationNeeded')}</Text>
               <Pressable onPress={handleEnableLocation} style={styles.primaryBtn}>
                 <MapPin size={16} color={COLORS.bg} />
-                <Text style={styles.primaryBtnText}>Enable location</Text>
+                <Text style={styles.primaryBtnText}>{t('venue.enableLocation')}</Text>
               </Pressable>
             </Animated.View>
           )}
 
           {allZones.length > 0 && (
             <View style={styles.listBlock}>
-              <Text style={styles.listHeading}>All Epocheye venues</Text>
+              <Text style={styles.listHeading}>{t('venue.allVenues')}</Text>
               {allZones.map((zone, i) => (
                 <Animated.View
                   key={zone.id}

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -45,15 +46,19 @@ const { height: SCREEN_H } = Dimensions.get('window');
 // Figma "Site Details" (238:33) hero is 484 of a 977px frame ≈ 0.5 of height.
 const HERO_HEIGHT = Math.round(SCREEN_H * 0.52);
 
-const FACT_LOADING_LINES = [
-  'Reading the stones...',
-  'Uncovering connections...',
-  'Weaving the narrative...',
-];
-
 type Props = MainScreenProps<'SiteDetail'>;
 
 const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { t } = useTranslation();
+
+  const FACT_LOADING_LINES = useMemo(
+    () => [
+      t('siteDetail.factLoading.readingStones'),
+      t('siteDetail.factLoading.uncoveringConnections'),
+      t('siteDetail.factLoading.weavingNarrative'),
+    ],
+    [t],
+  );
   // Normal navigation passes `site`; a deep link (epocheye://site/<slug>) passes
   // only `slug` — synthesize a minimal param so the slug-keyed `getSite` lookup runs.
   const site = useMemo<PlaceNavParam>(
@@ -107,8 +112,11 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     if (typeof formatted === 'string' && formatted.length > 0) {
       return formatted;
     }
-    return [site.city, site.country].filter(Boolean).join(', ') || 'India';
-  }, [site, siteDetail]);
+    return (
+      [site.city, site.country].filter(Boolean).join(', ') ||
+      t('siteDetail.defaultCountry')
+    );
+  }, [site, siteDetail, t]);
 
   // Figma "BUILT" + "DYNASTY" stat cards. Each renders only when it has a value.
   const builtValue = useMemo(
@@ -137,9 +145,9 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     return (
       desc ||
       sig ||
-      `Explore ${site.name}, a historic heritage site located at ${location}.`
+      t('siteDetail.fallbackDescription', {name: site.name, location})
     );
-  }, [site, siteDetail, location]);
+  }, [site, siteDetail, location, t]);
 
   const arReady = Boolean(siteDetail?.ar_ready);
 
@@ -304,7 +312,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             style={{ top: insets.top + 8 }}
             className="absolute left-5 w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Back"
+            accessibilityLabel={t('siteDetail.back')}
           >
             <ArrowLeft color="#F5F0E8" size={20} />
           </TouchableOpacity>
@@ -315,7 +323,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             style={{ top: insets.top + 8 }}
             className="absolute right-5 w-10 h-10 rounded-full bg-black/45 border border-white/15 items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Share this site"
+            accessibilityLabel={t('siteDetail.shareSite')}
           >
             <Share2 color="#F5F0E8" size={18} />
           </TouchableOpacity>
@@ -327,7 +335,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               className="absolute self-center rounded-[15px] bg-[rgba(203,168,98,0.16)] border border-[rgba(203,168,98,0.4)] px-4 py-1"
             >
               <Text className="text-brand-gold text-[11px] tracking-[0.4px] font-ui-medium">
-                AR Ready
+                {t('siteDetail.arReady')}
               </Text>
             </View>
           )}
@@ -344,7 +352,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             {builtValue && (
               <View className="flex-1 bg-surface-1 border border-white/10 rounded-[10px] px-3.5 py-3">
                 <Text className="text-parchment-dim text-[9px] tracking-[0.9px] font-ui-semibold">
-                  BUILT
+                  {t('siteDetail.builtLabel')}
                 </Text>
                 <Text
                   numberOfLines={1}
@@ -357,7 +365,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             {dynastyValue && (
               <View className="flex-1 bg-surface-1 border border-white/10 rounded-[10px] px-3.5 py-3">
                 <Text className="text-parchment-dim text-[9px] tracking-[0.9px] font-ui-semibold">
-                  DYNASTY
+                  {t('siteDetail.dynastyLabel')}
                 </Text>
                 <Text
                   numberOfLines={1}
@@ -384,11 +392,11 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             activeOpacity={0.9}
             className="h-[53px] rounded-[30px] bg-brand-gold flex-row items-center justify-center gap-2"
             accessibilityRole="button"
-            accessibilityLabel="View in AR"
+            accessibilityLabel={t('siteDetail.viewInAr')}
           >
             <Camera color="#0A0A0C" size={18} />
             <Text className="text-ink text-[22px] font-display">
-              View in AR
+              {t('siteDetail.viewInAr')}
             </Text>
           </TouchableOpacity>
 
@@ -397,10 +405,10 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             activeOpacity={0.85}
             className="h-[53px] rounded-[30px] bg-surface-1 border border-white/12 items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Learn About It"
+            accessibilityLabel={t('siteDetail.learnAboutIt')}
           >
             <Text className="text-brand-gold text-[22px] font-display">
-              Learn About It
+              {t('siteDetail.learnAboutIt')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -415,7 +423,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             >
               <Shield color="#10B981" size={16} />
               <Text className="text-status-success text-sm font-ui-semibold">
-                Passport Active
+                {t('siteDetail.passportActive')}
               </Text>
             </Animated.View>
           )}
@@ -426,7 +434,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4"
           >
             <Text className="text-parchment text-lg font-ui-semibold mb-2">
-              Historical Overview
+              {t('siteDetail.historicalOverview')}
             </Text>
             <Text
               className="text-parchment-muted text-sm leading-[22px] font-ui"
@@ -441,7 +449,9 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 accessibilityRole="button"
               >
                 <Text className="text-brand-gold text-xs uppercase tracking-[0.8px] font-ui-semibold">
-                  {isDescriptionExpanded ? 'Show Less' : 'Read More'}
+                  {isDescriptionExpanded
+                    ? t('siteDetail.showLess')
+                    : t('siteDetail.readMore')}
                 </Text>
                 {isDescriptionExpanded ? (
                   <ChevronUp color="#CBA862" size={16} />
@@ -469,16 +479,20 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               <View className="flex-row flex-wrap">
                 {(
                   [
-                    ['Era', siteDetail.era],
-                    ['Dynasty', siteDetail.dynasty],
-                    ['Founder', siteDetail.founder],
-                    ['Deity', siteDetail.deity],
-                    ['Style', siteDetail.architectural_style],
-                  ] as Array<[string, string | undefined]>
+                    ['era', t('siteDetail.detailEra'), siteDetail.era],
+                    ['dynasty', t('siteDetail.detailDynasty'), siteDetail.dynasty],
+                    ['founder', t('siteDetail.detailFounder'), siteDetail.founder],
+                    ['deity', t('siteDetail.detailDeity'), siteDetail.deity],
+                    [
+                      'style',
+                      t('siteDetail.detailStyle'),
+                      siteDetail.architectural_style,
+                    ],
+                  ] as Array<[string, string, string | undefined]>
                 )
-                  .filter(([, value]) => Boolean(value))
-                  .map(([label, value]) => (
-                    <View key={label} className="w-1/2 pr-2 mb-3">
+                  .filter(([, , value]) => Boolean(value))
+                  .map(([key, label, value]) => (
+                    <View key={key} className="w-1/2 pr-2 mb-3">
                       <Text className="text-parchment-dim text-[10px] uppercase tracking-[0.8px] font-ui-semibold">
                         {label}
                       </Text>
@@ -496,7 +510,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             <View className="flex-row items-center gap-1.5 mb-3">
               <Sparkles color="#CBA862" size={18} />
               <Text className="text-parchment text-lg font-ui-semibold">
-                Insights
+                {t('siteDetail.insights')}
               </Text>
             </View>
 
@@ -544,7 +558,9 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     )}
 
                     <Text className="text-brand-gold text-[11px] mt-2 font-ui-semibold">
-                      {expandedFactId === fact.id ? 'Collapse' : 'Learn more'}
+                      {expandedFactId === fact.id
+                        ? t('siteDetail.collapse')
+                        : t('siteDetail.learnMore')}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -552,7 +568,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             ) : (
               <View className="rounded-2xl bg-surface-1 border border-white/[0.08] p-4">
                 <Text className="text-parchment-dim text-sm text-center font-ui">
-                  Insights will appear as you explore nearby monuments
+                  {t('siteDetail.insightsEmpty')}
                 </Text>
               </View>
             )}
@@ -566,11 +582,11 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 className="flex-row items-center justify-center gap-1.5 py-2"
                 activeOpacity={0.75}
                 accessibilityRole="button"
-                accessibilityLabel="Get Passport for this site"
+                accessibilityLabel={t('siteDetail.getPassport')}
               >
                 <Sparkles color="#CBA862" size={14} />
                 <Text className="text-brand-gold text-[13px] font-ui-semibold">
-                  Get Passport for this site
+                  {t('siteDetail.getPassport')}
                 </Text>
                 <ChevronRight color="#CBA862" size={14} />
               </TouchableOpacity>

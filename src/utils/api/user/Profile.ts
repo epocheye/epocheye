@@ -34,6 +34,12 @@ export async function updateUserProfile(
   try {
     const client = await createAuthenticatedClient();
     const response = await client.put<UserProfile>('/api/user/profile', profileData);
+    // The backend replies 204 No Content on success (empty body). Re-fetch the
+    // fresh profile so callers get the updated record instead of `undefined`
+    // (which the store was treating as a failed update).
+    if (response.status === 204 || !response.data) {
+      return await getUserProfile();
+    }
     return { success: true, data: response.data };
   } catch (error) {
     return createErrorResult(error);

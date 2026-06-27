@@ -22,7 +22,7 @@ import { useSessionStore } from './src/stores/sessionStore';
 try {
   GoogleSignin.configure({
     webClientId:
-      '390327894507-b3s027ad3ak1s562p65vuc280dg39q4c.apps.googleusercontent.com',
+      '390327894507-ma57s298a56a4p1mfo2ttq4pbu48lf89.apps.googleusercontent.com',
     offlineAccess: true,
     scopes: ['profile', 'email'],
   });

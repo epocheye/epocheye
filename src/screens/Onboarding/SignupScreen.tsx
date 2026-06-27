@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -34,6 +35,7 @@ const scrollContentStyle = {
 };
 
 const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { t } = useTranslation();
   const fromOnboarding = route.params?.fromOnboarding ?? false;
   const storeFirstName = useOnboardingStore(s => s.firstName);
   const storeRegion = useOnboardingStore(s => s.region);
@@ -65,19 +67,19 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         navigation.navigate('OB11_Notifications');
       }
     } else if (result.error.statusCode !== 0) {
-      Alert.alert('Google sign in failed', result.error.message);
+      Alert.alert(t('auth.googleSignInFailedTitle'), result.error.message);
     }
   };
 
   const handleAppleAuth = () => {
-    Alert.alert('Coming Soon', 'Apple sign-in will be available soon.');
+    Alert.alert(t('auth.comingSoonTitle'), t('auth.appleComingSoonBody'));
   };
 
   const handleSubmit = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) {
       Alert.alert(
-        'Missing fields',
-        'Please enter your name, email, and password.',
+        t('auth.missingFieldsTitle'),
+        t('auth.missingFieldsSignupBody'),
       );
       return;
     }
@@ -92,7 +94,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
 
     if (!signupResult.success) {
       setLoading(false);
-      Alert.alert('Signup failed', signupResult.error.message);
+      Alert.alert(t('auth.signupFailedTitle'), signupResult.error.message);
       return;
     }
 
@@ -109,8 +111,8 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         navigation.navigate('OB11_Notifications');
       } else {
         Alert.alert(
-          'Account created',
-          'Your account was created. Please sign in from the login screen if needed.',
+          t('auth.accountCreatedTitle'),
+          t('auth.accountCreatedBody'),
         );
         navigation.navigate('OB11_Notifications');
       }
@@ -119,8 +121,8 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
 
   // Heading text
   const headingText = fromOnboarding
-    ? `Save ${storeFirstName || 'your'} story.`
-    : 'Create your account';
+    ? t('auth.saveStory', { name: storeFirstName || t('auth.defaultName') })
+    : t('auth.createAccount');
   const visualSubject = storeRegion
     ? `${storeRegion.replace(/_/g, ' ')} heritage monument`
     : 'Heritage monument and ancestry story';
@@ -130,7 +132,9 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       {/* Google on Android, Apple on iOS (Apple sign-in is iOS-only). */}
       {Platform.OS === 'android' ? (
         <AuthButton
-          title={googleLoading ? 'Signing in...' : 'Sign up with Google'}
+          title={
+            googleLoading ? t('auth.signingIn') : t('auth.signUpWithGoogle')
+          }
           variant="google"
           onPress={handleGoogleAuth}
           disabled={googleLoading}
@@ -138,13 +142,13 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       ) : null}
       {Platform.OS === 'ios' ? (
         <AuthButton
-          title="Sign up with Apple"
+          title={t('auth.signUpWithApple')}
           variant="apple"
           onPress={handleAppleAuth}
         />
       ) : null}
       <AuthButton
-        title="Sign up with Email"
+        title={t('auth.signUpWithEmail')}
         variant="email"
         onPress={() => setShowEmailForm(true)}
       />
@@ -155,7 +159,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
     <View className="gap-5">
       <TextInput
         className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-ui text-lg text-[#F5E9D8]"
-        placeholder="Your name"
+        placeholder={t('auth.namePlaceholder')}
         placeholderTextColor={COLORS.textTertiary}
         value={name}
         onChangeText={setName}
@@ -164,7 +168,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       />
       <TextInput
         className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-ui text-lg text-[#F5E9D8]"
-        placeholder="Email"
+        placeholder={t('auth.emailPlaceholder')}
         placeholderTextColor={COLORS.textTertiary}
         value={email}
         onChangeText={setEmail}
@@ -174,7 +178,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       />
       <TextInput
         className="h-14 rounded-xl border border-[rgba(255,255,255,0.2)]  px-6 font-ui text-lg text-[#F5E9D8]"
-        placeholder="Password"
+        placeholder={t('auth.passwordPlaceholder')}
         placeholderTextColor={COLORS.textTertiary}
         value={password}
         onChangeText={setPassword}
@@ -190,11 +194,14 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
             showRing={false}
           />
           <Text className="font-ui text-sm text-parchment-muted">
-            Creating account...
+            {t('auth.creatingAccount')}
           </Text>
         </View>
       ) : (
-        <AmberButton title="Create Account" onPress={handleSubmit} />
+        <AmberButton
+          title={t('auth.createAccountButton')}
+          onPress={handleSubmit}
+        />
       )}
 
       <TouchableOpacity
@@ -202,7 +209,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         className="mt-2 items-center"
       >
         <Text className="font-ui-medium text-sm text-parchment-faint">
-          Back to options
+          {t('auth.backToOptions')}
         </Text>
       </TouchableOpacity>
     </View>
@@ -244,7 +251,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
             </Text>
             {fromOnboarding && (
               <Text className="mt-2 font-ui text-sm text-[#8C93A0]">
-                Create a free account to keep your ancestor.
+                {t('auth.signupHelper')}
               </Text>
             )}
           </View>
@@ -257,9 +264,9 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
               className="mt-8 items-center"
             >
               <Text className="font-ui text-sm text-parchment-faint">
-                Already have an account?{' '}
+                {t('auth.alreadyHaveAccount')}{' '}
                 <Text className="font-ui-semibold text-brand-amber">
-                  Log in
+                  {t('auth.logIn')}
                 </Text>
               </Text>
             </TouchableOpacity>
@@ -267,12 +274,12 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {fromOnboarding && (
             <Text className="mt-4 text-center font-ui text-[11px] text-[#8C93A0]">
-              Takes 10 seconds. No spam. Your data is never sold.
+              {t('auth.signupReassurance')}
             </Text>
           )}
 
           <Text className="mb-8 mt-10 text-center font-ui text-xs text-parchment-dim">
-            By continuing, you agree to our Terms & Privacy Policy
+            {t('auth.termsNotice')}
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

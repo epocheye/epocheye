@@ -37,6 +37,7 @@ import {
 } from 'lucide-react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useTranslation} from 'react-i18next';
 import {
   Camera as VisionCamera,
   useCameraDevice,
@@ -60,6 +61,7 @@ import {streamMuseumNarration} from '../../services/museumModeService';
 import {fetchObjectCard, type ObjectCard} from '../../services/detectorResolver';
 import {useVenueGate} from '../../shared/hooks/useVenueGate';
 import {useSafeBackHandler} from '../../shared/hooks/useSafeGoBack';
+import {useMuseumPrefsStore} from '../../stores/museumPrefsStore';
 import {usePlacesStore} from '../../stores/placesStore';
 import {analytics} from '../../services/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -70,6 +72,7 @@ import ARActivationOverlay from '../../components/ui/ARActivationOverlay';
 import ShareExperienceModal from '../../components/ShareExperienceModal';
 import {ROUTES} from '../../core/constants';
 import {COLORS} from '../../core/constants/theme';
+import i18n from '../../i18n';
 import type {MainStackParamList} from '../../core/types/navigation.types';
 
 // Primary accent for the scan screen — the theme's sky token (was a stale amber
@@ -187,11 +190,11 @@ function buildArCards(label: string | null, body: string): string {
   const chunks = chunkText(body, 300, 3);
   const cards =
     chunks.length === 0
-      ? [{display_name: label ?? 'This object', identity_confidence: 'inferred', narrative: body}]
+      ? [{display_name: label ?? i18n.t('lens.thisObject'), identity_confidence: 'inferred', narrative: body}]
       : chunks.map((chunk, i) =>
           i === 0
             ? {
-                display_name: label ?? 'This object',
+                display_name: label ?? i18n.t('lens.thisObject'),
                 identity_confidence: 'inferred',
                 narrative: chunk,
               }
@@ -244,6 +247,8 @@ function buildGroundedArCards(card: ObjectCard): string {
  */
 function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
   const [resolved, setResolved] = useState<ResolvedState>({kind: 'idle'});
+  // Narration content language (en/hi/bn) — passed to the museum-mode stream.
+  const narrationLang = useMuseumPrefsStore(s => s.narrationLang);
   // Free scans left at this venue after the latest serve (null when ungated/dev).
   const [remaining, setRemaining] = useState<number | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
@@ -285,6 +290,7 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
         abortRef.current?.();
         abortRef.current = streamMuseumNarration({
           imageUri,
+          lang: narrationLang,
           onObject: label => {
             setResolved(prev =>
               prev.kind === 'ai'
@@ -325,7 +331,7 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
             }),
         });
       }),
-    [venueSlug],
+    [venueSlug, narrationLang],
   );
 
   const runResolution = useCallback(
@@ -444,6 +450,7 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
 }
 
 const DetectArScreen: React.FC = () => {
+  const {t} = useTranslation();
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const route = useRoute() as unknown as RouteParam;
@@ -508,10 +515,8 @@ const DetectArScreen: React.FC = () => {
         <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
           <View style={styles.fallbackBlock}>
             <ActivityIndicator color={AMBER} />
-            <Text style={styles.fallbackHeading}>Locating you…</Text>
-            <Text style={styles.fallbackBody}>
-              Finding the nearest heritage site. This only takes a moment.
-            </Text>
+            <Text style={styles.fallbackHeading}>{t('lens.locatingTitle')}</Text>
+            <Text style={styles.fallbackBody}>{t('lens.locatingBody')}</Text>
           </View>
         </SafeAreaView>
       );
@@ -528,26 +533,24 @@ const DetectArScreen: React.FC = () => {
       <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
         <View style={styles.fallbackBlock}>
           <Camera size={40} color={AMBER} />
-          <Text style={styles.fallbackHeading}>Allow Camera to continue</Text>
-          <Text style={styles.fallbackBody}>
-            The detector and AR both need the camera. Footage stays on the device.
-          </Text>
+          <Text style={styles.fallbackHeading}>{t('lens.cameraTitle')}</Text>
+          <Text style={styles.fallbackBody}>{t('lens.cameraBody')}</Text>
           {permissionDenied ? (
             <Pressable
               onPress={() => void PermissionService.openAppSettings()}
               style={styles.fallbackButton}>
               <SettingsIcon size={14} color="#1A0F00" />
-              <Text style={styles.fallbackButtonText}>Open Settings</Text>
+              <Text style={styles.fallbackButtonText}>{t('lens.openSettings')}</Text>
             </Pressable>
           ) : (
             <Pressable
               onPress={() => void requestPermission()}
               style={styles.fallbackButton}>
-              <Text style={styles.fallbackButtonText}>Allow Camera</Text>
+              <Text style={styles.fallbackButtonText}>{t('lens.allowCamera')}</Text>
             </Pressable>
           )}
           <Pressable onPress={handleClose} hitSlop={8}>
-            <Text style={styles.fallbackDismiss}>Close</Text>
+            <Text style={styles.fallbackDismiss}>{t('lens.close')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -587,6 +590,7 @@ const DetectARNative: React.FC<{
   onClose: () => void;
   allowUngrounded?: boolean;
 }> = ({venueSlug, onClose, allowUngrounded = false}) => {
+  const {t} = useTranslation();
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const arRef = useRef<EpocheyeDetectARHandle>(null);
@@ -625,16 +629,16 @@ const DetectARNative: React.FC<{
   const handleDetect = useCallback(() => {
     if (detecting) return;
     if (!trackingRef.current) {
-      setErrorMessage('Move your phone slowly to scan first');
+      setErrorMessage(t('lens.moveToScanFirst'));
       return;
     }
     setDetecting(true);
-    setErrorMessage('Scanning…');
+    setErrorMessage(t('lens.scanning'));
     setArCardShown(false); // re-show on-screen card until this scan anchors an AR one
     placedAiTextRef.current = null; // a new scan may anchor a fresh AR card
     analytics.track('scan_started', {venue: venueSlug, mode: 'ar'});
     arRef.current?.captureFrame();
-  }, [detecting, venueSlug]);
+  }, [detecting, venueSlug, t]);
 
   const handleFrameCaptured = useCallback(
     async (uri: string) => {
@@ -673,22 +677,17 @@ const DetectARNative: React.FC<{
         } else if (resolution.kind === 'paywall') {
           navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
         } else if (resolution.kind === 'limit') {
-          setErrorMessage(
-            'You’ve explored a lot here today — come back tomorrow for more.',
-          );
+          setErrorMessage(t('lens.dailyLimit'));
         } else if (resolution.kind === 'rejected') {
           // Statue-only gate: calm tip, no card, nothing placed.
           arRef.current?.clearAnchor();
           setGlbUri(null);
-          setErrorMessage(
-            resolution.message ??
-              'Point at a museum sculpture or artifact to explore it.',
-          );
+          setErrorMessage(resolution.message ?? t('lens.statueGate'));
         } else if (resolution.kind === 'error') {
           setErrorMessage(
             __DEV__ && resolution.message
               ? `Lens error — ${resolution.message}`
-              : 'Couldn’t identify this — try again, or move a little closer.',
+              : t('lens.identifyFailed'),
           );
         } else if (resolution.kind === 'ai') {
           // AI interpretation of an allowed statue. In a real venue (not DEV),
@@ -708,12 +707,12 @@ const DetectARNative: React.FC<{
           void maybePromptShare(allowUngrounded, setShareOpen);
         }
       } catch {
-        setErrorMessage('Detection failed — try again');
+        setErrorMessage(t('lens.detectionFailed'));
       } finally {
         setDetecting(false);
       }
     },
-    [runResolution, navigation, venueSlug, allowUngrounded],
+    [runResolution, navigation, venueSlug, allowUngrounded, t],
   );
 
   const handleTrackingState = useCallback((state: string) => {
@@ -762,10 +761,10 @@ const DetectARNative: React.FC<{
   }, [allowUngrounded, resolved]);
 
   const hint = !tracking
-    ? 'Move your phone slowly to scan the area'
+    ? t('lens.hintMove')
     : status === 'placed'
-      ? 'Walk around — it stays locked · ⟳ rotate · Detect again to re-scan'
-      : 'Point at an artifact and tap Detect';
+      ? t('lens.hintPlaced')
+      : t('lens.hintPoint');
 
   return (
     <View style={styles.root}>
@@ -798,10 +797,10 @@ const DetectARNative: React.FC<{
           </Pressable>
           <View style={styles.titleBlock}>
             <Text style={styles.title}>
-              {allowUngrounded ? 'DEV · Scan anything' : 'Scan artifact'}
+              {allowUngrounded ? 'DEV · Scan anything' : t('lens.scanArtifact')}
             </Text>
             <Text style={styles.subtitle}>
-              {tracking ? 'tracking' : 'scanning'} · world-anchored
+              {`${tracking ? t('lens.stateTracking') : t('lens.stateScanning')} · ${t('lens.worldAnchored')}`}
             </Text>
           </View>
           <Pressable
@@ -817,7 +816,7 @@ const DetectARNative: React.FC<{
         {remaining != null ? (
           <View style={styles.scansPill} pointerEvents="none">
             <Text style={styles.scansPillText}>
-              {remaining} {remaining === 1 ? 'scan' : 'scans'} left here
+              {t('lens.scansLeft', {count: remaining})}
             </Text>
           </View>
         ) : null}
@@ -855,7 +854,7 @@ const DetectARNative: React.FC<{
             ) : (
               <>
                 <ScanSearch size={18} color="#1A0F00" />
-                <Text style={styles.detectButtonText}>Detect</Text>
+                <Text style={styles.detectButtonText}>{t('lens.detect')}</Text>
               </>
             )}
           </Pressable>
@@ -885,6 +884,7 @@ const DetectAR2D: React.FC<{
   onClose: () => void;
   allowUngrounded?: boolean;
 }> = ({venueSlug, onClose, allowUngrounded = false}) => {
+  const {t} = useTranslation();
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const cameraRef = useRef<VisionCamera | null>(null);
@@ -907,7 +907,7 @@ const DetectAR2D: React.FC<{
     try {
       const photo = await cameraRef.current?.takePhoto();
       if (!photo?.path) {
-        setMessage('Could not capture a frame');
+        setMessage(t('lens.captureFailed'));
         return;
       }
       // vision-camera returns a bare filesystem path; the SSE upload (FormData)
@@ -924,36 +924,33 @@ const DetectAR2D: React.FC<{
       if (resolution.kind === 'paywall') {
         navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
       } else if (resolution.kind === 'limit') {
-        setMessage('You’ve explored a lot here today — come back tomorrow for more.');
+        setMessage(t('lens.dailyLimit'));
       } else if (resolution.kind === 'rejected') {
-        setMessage(
-          resolution.message ??
-            'Point at a museum sculpture or artifact to explore it.',
-        );
+        setMessage(resolution.message ?? t('lens.statueGate'));
       } else if (resolution.kind === 'error') {
         setMessage(
           __DEV__ && resolution.message
             ? `Lens error — ${resolution.message}`
-            : 'Couldn’t identify this — try again, or move a little closer.',
+            : t('lens.identifyFailed'),
         );
       } else {
         setMessage(null);
         void maybePromptShare(allowUngrounded, setShareOpen);
       }
     } catch {
-      setMessage('Detection failed — try again');
+      setMessage(t('lens.detectionFailed'));
     } finally {
       setBusy(false);
     }
-  }, [busy, runResolution, navigation, venueSlug, allowUngrounded]);
+  }, [busy, runResolution, navigation, venueSlug, allowUngrounded, t]);
 
   if (!device) {
     return (
       <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
         <View style={styles.fallbackBlock}>
-          <Text style={styles.fallbackHeading}>No camera available</Text>
+          <Text style={styles.fallbackHeading}>{t('lens.noCamera')}</Text>
           <Pressable onPress={onClose} style={styles.fallbackButton}>
-            <Text style={styles.fallbackButtonText}>Close</Text>
+            <Text style={styles.fallbackButtonText}>{t('lens.close')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -984,16 +981,16 @@ const DetectAR2D: React.FC<{
           </Pressable>
           <View style={styles.titleBlock}>
             <Text style={styles.title}>
-              {allowUngrounded ? 'DEV · Scan anything' : 'Scan artifact'}
+              {allowUngrounded ? 'DEV · Scan anything' : t('lens.scanArtifact')}
             </Text>
-            <Text style={styles.subtitle}>identify · no AR on this device</Text>
+            <Text style={styles.subtitle}>{t('lens.subtitle2d')}</Text>
           </View>
           <View style={styles.iconButton} />
         </View>
         {remaining != null ? (
           <View style={styles.scansPill} pointerEvents="none">
             <Text style={styles.scansPillText}>
-              {remaining} {remaining === 1 ? 'scan' : 'scans'} left here
+              {t('lens.scansLeft', {count: remaining})}
             </Text>
           </View>
         ) : null}
@@ -1001,9 +998,7 @@ const DetectAR2D: React.FC<{
 
       <SafeAreaView style={styles.bottomOverlay} edges={['bottom']} pointerEvents="box-none">
         <View style={styles.arNotice} pointerEvents="none">
-          <Text style={styles.arNoticeText}>
-            AR isn’t available on this device — showing the info card instead.
-          </Text>
+          <Text style={styles.arNoticeText}>{t('lens.noArNotice')}</Text>
         </View>
 
         {resolved.kind === 'grounded' && (
@@ -1036,7 +1031,7 @@ const DetectAR2D: React.FC<{
           ) : (
             <>
               <ScanSearch size={18} color="#1A0F00" />
-              <Text style={styles.detectButtonText}>Detect</Text>
+              <Text style={styles.detectButtonText}>{t('lens.detect')}</Text>
             </>
           )}
         </Pressable>

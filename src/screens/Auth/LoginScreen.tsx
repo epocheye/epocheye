@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -45,13 +46,14 @@ const scrollContentStyle = {
  */
 const LoginScreen: React.FC<LoginScreenProps> = ({
   onLoginSuccess,
-  headingText = 'Welcome back',
+  headingText,
   subheadingText,
   visualSubject,
   visualContext,
   secondaryActionLabel,
   onSecondaryActionPress,
 }) => {
+  const { t } = useTranslation();
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -67,17 +69,20 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
       await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.COMPLETED, 'true');
       onLoginSuccess();
     } else if (result.error.statusCode !== 0) {
-      Alert.alert('Google sign in failed', result.error.message);
+      Alert.alert(t('auth.googleSignInFailedTitle'), result.error.message);
     }
   };
 
   const handleAppleAuth = () => {
-    Alert.alert('Coming Soon', 'Apple sign-in will be available soon.');
+    Alert.alert(t('auth.comingSoonTitle'), t('auth.appleComingSoonBody'));
   };
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Missing fields', 'Please enter your email and password.');
+      Alert.alert(
+        t('auth.missingFieldsTitle'),
+        t('auth.missingFieldsLoginBody'),
+      );
       return;
     }
 
@@ -89,7 +94,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
       await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.COMPLETED, 'true');
       onLoginSuccess();
     } else {
-      Alert.alert('Login failed', result.error.message);
+      Alert.alert(t('auth.loginFailedTitle'), result.error.message);
     }
   };
 
@@ -138,11 +143,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
               EpochEye
             </Text>
             <Text className="mt-3 font-display text-[20px] leading-[26px] text-center text-brand-gold">
-              {headingText}
+              {headingText ?? t('auth.welcomeBack')}
             </Text>
             <Text className="mt-2 text-center font-ui text-sm leading-5 text-parchment-muted px-2">
-              {subheadingText ??
-                'Sign in to continue your journey through India’s heritage.'}
+              {subheadingText ?? t('auth.loginSubheading')}
             </Text>
           </View>
 
@@ -151,7 +155,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
               {/* Google on Android, Apple on iOS (Apple sign-in is iOS-only). */}
               {Platform.OS === 'android' ? (
                 <AuthButton
-                  title={googleLoading ? 'Signing in...' : 'Continue with Google'}
+                  title={
+                    googleLoading
+                      ? t('auth.signingIn')
+                      : t('auth.continueWithGoogle')
+                  }
                   variant="google"
                   onPress={handleGoogleAuth}
                   disabled={googleLoading}
@@ -159,13 +167,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
               ) : null}
               {Platform.OS === 'ios' ? (
                 <AuthButton
-                  title="Continue with Apple"
+                  title={t('auth.continueWithApple')}
                   variant="apple"
                   onPress={handleAppleAuth}
                 />
               ) : null}
               <AuthButton
-                title="Continue with Email"
+                title={t('auth.continueWithEmail')}
                 variant="email"
                 onPress={() => setShowEmailForm(true)}
               />
@@ -174,7 +182,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
             <View className="gap-5">
               <TextInput
                 className="h-14 rounded-2xl border border-white/10 bg-white/[0.04] px-5 font-ui text-base text-parchment"
-                placeholder="Email"
+                placeholder={t('auth.emailPlaceholder')}
                 placeholderTextColor={COLORS.textTertiary}
                 value={email}
                 onChangeText={setEmail}
@@ -184,7 +192,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
               />
               <TextInput
                 className="h-14 rounded-2xl border border-white/10 bg-white/[0.04] px-5 font-ui text-base text-parchment"
-                placeholder="Password"
+                placeholder={t('auth.passwordPlaceholder')}
                 placeholderTextColor={COLORS.textTertiary}
                 value={password}
                 onChangeText={setPassword}
@@ -200,11 +208,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                     showRing={false}
                   />
                   <Text className="font-ui text-sm text-parchment-muted">
-                    Signing in...
+                    {t('auth.signingIn')}
                   </Text>
                 </View>
               ) : (
-                <AmberButton title="Sign In" onPress={handleSubmit} />
+                <AmberButton title={t('auth.signIn')} onPress={handleSubmit} />
               )}
 
               <TouchableOpacity
@@ -212,7 +220,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                 className="mt-2 items-center"
               >
                 <Text className="font-ui-medium text-sm text-parchment-faint">
-                  Back to options
+                  {t('auth.backToOptions')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -230,7 +238,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
           ) : null}
 
           <Text className="mb-8 mt-10 text-center font-ui text-xs text-parchment-dim">
-            By continuing, you agree to our Terms & Privacy Policy
+            {t('auth.termsNotice')}
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

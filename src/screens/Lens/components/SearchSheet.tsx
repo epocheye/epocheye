@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {useTranslation} from 'react-i18next';
 import BottomSheet, {
   BottomSheetFlatList,
   BottomSheetTextInput,
@@ -27,6 +28,7 @@ interface SearchSheetProps {
 
 const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
   ({places, onSelectPlace}, ref) => {
+    const {t} = useTranslation();
     const sheetRef = useRef<BottomSheet>(null);
     const [query, setQuery] = useState('');
 
@@ -73,7 +75,7 @@ const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
           <BottomSheetTextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search monuments..."
+            placeholder={t('search.placeholder')}
             placeholderTextColor="#666666"
             style={styles.input}
           />
@@ -102,7 +104,7 @@ const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
                     backgroundColor: '#1A1A1A',
                   }}
                   imageStyle={{borderRadius: 10}}
-                  loadingLabel="Loading..."
+                  loadingLabel={t('search.loading')}
                 />
 
                 <View className="flex-1 ml-3">
@@ -114,8 +116,10 @@ const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
                   <Text
                     className="mt-0.5 text-grey-muted text-[12px]"
                     style={{fontFamily: FONTS.regular}}>
-                    {item.city} · {(item.distance_meters / 1000).toFixed(1)} km
-                    away
+                    {item.city} ·{' '}
+                    {t('search.kmAway', {
+                      distance: (item.distance_meters / 1000).toFixed(1),
+                    })}
                   </Text>
                 </View>
               </Pressable>
@@ -124,7 +128,7 @@ const SearchSheet = forwardRef<SearchSheetRef, SearchSheetProps>(
               <Text
                 className="mt-7 text-grey-muted text-center text-[13px]"
                 style={{fontFamily: FONTS.regular}}>
-                No monuments match your search.
+                {t('search.noResults')}
               </Text>
             }
           />

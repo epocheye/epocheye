@@ -38,6 +38,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft,
   Mic,
@@ -82,6 +83,7 @@ const Waveform: React.FC = () => (
 );
 
 const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { t } = useTranslation();
   const { slug, siteName, heroImageUrl } = route.params;
 
   const [siteDetail, setSiteDetail] = useState<SiteDetail | null>(null);
@@ -101,10 +103,10 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
   const hasConversation = messages.some(m => !m.isWelcome) || isStreaming;
   useBackConfirm({
     enabled: hasConversation,
-    title: 'Leave the guide?',
-    message: 'Your conversation with the AI guide will be lost.',
-    confirmText: 'Leave',
-    cancelText: 'Stay',
+    title: t('guide.leaveConfirmTitle'),
+    message: t('guide.leaveConfirmMessage'),
+    confirmText: t('guide.leaveConfirmConfirm'),
+    cancelText: t('guide.leaveConfirmCancel'),
   });
 
   // Fetch the full site content (we need narratives + faq from content.*).
@@ -225,9 +227,9 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleClearChat = useCallback(() => {
     AppAlert.confirm({
-      title: 'Clear conversation?',
-      message: 'This removes your questions and the guide’s answers.',
-      confirmText: 'Clear',
+      title: t('guide.clearConfirmTitle'),
+      message: t('guide.clearConfirmMessage'),
+      confirmText: t('guide.clearConfirmConfirm'),
       destructive: true,
       onConfirm: () => {
         abortRef.current?.();
@@ -242,7 +244,7 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
         ]);
       },
     });
-  }, [siteDetail, siteName]);
+  }, [siteDetail, siteName, t]);
 
   const handleRetry = useCallback(() => {
     if (!lastQuestion) return;
@@ -297,8 +299,8 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const hasText = input.trim().length > 0;
   const statusText = voice.isListening
-    ? 'Listening…'
-    : 'AI guide · grounded in site data';
+    ? t('guide.statusListening')
+    : t('guide.statusGrounded');
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -310,7 +312,7 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
           onPress={() => navigation.goBack()}
           hitSlop={10}
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={t('guide.backLabel')}
           style={styles.backButton}>
           <ArrowLeft size={18} color="#F2EBE0" />
         </Pressable>
@@ -344,7 +346,7 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
           onPress={handleClearChat}
           hitSlop={10}
           accessibilityRole="button"
-          accessibilityLabel="Conversation options"
+          accessibilityLabel={t('guide.optionsLabel')}
           style={styles.menuButton}>
           <MoreVertical size={18} color="#A89685" />
         </Pressable>
@@ -377,7 +379,7 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* TRY ASKING chips (Figma 240:40-50) */}
         {showSuggestions ? (
           <View style={styles.suggestionsBlock}>
-            <Text style={styles.tryAsking}>TRY ASKING</Text>
+            <Text style={styles.tryAsking}>{t('guide.tryAsking')}</Text>
             <View style={styles.chipsGrid}>
               {faqSuggestions.map(q => (
                 <TouchableOpacity
@@ -386,7 +388,7 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
                   activeOpacity={0.78}
                   style={styles.chip}
                   accessibilityRole="button"
-                  accessibilityLabel={`Ask: ${q}`}>
+                  accessibilityLabel={t('guide.askChipLabel', { question: q })}>
                   <Text style={styles.chipText} numberOfLines={2}>
                     {q}
                   </Text>
@@ -402,14 +404,16 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
             <TextInput
               value={input}
               onChangeText={setInput}
-              placeholder={`Ask about ${siteName?.trim() || 'this place'}…`}
+              placeholder={t('guide.inputPlaceholder', {
+                name: siteName?.trim() || t('guide.thisPlace'),
+              })}
               placeholderTextColor="#898888"
               style={styles.textInput}
               editable={!isStreaming}
               multiline
               returnKeyType="send"
               onSubmitEditing={handleSendPress}
-              accessibilityLabel="Question input"
+              accessibilityLabel={t('guide.inputLabel')}
             />
             <Pressable
               onPress={handlePrimaryPress}
@@ -417,10 +421,10 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
               accessibilityRole="button"
               accessibilityLabel={
                 voice.isListening
-                  ? 'Stop dictation'
+                  ? t('guide.stopDictation')
                   : hasText
-                  ? 'Send question'
-                  : 'Voice input'
+                  ? t('guide.sendQuestion')
+                  : t('guide.voiceInput')
               }
               style={[
                 styles.primaryButton,
@@ -448,6 +452,7 @@ const FooterArea: React.FC<{
   error: string | null;
   onRetry: () => void;
 }> = ({ streamingText, isStreaming, error, onRetry }) => {
+  const { t } = useTranslation();
   if (error) {
     return (
       <View style={styles.errorBubble}>
@@ -457,9 +462,9 @@ const FooterArea: React.FC<{
           style={styles.retryButton}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel="Retry">
+          accessibilityLabel={t('guide.retry')}>
           <RefreshCcw size={14} color={FLAME} />
-          <Text style={styles.retryText}>Retry</Text>
+          <Text style={styles.retryText}>{t('guide.retry')}</Text>
         </TouchableOpacity>
       </View>
     );

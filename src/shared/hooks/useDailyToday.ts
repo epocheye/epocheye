@@ -23,6 +23,10 @@ export function useDailyToday(): UseDailyTodayReturn {
       const result = await getDailyToday();
       if (result.success) {
         setDaily(result.data);
+      } else if (__DEV__) {
+        // Surfaces WHY the Daily hero falls back to the empty state (e.g. the
+        // /daily/today endpoint 404s on an undeployed backend, or returns no body).
+        console.warn('[daily] today fetch failed:', result.error?.message);
       }
     } finally {
       setLoading(false);

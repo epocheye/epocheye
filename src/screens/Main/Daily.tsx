@@ -8,7 +8,6 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
@@ -24,12 +23,13 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
-import {Bell, ChevronRight} from 'lucide-react-native';
+import {useTranslation} from 'react-i18next';
+import {ChevronRight} from 'lucide-react-native';
 import {COLORS, FONTS, GOLD_GRADIENT} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
 import StreakModule from '../../components/ui/StreakModule';
 import {AmbientGlow, ImageScrim} from '../../components/ui/premium';
-import {useDailyToday, useDailyNudge} from '../../shared/hooks';
+import {useDailyToday} from '../../shared/hooks';
 import type {DailyStreakDay} from '../../utils/api/daily';
 import type {TabScreenProps} from '../../core/types/navigation.types';
 
@@ -39,13 +39,13 @@ const HERO_TEXT = '#FBF6EC';
 const HERO_MIN_H = 330;
 const CARD_W = Dimensions.get('window').width - 40; // px-5 wrapper = 20 each side
 
-function todayDateLabel(): string {
+function todayDateParts(): {month: string; day: number} {
   const months = [
     'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
     'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
   ];
   const now = new Date();
-  return `TODAY · ${months[now.getMonth()]} ${now.getDate()}`;
+  return {month: months[now.getMonth()], day: now.getDate()};
 }
 
 /** Staggered fade + rise driven by the shared `intro` value (0 → 1). */
@@ -74,13 +74,14 @@ const ExploreButton: React.FC<{label: string; onPress: () => void}> = ({label, o
 );
 
 const Daily: React.FC<Props> = ({navigation}) => {
+  const {t} = useTranslation();
   const {daily, loading, refresh: refreshDaily} = useDailyToday();
-  const {state: nudge, toggle: toggleNudge} = useDailyNudge();
   const [refreshing, setRefreshing] = useState(false);
   // Bumped on pull-to-refresh to replay the staggered entrance animations.
   const [cycle, setCycle] = useState(0);
 
-  const dateLabel = useMemo(() => todayDateLabel(), []);
+  const dateParts = useMemo(() => todayDateParts(), []);
+  const dateLabel = t('daily.todayLabel', {month: dateParts.month, day: dateParts.day});
 
   // Entrance progress (0 → 1), replayed when `cycle` changes.
   const intro = useSharedValue(0);
@@ -114,7 +115,6 @@ const Daily: React.FC<Props> = ({navigation}) => {
   const sStreak = useAnimatedStyle(() => fadeRise(intro.value, 0.1));
   const sHero = useAnimatedStyle(() => fadeRise(intro.value, 0.22));
   const sWeekly = useAnimatedStyle(() => fadeRise(intro.value, 0.36));
-  const sNudge = useAnimatedStyle(() => fadeRise(intro.value, 0.5));
   const sYear = useAnimatedStyle(() => {
     const p = interpolate(intro.value, [0.3, 0.72], [0, 1], Extrapolation.CLAMP);
     return {transform: [{scale: 0.92 + p * 0.08}]};
@@ -186,7 +186,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
           <Text
             style={{fontFamily: FONTS.display}}
             className="mt-1.5 text-[32px] leading-[38px] text-foreground tracking-tight">
-            On this day
+            {t('daily.onThisDay')}
           </Text>
         </Animated.View>
 
@@ -199,7 +199,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
                 ? weeklyStreak.map(d => d.is_today || d.visited)
                 : undefined
             }
-            subtitle="Read today's story to keep it alive"
+            subtitle={t('daily.streakSubtitle')}
           />
         </Animated.View>
 
@@ -281,7 +281,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
                   </>
                 ) : loading ? (
                   <Text style={{fontFamily: FONTS.ui, fontSize: 14, color: 'rgba(244,239,231,0.6)'}}>
-                    Loading today's story…
+                    {t('daily.loading')}
                   </Text>
                 ) : (
                   <>
@@ -289,12 +289,12 @@ const Daily: React.FC<Props> = ({navigation}) => {
                     <Text
                       style={{fontFamily: FONTS.display, color: COLORS.gold}}
                       className="mt-3 text-2xl leading-tight">
-                      A story is on its way
+                      {t('daily.emptyTitle')}
                     </Text>
                     <Text
                       style={{fontFamily: FONTS.ui}}
                       className="mt-2 text-sm leading-[21px] text-foreground/80">
-                      Today's moment in history is being prepared. Pull to refresh, or check back soon.
+                      {t('daily.emptyBody')}
                     </Text>
                   </>
                 )}
@@ -309,15 +309,15 @@ const Daily: React.FC<Props> = ({navigation}) => {
             <Text
               style={{fontFamily: FONTS.uiSemiBold}}
               className="text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
-              This week
+              {t('daily.thisWeek')}
             </Text>
             <Pressable
               onPress={onSeeAll}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="See all visit history">
+              accessibilityLabel={t('daily.seeAllA11y')}>
               <Text style={{fontFamily: FONTS.uiMedium}} className="text-[13px] text-primary">
-                See all
+                {t('daily.seeAll')}
               </Text>
             </Pressable>
           </View>
@@ -357,7 +357,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
                     </Text>
                     {isToday ? (
                       <Text style={{marginTop: 3, fontFamily: FONTS.uiMedium, fontSize: 9, color: 'rgba(10,10,12,0.7)', letterSpacing: 0.5}}>
-                        now
+                        {t('daily.nowTile')}
                       </Text>
                     ) : visited ? (
                       <View className="mt-1.5 w-3 h-3 rounded-full items-center justify-center" style={{backgroundColor: COLORS.success}}>
@@ -371,32 +371,6 @@ const Daily: React.FC<Props> = ({navigation}) => {
               );
             })}
           </View>
-        </Animated.View>
-
-        {/* Daily nudge row */}
-        <Animated.View
-          style={sNudge}
-          className="mt-7 mx-5 px-4 py-3.5 rounded-2xl bg-card border border-white/10 flex-row items-center">
-          <View
-            className="w-11 h-11 rounded-full items-center justify-center mr-3"
-            style={{backgroundColor: 'rgba(203,168,98,0.15)'}}>
-            <Bell color={COLORS.goldLight} size={20} />
-          </View>
-          <View className="flex-1">
-            <Text style={{fontFamily: FONTS.uiSemiBold}} className="text-sm text-foreground">
-              Daily nudge at {nudge.time_local}
-            </Text>
-            <Text style={{fontFamily: FONTS.ui}} className="mt-0.5 text-xs text-muted-foreground">
-              A 60-second story to start your day
-            </Text>
-          </View>
-          <Switch
-            value={nudge.enabled}
-            onValueChange={toggleNudge}
-            trackColor={{false: 'rgba(255,255,255,0.18)', true: COLORS.gold}}
-            thumbColor="#FFFFFF"
-            ios_backgroundColor="rgba(255,255,255,0.18)"
-          />
         </Animated.View>
       </ScrollView>
     </View>

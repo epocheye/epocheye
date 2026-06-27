@@ -7,6 +7,8 @@ import { firebase } from '@react-native-firebase/app';
 import messaging from '@react-native-firebase/messaging';
 import App from './App';
 import { name as appName } from './app.json';
+// Initialize i18n (en/hi/bn) before the app renders so t() is ready everywhere.
+import './src/i18n';
 
 // Background/quit-state FCM handler. Must be registered at module scope before
 // AppRegistry.registerComponent so the native bridge can reach it when the JS
