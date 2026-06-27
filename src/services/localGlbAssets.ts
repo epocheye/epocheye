@@ -21,13 +21,11 @@ import {
   mkdir,
 } from '@dr.pogodin/react-native-fs';
 
-/** modelId → path of the GLB inside the platform asset bundle. */
-const BUNDLED_GLBS: Record<string, string> = {
-  // android/app/src/main/assets/models/konark_vimana.glb (compressed, ~3.3 MB)
-  konark_vimana: 'models/konark_vimana.glb',
-  // Low-detail placeholder (~417 KB) for the progressive swap — always instant.
-  konark_vimana_low: 'models/konark_vimana.low.glb',
-};
+/** modelId → path of the GLB inside the platform asset bundle.
+ *  Intentionally empty: no GLBs are bundled in-app anymore — every model streams
+ *  from CloudFront (GLB_BASE_URL) to keep the APK small. isGlbBundled() returns
+ *  false and getBundledGlbUri() returns null, so callers always use the CDN path. */
+const BUNDLED_GLBS: Record<string, string> = {};
 
 const OUT_DIR = `${CachesDirectoryPath}/bundled_glb`;
 const memo = new Map<string, string>();

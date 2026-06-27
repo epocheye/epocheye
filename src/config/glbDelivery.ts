@@ -16,7 +16,8 @@
 import { GLB_BASE_URL } from '@env';
 import { DEFAULT_MONUMENT_SLUG } from './monuments';
 
-/** The marquee object bundled in-app today (compressed konark_vimana, ~3.3 MB). */
+/** The marquee object (konark_vimana). Streamed from CloudFront (GLB_BASE_URL);
+ *  no longer bundled in-app — prefetched on first use + LRU-cached on device. */
 export const MARQUEE_MODEL_ID = 'konark_vimana';
 
 /**

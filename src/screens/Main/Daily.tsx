@@ -1,6 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
-  Dimensions,
   Image,
   Linking,
   Pressable,
@@ -38,7 +37,6 @@ type Props = TabScreenProps<'Daily'>;
 
 const HERO_TEXT = '#FBF6EC';
 const HERO_MIN_H = 330;
-const CARD_W = Dimensions.get('window').width - 40; // px-5 wrapper = 20 each side
 
 function todayDateParts(): {month: string; day: number} {
   const months = [
@@ -86,8 +84,6 @@ const Daily: React.FC<Props> = ({navigation}) => {
 
   // Entrance progress (0 → 1), replayed when `cycle` changes.
   const intro = useSharedValue(0);
-  // Slow gold shimmer sweeping across the hero card.
-  const shimmer = useSharedValue(0);
   // Soft pulse behind today's streak tile.
   const pulse = useSharedValue(0);
 
@@ -97,11 +93,6 @@ const Daily: React.FC<Props> = ({navigation}) => {
   }, [intro, cycle]);
 
   useEffect(() => {
-    shimmer.value = withRepeat(
-      withTiming(1, {duration: 2600, easing: Easing.inOut(Easing.ease)}),
-      -1,
-      false,
-    );
     pulse.value = withRepeat(
       withSequence(
         withTiming(1, {duration: 900, easing: Easing.inOut(Easing.quad)}),
@@ -110,7 +101,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
       -1,
       false,
     );
-  }, [shimmer, pulse]);
+  }, [pulse]);
 
   const sHeader = useAnimatedStyle(() => fadeRise(intro.value, 0));
   const sStreak = useAnimatedStyle(() => fadeRise(intro.value, 0.1));
@@ -120,12 +111,6 @@ const Daily: React.FC<Props> = ({navigation}) => {
     const p = interpolate(intro.value, [0.3, 0.72], [0, 1], Extrapolation.CLAMP);
     return {transform: [{scale: 0.92 + p * 0.08}]};
   });
-  const shimmerStyle = useAnimatedStyle(() => ({
-    transform: [
-      {translateX: -140 + shimmer.value * (CARD_W + 140)},
-      {rotate: '18deg'},
-    ],
-  }));
   const glowStyle = useAnimatedStyle(() => ({
     opacity: 0.35 + pulse.value * 0.45,
     transform: [{scale: 1 + pulse.value * 0.14}],
@@ -211,19 +196,17 @@ const Daily: React.FC<Props> = ({navigation}) => {
           <Animated.View style={sHero} className="px-5">
           {hasStory && daily?.image_url ? (
             <View style={styles.heroCard}>
-              <Image source={{uri: daily.image_url}} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <View style={styles.heroCardBg} pointerEvents="none" />
+              <Image
+                source={{uri: daily.image_url}}
+                style={[StyleSheet.absoluteFill, styles.heroRadius]}
+                resizeMode="cover"
+              />
               <ImageScrim
                 colors={['rgba(10,10,12,0.15)', 'rgba(10,10,12,0.55)', 'rgba(10,10,12,0.97)']}
                 locations={[0, 0.45, 1]}
+                style={styles.heroRadius}
               />
-              <Animated.View pointerEvents="none" style={[styles.shimmer, shimmerStyle]}>
-                <LinearGradient
-                  colors={['transparent', 'rgba(230,200,139,0.22)', 'transparent']}
-                  start={{x: 0, y: 0}}
-                  end={{x: 1, y: 0}}
-                  style={StyleSheet.absoluteFill}
-                />
-              </Animated.View>
               <View style={styles.heroContent}>
                 {hasYear ? (
                   <Animated.Text
@@ -253,6 +236,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
             </View>
           ) : (
             <View style={[styles.heroCard, styles.heroFallback]}>
+              <View style={styles.heroCardBg} pointerEvents="none" />
               <AmbientGlow height={HERO_MIN_H} />
               <View style={styles.heroContent}>
                 {hasStory ? (
@@ -386,8 +370,22 @@ const styles = StyleSheet.create({
   heroCard: {
     minHeight: HERO_MIN_H,
     borderRadius: 28,
-    overflow: 'hidden',
+    // NOTE: do NOT add `overflow: 'hidden'` here. On the New Architecture (Fabric)
+    // Android, borderRadius + overflow:'hidden' on a View suppresses ALL of its
+    // children (the card renders blank). The image/scrim are rounded individually
+    // via `heroRadius` instead, and `heroCardBg` provides the solid backdrop.
+  },
+  heroCardBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 28,
     backgroundColor: '#131218',
+  },
+  heroRadius: {
+    borderRadius: 28,
   },
   heroFallback: {
     borderWidth: 1,
@@ -397,13 +395,6 @@ const styles = StyleSheet.create({
     minHeight: HERO_MIN_H,
     justifyContent: 'flex-end',
     padding: 24,
-  },
-  shimmer: {
-    position: 'absolute',
-    top: -90,
-    bottom: -90,
-    left: 0,
-    width: 140,
   },
   goldRule: {
     marginTop: 14,

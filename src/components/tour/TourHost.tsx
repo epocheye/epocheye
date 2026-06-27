@@ -118,28 +118,38 @@ const TourHost: React.FC = () => {
     const step = TOUR_STEPS[stepIndex];
 
     (async () => {
-      await navigateForStep(step);
-      await delay(step.nav.kind === 'tab' ? 380 : 580);
-      if (cancelled) return;
+      try {
+        await navigateForStep(step);
+        await delay(step.nav.kind === 'tab' ? 380 : 580);
+        if (cancelled) return;
 
-      if (!step.targetId) {
-        setRect(null);
-        setReady(true);
-        return;
-      }
-      // Poll for the registered rect (screen needs to mount + measure).
-      let found: TourRect | null = null;
-      for (let i = 0; i < 16 && !cancelled; i++) {
-        const r = useTourStore.getState().targets[step.targetId];
-        if (r && isOnScreen(r)) {
-          found = r;
-          break;
+        if (!step.targetId) {
+          setRect(null);
+          setReady(true);
+          return;
         }
-        await delay(100);
+        // Poll for the registered rect (screen needs to mount + measure).
+        let found: TourRect | null = null;
+        for (let i = 0; i < 16 && !cancelled; i++) {
+          const r = useTourStore.getState().targets[step.targetId];
+          if (r && isOnScreen(r)) {
+            found = r;
+            break;
+          }
+          await delay(100);
+        }
+        if (cancelled) return;
+        setRect(found);
+        setReady(true);
+      } catch (e) {
+        // Never let a navigation/measure failure crash the app — fall back to the
+        // centered card so the user can still tap Next/Skip.
+        if (__DEV__) console.warn('[tour] step failed', e);
+        if (!cancelled) {
+          setRect(null);
+          setReady(true);
+        }
       }
-      if (cancelled) return;
-      setRect(found);
-      setReady(true);
     })();
 
     return () => {

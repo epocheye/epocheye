@@ -9,12 +9,10 @@ const config = mergeConfig(defaultConfig, {
   },
   resolver: {
     blockList: [
-      /node_modules[\\/]react-native-fast-tflite[\\/]android[\\/]src[\\/]main[\\/]cpp[\\/]lib[\\/].*/,
       /node_modules[\\/]@shopify[\\/]react-native-skia[\\/]android[\\/]\.cxx[\\/].*/,
     ],
     assetExts: [
       ...defaultConfig.resolver.assetExts.filter(ext => ext !== "svg"),
-      "tflite",
     ],
     sourceExts: [...defaultConfig.resolver.sourceExts, "svg"],
   },
