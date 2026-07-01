@@ -276,7 +276,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <View className="flex-1 bg-background">
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" translucent />
 
       <ScrollView
         ref={scrollRef}

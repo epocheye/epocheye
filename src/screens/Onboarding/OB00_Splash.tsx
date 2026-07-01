@@ -8,7 +8,6 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import {ROUTES} from '../../core/constants/routes';
-import {COLORS} from '../../core/constants/theme';
 import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB00_Splash'>;
@@ -36,7 +35,7 @@ const OB00_Splash: React.FC<Props> = ({navigation}) => {
 
   return (
     <View className="flex-1 bg-ink-warm items-center justify-center">
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bgWarm} translucent />
+      <StatusBar barStyle="light-content" translucent />
 
       <Animated.View className="w-[110px] h-[108px]" style={logoStyle}>
         <Image

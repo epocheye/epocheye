@@ -33,6 +33,7 @@ import {
 import { launchImageLibrary } from 'react-native-image-picker';
 import { logout } from '../../utils/api/auth';
 import { useUser } from '../../context';
+import { useUserStore } from '../../stores/userStore';
 import { PermissionService } from '../../shared/services/permission.service';
 import { APP_CONFIG } from '../../core/config';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
@@ -182,7 +183,15 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
         showToast(t('settings.profileUpdated'), { type: 'success' });
         setHasChanges(false);
       } else {
-        Alert.alert(t('settings.error'), t('settings.updateProfileFailed'));
+        // Surface the actual reason (set on the store by updateProfile) so the
+        // failure is diagnosable instead of an opaque generic message.
+        const reason = useUserStore.getState().error;
+        Alert.alert(
+          t('settings.error'),
+          reason
+            ? `${t('settings.updateProfileFailed')}\n\n${reason}`
+            : t('settings.updateProfileFailed'),
+        );
       }
     } catch {
       Alert.alert(t('settings.error'), t('settings.unexpectedError'));

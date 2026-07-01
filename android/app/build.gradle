@@ -1,5 +1,8 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
+// SceneView 4.18.0's ARSceneView is a Jetpack Compose composable; the native AR
+// views host it in a ComposeView, so this module needs the Compose compiler.
+apply plugin: "org.jetbrains.kotlin.plugin.compose"
 apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 
@@ -85,6 +88,12 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.epocheye"
+
+    // Jetpack Compose — required to host SceneView 4.18.0's ARSceneView composable.
+    buildFeatures {
+        compose true
+    }
+
     defaultConfig {
         applicationId "com.epocheye"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -163,4 +172,12 @@ dependencies {
     implementation 'com.google.ar:core:1.44.0'
     implementation 'io.github.sceneview:arsceneview:4.18.0'
     implementation 'androidx.lifecycle:lifecycle-process:2.7.0'
+
+    // Jetpack Compose — the native AR views host SceneView 4.18.0's ARSceneView
+    // composable inside a ComposeView. BOM matches the one arsceneview 4.18.0
+    // resolves (compose-bom 2026.05.01) so runtime/ui versions stay aligned.
+    implementation platform('androidx.compose:compose-bom:2026.05.01')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.activity:activity-compose:1.11.0'
 }

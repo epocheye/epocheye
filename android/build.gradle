@@ -20,6 +20,11 @@ buildscript {
         // explicit version it resolves to RNGP's catalog pin (2.1.20), whose
         // compiler can't read SceneView 4.18.0's Kotlin 2.3.0 metadata.
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+        // Compose compiler plugin (Kotlin 2.x): SceneView 4.18.0's AR surface is
+        // Jetpack Compose (ARSceneView is a @Composable), so the native AR views
+        // host it via ComposeView and must be compiled with the Compose compiler.
+        // Version must match kotlinVersion.
+        classpath("org.jetbrains.kotlin:compose-compiler-gradle-plugin:$kotlinVersion")
         classpath("com.google.gms:google-services:4.4.1")
     }
 }

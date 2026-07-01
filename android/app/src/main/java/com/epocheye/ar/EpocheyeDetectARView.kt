@@ -8,21 +8,35 @@ import android.net.Uri
 import android.util.Log
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import com.facebook.react.uimanager.ThemedReactContext
+import com.google.android.filament.Engine
+import com.google.android.filament.IndirectLight
+import com.google.ar.core.Config
 import com.google.ar.core.Coordinates2d
+import com.google.ar.core.Frame
 import com.google.ar.core.Plane
 import com.google.ar.core.Pose
+import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
-import com.google.ar.core.Config
-import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.node.AnchorNode
+import io.github.sceneview.environment.Environment
+import io.github.sceneview.loaders.MaterialLoader
+import io.github.sceneview.loaders.ModelLoader
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.node.ImageNode
 import io.github.sceneview.node.ModelNode
+import io.github.sceneview.node.Node as SvNode
+import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberMainLightNode
+import io.github.sceneview.rememberMaterialLoader
+import io.github.sceneview.rememberModelLoader
 import org.json.JSONArray
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -41,17 +55,16 @@ import kotlin.math.atan2
  *
  * The GLB is parented to an [AnchorNode], so it stays world-locked as the device
  * moves (it does NOT drift with the camera).
+ *
+ * SceneView 4.18.0 removed the View-based `ARSceneView`; the AR surface is now the
+ * Jetpack Compose `ARSceneView { }` composable. We host it in a [ComposeView] and
+ * drive it imperatively: the scene graph hangs off a captured root node,
+ * and Engine / loaders / Session / Frame are captured from the composable's
+ * remember-factories and session callbacks so the placement/capture methods below
+ * keep their original imperative shape. The React Native bridge (props, commands,
+ * events) is unchanged.
  */
-class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOwner {
-
-    // SceneView is driven by a view-tied lifecycle: CREATED at construction (no
-    // session/rendering yet), RESUMED only once attached to a window (so the
-    // Display + GL surface exist), DESTROYED on detach. Hosting it off
-    // ProcessLifecycleOwner started rendering before the surface was ready
-    // ("OpenGL ES API with no current context" → black) and read the Display
-    // before attach ("Display.getRotation() on null" → crash).
-    private val lifecycleRegistry = LifecycleRegistry(this)
-    override val lifecycle: Lifecycle get() = lifecycleRegistry
+class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
     private var glbUri: String? = null
     private var modelScale: Float = 0.5f
@@ -66,7 +79,22 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
     var onARError: ((String) -> Unit)? = null
     var onFrameCaptured: ((String) -> Unit)? = null
 
-    private var arSceneView: ARSceneView? = null
+    // ── Compose-hosted scene ─────────────────────────────────────────────────
+    // A single root node is created inside the ARSceneView content DSL and captured
+    // here; imperative placement attaches/detaches the world-anchored nodes as its
+    // children (SceneView 4.x has no public "adopt an existing node" list on the AR
+    // composable, so this root bridges our imperative graph into the Compose scene).
+    @Volatile private var sceneRoot: SvNode? = null
+    private var composeView: ComposeView? = null
+
+    // Captured from the composable so the imperative methods can build nodes and
+    // read the live ARCore state without a View-based ARSceneView.
+    @Volatile private var engine: Engine? = null
+    @Volatile private var modelLoader: ModelLoader? = null
+    @Volatile private var materialLoader: MaterialLoader? = null
+    @Volatile private var arSession: Session? = null
+    @Volatile private var arFrame: Frame? = null
+
     private var currentAnchorNode: AnchorNode? = null
     private var currentModelNode: ModelNode? = null
     // One or more world-anchored card placards. Grounded results use a single card
@@ -84,7 +112,6 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
     private val cardOnlyScale = 0.26f
     private var readyReported = false
     private var planeReported = false
-    private var lightingApplied = false
     private var lastTrackingState: TrackingState? = null
 
     /**
@@ -114,180 +141,193 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
     private val trackWaitNanos = 1_500L * 1_000_000L
     private val cardDistance = 1.2f
 
-    init {
-        // Do NOT build the ARSceneView here. SceneView's onLayout reads the
-        // View's own Display rotation, which is null until the view is attached
-        // to a window — building it at construction time crashes with
-        // "Display.getRotation() on a null object reference". Construction is
-        // deferred to onAttachedToWindow().
-        lifecycleRegistry.currentState = Lifecycle.State.CREATED
-    }
+    // ARSceneView (composable) is created in onAttachedToWindow, not here: the
+    // ComposeView needs a ViewTreeLifecycleOwner (resolved once attached to the
+    // Activity window) to drive the AR session lifecycle.
 
     private fun setupAR() {
         try {
-            // ARSceneView reads the Display rotation, so it MUST be built with a
-            // display-associated context. The ThemedReactContext (a non-Activity
-            // context) returns a null Display on API 30+, which crashes SceneView
-            // with "Display.getRotation() on a null object reference". Use the
-            // current Activity context instead.
+            // Use the Activity context — a non-Activity context returns a null
+            // Display on API 30+ and SceneView reads the display rotation.
             val hostContext: Context =
                 (context as? ThemedReactContext)?.currentActivity ?: context
-            val sceneView = ARSceneView(
-                context = hostContext,
-                sharedLifecycle = lifecycleRegistry,
-            ).apply {
+
+            val view = ComposeView(hostContext).apply {
                 layoutParams = LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 )
+                // Dispose the composition (and release the AR session / Filament
+                // engine) when THIS view unmounts — RN views come and go while the
+                // host Activity lives, so the default (dispose-on-Activity-destroy)
+                // would leak the camera/session.
+                setViewCompositionStrategy(
+                    ViewCompositionStrategy.DisposeOnDetachedFromWindow,
+                )
+                setContent {
+                    val eng = rememberEngine()
+                    val ml = rememberModelLoader(eng)
+                    val matl = rememberMaterialLoader(eng)
 
-                configureSession { _, config ->
-                    config.geospatialMode = Config.GeospatialMode.DISABLED
-                    config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                    config.depthMode = Config.DepthMode.DISABLED
-                    // Light estimation DISABLED — on this device it produced no usable
-                    // scene light (models stayed black). Instead we apply our own
-                    // bright diffuse IndirectLight in ensureLighting(); because the
-                    // model materials are forced dielectric (metallicFactor=0) at load,
-                    // a diffuse-only IBL lights them reliably (a metal would still need
-                    // reflections). Deterministic and independent of ARCore estimates.
-                    config.lightEstimationMode = Config.LightEstimationMode.DISABLED
-                    config.focusMode = Config.FocusMode.AUTO
-                    config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                }
-
-                onSessionUpdated = { session, frame ->
-                    if (!readyReported) {
-                        readyReported = true
-                        post { onARReady?.invoke() }
-                    }
-                    // Apply our explicit scene lighting once the session/scene is live
-                    // (doing it at construction can touch Filament before the surface
-                    // exists). Estimation is off, so this is the only light source.
-                    if (!lightingApplied) {
-                        lightingApplied = true
-                        arSceneView?.let { ensureLighting(it) }
-                    }
-                    // Emit camera tracking state transitions so JS can gate placement.
-                    val ts = try {
-                        frame.camera.trackingState
-                    } catch (_: Throwable) {
-                        null
-                    }
-                    if (ts != null && ts != lastTrackingState) {
-                        lastTrackingState = ts
-                        post { onTrackingState?.invoke(ts.name) }
-                    }
-                    if (!planeReported && hasTrackedPlane(session)) {
-                        planeReported = true
-                        post { onPlaneDetected?.invoke() }
-                    }
-                    // Billboard the data panel to face the camera each frame.
-                    // Best-effort: any SceneView API mismatch is swallowed so the
-                    // panel (and the rest of the scene) never crash the session.
-                    // Billboard the data placard to face the camera — Y-axis only,
-                    // so it stays upright (never inverted) and +Z (the image face)
-                    // points at the viewer.
-                    if (cardNodes.isNotEmpty()) {
+                    // Explicit, asset-free bright IBL (AR light estimation is disabled
+                    // below). A flat 1-band SH irradiance lights every dielectric
+                    // surface uniformly — combined with the forced metallicFactor=0 at
+                    // load this reliably lights the heritage models, which otherwise
+                    // render near-black under indoor AR. Deterministic and independent
+                    // of ARCore estimates.
+                    val env = remember(eng) {
                         try {
-                            val cam = frame.camera.pose
-                            if (cardsCameraLocked) {
-                                // Headlocked float: re-pose each card ~cardDistance in
-                                // front of the camera every frame (no world anchor), so it
-                                // stays in view even when ARCore never reaches full tracking.
-                                for ((i, card) in cardNodes.withIndex()) {
-                                    val o = cardLayout[i.coerceAtMost(cardLayout.lastIndex)]
-                                    val t = cam.compose(
-                                        Pose.makeTranslation(o.x, o.y, o.z - cardDistance),
-                                    )
-                                    card.worldPosition = Position(t.tx(), t.ty(), t.tz())
-                                    val yaw = Math.toDegrees(
-                                        atan2(
-                                            (cam.tx() - t.tx()).toDouble(),
-                                            (cam.tz() - t.tz()).toDouble(),
-                                        ),
-                                    ).toFloat()
-                                    card.rotation = Rotation(0f, yaw, 0f)
-                                }
-                            } else {
-                                for (card in cardNodes) {
-                                    val p = card.worldPosition
-                                    val yaw = Math.toDegrees(
-                                        atan2(
-                                            (cam.tx() - p.x).toDouble(),
-                                            (cam.tz() - p.z).toDouble(),
-                                        ),
-                                    ).toFloat()
-                                    card.rotation = Rotation(0f, yaw, 0f)
-                                }
+                            val ibl = IndirectLight.Builder()
+                                .irradiance(1, floatArrayOf(1.0f, 1.0f, 1.0f))
+                                .intensity(80_000f)
+                                .build(eng)
+                            Environment(indirectLight = ibl)
+                        } catch (t: Throwable) {
+                            Log.w(TAG, "IBL build failed", t)
+                            Environment()
+                        }
+                    }
+                    val mainLight = rememberMainLightNode(eng)
+                    SideEffect {
+                        engine = eng
+                        modelLoader = ml
+                        materialLoader = matl
+                        // Boost the main directional light for some shading/relief.
+                        try {
+                            mainLight?.let {
+                                it.lightManager.setIntensity(it.lightInstance, 120_000f)
                             }
                         } catch (_: Throwable) {
                         }
                     }
-                    // Retry any deferred placement now that a fresh (possibly
-                    // TRACKING) frame is available.
-                    if (pending != null) tryPlacePending()
-                    if (pendingCards != null) tryPlaceCardsPending()
-                }
 
-                onTrackingFailureChanged = { reason ->
-                    // While a card placement is pending, stay quiet — the headlock
-                    // fallback will float the card within TRACK_WAIT, so surfacing a raw
-                    // INSUFFICIENT_FEATURES here would read as a scary "no surface" error.
-                    if (reason != null && pendingCards == null) {
-                        post { onARError?.invoke(reason.name) }
+                    io.github.sceneview.ar.ARSceneView(
+                        modifier = Modifier.fillMaxSize(),
+                        engine = eng,
+                        modelLoader = ml,
+                        materialLoader = matl,
+                        environment = env,
+                        mainLightNode = mainLight,
+                        // Hide the dotted plane-visualization grid. Plane DETECTION
+                        // stays on (planeFindingMode below) so hit-testing works.
+                        planeRenderer = false,
+                        sessionConfiguration = { _, config ->
+                            config.geospatialMode = Config.GeospatialMode.DISABLED
+                            config.planeFindingMode =
+                                Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                            config.depthMode = Config.DepthMode.DISABLED
+                            // Light estimation DISABLED — on this device it produced no
+                            // usable scene light (models stayed black). Our own bright
+                            // diffuse IBL (env above) is the only light source.
+                            config.lightEstimationMode = Config.LightEstimationMode.DISABLED
+                            config.focusMode = Config.FocusMode.AUTO
+                            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                        },
+                        onSessionCreated = { session ->
+                            arSession = session
+                        },
+                        onSessionUpdated = { session, frame ->
+                            arSession = session
+                            arFrame = frame
+                            onSessionTick(session, frame)
+                        },
+                        onTrackingFailureChanged = { reason ->
+                            // While a card placement is pending, stay quiet — the
+                            // headlock fallback floats the card within TRACK_WAIT, so a
+                            // raw INSUFFICIENT_FEATURES here would read as a scary "no
+                            // surface" error.
+                            if (reason != null && pendingCards == null) {
+                                post { onARError?.invoke(reason.name) }
+                            }
+                        },
+                    ) {
+                        // Scene-attached root node; imperative placement parents the
+                        // world-anchored nodes under it.
+                        Node(apply = { sceneRoot = this })
                     }
                 }
             }
-            // Hide SceneView's built-in plane visualization (the dotted grid). Plane
-            // DETECTION stays on (config.planeFindingMode above) so hit-testing still
-            // works — only the on-screen technical overlay is suppressed.
-            try {
-                sceneView.planeRenderer.isEnabled = false
-            } catch (_: Throwable) {
-            }
-            addView(sceneView)
-            arSceneView = sceneView
+            addView(view)
+            composeView = view
         } catch (e: Throwable) {
             Log.e(TAG, "detect AR setup failed", e)
             post { onARError?.invoke(e.message ?: "detect AR setup failed") }
         }
     }
 
-    private fun hasTrackedPlane(session: com.google.ar.core.Session): Boolean {
+    /** Per-frame work, invoked from the composable's onSessionUpdated (main thread). */
+    private fun onSessionTick(session: Session, frame: Frame) {
+        if (!readyReported) {
+            readyReported = true
+            post { onARReady?.invoke() }
+        }
+        // Emit camera tracking state transitions so JS can gate placement.
+        val ts = try {
+            frame.camera.trackingState
+        } catch (_: Throwable) {
+            null
+        }
+        if (ts != null && ts != lastTrackingState) {
+            lastTrackingState = ts
+            post { onTrackingState?.invoke(ts.name) }
+        }
+        if (!planeReported && hasTrackedPlane(session)) {
+            planeReported = true
+            post { onPlaneDetected?.invoke() }
+        }
+        // Billboard the data placard to face the camera — Y-axis only, so it stays
+        // upright (never inverted) and +Z (the image face) points at the viewer.
+        // Best-effort: any mismatch is swallowed so the placard never crashes the
+        // session.
+        if (cardNodes.isNotEmpty()) {
+            try {
+                val cam = frame.camera.pose
+                if (cardsCameraLocked) {
+                    // Headlocked float: re-pose each card ~cardDistance in front of the
+                    // camera every frame (no world anchor), so it stays in view even
+                    // when ARCore never reaches full tracking.
+                    for ((i, card) in cardNodes.withIndex()) {
+                        val o = cardLayout[i.coerceAtMost(cardLayout.lastIndex)]
+                        val t = cam.compose(
+                            Pose.makeTranslation(o.x, o.y, o.z - cardDistance),
+                        )
+                        card.worldPosition = Position(t.tx(), t.ty(), t.tz())
+                        val yaw = Math.toDegrees(
+                            atan2(
+                                (cam.tx() - t.tx()).toDouble(),
+                                (cam.tz() - t.tz()).toDouble(),
+                            ),
+                        ).toFloat()
+                        card.rotation = Rotation(0f, yaw, 0f)
+                    }
+                } else {
+                    for (card in cardNodes) {
+                        val p = card.worldPosition
+                        val yaw = Math.toDegrees(
+                            atan2(
+                                (cam.tx() - p.x).toDouble(),
+                                (cam.tz() - p.z).toDouble(),
+                            ),
+                        ).toFloat()
+                        card.rotation = Rotation(0f, yaw, 0f)
+                    }
+                }
+            } catch (_: Throwable) {
+            }
+        }
+        // Retry any deferred placement now that a fresh (possibly TRACKING) frame is
+        // available.
+        if (pending != null) tryPlacePending()
+        if (pendingCards != null) tryPlaceCardsPending()
+    }
+
+    private fun hasTrackedPlane(session: Session): Boolean {
         return try {
             session.getAllTrackables(Plane::class.java).any {
                 it.trackingState == TrackingState.TRACKING
             }
         } catch (_: Throwable) {
             false
-        }
-    }
-
-    /**
-     * Explicit, asset-free scene lighting (AR light estimation is disabled). A
-     * bright flat-ambient [IndirectLight] (1-band SH irradiance) lights every
-     * dielectric surface uniformly — combined with the forced metallicFactor=0 at
-     * load, this reliably lights the heritage models — and the main directional
-     * light is boosted for some shading/relief. Best-effort and guarded so a
-     * Filament hiccup never blocks the camera.
-     */
-    private fun ensureLighting(sceneView: ARSceneView) {
-        try {
-            val ibl = com.google.android.filament.IndirectLight.Builder()
-                .irradiance(1, floatArrayOf(1.0f, 1.0f, 1.0f))
-                .intensity(80_000f)
-                .build(sceneView.engine)
-            sceneView.indirectLight = ibl
-        } catch (t: Throwable) {
-            Log.w(TAG, "ensureLighting: indirect light failed", t)
-        }
-        try {
-            sceneView.mainLightNode?.let { ln ->
-                ln.lightManager.setIntensity(ln.lightInstance, 120_000f)
-            }
-        } catch (t: Throwable) {
-            Log.w(TAG, "ensureLighting: main light boost failed", t)
         }
     }
 
@@ -306,7 +346,6 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
         // Already anchored → progressive swap: reload the new GLB into the SAME
         // anchor so the upgrade is seamless and keeps pose + yaw.
         val node = currentAnchorNode ?: return
-        val sceneView = arSceneView ?: return
         val uriStr = glbUri ?: return
         try {
             currentModelNode?.let { node.removeChildNode(it) }
@@ -314,7 +353,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
             Log.w(TAG, "swap: remove old model failed", t)
         }
         currentModelNode = null
-        attachModel(sceneView, node, uriStr)
+        attachModel(node, uriStr)
     }
 
     fun setModelScale(scale: Float) {
@@ -322,26 +361,19 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
     }
 
     /**
-     * Set the grounded data-card JSON to render as a world-anchored 3D panel
-     * beside the placed model. If an anchor already exists the panel is
-     * (re)attached immediately; otherwise it's attached at placement time.
-     * Passing null/blank removes any existing panel.
-     */
-    /**
      * Set the grounded card JSON to render as a world-anchored placard floating
      * above the model. (Re)attaches now if an anchor exists; else at placement
      * time. Null/blank removes the placard.
      */
     fun setCardData(json: String?) {
         cardData = json?.takeIf { it.isNotBlank() }
-        val sceneView = arSceneView ?: return
         val anchorNode = currentAnchorNode ?: return
         val data = cardData
         if (data == null) {
             removeCardNodes(anchorNode)
             return
         }
-        attachCard(sceneView, anchorNode, data)
+        attachCard(anchorNode, data)
     }
 
     /**
@@ -350,14 +382,9 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
      * contains the hit pose.
      */
     fun placeAtScreenPoint(screenX: Float, screenY: Float) {
-        val sceneView = arSceneView
-        val frame = try {
-            sceneView?.frame
-        } catch (t: Throwable) {
-            null
-        }
-        if (!preflight(sceneView, frame)) return
-        doPlace(sceneView!!, frame!!, screenX, screenY)
+        val frame = arFrame
+        if (!preflight(frame)) return
+        doPlace(frame!!, screenX, screenY)
     }
 
     /**
@@ -384,19 +411,14 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
      */
     private fun tryPlacePending() {
         val p = pending ?: return
-        val sceneView = arSceneView ?: return
-        val frame = try {
-            sceneView.frame
-        } catch (t: Throwable) {
-            null
-        } ?: return
+        val frame = arFrame ?: return
         if (glbUri.isNullOrBlank()) return
         if (frame.camera.trackingState != TrackingState.TRACKING) return
 
         when (p) {
             is Pending.Front -> {
                 pending = null
-                doPlaceInFront(sceneView, frame)
+                doPlaceInFront(frame)
             }
             is Pending.Detection -> {
                 // IMAGE_NORMALIZED → VIEW pixels (rotation/crop-safe), then hit-test.
@@ -413,7 +435,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
                     return
                 }
                 pending = null
-                doPlace(sceneView, frame, output[0], output[1])
+                doPlace(frame, output[0], output[1])
             }
         }
     }
@@ -423,9 +445,10 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
      * always succeeds while TRACKING) and attach the model. Powers the dev
      * picker's "auto-place in front" so a model appears without aiming at a plane.
      */
-    private fun doPlaceInFront(sceneView: ARSceneView, frame: com.google.ar.core.Frame) {
+    private fun doPlaceInFront(frame: Frame) {
         val uri = glbUri ?: return
-        val session = sceneView.session ?: run {
+        val eng = engine ?: return
+        val session = arSession ?: run {
             post { onARError?.invoke("AR session not ready") }
             return
         }
@@ -441,26 +464,23 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
         }
         clearCurrentAnchor()
         val anchorNode = try {
-            AnchorNode(sceneView.engine, anchor).also { sceneView.addChildNode(it) }
+            AnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
         } catch (t: Throwable) {
             Log.e(TAG, "anchor node create failed", t)
             post { onARError?.invoke("anchor node create failed") }
             return
         }
         currentAnchorNode = anchorNode
-        attachModel(sceneView, anchorNode, uri)
+        attachModel(anchorNode, uri)
     }
 
     /** Shared guard: glbUri set, session live, camera TRACKING. */
-    private fun preflight(
-        sceneView: ARSceneView?,
-        frame: com.google.ar.core.Frame?,
-    ): Boolean {
+    private fun preflight(frame: Frame?): Boolean {
         if (glbUri.isNullOrBlank()) {
             post { onARError?.invoke("glbUri not set") }
             return false
         }
-        if (sceneView == null || frame == null) {
+        if (frame == null || engine == null) {
             post { onARError?.invoke("AR session not ready") }
             return false
         }
@@ -472,13 +492,9 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
     }
 
     /** Shared hit-test → anchor → model at a VIEW (display-pixel) point. */
-    private fun doPlace(
-        sceneView: ARSceneView,
-        frame: com.google.ar.core.Frame,
-        viewX: Float,
-        viewY: Float,
-    ) {
+    private fun doPlace(frame: Frame, viewX: Float, viewY: Float) {
         val uri = glbUri ?: return
+        val eng = engine ?: return
         val hits = try {
             frame.hitTest(viewX, viewY)
         } catch (t: Throwable) {
@@ -506,14 +522,14 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
 
         clearCurrentAnchor()
         val anchorNode = try {
-            AnchorNode(sceneView.engine, anchor).also { sceneView.addChildNode(it) }
+            AnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
         } catch (t: Throwable) {
             Log.e(TAG, "anchor node create failed", t)
             post { onARError?.invoke("anchor node create failed") }
             return
         }
         currentAnchorNode = anchorNode
-        attachModel(sceneView, anchorNode, uri)
+        attachModel(anchorNode, uri)
     }
 
     /**
@@ -523,7 +539,6 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
      * objects (first full; the rest carry "continuation": true for long text).
      */
     fun placeCardsOnly(imgNormX: Float, imgNormY: Float, cardsJson: String) {
-        arSceneView ?: return
         // Defer-and-retry (mirrors the model's pending/tryPlacePending): world-anchor the
         // card when tracking locks, else headlock-float it after TRACK_WAIT. No hard
         // not-tracking failure — a no-GLB heritage card must ALWAYS appear.
@@ -542,12 +557,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
      */
     private fun tryPlaceCardsPending() {
         val cardsJson = pendingCards ?: return
-        val sceneView = arSceneView ?: return
-        val frame = try {
-            sceneView.frame
-        } catch (t: Throwable) {
-            null
-        } ?: return
+        val frame = arFrame ?: return
 
         if (frame.camera.trackingState == TrackingState.TRACKING) {
             val input = floatArrayOf(pendingCardX, pendingCardY)
@@ -563,7 +573,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
             }
             pendingCards = null
             if (transformed) {
-                doPlaceCards(sceneView, frame, output[0], output[1], cardsJson)
+                doPlaceCards(frame, output[0], output[1], cardsJson)
             } else {
                 doPlaceCardsHeadlocked(cardsJson)
             }
@@ -578,14 +588,9 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
         // will call us again on the next frame.
     }
 
-    private fun doPlaceCards(
-        sceneView: ARSceneView,
-        frame: com.google.ar.core.Frame,
-        viewX: Float,
-        viewY: Float,
-        cardsJson: String,
-    ) {
-        val session = sceneView.session ?: return
+    private fun doPlaceCards(frame: Frame, viewX: Float, viewY: Float, cardsJson: String) {
+        val eng = engine ?: return
+        val session = arSession ?: return
         // Prefer a plane hit at the aimed point; fall back to ~1.5 m ahead so the
         // cards still appear when no plane is directly under the cursor.
         val hit = try {
@@ -612,7 +617,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
 
         clearCurrentAnchor()
         val anchorNode = try {
-            AnchorNode(sceneView.engine, anchor).also { sceneView.addChildNode(it) }
+            AnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
         } catch (t: Throwable) {
             Log.e(TAG, "card anchor node create failed", t)
             post { onARError?.invoke("anchor node create failed") }
@@ -628,7 +633,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
         val n = minOf(cards.length(), cardLayout.size)
         for (i in 0 until n) {
             val json = cards.optJSONObject(i)?.toString() ?: continue
-            addCardNode(sceneView, anchorNode, json, cardLayout[i], cardOnlyScale)
+            addCardNode(anchorNode, json, cardLayout[i], cardOnlyScale)
         }
         if (cardNodes.isEmpty()) {
             post { onARError?.invoke("could not render the card") }
@@ -645,7 +650,6 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
      * façade). The per-frame pose is set in onSessionUpdated while cardsCameraLocked.
      */
     private fun doPlaceCardsHeadlocked(cardsJson: String) {
-        val sceneView = arSceneView ?: return
         clearCurrentAnchor()
         val cards = try {
             JSONArray(cardsJson)
@@ -655,7 +659,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
         val n = minOf(cards.length(), cardLayout.size)
         for (i in 0 until n) {
             val json = cards.optJSONObject(i)?.toString() ?: continue
-            addCardNodeToScene(sceneView, json, cardOnlyScale)
+            addCardNodeToScene(json, cardOnlyScale)
         }
         if (cardNodes.isEmpty()) {
             post { onARError?.invoke("could not render the card") }
@@ -667,13 +671,14 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
     }
 
     /** Add a card placard parented to the SCENE (headlocked); pose set per-frame. */
-    private fun addCardNodeToScene(sceneView: ARSceneView, json: String, scale: Float) {
+    private fun addCardNodeToScene(json: String, scale: Float) {
+        val matl = materialLoader ?: return
         try {
             val bitmap = EpocheyeArCardRenderer.render(json) ?: return
-            val node = ImageNode(sceneView.materialLoader, bitmap).apply {
+            val node = ImageNode(matl, bitmap).apply {
                 setScale(scale)
             }
-            sceneView.addChildNode(node)
+            sceneRoot?.addChildNode(node)
             cardNodes.add(node)
         } catch (t: Throwable) {
             Log.w(TAG, "addCardNodeToScene failed — placard skipped (RN card still shows data)", t)
@@ -705,7 +710,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
      * heavy per-frame plane detection is pure wasted CPU/heat after placement.
      */
     private fun setPlaneFinding(enabled: Boolean) {
-        val session = arSceneView?.session ?: return
+        val session = arSession ?: return
         try {
             val config = session.config
             config.planeFindingMode =
@@ -718,14 +723,13 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
     }
 
     private fun clearCurrentAnchor() {
-        val sceneView = arSceneView ?: return
         // Headlocked cards are parented to the scene (no anchor), so this must NOT
         // early-return on a null anchor — clean up cards explicitly in both cases.
         currentAnchorNode?.let { node ->
             try {
-                sceneView.removeChildNode(node)
+                sceneRoot?.removeChildNode(node)
             } catch (t: Throwable) {
-                Log.w(TAG, "removeChildNode failed", t)
+                Log.w(TAG, "remove anchor node failed", t)
             }
             try {
                 node.anchor.detach()
@@ -743,11 +747,10 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
 
     /**
      * Detach every card placard from its actual parent — the anchor node (world-anchored
-     * cards) or the scene (headlocked cards). Best-effort; a wrong-parent removeChildNode
-     * is a harmless no-op/throw we swallow.
+     * cards) or the scene (headlocked cards). Best-effort; a wrong-parent remove is a
+     * harmless no-op we swallow.
      */
     private fun removeAllCardNodes() {
-        val sceneView = arSceneView
         val anchorNode = currentAnchorNode
         for (node in cardNodes) {
             try {
@@ -755,7 +758,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
             } catch (_: Throwable) {
             }
             try {
-                sceneView?.removeChildNode(node)
+                sceneRoot?.removeChildNode(node)
             } catch (_: Throwable) {
             }
         }
@@ -773,13 +776,13 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
         cardNodes.clear()
     }
 
-    private fun attachModel(
-        sceneView: ARSceneView,
-        anchorNode: AnchorNode,
-        glbUri: String,
-    ) {
+    private fun attachModel(anchorNode: AnchorNode, glbUri: String) {
+        val loader = modelLoader ?: run {
+            post { onARError?.invoke("AR not ready") }
+            return
+        }
         try {
-            sceneView.modelLoader.loadModelInstanceAsync(
+            loader.loadModelInstanceAsync(
                 Uri.parse(glbUri).toString(),
                 { it },
             ) { modelInstance ->
@@ -790,13 +793,12 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
                 // Fix-ups for the recompressed heritage GLBs:
                 //  1) They are stone sculpture but mis-authored as fully metallic
                 //     (metallicFactor=1). A metal has no diffuse term, so under indoor
-                //     AR light estimation it renders near-black — force dielectric so
-                //     the diffuse path (estimated SH + main light) lights it.
+                //     AR light it renders near-black — force dielectric so the diffuse
+                //     path lights it.
                 //  2) gltfpack's meshopt/quantization left the winding reversed, so
                 //     back-face culling hid the camera-facing surfaces — the model
-                //     showed as a black shell with the floor visible through it.
-                //     setDoubleSided(true) renders both faces AND flips normals for the
-                //     back side so the lighting is correct (plus cull NONE as backstop).
+                //     showed as a black shell. setDoubleSided(true) renders both faces
+                //     AND flips normals for the back side (plus cull NONE as backstop).
                 // Per-material, each call guarded (setParameter throws on a missing param).
                 try {
                     modelInstance.materialInstances.forEach { mi ->
@@ -827,7 +829,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
                     setPlaneFinding(false)
                     post { onAnchorPlaced?.invoke("detect_place") }
                     // Float the data placard above the model, if a card is set.
-                    cardData?.let { attachCard(sceneView, anchorNode, it) }
+                    cardData?.let { attachCard(anchorNode, it) }
                 } catch (t: Throwable) {
                     Log.e(TAG, "model node attach failed", t)
                     post { onARError?.invoke("model attach failed") }
@@ -846,22 +848,22 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
      * onSessionUpdated. Guarded — if it fails the RN overlay card still shows the
      * data and placement is unaffected.
      */
-    private fun attachCard(sceneView: ARSceneView, anchorNode: AnchorNode, json: String) {
+    private fun attachCard(anchorNode: AnchorNode, json: String) {
         removeCardNodes(anchorNode)
-        addCardNode(sceneView, anchorNode, json, Position(0f, 0.55f, 0f), 0.28f)
+        addCardNode(anchorNode, json, Position(0f, 0.55f, 0f), 0.28f)
     }
 
     /** Render one card JSON to a bitmap and add it as a billboarded ImageNode. */
     private fun addCardNode(
-        sceneView: ARSceneView,
         anchorNode: AnchorNode,
         json: String,
         position: Position,
         scale: Float,
     ) {
+        val matl = materialLoader ?: return
         try {
             val bitmap = EpocheyeArCardRenderer.render(json) ?: return
-            val node = ImageNode(sceneView.materialLoader, bitmap).apply {
+            val node = ImageNode(matl, bitmap).apply {
                 this.position = position
                 setScale(scale)
             }
@@ -879,11 +881,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
      * when mapping detector coords back to a screen hit-test point.
      */
     fun captureFrame() {
-        val frame = try {
-            arSceneView?.frame
-        } catch (t: Throwable) {
-            null
-        }
+        val frame = arFrame
         if (frame == null) {
             post { onARError?.invoke("AR session not ready") }
             return
@@ -959,37 +957,33 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
 
     fun cleanup() {
         clearCurrentAnchor()
-        try {
-            arSceneView?.destroy()
-        } catch (t: Throwable) {
-            Log.w(TAG, "destroy failed", t)
-        }
-        arSceneView = null
+        // Removing the ComposeView detaches it → DisposeOnDetachedFromWindow tears
+        // down the composition, releasing the AR session + Filament engine.
+        composeView?.let { removeView(it) }
+        composeView = null
+        engine = null
+        modelLoader = null
+        materialLoader = null
+        arSession = null
+        arFrame = null
         readyReported = false
         planeReported = false
-        lightingApplied = false
         lastTrackingState = null
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        // Now attached: build the ARSceneView (its child View attaches immediately,
-        // so getDisplay() is non-null and onLayout won't NPE), THEN resume — the
-        // window/display + render surface exist, so the GL context is ready before
-        // SceneView starts the session and renders.
-        if (arSceneView == null) setupAR()
-        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+        if (composeView == null) setupAR()
     }
 
     /**
      * Re-run a real measure + layout pass on this view and its children.
      *
      * React Native drives layout from its shadow tree and swallows requestLayout()
-     * on the native view hierarchy. The ARSceneView is a SurfaceView added natively
-     * (outside RN's shadow tree): when its surface is (re)created it calls
-     * requestLayout() so SurfaceView.updateSurface() can size/position the surface.
-     * RN drops that request, so the surface is never presented and the camera
-     * renders to nothing → BLACK SCREEN. Forcing this pass applies the geometry.
+     * on the native view hierarchy. The AR surface (a SurfaceView added natively,
+     * outside RN's shadow tree) calls requestLayout() when its surface is
+     * (re)created so it can size/position the surface. RN drops that, so the surface
+     * is never presented → BLACK SCREEN. Forcing this pass applies the geometry.
      */
     private val measureAndLayout = Runnable {
         measure(
@@ -1007,7 +1001,6 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context), LifecycleOw
     }
 
     override fun onDetachedFromWindow() {
-        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         super.onDetachedFromWindow()
         cleanup()
     }

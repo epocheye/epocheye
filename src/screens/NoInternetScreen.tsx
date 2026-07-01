@@ -157,7 +157,7 @@ const NoInternetScreen: React.FC = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-[#0A0A0F]">
-      <StatusBar barStyle="light-content" backgroundColor="#0A0A0F" />
+      <StatusBar barStyle="light-content" />
 
       <View className="flex-1 items-center justify-center px-8">
         {/* Radar Animation Container */}

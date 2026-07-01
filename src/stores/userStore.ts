@@ -107,8 +107,11 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
   updateProfile: async data => {
     try {
       set({ error: null });
-      const result = await updateUserProfile(data);
+      const result = await updateUserProfile(data, get().profile);
       if (!result.success) {
+        console.warn(
+          `[userStore] updateProfile failed (status ${result.error.statusCode}): ${result.error.message}`,
+        );
         set({ error: result.error.message });
         return false;
       }

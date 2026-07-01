@@ -11,23 +11,25 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import com.facebook.react.uimanager.ThemedReactContext
 import com.google.ar.core.Config
 import com.google.ar.core.TrackingState
-import io.github.sceneview.ar.ARSceneView
 
 /**
  * Live ARCore camera scene with an overlaid heritage info card.
  *
- * Uses SceneView's `ARSceneView` to drive the ARCore session (camera
- * feed + pose tracking). The Gemini identification is shown as a 2D
- * overlay rather than a 3D-anchored node — keeps the implementation
- * robust across SceneView minor versions and avoids the engine /
- * material / ViewNode plumbing which has churned between 2.x releases.
+ * Uses SceneView 4.18.0's Compose `ARSceneView` (hosted in a [ComposeView]) to
+ * drive the ARCore session (camera feed + pose tracking). The Gemini
+ * identification is shown as a 2D Android overlay rather than a 3D-anchored node —
+ * keeps the implementation robust and avoids the engine / material / node plumbing.
  *
- * All SceneView interactions are wrapped in try/catch. On any failure
- * we invoke [onARError] so the React Native side falls back to the 2D
- * IdentificationCard — the rest of the Lens flow keeps working.
+ * All AR interactions are guarded. On any failure we invoke [onARError] so the
+ * React Native side falls back to the 2D IdentificationCard — the rest of the Lens
+ * flow keeps working. The RN bridge (props, commands, events) is unchanged.
  */
 class EpocheyeARView(context: Context) : FrameLayout(context) {
 
@@ -42,53 +44,60 @@ class EpocheyeARView(context: Context) : FrameLayout(context) {
     var onCardTapped: (() -> Unit)? = null
     var onARError: ((String) -> Unit)? = null
 
-    private var arSceneView: ARSceneView? = null
+    private var composeView: ComposeView? = null
     private var overlayCard: LinearLayout? = null
     private var readyReported = false
     private var errorReported = false
 
-    // ARSceneView is created in onAttachedToWindow (not here): SceneView's
-    // onLayout reads the View's Display rotation, null until attached → crash.
+    // ARSceneView (composable) is created in onAttachedToWindow, not here: the
+    // ComposeView needs a ViewTreeLifecycleOwner (resolved once attached to the
+    // Activity window) to drive the AR session lifecycle.
 
     private fun setupAR() {
         try {
-            val sceneView = ARSceneView(
-                // Activity context — a non-Activity context has a null Display on
-                // API 30+ and crashes SceneView's Display.getRotation().
-                context = (context as? com.facebook.react.uimanager.ThemedReactContext)?.currentActivity ?: context,
-                sharedLifecycle = ProcessLifecycleOwner.get().lifecycle,
-            ).apply {
+            val hostContext: Context =
+                (context as? ThemedReactContext)?.currentActivity ?: context
+
+            val view = ComposeView(hostContext).apply {
                 layoutParams = LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 )
-
-                configureSession { _, config ->
-                    config.depthMode = Config.DepthMode.DISABLED
-                    config.instantPlacementMode = Config.InstantPlacementMode.LOCAL_Y_UP
-                    config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
-                    config.focusMode = Config.FocusMode.AUTO
-                }
-
-                onSessionUpdated = { _, frame ->
-                    if (!readyReported && frame.camera.trackingState == TrackingState.TRACKING) {
-                        readyReported = true
-                        post { onARReady?.invoke() }
-                    }
-                }
-
-                onTrackingFailureChanged = { reason ->
-                    if (reason != null && !errorReported) {
-                        errorReported = true
-                        post { onARError?.invoke(reason.name) }
-                    }
+                // Dispose the composition (release the AR session / camera) when this
+                // RN view unmounts, not when the host Activity is destroyed.
+                setViewCompositionStrategy(
+                    ViewCompositionStrategy.DisposeOnDetachedFromWindow,
+                )
+                setContent {
+                    io.github.sceneview.ar.ARSceneView(
+                        modifier = Modifier.fillMaxSize(),
+                        // Hide SceneView's dotted plane-visualization grid.
+                        planeRenderer = false,
+                        sessionConfiguration = { _, config ->
+                            config.depthMode = Config.DepthMode.DISABLED
+                            config.instantPlacementMode = Config.InstantPlacementMode.LOCAL_Y_UP
+                            config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
+                            config.focusMode = Config.FocusMode.AUTO
+                        },
+                        onSessionUpdated = { _, frame ->
+                            if (!readyReported &&
+                                frame.camera.trackingState == TrackingState.TRACKING
+                            ) {
+                                readyReported = true
+                                post { onARReady?.invoke() }
+                            }
+                        },
+                        onTrackingFailureChanged = { reason ->
+                            if (reason != null && !errorReported) {
+                                errorReported = true
+                                post { onARError?.invoke(reason.name) }
+                            }
+                        },
+                    )
                 }
             }
-
-            // Hide SceneView's dotted plane-visualization grid (detection stays on).
-            try { sceneView.planeRenderer.isEnabled = false } catch (_: Throwable) {}
-            addView(sceneView)
-            arSceneView = sceneView
+            addView(view)
+            composeView = view
 
             addOverlayCard()
         } catch (e: Throwable) {
@@ -163,16 +172,12 @@ class EpocheyeARView(context: Context) : FrameLayout(context) {
     }
 
     fun setArEnabled(enabled: Boolean) {
-        arSceneView?.visibility = if (enabled) VISIBLE else GONE
+        composeView?.visibility = if (enabled) VISIBLE else GONE
     }
 
     fun cleanup() {
-        try {
-            arSceneView?.destroy()
-        } catch (t: Throwable) {
-            Log.w(TAG, "destroy failed", t)
-        }
-        arSceneView = null
+        composeView?.let { removeView(it) }
+        composeView = null
         overlayCard = null
     }
 
@@ -181,13 +186,13 @@ class EpocheyeARView(context: Context) : FrameLayout(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (arSceneView == null) setupAR()
+        if (composeView == null) setupAR()
     }
 
     // React Native swallows requestLayout() on the native view tree, so the
-    // embedded ARSceneView (a SurfaceView) never re-runs updateSurface() when its
-    // surface is created → it renders to an unpresented surface → black screen.
-    // Force a real measure + layout pass to apply the SurfaceView's geometry.
+    // embedded AR SurfaceView never re-runs updateSurface() when its surface is
+    // created → it renders to an unpresented surface → black screen. Force a real
+    // measure + layout pass to apply the SurfaceView's geometry.
     private val measureAndLayout = Runnable {
         measure(
             MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),

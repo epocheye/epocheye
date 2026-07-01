@@ -5,32 +5,46 @@ import android.net.Uri
 import android.util.Log
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import com.facebook.react.uimanager.ThemedReactContext
+import com.google.android.filament.Engine
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
 import com.google.ar.core.Earth
+import com.google.ar.core.Frame
+import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
-import io.github.sceneview.ar.ARSceneView
 import io.github.sceneview.ar.node.AnchorNode
+import io.github.sceneview.loaders.ModelLoader
 import io.github.sceneview.node.ModelNode
+import io.github.sceneview.node.Node as SvNode
+import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberModelLoader
 import org.json.JSONArray
 
 /**
  * Geospatial AR scene that places curated GLB models at known geo positions.
  *
- * v1 scaffold — needs on-site field testing. SceneView 2.x has had API churn
- * around ModelLoader / ModelNode signatures, so the hot paths here are
- * defensively wrapped in try/catch and emit `onARError` on failure rather
- * than crashing the host activity. Anchor placement is per-object: a
- * single failed model download/parse won't kill the whole site bundle.
+ * v1 scaffold — needs on-site field testing. Hot paths are defensively wrapped in
+ * try/catch and emit `onARError` on failure rather than crashing the host activity.
+ * Anchor placement is per-object: a single failed model download/parse won't kill
+ * the whole site bundle.
  *
- * Activation requires Google Cloud "ARCore API" enabled on the Maps API
- * key already declared in AndroidManifest.xml. Coverage is uneven across
- * heritage sites — when [Earth.getEarthState] never reaches ENABLED, the
- * caller is expected to swap to the 2D compass-relative fallback flow.
+ * SceneView 4.18.0's AR surface is the Jetpack Compose `ARSceneView`; it is hosted
+ * in a [ComposeView] and driven imperatively (a captured root node holds the placed
+ * anchor nodes + captured Engine / ModelLoader / Session / Frame). The RN bridge
+ * (props, commands, events) is unchanged.
  *
- * Anchor input is a JSON string set via [setAnchorsJson] from the React
- * Native side. Each entry must include:
+ * Activation requires Google Cloud "ARCore API" enabled on the Maps API key
+ * already declared in AndroidManifest.xml. Coverage is uneven across heritage
+ * sites — when [Earth.getEarthState] never reaches ENABLED, the caller is expected
+ * to swap to the 2D compass-relative fallback flow.
+ *
+ * Anchor input is a JSON string set via [setAnchorsJson]. Each entry must include:
  *   - label:       display key (used to dedupe placement calls)
  *   - glb_uri:     file:// URI (pre-cached on-device GLB) or https:// fallback
  *   - lat, lng:    decimal degrees
@@ -48,62 +62,89 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
     /**
      * Fires when the JS side requests the current geospatial pose via the
      * `requestPoseSnapshot` view command. Args: lat, lng, altitude, headingDeg.
-     * Used to attach a hit_test_pose to /api/v1/ar/recognize so backend can
-     * persist a runtime anchor at the user's current location.
      */
     var onGeospatialPose: ((Double, Double, Double, Double) -> Unit)? = null
 
     /**
      * Fires when JS dispatches `performHitTest`. `ok=true` carries a real
-     * plane-intersection pose; `ok=false` means no plane was detected and
-     * the caller should fall through to pose_fallback.
+     * plane-intersection pose; `ok=false` means no plane was detected and the
+     * caller should fall through to pose_fallback.
      */
     var onHitTestResult: ((Boolean, Double, Double, Double, Double) -> Unit)? = null
 
-    private var arSceneView: ARSceneView? = null
+    // ── Compose-hosted scene ─────────────────────────────────────────────────
+    // A root node captured from the ARSceneView content DSL; placed anchor nodes
+    // are attached as its children (see EpocheyeDetectARView for the rationale).
+    @Volatile private var sceneRoot: SvNode? = null
+    private var composeView: ComposeView? = null
+    @Volatile private var engine: Engine? = null
+    @Volatile private var modelLoader: ModelLoader? = null
+    @Volatile private var arSession: Session? = null
+    @Volatile private var arFrame: Frame? = null
+
     private val placedLabels = mutableSetOf<String>()
     private var earthReady = false
     private var readyReported = false
 
-    // ARSceneView is created in onAttachedToWindow (not here): SceneView's
-    // onLayout reads the View's Display rotation, null until attached → crash.
+    // ARSceneView (composable) is created in onAttachedToWindow, not here: the
+    // ComposeView needs a ViewTreeLifecycleOwner (resolved once attached to the
+    // Activity window) to drive the AR session lifecycle.
 
     private fun setupAR() {
         try {
-            val sceneView = ARSceneView(
-                // Activity context — a non-Activity context has a null Display on
-                // API 30+ and crashes SceneView's Display.getRotation().
-                context = (context as? com.facebook.react.uimanager.ThemedReactContext)?.currentActivity ?: context,
-                sharedLifecycle = ProcessLifecycleOwner.get().lifecycle,
-            ).apply {
+            val hostContext: Context =
+                (context as? ThemedReactContext)?.currentActivity ?: context
+
+            val view = ComposeView(hostContext).apply {
                 layoutParams = LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 )
-
-                configureSession { _, config ->
-                    // Geospatial mode requires Google Cloud "ARCore API" enabled
-                    // for the project that owns the Maps API key.
-                    config.geospatialMode = Config.GeospatialMode.ENABLED
-                    config.depthMode = Config.DepthMode.DISABLED
-                    config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
-                    config.focusMode = Config.FocusMode.AUTO
-                }
-
-                onSessionUpdated = { session, _ ->
-                    handleSessionUpdate(session.earth)
-                }
-
-                onTrackingFailureChanged = { reason ->
-                    if (reason != null) {
-                        post { onARError?.invoke(reason.name) }
+                setViewCompositionStrategy(
+                    ViewCompositionStrategy.DisposeOnDetachedFromWindow,
+                )
+                setContent {
+                    val eng = rememberEngine()
+                    val ml = rememberModelLoader(eng)
+                    SideEffect {
+                        engine = eng
+                        modelLoader = ml
+                    }
+                    io.github.sceneview.ar.ARSceneView(
+                        modifier = Modifier.fillMaxSize(),
+                        engine = eng,
+                        modelLoader = ml,
+                        // Hide SceneView's dotted plane-visualization grid.
+                        planeRenderer = false,
+                        sessionConfiguration = { _, config ->
+                            // Geospatial mode requires Google Cloud "ARCore API"
+                            // enabled for the project that owns the Maps API key.
+                            config.geospatialMode = Config.GeospatialMode.ENABLED
+                            config.depthMode = Config.DepthMode.DISABLED
+                            config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
+                            config.focusMode = Config.FocusMode.AUTO
+                        },
+                        onSessionCreated = { session ->
+                            arSession = session
+                        },
+                        onSessionUpdated = { session, frame ->
+                            arSession = session
+                            arFrame = frame
+                            handleSessionUpdate(session.earth)
+                        },
+                        onTrackingFailureChanged = { reason ->
+                            if (reason != null) {
+                                post { onARError?.invoke(reason.name) }
+                            }
+                        },
+                    ) {
+                        // Scene-attached root; placed anchor nodes hang off it.
+                        Node(apply = { sceneRoot = this })
                     }
                 }
             }
-            // Hide SceneView's dotted plane-visualization grid (detection stays on).
-            try { sceneView.planeRenderer.isEnabled = false } catch (_: Throwable) {}
-            addView(sceneView)
-            arSceneView = sceneView
+            addView(view)
+            composeView = view
         } catch (e: Throwable) {
             Log.e(TAG, "geospatial setup failed", e)
             post { onARError?.invoke(e.message ?: "geospatial setup failed") }
@@ -153,21 +194,17 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
         // if their label matches an earlier anchor.
         placedLabels.clear()
         if (earthReady) {
-            arSceneView?.session?.earth?.let { placePendingAnchors(it) }
+            arSession?.earth?.let { placePendingAnchors(it) }
         }
     }
 
     /**
      * Snapshot the current ARCore Geospatial pose and emit it via
-     * onGeospatialPose. Used as a stand-in for a true raycast HitTest in v1
-     * — mobile attaches the result to /api/v1/ar/recognize as `hit_test_pose`
-     * so the backend can persist a runtime anchor at the user's location.
-     *
-     * No-ops silently when Earth tracking isn't ready (caller must check
-     * onEarthState first).
+     * onGeospatialPose. No-ops silently when Earth tracking isn't ready (caller
+     * must check onEarthState first).
      */
     fun requestPoseSnapshot() {
-        val earth = arSceneView?.session?.earth ?: return
+        val earth = arSession?.earth ?: return
         if (earth.trackingState != TrackingState.TRACKING) return
         val pose = try {
             earth.cameraGeospatialPose
@@ -190,19 +227,10 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
      * resolves the hit's world pose into a Geospatial pose (lat/lng/alt +
      * heading). Emits onHitTestResult with `ok=false` if no plane was hit
      * (caller should fall back to pose_fallback).
-     *
-     * Requires an active ARCore session — no-ops with `ok=false` if Earth
-     * tracking is not ready or if VisionCamera owns the camera in the
-     * current screen layout.
      */
     fun performHitTest(screenX: Float, screenY: Float) {
-        val sceneView = arSceneView
-        val session = sceneView?.session
-        val frame = try {
-            sceneView?.frame
-        } catch (t: Throwable) {
-            null
-        }
+        val session = arSession
+        val frame = arFrame
         val earth = session?.earth
         if (frame == null || earth == null || earth.trackingState != TrackingState.TRACKING) {
             post { onHitTestResult?.invoke(false, 0.0, 0.0, 0.0, 0.0) }
@@ -266,13 +294,12 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
         }
         anchorsJson = merged.toString()
         if (earthReady) {
-            arSceneView?.session?.earth?.let { placePendingAnchors(it) }
+            arSession?.earth?.let { placePendingAnchors(it) }
         }
     }
 
     private fun placePendingAnchors(earth: Earth) {
         val json = anchorsJson ?: return
-        val sceneView = arSceneView ?: return
         try {
             val arr = JSONArray(json)
             for (i in 0 until arr.length()) {
@@ -307,7 +334,7 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
                 }
 
                 placedLabels += label
-                attachModel(sceneView, anchor, glbUri, label)
+                attachModel(anchor, glbUri, label)
             }
         } catch (e: Throwable) {
             Log.e(TAG, "placePendingAnchors failed", e)
@@ -315,21 +342,18 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
         }
     }
 
-    private fun attachModel(
-        sceneView: ARSceneView,
-        anchor: Anchor,
-        glbUri: String,
-        label: String,
-    ) {
+    private fun attachModel(anchor: Anchor, glbUri: String, label: String) {
+        val eng = engine ?: return
+        val loader = modelLoader ?: return
         val anchorNode = try {
-            AnchorNode(sceneView.engine, anchor).also { sceneView.addChildNode(it) }
+            AnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
         } catch (t: Throwable) {
             Log.e(TAG, "anchor node create failed for $label", t)
             return
         }
 
         try {
-            sceneView.modelLoader.loadModelInstanceAsync(
+            loader.loadModelInstanceAsync(
                 Uri.parse(glbUri).toString(),
                 { it },
             ) { modelInstance ->
@@ -365,12 +389,12 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
     }
 
     fun cleanup() {
-        try {
-            arSceneView?.destroy()
-        } catch (t: Throwable) {
-            Log.w(TAG, "destroy failed", t)
-        }
-        arSceneView = null
+        composeView?.let { removeView(it) }
+        composeView = null
+        engine = null
+        modelLoader = null
+        arSession = null
+        arFrame = null
         placedLabels.clear()
         earthReady = false
         readyReported = false
@@ -378,13 +402,13 @@ class EpocheyeGeospatialARView(context: Context) : FrameLayout(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (arSceneView == null) setupAR()
+        if (composeView == null) setupAR()
     }
 
     // React Native swallows requestLayout() on the native view tree, so the
-    // embedded ARSceneView (a SurfaceView) never re-runs updateSurface() when its
-    // surface is created → it renders to an unpresented surface → black screen.
-    // Force a real measure + layout pass to apply the SurfaceView's geometry.
+    // embedded AR SurfaceView never re-runs updateSurface() when its surface is
+    // created → it renders to an unpresented surface → black screen. Force a real
+    // measure + layout pass to apply the SurfaceView's geometry.
     private val measureAndLayout = Runnable {
         measure(
             MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
