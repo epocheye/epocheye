@@ -69,6 +69,7 @@ import GroundedObjectCard from './components/GroundedObjectCard';
 import AiGuessCard from './components/AiGuessCard';
 import AnalyzingOverlay from './components/AnalyzingOverlay';
 import ARActivationOverlay from '../../components/ui/ARActivationOverlay';
+import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
 import ShareExperienceModal from '../../components/ShareExperienceModal';
 import {ROUTES} from '../../core/constants';
 import {COLORS} from '../../core/constants/theme';
@@ -469,14 +470,19 @@ const DetectArScreen: React.FC = () => {
   const permissionRequestedRef = useRef(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [gateTimedOut, setGateTimedOut] = useState(false);
+  // Families-policy safety notice must be acknowledged before the camera opens.
+  // Resets on every fresh mount (fullScreenModal), so it shows each AR launch.
+  const [safetyAck, setSafetyAck] = useState(false);
 
+  // Defer the OS camera prompt until the safety notice is acknowledged, so the
+  // two never stack.
   useEffect(() => {
-    if (hasPermission || permissionRequestedRef.current) return;
+    if (!safetyAck || hasPermission || permissionRequestedRef.current) return;
     permissionRequestedRef.current = true;
     void requestPermission().then(granted => {
       if (!granted) setPermissionDenied(true);
     });
-  }, [hasPermission, requestPermission]);
+  }, [safetyAck, hasPermission, requestPermission]);
 
   // Make sure GPS is actually being acquired the moment the screen opens, so the
   // venue gate below can decide on a real fix instead of a stale/empty location.
@@ -526,6 +532,19 @@ const DetectArScreen: React.FC = () => {
       );
     }
     return <View style={styles.root} />; // redirecting to GoToVenue
+  }
+
+  // Families-policy gate: the safety notice must be acknowledged before the
+  // camera/AR view can mount. Placed after the venue gate (so an out-of-venue
+  // user is bounced to GoToVenue first) and before the permission prompt (so the
+  // two never stack). The guided tour / dev preview bypass the gate.
+  if (!bypassGate && !safetyAck) {
+    return (
+      <ARSafetyNotice
+        onAcknowledge={() => setSafetyAck(true)}
+        onExit={handleClose}
+      />
+    );
   }
 
   // Native AR when the module is registered AND ARCore supports the device (or

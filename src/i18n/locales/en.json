@@ -198,6 +198,12 @@
     "accountCreatedTitle": "Account created",
     "accountCreatedBody": "Your account was created. Please sign in from the login screen if needed."
   },
+  "safety": {
+    "title": "Before you begin",
+    "supervise": "Younger explorers should have an adult nearby.",
+    "surroundings": "Stay aware of your surroundings while the camera is open.",
+    "acknowledge": "I understand"
+  },
   "lens": {
     "thisObject": "This object",
     "locatingTitle": "Locating you…",

@@ -56,6 +56,7 @@ import {
 import { useGeminiIdentification } from '../../shared/hooks/useGeminiIdentification';
 import { useARCore } from '../../shared/hooks/useARCore';
 import { useSafeBackHandler } from '../../shared/hooks/useSafeGoBack';
+import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
 import { getActiveZone } from '../../services/geofenceService';
 import { fetchZones } from '../../services/zoneService';
 import { prefetchSiteForMonument } from '../../services/sitePrefetchService';
@@ -118,6 +119,9 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   // Plays the cinematic AR takeover once, the first time the live camera mounts.
   const [activationDone, setActivationDone] = useState(false);
+  // Families-policy safety notice — must be acknowledged before the camera opens.
+  // Resets on every fresh mount (fullScreenModal), so it shows each AR launch.
+  const [safetyAck, setSafetyAck] = useState(false);
 
   // Geofence state
   const [activeZone, setActiveZone] = useState<HeritageZone | null>(null);
@@ -225,12 +229,13 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
     (site as { longitude?: number }).longitude ??
     null;
 
-  // Request permission on mount
+  // Request permission once the safety notice is acknowledged, so the OS prompt
+  // never stacks on top of the notice.
   useEffect(() => {
-    if (!hasPermission) {
+    if (safetyAck && !hasPermission) {
       requestPermission().catch(() => {});
     }
-  }, [hasPermission, requestPermission]);
+  }, [safetyAck, hasPermission, requestPermission]);
 
   // Load timeline facts
   useEffect(() => {
@@ -647,6 +652,18 @@ const ARExperienceScreen: React.FC<Props> = ({ navigation, route }) => {
   const timelineAnimStyle = useAnimatedStyle(() => ({
     height: timelineHeight.value,
   }));
+
+  // ── Families-policy safety gate ──────────────────────────────────
+  // Must be acknowledged before the camera can mount; placed before the
+  // permission prompt so the two never stack. Hardware back exits the section.
+  if (!safetyAck) {
+    return (
+      <ARSafetyNotice
+        onAcknowledge={() => setSafetyAck(true)}
+        onExit={safeGoBack}
+      />
+    );
+  }
 
   // ── Permission fallback ──────────────────────────────────────────
   if (!hasPermission) {

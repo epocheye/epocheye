@@ -5,7 +5,9 @@ buildscript {
         compileSdkVersion = 36
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
-        kotlinVersion = "2.1.20"
+        // 2.3.21 (was 2.1.20): SceneView 4.18.0 is compiled with Kotlin 2.3.0
+        // metadata + pulls kotlin-stdlib 2.3.21; the older compiler can't read it.
+        kotlinVersion = "2.3.21"
     }
     repositories {
         google()
@@ -14,7 +16,10 @@ buildscript {
     dependencies {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        // Pin the Kotlin Gradle plugin to kotlinVersion (2.3.21). Without an
+        // explicit version it resolves to RNGP's catalog pin (2.1.20), whose
+        // compiler can't read SceneView 4.18.0's Kotlin 2.3.0 metadata.
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
         classpath("com.google.gms:google-services:4.4.1")
     }
 }

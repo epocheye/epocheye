@@ -89,7 +89,7 @@ android {
         applicationId "com.epocheye"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
+        versionCode 9
         versionName "1.1"
         ndk {
             abiFilters 'arm64-v8a', 'armeabi-v7a'
@@ -133,6 +133,11 @@ android {
     // vision-camera ship the same shared libs.
     packagingOptions {
         jniLibs {
+            // Store .so uncompressed and 16 KB-page-aligned in the AAB/APK
+            // (Google Play 16 KB page-size requirement). This is the AGP default
+            // on modern targets, but we set it explicitly so a future SDK/AGP
+            // change can't silently re-enable legacy (compressed, 4 KB) packaging.
+            useLegacyPackaging false
             pickFirsts += [
                 '**/libc++_shared.so',
                 '**/libfbjni.so',
@@ -151,8 +156,11 @@ dependencies {
         implementation jscFlavor
     }
 
-    // ARCore + SceneView for 3D-anchored heritage info cards
+    // ARCore + SceneView for 3D-anchored heritage info cards.
+    // SceneView 4.18.0 brings 16 KB-aligned Filament 1.71.5 native libs (the old
+    // 2.2.1 pulled Filament 1.52.0, whose .so were only 4 KB-aligned → Google Play
+    // "does not support 16 KB memory page size" warning on API 35+ targets).
     implementation 'com.google.ar:core:1.44.0'
-    implementation 'io.github.sceneview:arsceneview:2.2.1'
+    implementation 'io.github.sceneview:arsceneview:4.18.0'
     implementation 'androidx.lifecycle:lifecycle-process:2.7.0'
 }
