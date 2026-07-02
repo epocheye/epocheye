@@ -67,7 +67,7 @@ import {analytics} from '../../services/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GroundedObjectCard from './components/GroundedObjectCard';
 import AiGuessCard from './components/AiGuessCard';
-import AnalyzingOverlay from './components/AnalyzingOverlay';
+import ScanGuideOverlay, {type ScanPhase} from './components/ScanGuideOverlay';
 import ARActivationOverlay from '../../components/ui/ARActivationOverlay';
 import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
 import ShareExperienceModal from '../../components/ShareExperienceModal';
@@ -604,6 +604,74 @@ const DetectArScreen: React.FC = () => {
   );
 };
 
+/**
+ * Drives the cosmetic ScanGuideOverlay from the EXISTING scan state — it reads
+ * the in-flight flag and the resolved outcome, never the recognizer directly, so
+ * recognition timing is untouched. The only timing it owns is a ~600ms lock-on
+ * hold before the on-screen result card is revealed (`cardReady`) and a brief
+ * neutral "miss" dwell.
+ *
+ *  aiming → scanning (in-flight) → hit | miss → aiming
+ */
+function useScanPhase(inFlight: boolean) {
+  const [scanPhase, setScanPhase] = useState<ScanPhase>('aiming');
+  // The HIT lock-on plays first; the parent gates the result card on this.
+  const [cardReady, setCardReady] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  // Scanning mirrors the existing in-flight flag directly — no parallel flow.
+  useEffect(() => {
+    if (inFlight) {
+      clearTimer();
+      setCardReady(false);
+      setScanPhase('scanning');
+    } else {
+      // Ended without an outcome moving us on (e.g. a native AR error) → settle,
+      // so the overlay can never stick in 'scanning'.
+      setScanPhase(p => (p === 'scanning' ? 'aiming' : p));
+    }
+  }, [inFlight, clearTimer]);
+
+  // Called with the resolved outcome so the frame can lock-on (hit) or dim (miss).
+  const resolveScan = useCallback(
+    (kind: ResolutionOutcome['kind']) => {
+      clearTimer();
+      if (kind === 'grounded' || kind === 'minimal' || kind === 'ai') {
+        setScanPhase('hit');
+        timerRef.current = setTimeout(() => {
+          setCardReady(true);
+          setScanPhase('aiming');
+        }, 600);
+      } else if (kind === 'error') {
+        setScanPhase('miss');
+        timerRef.current = setTimeout(() => setScanPhase('aiming'), 1600);
+      } else {
+        // rejected / paywall / limit / aborted — their own UI carries messaging.
+        setCardReady(true);
+        setScanPhase('aiming');
+      }
+    },
+    [clearTimer],
+  );
+
+  const resetPhase = useCallback(() => {
+    clearTimer();
+    setCardReady(false);
+    setScanPhase('aiming');
+  }, [clearTimer]);
+
+  useEffect(() => clearTimer, [clearTimer]);
+
+  return {scanPhase, cardReady, resolveScan, resetPhase};
+}
+
 // ============================================================
 // PRODUCTION native AR: detect → grounded card → world-anchored model
 // ============================================================
@@ -634,6 +702,7 @@ const DetectARNative: React.FC<{
     venueSlug,
     allowUngrounded,
   );
+  const {scanPhase, cardReady, resolveScan, resetPhase} = useScanPhase(detecting);
 
   const trackingRef = useRef(false);
   useEffect(() => {
@@ -656,7 +725,7 @@ const DetectARNative: React.FC<{
       return;
     }
     setDetecting(true);
-    setErrorMessage(t('lens.scanning'));
+    setErrorMessage(null); // the ScanGuideOverlay now owns the "Scanning…" cue
     setArCardShown(false); // re-show on-screen card until this scan anchors an AR one
     placedAiTextRef.current = null; // a new scan may anchor a fresh AR card
     analytics.track('scan_started', {venue: venueSlug, mode: 'ar'});
@@ -673,6 +742,7 @@ const DetectARNative: React.FC<{
         // "scan anything" path fall back to the universal identify.
         const resolution = await runResolution(base64, uri);
         if (resolution.kind === 'aborted') return; // scan cancelled — leave UI as-is
+        resolveScan(resolution.kind); // drive the overlay lock-on / miss cue
         if (resolution.kind === 'grounded' || resolution.kind === 'minimal') {
           const modelUri = await resolveModelGlb(resolution.classId);
           if (modelUri) {
@@ -730,12 +800,13 @@ const DetectARNative: React.FC<{
           void maybePromptShare(allowUngrounded, setShareOpen);
         }
       } catch {
+        resolveScan('error'); // frame prep / placement failed → miss cue
         setErrorMessage(t('lens.detectionFailed'));
       } finally {
         setDetecting(false);
       }
     },
-    [runResolution, navigation, venueSlug, allowUngrounded, t],
+    [runResolution, resolveScan, navigation, venueSlug, allowUngrounded, t],
   );
 
   const handleTrackingState = useCallback((state: string) => {
@@ -759,8 +830,9 @@ const DetectARNative: React.FC<{
     setArCardShown(false); // AR card cleared → on-screen card may show again
     placedAiTextRef.current = null;
     reset();
+    resetPhase();
     setStatus(prev => (prev === 'placed' ? 'ready' : prev));
-  }, [reset]);
+  }, [reset, resetPhase]);
 
   const handleYaw = useCallback(() => arRef.current?.nudgeYaw(YAW_STEP_DEG), []);
 
@@ -782,12 +854,6 @@ const DetectARNative: React.FC<{
     );
     setArCardShown(true); // AR cards now anchored → hide the on-screen card
   }, [allowUngrounded, resolved]);
-
-  const hint = !tracking
-    ? t('lens.hintMove')
-    : status === 'placed'
-      ? t('lens.hintPlaced')
-      : t('lens.hintPoint');
 
   return (
     <View style={styles.root}>
@@ -811,7 +877,7 @@ const DetectARNative: React.FC<{
         onDone={() => setActivationDone(true)}
       />
 
-      <AnalyzingOverlay visible={detecting} />
+      <ScanGuideOverlay phase={scanPhase} ready={tracking} />
 
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">
@@ -846,12 +912,12 @@ const DetectARNative: React.FC<{
       </SafeAreaView>
 
       <SafeAreaView style={styles.bottomOverlay} edges={['bottom']} pointerEvents="box-none">
-        {resolved.kind === 'grounded' && !arCardShown && (
+        {resolved.kind === 'grounded' && !arCardShown && cardReady && (
           <View style={styles.cardWrap}>
             <GroundedObjectCard card={resolved.card} minimal={resolved.minimal} />
           </View>
         )}
-        {resolved.kind === 'ai' && !arCardShown && (
+        {resolved.kind === 'ai' && !arCardShown && cardReady && (
           <View style={styles.cardWrap}>
             <AiGuessCard
               label={resolved.label}
@@ -861,11 +927,17 @@ const DetectARNative: React.FC<{
           </View>
         )}
 
-        <View
-          style={[styles.messageBubble, status === 'error' && styles.bubbleError]}
-          pointerEvents="none">
-          <Text style={styles.messageText}>{errorMessage ?? hint}</Text>
-        </View>
+        {/* The ScanGuideOverlay owns the aiming/scanning/miss cues; this bubble is
+            reserved for actionable errors/gates and the post-placement hint. */}
+        {(errorMessage || status === 'placed') && (
+          <View
+            style={[styles.messageBubble, status === 'error' && styles.bubbleError]}
+            pointerEvents="none">
+            <Text style={styles.messageText}>
+              {errorMessage ?? t('lens.hintPlaced')}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.buttonRow} pointerEvents="box-none">
           <Pressable
@@ -921,6 +993,7 @@ const DetectAR2D: React.FC<{
     venueSlug,
     allowUngrounded,
   );
+  const {scanPhase, cardReady, resolveScan} = useScanPhase(busy);
 
   const handleDetect = useCallback(async () => {
     if (busy) return;
@@ -930,6 +1003,7 @@ const DetectAR2D: React.FC<{
     try {
       const photo = await cameraRef.current?.takePhoto();
       if (!photo?.path) {
+        resolveScan('error'); // capture failed → miss cue
         setMessage(t('lens.captureFailed'));
         return;
       }
@@ -944,6 +1018,7 @@ const DetectAR2D: React.FC<{
       // surface. imageUri lets the dev "scan anything" path fall back to identify.
       const resolution = await runResolution(base64, imageUri);
       if (resolution.kind === 'aborted') return; // scan cancelled — leave UI as-is
+      resolveScan(resolution.kind); // drive the overlay lock-on / miss cue
       if (resolution.kind === 'paywall') {
         navigation.navigate(ROUTES.MAIN.PURCHASE, {preSelectedPlaceId: venueSlug});
       } else if (resolution.kind === 'limit') {
@@ -961,11 +1036,12 @@ const DetectAR2D: React.FC<{
         void maybePromptShare(allowUngrounded, setShareOpen);
       }
     } catch {
+      resolveScan('error'); // frame prep failed → miss cue
       setMessage(t('lens.detectionFailed'));
     } finally {
       setBusy(false);
     }
-  }, [busy, runResolution, navigation, venueSlug, allowUngrounded, t]);
+  }, [busy, runResolution, resolveScan, navigation, venueSlug, allowUngrounded, t]);
 
   if (!device) {
     return (
@@ -995,7 +1071,7 @@ const DetectAR2D: React.FC<{
         onDone={() => setActivationDone(true)}
       />
 
-      <AnalyzingOverlay visible={busy} />
+      <ScanGuideOverlay phase={scanPhase} />
 
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">
@@ -1024,12 +1100,12 @@ const DetectAR2D: React.FC<{
           <Text style={styles.arNoticeText}>{t('lens.noArNotice')}</Text>
         </View>
 
-        {resolved.kind === 'grounded' && (
+        {resolved.kind === 'grounded' && cardReady && (
           <View style={styles.cardWrap}>
             <GroundedObjectCard card={resolved.card} minimal={resolved.minimal} />
           </View>
         )}
-        {resolved.kind === 'ai' && (
+        {resolved.kind === 'ai' && cardReady && (
           <View style={styles.cardWrap}>
             <AiGuessCard
               label={resolved.label}

@@ -130,7 +130,6 @@ A native stack containing `TabNavigation` (4 tabs) plus full-screen-modal and pu
 | `TabNavigation`       | `ROUTES.MAIN.TABS`           | default                  |
 | `SiteDetailScreen`    | `ROUTES.MAIN.SITE_DETAIL`    | slide_from_right         |
 | `DetectArScreen`      | `ROUTES.MAIN.DETECT_AR`      | fullScreenModal, fade    |
-| `ARExperienceScreen`  | `ROUTES.MAIN.AR_EXPERIENCE`  | fullScreenModal, fade    |
 | `ARComposer`          | `ROUTES.MAIN.AR_COMPOSER`    | fullScreenModal, fade    |
 | `Ar3dViewerScreen`    | `ROUTES.MAIN.AR_3D_VIEWER`   | fullScreenModal, fade    |
 | `AiGuideScreen`       | `ROUTES.MAIN.AI_GUIDE`       | modal, slide_from_bottom |
@@ -170,17 +169,16 @@ An extended token set lives in `src/design-system/tokens/` (`typography.ts`, `co
 ## Scan / AR screens
 
 There is **no** `src/screens/Lens/LensScreen.tsx` and no `LENS` route. The live
-"point the camera at an object" experience is two mounted screens:
+"point the camera at an object" experience is a single screen:
 
 - `src/screens/Main/DetectArScreen.tsx` (`ROUTES.MAIN.DETECT_AR`) — the production
   object-scan/recognition surface. Runs the venue gate, captures a frame with
   `react-native-vision-camera`, calls `POST /api/v1/recognize` (async poll → `/recognize/result`),
   and renders the resolved card (native world-anchored AR card on ARCore devices; on-screen card
-  otherwise).
-- `src/screens/Main/ARExperienceScreen.tsx` (`ROUTES.MAIN.AR_EXPERIENCE`) — the monument AR shell
-  (Gemini identify, timeline, HD scan, native `EpocheyeARView`).
+  otherwise). It has two internal render paths — `DetectARNative` (ARCore) and `DetectAR2D`
+  (vision-camera fallback) — and layers a `ScanGuideOverlay` viewfinder cue over the feed.
 
-Both route every back/exit affordance — **including the Android hardware back button** — through
+It routes every back/exit affordance — **including the Android hardware back button** — through
 `useSafeBackHandler()` (`src/shared/hooks/useSafeGoBack.ts`), which pops when it can and otherwise
 lands on the tabs, so exiting the camera can never fall through to closing the app.
 
@@ -194,8 +192,6 @@ identification/overlay components) — not a screen named `LensScreen`.
 Beyond SSE, a set of services back the Lens/AR experience:
 
 - `geminiVisionService.ts` / `geminiImageService.ts` / `geminiCacheService.ts` — Gemini-backed vision calls for identification and image generation, with a local response cache
-- `hdScanService.ts` — orchestrates the HD scan flow shown by `HDScanOverlay`
-- `arReconstructionService.ts` — 3D reconstruction driving `GLBViewer`
 - `geofenceService.ts` / `zoneService.ts` — geofencing and heritage-zone detection
 - `usageTracker.ts` / `usageTelemetryService.ts` — client-side usage counters and telemetry emission
 - `fcmService.ts` — Firebase Cloud Messaging (push notifications)
@@ -258,7 +254,7 @@ Each subdirectory exports typed functions. All API calls return a discriminated 
 
 ## Image Resolution Pipeline
 
-`useResolvedSubjectImage(subject, context?)` (`src/shared/hooks/useResolvedSubjectImage.ts`) is the shared entry point for all contextual monument imagery across Home, SiteDetailScreen, ARExperienceScreen, OB08_DemoStory, and ResolvedSubjectImage components.
+`useResolvedSubjectImage(subject, context?)` (`src/shared/hooks/useResolvedSubjectImage.ts`) is the shared entry point for all contextual monument imagery across Home, SiteDetailScreen, OB08_DemoStory, and ResolvedSubjectImage components.
 
 **Resolution flow:**
 
@@ -269,8 +265,6 @@ Each subdirectory exports typed functions. All API calls return a discriminated 
    - `202 Accepted` with `{ job_id }` — backend is resolving asynchronously
 4. On `202`, the service polls `GET /api/v1/images/resolve/status?job_id=` until `completed`, `failed`, or a client-side timeout
 5. Resolved URL is stored in the in-memory session cache and returned
-
-**Important:** `ARExperienceScreen` uses this hook for its backdrop imagery — it does **not** call `/api/lens/identify` or any live AI scan. The scan UI on that screen simulates progress locally.
 
 ---
 

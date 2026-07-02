@@ -25,9 +25,6 @@
 		6C6CF29B854E40039AA2F3D7 /* MontserratAlternates-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DA9ECE02EEAB45AA934AE476 /* MontserratAlternates-Regular.ttf */; };
 		3BD3E54D38FD43D185B3743F /* MontserratAlternates-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 09C137D3D6F44D759BAE6306 /* MontserratAlternates-SemiBold.ttf */; };
 		83D849CEEE324B6CA7F5DF77 /* NothingYouCouldDo-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2F83083792A043719230D2BD /* NothingYouCouldDo-Regular.ttf */; };
-		B1B10001BB10BB10BB100001 /* EpocheyeARView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100001 /* EpocheyeARView.swift */; };
-		B1B10001BB10BB10BB100002 /* EpocheyeARViewManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100002 /* EpocheyeARViewManager.swift */; };
-		B1B10001BB10BB10BB100003 /* EpocheyeARViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100003 /* EpocheyeARViewManager.m */; };
 		B1B10001BB10BB10BB100004 /* ARKitModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100004 /* ARKitModule.swift */; };
 		B1B10001BB10BB10BB100005 /* ARKitModule.m in Sources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100005 /* ARKitModule.m */; };
 		B1B10001BB10BB10BB100006 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A1A10001AA10AA10AA100008 /* GoogleService-Info.plist */; };
@@ -69,9 +66,6 @@
 		DA9ECE02EEAB45AA934AE476 /* MontserratAlternates-Regular.ttf */ = {isa = PBXFileReference; name = "MontserratAlternates-Regular.ttf"; path = "../src/assets/fonts/MontserratAlternates-Regular.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 		09C137D3D6F44D759BAE6306 /* MontserratAlternates-SemiBold.ttf */ = {isa = PBXFileReference; name = "MontserratAlternates-SemiBold.ttf"; path = "../src/assets/fonts/MontserratAlternates-SemiBold.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 		2F83083792A043719230D2BD /* NothingYouCouldDo-Regular.ttf */ = {isa = PBXFileReference; name = "NothingYouCouldDo-Regular.ttf"; path = "../src/assets/fonts/NothingYouCouldDo-Regular.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
-		A1A10001AA10AA10AA100001 /* EpocheyeARView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EpocheyeARView.swift; path = epocheye/AR/EpocheyeARView.swift; sourceTree = "<group>"; };
-		A1A10001AA10AA10AA100002 /* EpocheyeARViewManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EpocheyeARViewManager.swift; path = epocheye/AR/EpocheyeARViewManager.swift; sourceTree = "<group>"; };
-		A1A10001AA10AA10AA100003 /* EpocheyeARViewManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = EpocheyeARViewManager.m; path = epocheye/AR/EpocheyeARViewManager.m; sourceTree = "<group>"; };
 		A1A10001AA10AA10AA100004 /* ARKitModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ARKitModule.swift; path = epocheye/AR/ARKitModule.swift; sourceTree = "<group>"; };
 		A1A10001AA10AA10AA100005 /* ARKitModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = ARKitModule.m; path = epocheye/AR/ARKitModule.m; sourceTree = "<group>"; };
 		A1A10001AA10AA10AA100006 /* epocheye-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "epocheye-Bridging-Header.h"; path = "epocheye/epocheye-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -121,9 +115,6 @@
 		C1C10001CC10CC10CC100001 /* AR */ = {
 			isa = PBXGroup;
 			children = (
-				A1A10001AA10AA10AA100001 /* EpocheyeARView.swift */,
-				A1A10001AA10AA10AA100002 /* EpocheyeARViewManager.swift */,
-				A1A10001AA10AA10AA100003 /* EpocheyeARViewManager.m */,
 				A1A10001AA10AA10AA100004 /* ARKitModule.swift */,
 				A1A10001AA10AA10AA100005 /* ARKitModule.m */,
 			);
@@ -385,9 +376,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
-				B1B10001BB10BB10BB100001 /* EpocheyeARView.swift in Sources */,
-				B1B10001BB10BB10BB100002 /* EpocheyeARViewManager.swift in Sources */,
-				B1B10001BB10BB10BB100003 /* EpocheyeARViewManager.m in Sources */,
 				B1B10001BB10BB10BB100004 /* ARKitModule.swift in Sources */,
 				B1B10001BB10BB10BB100005 /* ARKitModule.m in Sources */,
 			);

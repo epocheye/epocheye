@@ -38,19 +38,6 @@ export type { UseExplorerPassReturn } from './useExplorerPass';
 export { useExplorerPassPurchase } from './useExplorerPassPurchase';
 export type { UseExplorerPassPurchaseReturn } from './useExplorerPassPurchase';
 
-export { useMonumentDetection } from './useMonumentDetection';
-export type {
-  DetectionState,
-  UseMonumentDetectionOptions,
-  UseMonumentDetectionReturn,
-} from './useMonumentDetection';
-
-export { useGeminiIdentification } from './useGeminiIdentification';
-export type {
-  UseGeminiIdentificationOptions,
-  UseGeminiIdentificationReturn,
-} from './useGeminiIdentification';
-
 export { usePassportSummary } from './usePassportSummary';
 export type { UsePassportSummaryReturn } from './usePassportSummary';
 

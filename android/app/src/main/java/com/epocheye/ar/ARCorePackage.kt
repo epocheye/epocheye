@@ -21,8 +21,6 @@ class ARCorePackage : ReactPackage {
         reactContext: ReactApplicationContext
     ): List<ViewManager<*, *>> {
         return listOf(
-            EpocheyeARViewManager(reactContext),
-            EpocheyeGeospatialARViewManager(reactContext),
             EpocheyeDetectARViewManager(reactContext),
         )
     }

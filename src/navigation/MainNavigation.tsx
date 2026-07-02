@@ -3,7 +3,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import TabNavigation from './TabNavigation';
 import SiteDetailScreen from '../screens/Main/SiteDetailScreen';
 import ErrorBoundary from '../components/ui/ErrorBoundary';
-import ARExperienceScreen from '../screens/Main/ARExperienceScreen';
 import ARComposer from '../screens/Lens/ARComposer';
 import PurchaseScreen from '../screens/Main/PurchaseScreen';
 import HistoryScreen from '../screens/History/HistoryScreen';
@@ -45,19 +44,6 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         {props => (
           <ErrorBoundary onReset={() => props.navigation.goBack()}>
             <SiteDetailScreen {...props} />
-          </ErrorBoundary>
-        )}
-      </Stack.Screen>
-      <Stack.Screen
-        name={ROUTES.MAIN.AR_EXPERIENCE}
-        options={{
-          animation: 'fade',
-          presentation: 'fullScreenModal',
-        }}
-      >
-        {props => (
-          <ErrorBoundary onReset={() => props.navigation.goBack()}>
-            <ARExperienceScreen {...props} />
           </ErrorBoundary>
         )}
       </Stack.Screen>

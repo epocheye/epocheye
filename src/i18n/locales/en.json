@@ -232,7 +232,9 @@
     "captureFailed": "Could not capture a frame",
     "subtitle2d": "identify · no AR on this device",
     "noCamera": "No camera available",
-    "noArNotice": "AR isn't available on this device — showing the info card instead."
+    "noArNotice": "AR isn't available on this device — showing the info card instead.",
+    "aimHint": "Point at the statue or inscription",
+    "nothingRecognized": "Nothing recognized yet — move closer or try another angle"
   },
   "siteDetail": {
     "factLoading": {

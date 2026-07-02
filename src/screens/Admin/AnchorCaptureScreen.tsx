@@ -8,10 +8,9 @@
  * v1 uses the device GPS for capture (lat/lng/altitude/heading from
  * `Geolocation.getCurrentPosition`). Accuracy is ~3-10m depending on phone
  * + sky view — acceptable for the launch sites where anchors don't need
- * to be sub-meter precise. For a more accurate flow we'd dispatch a UI
- * Manager command into `EpocheyeGeospatialARView` to read
- * `Earth.cameraGeospatialPose`; deferred until first launch tells us
- * whether GPS-quality is good enough.
+ * to be sub-meter precise. A more accurate flow (reading ARCore Earth's
+ * `cameraGeospatialPose`) is deferred until first launch tells us whether
+ * GPS-quality is good enough.
  */
 import React, { useState } from 'react';
 import {

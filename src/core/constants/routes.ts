@@ -29,7 +29,6 @@ export const ROUTES = {
   MAIN: {
     TABS: 'MainTabs',
     SITE_DETAIL: 'SiteDetail',
-    AR_EXPERIENCE: 'ARExperience',
     AR_COMPOSER: 'ARComposer',
     PURCHASE: 'Purchase',
     HISTORY: 'History',

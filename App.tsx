@@ -16,7 +16,6 @@ import {
   startNotificationsRealtime,
   stopNotificationsRealtime,
 } from './src/services/notificationsSocketService';
-import { useArQuotaStore } from './src/stores/arQuotaStore';
 import { useSessionStore } from './src/stores/sessionStore';
 
 // Module-load configure() throws if the native module failed to autolink;
@@ -56,9 +55,6 @@ export default function App() {
     // Best-effort — FCM registration is skipped silently until the user is
     // authenticated and has granted notification permission.
     void fcmInit();
-    // Pull AR quota + config so the quota pill + maintenance banner render
-    // correctly from first paint. Unauth requests are silently dropped.
-    void useArQuotaStore.getState().refresh();
   }, []);
 
   // fcmInit() runs once at launch and may find the session not yet restored
