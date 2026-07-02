@@ -45,7 +45,11 @@
     "epocheyeSite": "ইপোকাই সাইট",
     "tapToExplore": "অন্বেষণ করতে ট্যাপ করুন",
     "viewDetailsFor": "{{name}}এর বিস্তারিত দেখুন",
-    "viewDetails": "বিস্তারিত দেখুন"
+    "viewDetails": "বিস্তারিত দেখুন",
+    "exitConfirmTitle": "Epocheye ছাড়বেন?",
+    "exitConfirmMessage": "আপনি অ্যাপটি বন্ধ করতে চলেছেন।",
+    "exitConfirmConfirm": "প্রস্থান",
+    "exitConfirmCancel": "থাকুন"
   },
   "daily": {
     "todayLabel": "আজ · {{month}} {{day}}",
@@ -265,10 +269,12 @@
     "optionsLabel": "কথোপকথনের বিকল্পগুলি",
     "statusListening": "শুনছি…",
     "statusGrounded": "এআই গাইড · সাইটের তথ্যের উপর ভিত্তি করে",
-    "leaveConfirmTitle": "গাইড ছেড়ে দেবেন?",
-    "leaveConfirmMessage": "এআই গাইডের সাথে আপনার কথোপকথনটি হারিয়ে যাবে।",
-    "leaveConfirmConfirm": "ছেড়ে দিন",
-    "leaveConfirmCancel": "থাকুন",
+    "thinkingPhrases": [
+      "নথিপত্র খতিয়ে দেখা হচ্ছে…",
+      "শিলালিপি পড়া হচ্ছে…",
+      "রাজবংশের সূত্র খোঁজা হচ্ছে…",
+      "গল্পটি সাজানো হচ্ছে…"
+    ],
     "clearConfirmTitle": "স্পষ্ট আলোচনা?",
     "clearConfirmMessage": "এটি আপনার প্রশ্ন এবং গাইডের উত্তরগুলো মুছে দেয়।",
     "clearConfirmConfirm": "পরিষ্কার",

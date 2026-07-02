@@ -28,7 +28,7 @@ import {getSites, searchPlaces, type SiteDetail} from '../../utils/api/places';
 import {useNotificationsStore} from '../../stores/notificationsStore';
 import {reverseGeocode, reverseGeocodeLabel} from '../../utils/api/geo';
 import {useVenueGate} from '../../shared/hooks/useVenueGate';
-import {usePassportSummary} from '../../shared/hooks';
+import {usePassportSummary, useExitConfirm} from '../../shared/hooks';
 import StreakFlame from '../../components/ui/StreakFlame';
 import LevelBadge from '../../components/ui/LevelBadge';
 import XPProgress from '../../components/ui/XPProgress';
@@ -196,6 +196,15 @@ function siteToNavParam(site: SiteDetail): PlaceNavParam {
 const Home: React.FC<Props> = ({navigation}) => {
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
+
+  // Home is the root tab, so an Android hardware-back here would exit the app.
+  // Confirm first rather than closing abruptly.
+  useExitConfirm({
+    title: t('home.exitConfirmTitle'),
+    message: t('home.exitConfirmMessage'),
+    confirmText: t('home.exitConfirmConfirm'),
+    cancelText: t('home.exitConfirmCancel'),
+  });
   const nearbyPlaces = usePlaces(state => state.nearbyPlaces);
   const currentLocation = usePlaces(state => state.currentLocation);
   const ensureLocationTracking = usePlaces(

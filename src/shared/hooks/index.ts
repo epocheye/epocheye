@@ -57,6 +57,9 @@ export type { UseProfileDigestReturn } from './useProfileDigest';
 export { useBackConfirm } from './useBackConfirm';
 export type { UseBackConfirmOptions } from './useBackConfirm';
 
+export { useExitConfirm } from './useExitConfirm';
+export type { UseExitConfirmOptions } from './useExitConfirm';
+
 export { useSafeGoBack, useSafeBackHandler } from './useSafeGoBack';
 
 export { useVoiceInput } from './useVoiceInput';

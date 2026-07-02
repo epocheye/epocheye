@@ -45,7 +45,11 @@
     "epocheyeSite": "Epocheye site",
     "tapToExplore": "Tap to explore",
     "viewDetailsFor": "View details for {{name}}",
-    "viewDetails": "View Details"
+    "viewDetails": "View Details",
+    "exitConfirmTitle": "Leave Epocheye?",
+    "exitConfirmMessage": "You're about to close the app.",
+    "exitConfirmConfirm": "Exit",
+    "exitConfirmCancel": "Stay"
   },
   "daily": {
     "todayLabel": "TODAY · {{month}} {{day}}",
@@ -154,7 +158,7 @@
     "retry": "Retry",
     "kicker": "The lens only opens on site",
     "title": "Epocheye comes alive at the venue.",
-    "subtitle": "Stand before the real piece and watch its history unfold in AR. Travel to your nearest site to begin.",
+    "subtitle": "Travel to your nearest site to begin.",
     "nearestLabel": "YOUR NEAREST VENUE",
     "getDirections": "Get directions",
     "turnOnLocation": "TURN ON LOCATION",
@@ -271,10 +275,12 @@
     "optionsLabel": "Conversation options",
     "statusListening": "Listening…",
     "statusGrounded": "AI guide · grounded in site data",
-    "leaveConfirmTitle": "Leave the guide?",
-    "leaveConfirmMessage": "Your conversation with the AI guide will be lost.",
-    "leaveConfirmConfirm": "Leave",
-    "leaveConfirmCancel": "Stay",
+    "thinkingPhrases": [
+      "Consulting the archives…",
+      "Reading the inscriptions…",
+      "Tracing the dynasty…",
+      "Piecing together the story…"
+    ],
     "clearConfirmTitle": "Clear conversation?",
     "clearConfirmMessage": "This removes your questions and the guide's answers.",
     "clearConfirmConfirm": "Clear",

@@ -45,7 +45,11 @@
     "epocheyeSite": "एपोचे साइट",
     "tapToExplore": "एक्सप्लोर करने के लिए टैप करें",
     "viewDetailsFor": "विवरण देखें {{name}}",
-    "viewDetails": "विवरण देखें"
+    "viewDetails": "विवरण देखें",
+    "exitConfirmTitle": "Epocheye छोड़ें?",
+    "exitConfirmMessage": "आप ऐप बंद करने वाले हैं।",
+    "exitConfirmConfirm": "बाहर निकलें",
+    "exitConfirmCancel": "रुकें"
   },
   "daily": {
     "todayLabel": "आज · {{month}} {{day}}",
@@ -265,10 +269,12 @@
     "optionsLabel": "बातचीत के विकल्प",
     "statusListening": "सुनना…",
     "statusGrounded": "एआई गाइड · साइट डेटा पर आधारित",
-    "leaveConfirmTitle": "गाइड छोड़ दें?",
-    "leaveConfirmMessage": "एआई गाइड के साथ आपकी बातचीत खो जाएगी।",
-    "leaveConfirmConfirm": "छुट्टी",
-    "leaveConfirmCancel": "रहना",
+    "thinkingPhrases": [
+      "अभिलेखों को खंगाला जा रहा है…",
+      "शिलालेख पढ़े जा रहे हैं…",
+      "राजवंश का सूत्र खोजा जा रहा है…",
+      "कहानी को जोड़ा जा रहा है…"
+    ],
     "clearConfirmTitle": "स्पष्ट बातचीत?",
     "clearConfirmMessage": "इससे आपके प्रश्न और गाइड के उत्तर हट जाते हैं।",
     "clearConfirmConfirm": "स्पष्ट",

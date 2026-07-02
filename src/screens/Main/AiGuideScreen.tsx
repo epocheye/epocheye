@@ -10,7 +10,9 @@
  * Behaviour upgrades over the previous version:
  *   - Assistant output renders as Markdown (react-native-markdown-display).
  *   - Voice input is wired (tap mic → dictate → edit → send) via useVoiceInput.
- *   - Leaving mid-conversation prompts a confirm (useBackConfirm).
+ *   - The "thinking" state and answer bubbles use animated waveforms
+ *     (see components/AiThinking). Back always just closes the guide (via
+ *     useSafeGoBack) — no leave/stay prompt, and it can never close the app.
  *
  * Streams answers from POST /api/v1/sites/{slug}/guide; welcome narration is
  * rendered locally from content.narratives.by_persona.casual. Conversation
@@ -53,9 +55,11 @@ import { getSite } from '../../utils/api/places';
 import type { SiteDetail } from '../../utils/api/places';
 import { streamGuideAnswer } from '../../utils/api/guide';
 import type { GuideHistoryTurn } from '../../utils/api/guide';
-import { useBackConfirm, useVoiceInput } from '../../shared/hooks';
+import { useVoiceInput } from '../../shared/hooks';
+import { useSafeGoBack } from '../../shared/hooks/useSafeGoBack';
 import { AppAlert } from '../../shared/ui/appAlert';
 import MarkdownText from '../../components/ui/MarkdownText';
+import { AnimatedWaveform, AiThinkingIndicator } from './components/AiThinking';
 import { analytics } from '../../services/analytics';
 
 type Props = MainScreenProps<'AiGuide'>;
@@ -71,18 +75,7 @@ interface ChatBubble {
 const MAX_SUGGESTIONS = 6;
 const FLAME = '#CBA862';
 
-// Decorative audio waveform (Figma 240:31-39). Purely visual — no playback.
-const WAVE_BARS = [6, 8, 10, 6, 8, 10, 6, 8];
-
-const Waveform: React.FC = () => (
-  <View style={styles.wave}>
-    {WAVE_BARS.map((h, i) => (
-      <View key={i} style={[styles.waveBar, { height: h }]} />
-    ))}
-  </View>
-);
-
-const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
+const AiGuideScreen: React.FC<Props> = ({ route }) => {
   const { t } = useTranslation();
   const { slug, siteName, heroImageUrl } = route.params;
 
@@ -99,15 +92,9 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const voice = useVoiceInput({ onTranscript: setInput });
 
-  // Confirm before leaving once a real conversation exists or a stream is live.
-  const hasConversation = messages.some(m => !m.isWelcome) || isStreaming;
-  useBackConfirm({
-    enabled: hasConversation,
-    title: t('guide.leaveConfirmTitle'),
-    message: t('guide.leaveConfirmMessage'),
-    confirmText: t('guide.leaveConfirmConfirm'),
-    cancelText: t('guide.leaveConfirmCancel'),
-  });
+  // Back always just closes the guide (returns to the site page) — never prompts,
+  // never falls through to closing the app. The active stream aborts on unmount.
+  const safeGoBack = useSafeGoBack();
 
   // Fetch the full site content (we need narratives + faq from content.*).
   useEffect(() => {
@@ -277,7 +264,9 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={styles.assistantLabel}>EPOCHEYE AI</Text>
             </View>
             <MarkdownText theme="dark">{item.content}</MarkdownText>
-            <Waveform />
+            <View style={styles.bubbleWave}>
+              <AnimatedWaveform active variant="calm" bars={8} />
+            </View>
           </View>
         </View>
       );
@@ -309,7 +298,7 @@ const AiGuideScreen: React.FC<Props> = ({ navigation, route }) => {
       {/* Top bar (Figma 240:16-25) */}
       <View style={styles.topBar}>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={safeGoBack}
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel={t('guide.backLabel')}
@@ -481,25 +470,11 @@ const FooterArea: React.FC<{
   }
 
   if (isStreaming) {
-    return (
-      <View style={styles.assistantWrap}>
-        <View style={[styles.assistantBubble, styles.thinkingBubble]}>
-          <ThinkingDots />
-        </View>
-      </View>
-    );
+    return <AiThinkingIndicator />;
   }
 
   return null;
 };
-
-const ThinkingDots: React.FC = () => (
-  <View style={styles.thinkingRow}>
-    <View style={[styles.dot, styles.dot1]} />
-    <View style={[styles.dot, styles.dot2]} />
-    <View style={[styles.dot, styles.dot3]} />
-  </View>
-);
 
 // --- content helpers ---
 
@@ -635,22 +610,13 @@ const styles = StyleSheet.create({
     color: '#CBA862',
     letterSpacing: 0.8,
   },
-  wave: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 4,
-    alignSelf: 'flex-start',
+  bubbleWave: {
     marginTop: 10,
+    alignSelf: 'flex-start',
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 7,
     paddingHorizontal: 8,
-    paddingVertical: 5,
-    height: 18,
-  },
-  waveBar: {
-    width: 2,
-    borderRadius: 1,
-    backgroundColor: FLAME,
+    paddingVertical: 4,
   },
   userWrap: {
     alignItems: 'flex-end',
@@ -671,22 +637,6 @@ const styles = StyleSheet.create({
     color: '#F2EBE0',
     lineHeight: 20,
   },
-  thinkingBubble: {
-    paddingVertical: 16,
-  },
-  thinkingRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: FLAME,
-  },
-  dot1: { opacity: 0.9 },
-  dot2: { opacity: 0.6 },
-  dot3: { opacity: 0.35 },
   errorBubble: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(239,68,68,0.10)',
