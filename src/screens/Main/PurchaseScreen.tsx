@@ -481,25 +481,6 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
             </Animated.View>
           )}
 
-          {/* Single-place access notice */}
-          {isSingle && (
-            <Animated.View
-              entering={FadeInDown.duration(300)}
-              className="bg-surface-1 rounded-2xl border border-white/[0.08] p-4 mt-3 mb-4"
-            >
-              <View className="flex-row items-center gap-2 mb-1.5">
-                <Clock3 color="#CBA862" size={14} />
-                <Text className="text-parchment text-sm font-ui-semibold">
-                  12 hours of access
-                </Text>
-              </View>
-              <Text className="text-parchment-dim text-xs leading-[18px] font-ui">
-                You'll have 12 hours to explore. We'll remind you 1 hour and 15
-                minutes before it ends.
-              </Text>
-            </Animated.View>
-          )}
-
           {/* Price Summary */}
           {selectedCount > 0 && quote && !quoteLoading && (
             <Animated.View
