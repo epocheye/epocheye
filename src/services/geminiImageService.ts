@@ -1,13 +1,13 @@
 /**
  * Gemini image generation service for heritage monument imagery.
  *
- * Replaces the backend /api/v1/images/resolve call with a direct Gemini
- * image-generation request from the device. Results are persisted to
- * AsyncStorage so repeat visits to the same monument are instant and
- * don't burn quota.
+ * Generates monument imagery via the backend Gemini proxy
+ * (`callGeminiProxy` → POST /api/v1/vision/gemini), which holds the key
+ * server-side and routes to Vertex AI. The app never calls Google directly
+ * and holds no Gemini key. Results are persisted to AsyncStorage so repeat
+ * visits to the same monument are instant and don't burn quota.
  *
- * Model: `gemini-2.5-flash-image` ("Nano Banana") — Google AI Studio
- * key works without additional billing setup. If the model rotates,
+ * Model: `gemini-2.5-flash-image` ("Nano Banana"). If the model rotates,
  * change GEMINI_IMAGE_MODEL below.
  */
 
