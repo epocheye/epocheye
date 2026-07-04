@@ -35,7 +35,7 @@
 		<string>remote-notification</string>
 	</array>
 	<key>CFBundleDisplayName</key>
-	<string>epocheye</string>
+	<string>Epocheye</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
