@@ -110,14 +110,24 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
       </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.GO_TO_VENUE}
-        component={GoToVenueScreen}
         options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}
-      />
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <GoToVenueScreen />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.SUGGEST_SITE}
-        component={SuggestSiteScreen}
         options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}
-      />
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <SuggestSiteScreen />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
     </Stack.Navigator>
     <VenueActivationBanner />
     </>
