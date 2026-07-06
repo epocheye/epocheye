@@ -123,7 +123,11 @@ export async function refreshAccessToken(): Promise<
   } catch (error) {
     if (isApiError(error)) {
       const statusCode = getStatusCode(error);
-      if (statusCode === 401 || statusCode === 403) {
+      // Only a 401 from /refresh means the refresh token is definitively
+      // rejected (the backend returns 401 for every invalid-token case and
+      // never 403). A transient 403/5xx from infrastructure must NOT wipe the
+      // session — otherwise a passing WAF/gateway blip logs the user out.
+      if (statusCode === 401) {
         await clearTokens();
       }
       return {
@@ -134,10 +138,12 @@ export async function refreshAccessToken(): Promise<
         },
       };
     }
+    // Network error / timeout (no HTTP response) — transient. Keep the session
+    // and report it as such so the interceptor doesn't log the user out.
     return {
       success: false,
       error: {
-        message: 'An unexpected error occurred',
+        message: 'Network error while refreshing session',
         statusCode: 0,
       },
     };
@@ -231,9 +237,14 @@ export function createAuthenticatedClient(): AxiosInstance {
           return authClient(originalRequest);
         }
 
-        // If refresh failed, clear tokens
-        await clearTokens();
-        throw new Error('Session expired. Please login again.');
+        // Refresh failed. `refreshAccessToken` has already cleared the tokens
+        // IFF the refresh token was definitively rejected (401). For transient
+        // failures (network / 403 / 5xx) the session is preserved — surface the
+        // original error so the caller can retry rather than being logged out.
+        if (refreshResult.error?.statusCode === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+        return Promise.reject(error);
       }
 
       return Promise.reject(error);

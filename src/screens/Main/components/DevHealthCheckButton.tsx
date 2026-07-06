@@ -1,0 +1,48 @@
+/**
+ * DEV-only entry to the Workflow Health-Check board.
+ *
+ * Opens DevHealthCheckScreen: every app workflow listed with a launch button,
+ * a persisted pass/fail status, and the crash journal (including native-crash
+ * "died on screen X" detection).
+ *
+ * Compiles to a no-op in production builds (and the target screen is only
+ * registered in dev, see MainNavigation).
+ */
+
+import React, {useCallback} from 'react';
+import {Pressable, Text, View} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {ROUTES} from '../../../core/constants';
+import type {MainStackParamList} from '../../../core/types/navigation.types';
+
+const DevHealthCheckButton: React.FC = () => {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+
+  const handleOpen = useCallback(() => {
+    navigation.navigate(ROUTES.MAIN.DEV_HEALTH);
+  }, [navigation]);
+
+  if (!__DEV__) return null;
+
+  return (
+    <View className="mx-5 mt-3">
+      <Pressable
+        onPress={handleOpen}
+        accessibilityRole="button"
+        accessibilityLabel="DEV: Workflow health check"
+        className="rounded-2xl border border-[rgba(203,168,98,0.45)] bg-[rgba(203,168,98,0.08)] px-4 py-3"
+      >
+        <Text className="text-accent-amber font-ui-semibold text-[13px] tracking-[1.6px]">
+          DEV: WORKFLOW HEALTH CHECK
+        </Text>
+        <Text className="text-[rgba(255,255,255,0.55)] font-ui text-[11px] mt-1">
+          Launch every flow · mark pass/fail · view crash log
+        </Text>
+      </Pressable>
+    </View>
+  );
+};
+
+export default DevHealthCheckButton;

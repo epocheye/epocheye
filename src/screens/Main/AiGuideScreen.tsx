@@ -29,8 +29,6 @@ import React, {
 import {
   FlatList,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -39,6 +37,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+// Edge-to-edge-aware KAV; the core one was a no-op on Android here, leaving
+// the chat input bar underneath the keyboard.
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import {
@@ -88,6 +89,10 @@ const AiGuideScreen: React.FC<Props> = ({ route }) => {
   const [lastQuestion, setLastQuestion] = useState<string | null>(null);
 
   const abortRef = useRef<(() => void) | null>(null);
+  // True once the screen has unmounted — used to abort a stream that opens
+  // AFTER unmount (unmount landing during the pre-stream token fetch, before
+  // `abortRef` is set, would otherwise leak the SSE + setState post-unmount).
+  const unmountedRef = useRef(false);
   const listRef = useRef<FlatList<ChatBubble>>(null);
 
   const voice = useVoiceInput({ onTranscript: setInput });
@@ -123,6 +128,7 @@ const AiGuideScreen: React.FC<Props> = ({ route }) => {
   // Cancel any active stream on unmount.
   useEffect(() => {
     return () => {
+      unmountedRef.current = true;
       abortRef.current?.();
     };
   }, []);
@@ -182,6 +188,12 @@ const AiGuideScreen: React.FC<Props> = ({ route }) => {
           abortRef.current = null;
         },
       }).then(abort => {
+        // If the screen unmounted while the stream was being set up, abort it
+        // right away instead of stashing a handle nothing will ever call.
+        if (unmountedRef.current) {
+          abort();
+          return;
+        }
         abortRef.current = abort;
       });
     },
@@ -343,9 +355,7 @@ const AiGuideScreen: React.FC<Props> = ({ route }) => {
 
       <View style={styles.divider} />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.flexFill}>
+      <KeyboardAvoidingView behavior="padding" style={styles.flexFill}>
         <FlatList
           ref={listRef}
           data={messages}

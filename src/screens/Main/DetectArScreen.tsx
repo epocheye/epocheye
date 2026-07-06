@@ -464,8 +464,7 @@ const DetectArScreen: React.FC = () => {
 
   const {hasPermission, requestPermission} = useCameraPermission();
   const {arAvailable, arChecked} = useARCore();
-  const {inVenue} = useVenueGate();
-  const currentLocation = usePlacesStore(s => s.currentLocation);
+  const {inVenue, evaluated: zoneEvaluated} = useVenueGate();
   const ensureLocationTracking = usePlacesStore(s => s.ensureLocationTracking);
   const permissionRequestedRef = useRef(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
@@ -500,19 +499,21 @@ const DetectArScreen: React.FC = () => {
   }, [bypassGate, inVenue]);
 
   // Venue lock: the live scan/AR experience only runs inside a curated venue.
-  // CRITICAL: do NOT bounce the user the instant the screen mounts — the active
-  // zone is only set after the first GPS fix evaluates the geofence, so an
-  // immediate redirect tells someone standing AT the site to "reach the site".
-  // Wait until we actually have a location (zone evaluated) or the grace period
-  // elapses; only then redirect if still outside. Dev picker bypasses the gate.
+  // CRITICAL: do NOT bounce the user the instant the screen mounts — and do NOT
+  // key the redirect off `currentLocation`. `currentLocation` is set one
+  // microtask BEFORE the geofence is evaluated (placesStore sets it
+  // synchronously, then schedules checkZoneEntry), so gating on it ejects a
+  // user standing INSIDE a venue before their zone is set. Wait until the zone
+  // has actually been evaluated (`zoneEvaluated`) or the grace period elapses;
+  // only then redirect if still outside. Dev picker bypasses the gate.
   const locating =
-    !bypassGate && !inVenue && currentLocation == null && !gateTimedOut;
+    !bypassGate && !inVenue && !zoneEvaluated && !gateTimedOut;
   useEffect(() => {
     if (bypassGate || inVenue) return;
-    if (currentLocation != null || gateTimedOut) {
+    if (zoneEvaluated || gateTimedOut) {
       navigation.replace(ROUTES.MAIN.GO_TO_VENUE);
     }
-  }, [bypassGate, inVenue, currentLocation, gateTimedOut, navigation]);
+  }, [bypassGate, inVenue, zoneEvaluated, gateTimedOut, navigation]);
 
   // Route both the in-screen close button AND the Android hardware back button
   // through the safe-back path so exiting the camera can never fall through to

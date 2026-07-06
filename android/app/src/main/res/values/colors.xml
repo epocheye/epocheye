@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand amber used to tint the (white-silhouette) notification small icon. -->
+    <color name="notification_color">#C9A84C</color>
+</resources>

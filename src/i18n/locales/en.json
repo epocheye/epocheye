@@ -112,6 +112,7 @@
     "fullName": "Full name",
     "email": "Email",
     "emailAddress": "Email address",
+    "emailReadonlyHint": "Your email can't be changed here.",
     "phone": "Phone",
     "phoneNumber": "Phone number",
     "saveProfileChanges": "Save profile changes",
@@ -143,6 +144,7 @@
     "openDeviceSettingsA11y": "Open device settings",
     "openDeviceSettings": "Open Device Settings",
     "getSupport": "Get Support",
+    "supportEmailFallback": "Email us at support@epocheye.app",
     "replayTour": "Replay app tour",
     "version": "Version {{version}}",
     "madeWithCare": "Made with care for India's heritage",
@@ -206,7 +208,18 @@
     "title": "Before you begin",
     "supervise": "Younger explorers should have an adult nearby.",
     "surroundings": "Stay aware of your surroundings while the camera is open.",
-    "acknowledge": "I understand"
+    "acknowledge": "I understand",
+    "close": "Close and go back"
+  },
+  "arrival": {
+    "title": "Epocheye is now active at {{name}}",
+    "body": "{{epoch}} · Point your phone at an exhibit to begin."
+  },
+  "levelUp": {
+    "rankUnlocked": "RANK UNLOCKED",
+    "xpEarned": "XP EARNED",
+    "newPerks": "NEW PERKS",
+    "continue": "Continue exploring"
   },
   "lens": {
     "thisObject": "This object",
@@ -249,6 +262,7 @@
     "defaultCountry": "India",
     "fallbackDescription": "Explore {{name}}, a historic heritage site located at {{location}}.",
     "arReady": "AR Ready",
+    "untitled": "Heritage site",
     "builtLabel": "BUILT",
     "dynastyLabel": "DYNASTY",
     "viewInAr": "View in AR",
@@ -324,6 +338,10 @@
     "next": "Next",
     "done": "Finish",
     "skip": "Skip tour",
+    "offerTitle": "Take a quick tour?",
+    "offerBody": "Sixty seconds, eight stops — we'll show you where everything lives. You can skip at any time.",
+    "offerStart": "Take the tour",
+    "offerSkip": "Explore on my own",
     "welcome": {
       "title": "Welcome to Epocheye",
       "body": "A quick tour to show you around. Tap Next to begin — we'll walk you through every part of the app."
@@ -366,7 +384,7 @@
     },
     "profile": {
       "title": "Your profile",
-      "body": "Update your name and details, and manage your account here."
+      "body": "Update your details and switch the app between English, Hindi and Bengali — all from here."
     },
     "language": {
       "title": "Choose your language",

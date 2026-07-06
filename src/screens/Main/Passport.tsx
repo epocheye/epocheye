@@ -39,6 +39,18 @@ const HERO_GRADIENT = ['#D8B978', '#CBA862', '#9C7B3A'];
 const HERO_TEXT = '#FBF6EC';
 const HERO_SUBTLE = 'rgba(255,255,255,0.85)';
 
+/** "1250 · 12 Jun" — the monument's built year (when known) + first-visit date. */
+function stampMetaLine(stamp: PassportStamp): string {
+  const visited = new Date(stamp.visited_at);
+  const visitedLabel = Number.isNaN(visited.getTime())
+    ? ''
+    : visited.toLocaleDateString(undefined, {day: 'numeric', month: 'short'});
+  if (stamp.built_year && visitedLabel) {
+    return `${stamp.built_year} · ${visitedLabel}`;
+  }
+  return visitedLabel || (stamp.built_year ? String(stamp.built_year) : '');
+}
+
 function formatPassExpiry(iso: string, t: TFunction): string {
   const ms = Date.parse(iso) - Date.now();
   if (Number.isNaN(ms) || ms <= 0) return t('passport.passExpired');
@@ -348,6 +360,12 @@ const Passport: React.FC<Props> = ({navigation}) => {
                   className="text-[11px] text-foreground mt-2 text-center"
                   numberOfLines={1}>
                   {stamp.place_name}
+                </Text>
+                <Text
+                  style={{fontFamily: FONTS.ui}}
+                  className="text-[10px] text-muted-foreground mt-0.5 text-center"
+                  numberOfLines={1}>
+                  {stampMetaLine(stamp)}
                 </Text>
               </Pressable>
             </View>

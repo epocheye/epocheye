@@ -13,6 +13,10 @@ jest.mock('react-native-reanimated', () => {
   return Reanimated;
 });
 
+jest.mock('react-native-keyboard-controller', () =>
+  require('react-native-keyboard-controller/jest'),
+);
+
 jest.mock('@react-native-community/netinfo', () => ({
   addEventListener: jest.fn(() => jest.fn()),
   fetch: jest.fn(() =>

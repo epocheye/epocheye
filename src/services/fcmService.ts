@@ -96,12 +96,24 @@ async function showForegroundNotification(
   const body = msg.notification?.body ?? (msg.data?.message as string) ?? '';
   if (!body) return;
 
+  // Daily-content nudges: while the user is INSIDE the app, a tray
+  // notification is redundant — show the in-app banner (CTA → Daily tab)
+  // instead. Background/quit deliveries still render as OS notifications.
+  if ((msg.data?.notif_type as string) === 'daily') {
+    useNotificationsStore.getState().showDailyBanner(title, body);
+    return;
+  }
+
   await notifee.displayNotification({
     title,
     body,
     android: {
       channelId: CHANNEL_ID,
-      smallIcon: 'ic_launcher',
+      // Status-bar icons must be white-on-transparent; the full-colour
+      // launcher icon renders as a blank square there.
+      smallIcon: 'ic_stat_epocheye',
+      color: '#C9A84C',
+      largeIcon: 'ic_launcher',
       pressAction: { id: 'default' },
     },
     ios: {
@@ -123,10 +135,16 @@ export async function fcmInit(): Promise<void> {
   try {
     await ensureAndroidChannel();
 
-    // iOS requires explicit authorization before tokens are issued. Android
-    // returns AUTHORIZED automatically; the runtime prompt is handled by
-    // react-native-permissions in OB11_Notifications.
-    const authStatus = await messaging().requestPermission({ provisional: false });
+    // The notification-permission PROMPT is owned by OB11_Notifications
+    // (react-native-permissions), which calls fcmRegisterAfterPermission once
+    // granted. So at launch we must NOT prompt — on iOS that would pop the
+    // system dialog before the onboarding rationale screen. Only read the
+    // CURRENT status here: on iOS `hasPermission()` never prompts; on Android
+    // `requestPermission()` returns AUTHORIZED without a dialog.
+    const authStatus =
+      Platform.OS === 'ios'
+        ? await messaging().hasPermission()
+        : await messaging().requestPermission({ provisional: false });
     const allowed =
       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
       authStatus === messaging.AuthorizationStatus.PROVISIONAL;

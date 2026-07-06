@@ -14,6 +14,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+// Keeps the centered card above the IME while typing notes (RN edge-to-edge
+// leaves plain Modals underneath the keyboard).
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Check, X } from 'lucide-react-native';
 import { reportScanIssue } from '../../utils/api/explorer-pass';
 
@@ -37,12 +40,14 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const reset = useCallback(() => {
     setSelectedReason(null);
     setNotes('');
     setSubmitted(false);
     setSubmitting(false);
+    setFailed(false);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -52,6 +57,7 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
 
   const handleSubmit = useCallback(async () => {
     if (!selectedReason) return;
+    setFailed(false);
     setSubmitting(true);
     const result = await reportScanIssue({
       scan_id: scanId,
@@ -62,6 +68,9 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
     setSubmitting(false);
     if (result.success) {
       setSubmitted(true);
+    } else {
+      // Don't fail silently — let the user know it didn't go through.
+      setFailed(true);
     }
   }, [imageUrl, notes, scanId, selectedReason]);
 
@@ -71,7 +80,9 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
       animationType="fade"
       transparent
       onRequestClose={handleClose}>
-      <View className="flex-1 bg-[rgba(0,0,0,0.7)] justify-center px-6">
+      <KeyboardAvoidingView
+        behavior="padding"
+        className="flex-1 bg-[rgba(0,0,0,0.7)] justify-center px-6">
         <View className="bg-[#0E0E10] rounded-[20px] p-5 border border-[rgba(255,255,255,0.08)]">
           <View className="flex-row justify-between items-center mb-[14px]">
             <Text className="text-parchment text-[17px] font-ui-semibold">
@@ -148,6 +159,12 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
                 }}
               />
 
+              {failed ? (
+                <Text className="text-[#E5837A] text-[12px] font-ui text-center mb-2.5">
+                  Couldn't send your report. Check your connection and try again.
+                </Text>
+              ) : null}
+
               <TouchableOpacity
                 disabled={!selectedReason || submitting}
                 onPress={handleSubmit}
@@ -158,14 +175,14 @@ const ReportIssueModal: React.FC<Props> = ({ visible, onClose, scanId, imageUrl 
                   <ActivityIndicator color="#0A0A0A" size="small" />
                 ) : (
                   <Text className="text-surface-1 text-[14px] font-ui-semibold">
-                    Submit report
+                    {failed ? 'Try again' : 'Submit report'}
                   </Text>
                 )}
               </TouchableOpacity>
             </>
           )}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

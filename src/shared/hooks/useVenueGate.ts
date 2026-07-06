@@ -21,13 +21,21 @@ export interface VenueGate {
   zone: HeritageZone | null;
   /** Convenience: the venue slug for the recognizer (`venue_id`), or null. */
   venueSlug: string | null;
+  /**
+   * True once the geofence has been evaluated against a real fix this session.
+   * Gate on this (not `currentLocation`) before redirecting an out-of-venue
+   * user — see `currentZoneStore.evaluated`.
+   */
+  evaluated: boolean;
 }
 
 export function useVenueGate(): VenueGate {
   const zone = useCurrentZoneStore(s => s.zone);
+  const evaluated = useCurrentZoneStore(s => s.evaluated);
   return {
     inVenue: zone != null,
     zone,
     venueSlug: zone?.monument_id ?? null,
+    evaluated,
   };
 }

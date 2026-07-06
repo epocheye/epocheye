@@ -10,7 +10,7 @@
  * Location off/denied → we can't compute "nearest", so we show the full curated
  * venue list and a prompt to enable location.
  */
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   Linking,
   Pressable,
@@ -57,7 +57,10 @@ const GoToVenueScreen: React.FC = () => {
     return getNearestZone(currentLocation.latitude, currentLocation.longitude);
   }, [currentLocation]);
 
-  const allZones = useMemo(() => getCachedZones(), []);
+  // Zones may not be cached yet at mount (deep-link straight here, or a prior
+  // load failed). Hold them in state so a successful Retry actually refreshes
+  // the "All venues" list instead of showing a frozen empty snapshot.
+  const [allZones, setAllZones] = useState(getCachedZones);
 
   // Network failure (zones never loaded) is NOT the same as being outside a
   // venue — surface a connection-issue + retry state instead of a false "outside".
@@ -75,7 +78,24 @@ const GoToVenueScreen: React.FC = () => {
     await ensureLocationTracking?.();
     const s = getZonesStatus();
     setCheckError(s.lastFailed && !s.everLoaded);
+    setAllZones(getCachedZones());
   }, [currentLocation, ensureLocationTracking]);
+
+  // If zones weren't cached at mount, pull them once so the list can populate
+  // without waiting for a manual Retry.
+  useEffect(() => {
+    if (allZones.length > 0) return;
+    let cancelled = false;
+    void (async () => {
+      await fetchZones(currentLocation?.latitude, currentLocation?.longitude);
+      if (!cancelled) setAllZones(getCachedZones());
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Mount-only: a one-shot backfill; Retry handles subsequent refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <View style={styles.root}>

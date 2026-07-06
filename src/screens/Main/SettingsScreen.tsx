@@ -6,13 +6,15 @@ import {
   Platform,
   Pressable,
   RefreshControl,
-  ScrollView,
   StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+// Keyboard-aware scroll so the edit-profile fields + Save stay visible while
+// typing (RN edge-to-edge leaves plain ScrollViews underneath the IME).
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppAlert as Alert, showToast } from '../../shared/ui/appAlert';
 import LinearGradient from 'react-native-linear-gradient';
@@ -54,6 +56,7 @@ import {
 import {setAppLanguage} from '../../i18n';
 import {useTourStore} from '../../stores/tourStore';
 import DevLoadTestArModelButton from './components/DevLoadTestArModelButton';
+import DevHealthCheckButton from './components/DevHealthCheckButton';
 import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 import { getVisitHistory, type VisitRow } from '../../utils/api/visits';
 import { formatRelativeTime } from '../../shared/utils';
@@ -121,13 +124,14 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
 
   useEffect(() => {
     if (profile) {
+      // Email is read-only (the profile update can't change it), so it must not
+      // count toward "has changes" — otherwise Save would appear to succeed
+      // while silently dropping the edited email.
       const changed =
-        fullName !== profile.name ||
-        email !== profile.email ||
-        phone !== profile.phone;
+        fullName !== profile.name || phone !== profile.phone;
       setHasChanges(changed);
     }
-  }, [fullName, email, phone, profile]);
+  }, [fullName, phone, profile]);
 
   const fetchVisits = useCallback(async () => {
     const result = await getVisitHistory();
@@ -301,8 +305,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
         locations={[0, 0.5, 1]}
         className="flex-1"
       >
-        <ScrollView
+        <KeyboardAwareScrollView
           showsVerticalScrollIndicator={false}
+          bottomOffset={24}
           contentContainerStyle={{ paddingBottom: 120 }}
           refreshControl={
             <RefreshControl
@@ -630,13 +635,16 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                   </Text>
                   <TextInput
                     value={email}
-                    onChangeText={setEmail}
+                    editable={false}
                     keyboardType="email-address"
                     placeholder={t('settings.email')}
                     placeholderTextColor="rgba(245,240,232,0.25)"
-                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment font-ui-medium px-4 py-3 text-sm"
+                    className="bg-surface-2 border border-white/10 rounded-xl text-parchment-dim font-ui-medium px-4 py-3 text-sm opacity-70"
                     accessibilityLabel={t('settings.emailAddress')}
                   />
+                  <Text className="text-[10px] text-parchment-dim font-ui mt-1">
+                    {t('settings.emailReadonlyHint')}
+                  </Text>
                 </View>
                 <View className="flex-1">
                   <Text className="text-xs uppercase tracking-[1px] text-parchment-dim font-ui-semibold mb-2">
@@ -853,7 +861,16 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </TouchableOpacity>
             <TouchableOpacity
               className="mt-3 flex-row items-center justify-center rounded-xl border border-white/[0.08] bg-surface-2 py-2.5"
-              onPress={() => Linking.openURL('mailto:support@epocheye.app')}
+              onPress={() => {
+                // No mail client → openURL rejects. Show the address so the tap
+                // isn't a silent no-op.
+                Linking.openURL('mailto:support@epocheye.app').catch(() =>
+                  Alert.alert(
+                    t('settings.getSupport'),
+                    t('settings.supportEmailFallback'),
+                  ),
+                );
+              }}
               accessibilityRole="button"
               accessibilityLabel={t('settings.getSupport')}
             >
@@ -876,6 +893,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
           </Animated.View>
 
           <DevLoadTestArModelButton />
+          <DevHealthCheckButton />
 
           {/* ── App version ── */}
           <Animated.View
@@ -940,7 +958,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               </Text>
             </TouchableOpacity>
           </Animated.View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </LinearGradient>
     </SafeAreaView>
   );

@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  ScrollView,
   StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+// Keyboard-aware scroll so the coupon field stays visible while typing.
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -357,9 +358,10 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
           </Text>
         </View>
 
-        <ScrollView
+        <KeyboardAwareScrollView
           className="flex-1"
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+          bottomOffset={24}
           showsVerticalScrollIndicator={false}
         >
           {/* Hero */}
@@ -665,7 +667,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
             </View>
           </Animated.View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </LinearGradient>
     </SafeAreaView>
   );

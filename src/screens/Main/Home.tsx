@@ -38,6 +38,8 @@ import type {Place} from '../../utils/api/places/types';
 import type {PlaceNavParam} from '../../core/types/navigation.types';
 import UnavailableSiteCard from './components/UnavailableSiteCard';
 import TourFirstRun from '../../components/tour/TourFirstRun';
+import {useTourStore} from '../../stores/tourStore';
+import {useIsFocused} from '@react-navigation/native';
 import NotificationsModal from '../../components/NotificationsModal';
 import {TourTarget} from '../../components/tour/useTourTarget';
 import type {TabScreenProps} from '../../core/types/navigation.types';
@@ -198,8 +200,11 @@ const Home: React.FC<Props> = ({navigation}) => {
   const insets = useSafeAreaInsets();
 
   // Home is the root tab, so an Android hardware-back here would exit the app.
-  // Confirm first rather than closing abruptly.
+  // Confirm first rather than closing abruptly — but NOT while the guided tour
+  // is running, or back would show "Exit app?" instead of stepping the tour.
+  const tourRunning = useTourStore(s => s.running);
   useExitConfirm({
+    enabled: !tourRunning,
     title: t('home.exitConfirmTitle'),
     message: t('home.exitConfirmMessage'),
     confirmText: t('home.exitConfirmConfirm'),
@@ -217,6 +222,8 @@ const Home: React.FC<Props> = ({navigation}) => {
   const [arrivalDismissed, setArrivalDismissed] = useState(false);
   const [supportedSites, setSupportedSites] = useState<SiteDetail[]>([]);
   const [mapReady, setMapReady] = useState(false);
+  // Gates the map's marker children (see the MapView comment below).
+  const isScreenFocused = useIsFocused();
   const [selectedPlace, setSelectedPlace] = useState<ActivePlace | null>(null);
   const [routeActive, setRouteActive] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -291,10 +298,21 @@ const Home: React.FC<Props> = ({navigation}) => {
   // suggest-a-place screen — once per app launch. Reuses the already-loaded
   // supportedSites + distanceMeters; skips until both a location and the sites
   // list are available (an empty list = not loaded yet, not "nothing nearby").
+  //
+  // Sequencing: never navigate while the guided tour is driving navigation, and
+  // tell the tour offer (TourFirstRun) once this gate has evaluated — the two
+  // auto-navigations used to race on fresh launches. (`tourRunning` is declared
+  // above, next to useExitConfirm.)
   useEffect(() => {
-    if (suggestShownThisSession || !userLatLng || supportedSites.length === 0) {
+    if (tourRunning) return;
+    // Only act while Home is actually focused — otherwise the modal could pop
+    // over an unrelated screen the user navigated to in the meantime.
+    if (!isScreenFocused) return;
+    if (suggestShownThisSession) {
+      useTourStore.getState().noteSuggestGateDecided();
       return;
     }
+    if (!userLatLng || supportedSites.length === 0) return;
     const hasNearbySite = supportedSites.some(
       s =>
         typeof s.latitude === 'number' &&
@@ -306,7 +324,8 @@ const Home: React.FC<Props> = ({navigation}) => {
       suggestShownThisSession = true;
       navigation.navigate(ROUTES.MAIN.SUGGEST_SITE);
     }
-  }, [userLatLng, supportedSites, navigation]);
+    useTourStore.getState().noteSuggestGateDecided();
+  }, [tourRunning, isScreenFocused, userLatLng, supportedSites, navigation]);
 
   const activeCoords = useMemo(
     () =>
@@ -851,6 +870,13 @@ const Home: React.FC<Props> = ({navigation}) => {
             toolbarEnabled={false}
             // @ts-expect-error googleMapsApiKey is RN-native only, not in type defs
             googleMapsApiKey={GOOGLE_MAPS_API_KEY?.trim()}>
+            {/* Children mount ONLY while the map is initialised AND Home is
+                focused. Inserting markers into a not-yet-ready or covered map
+                is the react-native-maps Fabric crash that killed the app in
+                production ("addViewAt … Index: N, Size: 0") — with no children
+                during the risky windows, that insert can never happen. */}
+            {mapReady && isScreenFocused ? (
+              <>
             {/* Curated Epocheye sites near the user (e.g. Victoria Memorial +
                 Indian Museum in Kolkata) — distinct amber pins → site details. */}
             {nearbyCuratedSites.map(s => (
@@ -912,6 +938,8 @@ const Home: React.FC<Props> = ({navigation}) => {
                   fitUserAndActive();
                 }}
               />
+            ) : null}
+              </>
             ) : null}
           </MapView>
         {activeSite ? (

@@ -5,12 +5,14 @@ import {
   Text,
   TextInput,
   StatusBar,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   TouchableOpacity,
   Image,
 } from 'react-native';
+// Edge-to-edge-aware replacement for RN's KeyboardAvoidingView (core one
+// mis-measures the IME under RN 0.77+ edge-to-edge and hides the inputs).
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { AppAlert as Alert } from '../../shared/ui/appAlert';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AmberButton from '../../components/onboarding/AmberButton';
@@ -100,10 +102,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
 
   return (
     <AuthLiquidBackground>
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <StatusBar
           barStyle="light-content"
           translucent

@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { ArrowRight, Crown } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, FONTS, GOLD_GRADIENT } from '../../core/constants/theme';
 
 interface Props {
@@ -40,6 +41,7 @@ const LevelUpCelebration: React.FC<Props> = ({
   perks,
   onClose,
 }) => {
+  const { t } = useTranslation();
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -61,7 +63,7 @@ const LevelUpCelebration: React.FC<Props> = ({
       <Animated.View style={[styles.backdrop, backdropStyle]}>
         <View style={styles.glow} />
         <Animated.View style={[styles.content, contentStyle]}>
-          <Text style={styles.eyebrow}>RANK UNLOCKED</Text>
+          <Text style={styles.eyebrow}>{t('levelUp.rankUnlocked')}</Text>
 
           <View style={styles.medalRing}>
             <LinearGradient
@@ -81,13 +83,13 @@ const LevelUpCelebration: React.FC<Props> = ({
             {typeof xpEarned === 'number' ? (
               <View style={styles.statCell}>
                 <Text style={styles.statValue}>+{xpEarned}</Text>
-                <Text style={styles.statLabel}>XP EARNED</Text>
+                <Text style={styles.statLabel}>{t('levelUp.xpEarned')}</Text>
               </View>
             ) : null}
             {typeof perks === 'number' ? (
               <View style={styles.statCell}>
                 <Text style={styles.statValue}>{perks}</Text>
-                <Text style={styles.statLabel}>NEW PERKS</Text>
+                <Text style={styles.statLabel}>{t('levelUp.newPerks')}</Text>
               </View>
             ) : null}
           </View>
@@ -98,7 +100,7 @@ const LevelUpCelebration: React.FC<Props> = ({
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.cta}>
-              <Text style={styles.ctaText}>Continue exploring</Text>
+              <Text style={styles.ctaText}>{t('levelUp.continue')}</Text>
               <ArrowRight color={COLORS.bg} size={20} />
             </LinearGradient>
           </Pressable>

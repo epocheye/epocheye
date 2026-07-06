@@ -10,12 +10,14 @@ import React, {useCallback, useState} from 'react';
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+// Keyboard-aware scroll so the form fields + submit stay visible while typing
+// (RN edge-to-edge leaves plain ScrollViews underneath the IME).
+import {KeyboardAwareScrollView} from 'react-native-keyboard-controller';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Animated, {FadeIn, FadeInUp} from 'react-native-reanimated';
 import {Check, Compass, MapPin, X} from 'lucide-react-native';
@@ -77,9 +79,10 @@ const SuggestSiteScreen: React.FC = () => {
           </Pressable>
         </View>
 
-        <ScrollView
+        <KeyboardAwareScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
+          bottomOffset={24}
           showsVerticalScrollIndicator={false}>
           {done ? (
             <Animated.View entering={FadeIn.duration(400)} style={styles.card}>
@@ -161,7 +164,7 @@ const SuggestSiteScreen: React.FC = () => {
               </Pressable>
             </>
           )}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     </View>
   );

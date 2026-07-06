@@ -22,6 +22,12 @@ interface TourState {
   running: boolean;
   stepIndex: number;
   targets: Record<string, TourRect>;
+  /**
+   * Sequencing flag: Home's 5km suggest-a-place gate sets this once it has
+   * evaluated (whether or not it navigated). The first-run tour offer waits
+   * for it so two auto-navigations never race each other on a fresh launch.
+   */
+  suggestGateDecided: boolean;
 
   start: () => void;
   next: () => void;
@@ -30,13 +36,18 @@ interface TourState {
   finish: () => void;
   registerTarget: (id: string, rect: TourRect) => void;
   unregisterTarget: (id: string) => void;
-  maybeStartFirstRun: () => Promise<void>;
+  noteSuggestGateDecided: () => void;
+  /** True when the first-run tour has not been completed/declined yet. */
+  shouldOfferFirstRun: () => Promise<boolean>;
+  /** "Explore on my own" — persist the flag so the offer never re-appears. */
+  declineFirstRun: () => void;
 }
 
 export const useTourStore = create<TourState>((set, get) => ({
   running: false,
   stepIndex: 0,
   targets: {},
+  suggestGateDecided: false,
 
   start: () => set({running: true, stepIndex: 0, targets: {}}),
 
@@ -69,15 +80,24 @@ export const useTourStore = create<TourState>((set, get) => ({
       return {targets: next};
     }),
 
-  maybeStartFirstRun: async () => {
-    if (get().running) return;
+  noteSuggestGateDecided: () => {
+    if (!get().suggestGateDecided) set({suggestGateDecided: true});
+  },
+
+  shouldOfferFirstRun: async () => {
+    if (get().running) return false;
     try {
       const done = await AsyncStorage.getItem(
         STORAGE_KEYS.ONBOARDING.TOUR_COMPLETED,
       );
-      if (done !== 'true') get().start();
+      return done !== 'true';
     } catch {
       // If storage read fails, don't block the user with a tour.
+      return false;
     }
+  },
+
+  declineFirstRun: () => {
+    void AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.TOUR_COMPLETED, 'true');
   },
 }));

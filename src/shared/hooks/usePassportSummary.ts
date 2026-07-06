@@ -1,10 +1,12 @@
 /**
  * Fetches the Passport summary on mount + on focus.
  *
- * Primary source: GET /api/v1/passport/summary (not yet implemented on the
- * Go backend). When that fails, the hook falls back to deriving the summary
- * client-side from /api/v1/visits/history + getMyExplorerPasses, so the UI
- * renders real data today.
+ * Primary source: GET /api/v1/passport/summary — server-authoritative
+ * (apis/passport: XP ledger, level, badges, streak; reconciled from visits).
+ * Only when that call fails (offline / backend down) does the hook fall back
+ * to deriving sites + streak client-side from /api/v1/visits/history +
+ * getMyExplorerPasses. The fallback has no dynasty/XP/badge data — those
+ * fields are omitted and the UI derives display equivalents.
  */
 
 import {useCallback, useEffect, useState} from 'react';
@@ -44,7 +46,8 @@ async function fetchDerivedSummary(): Promise<PassportSummary | null> {
     streak_days: deriveStreakDays(visits),
     sites_visited: deriveSitesVisited(visits),
     sites_goal: DEFAULT_SITES_GOAL,
-    dynasties_count: 0,
+    // dynasties_count omitted: visit history carries no dynasty data, so the
+    // fallback genuinely doesn't know it (the server path always sends it).
     active_passes: activePasses,
   };
 }

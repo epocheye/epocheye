@@ -150,10 +150,11 @@ export function earnedCount(badges: Badge[]): number {
 }
 
 // ── Server-authoritative resolution ──────────────────────────────────────────
-// The functions above are the client fallback. When the backend ships XP/level/
-// badges on `PassportSummary`, the resolve* helpers below prefer those values so
-// the UI becomes server-authoritative with no screen changes — they degrade to
-// the client derivation field-by-field when a server value is absent.
+// The functions above are the client fallback. The backend DOES ship XP/level/
+// badges on `PassportSummary` (GET /api/v1/passport/summary, apis/passport) —
+// the resolve* helpers below prefer those values so the UI is server-
+// authoritative, degrading to the client derivation field-by-field only when a
+// server value is absent (offline fallback path).
 
 /** Optional server-authoritative gamification values (camelCased). */
 export interface ServerProgress {

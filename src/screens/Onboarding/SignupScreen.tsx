@@ -5,12 +5,13 @@ import {
   Text,
   TextInput,
   StatusBar,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   TouchableOpacity,
   Image,
 } from 'react-native';
+// Edge-to-edge-aware KAV (core one hides inputs behind the keyboard).
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { AppAlert as Alert } from '../../shared/ui/appAlert';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthButton from '../../components/onboarding/AuthButton';
@@ -101,22 +102,21 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
     const loginResult = await login({ email: email.trim(), password });
     setLoading(false);
 
-    if (fromOnboarding) {
-      // In onboarding flow: navigate to notifications screen
-      navigation.navigate('OB11_Notifications');
-    } else {
-      // Legacy: store onboarding complete and navigate to welcome
-      await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.COMPLETED, 'true');
-      if (loginResult.success) {
-        navigation.navigate('OB11_Notifications');
-      } else {
-        Alert.alert(
-          t('auth.accountCreatedTitle'),
-          t('auth.accountCreatedBody'),
-        );
-        navigation.navigate('OB11_Notifications');
-      }
+    // The account exists now, but if the auto-login failed we have NO tokens.
+    // Continuing into onboarding would drop the user into the authenticated
+    // "main" state signed-out (every API call 401s). Send them to the login
+    // screen to sign in with the credentials they just created instead.
+    if (!loginResult.success) {
+      Alert.alert(t('auth.accountCreatedTitle'), t('auth.accountCreatedBody'));
+      navigation.navigate('OB10_Login');
+      return;
     }
+
+    if (!fromOnboarding) {
+      // Legacy path also completes onboarding once authenticated.
+      await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.COMPLETED, 'true');
+    }
+    navigation.navigate('OB11_Notifications');
   };
 
   // Heading text
@@ -217,10 +217,7 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <AuthLiquidBackground>
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <StatusBar
           barStyle="light-content"
           translucent

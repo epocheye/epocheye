@@ -349,6 +349,18 @@ export const usePlacesStore = create<PlacesStoreState>((set, get) => ({
       }
     }
 
+    // The first-fix acquisition above can await 20s+. If the user logged out or
+    // tracking was stopped meanwhile, do NOT install the watch — it would leak
+    // past logout with no live handle to clear it. Also clear any watch a
+    // concurrent call may have created so we never leave two running.
+    if (!useSessionStore.getState().authenticated || !get().isTrackingLocation) {
+      return;
+    }
+    if (locationWatchId !== null) {
+      Geolocation.clearWatch(locationWatchId);
+      locationWatchId = null;
+    }
+
     locationWatchId = Geolocation.watchPosition(
       position => {
         handleLocationUpdate(position);

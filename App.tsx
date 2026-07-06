@@ -2,6 +2,7 @@ import './global.css';
 
 import React, { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AppNavigator from './src/navigation';
@@ -17,6 +18,7 @@ import {
   stopNotificationsRealtime,
 } from './src/services/notificationsSocketService';
 import { useSessionStore } from './src/stores/sessionStore';
+import { initCrashJournal } from './src/services/crashJournal';
 
 // Module-load configure() throws if the native module failed to autolink;
 // guard so a mis-linked build reaches the JS runtime instead of dying silently.
@@ -30,6 +32,10 @@ try {
 } catch (err) {
   if (__DEV__) console.warn('[auth] GoogleSignin.configure failed', err);
 }
+
+// Crash/stability journal: global JS error + rejection handlers and the
+// native-crash breadcrumb. Module scope so it's live before first render.
+initCrashJournal();
 
 /**
  * Main app content that handles network state
@@ -74,6 +80,10 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* Real IME insets under RN's forced edge-to-edge — the core
+          KeyboardAvoidingView mis-measures there (inputs hid behind the
+          keyboard on every typing screen). */}
+      <KeyboardProvider>
       <SafeAreaProvider style={{ backgroundColor: '#000000' }}>
         <NetworkProvider>
           {/* Root boundary: convert an uncaught render/lifecycle error from a
@@ -91,6 +101,7 @@ export default function App() {
           <TourHost />
         </TourErrorBoundary>
       </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

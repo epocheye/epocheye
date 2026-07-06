@@ -46,24 +46,6 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'request failed';
 }
 
-function stripCodeFence(value: string): string {
-  const trimmed = value.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return fenced?.[1]?.trim() ?? trimmed;
-}
-
-function extractJsonObject(value: string): string | null {
-  const stripped = stripCodeFence(value);
-  const firstCurly = stripped.indexOf('{');
-  const lastCurly = stripped.lastIndexOf('}');
-
-  if (firstCurly < 0 || lastCurly <= firstCurly) {
-    return null;
-  }
-
-  return stripped.slice(firstCurly, lastCurly + 1);
-}
-
 function normalizeFact(input: unknown, index: number): PersonalizedFact | null {
   if (typeof input === 'string') {
     return {

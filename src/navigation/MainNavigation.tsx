@@ -13,8 +13,17 @@ import DetectArScreen from '../screens/Main/DetectArScreen';
 import GoToVenueScreen from '../screens/Main/GoToVenueScreen';
 import SuggestSiteScreen from '../screens/Main/SuggestSiteScreen';
 import VenueActivationBanner from '../components/VenueActivationBanner';
+import DailyNudgeBanner from '../components/DailyNudgeBanner';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
+
+// Dev-only workflow health-check board. `__DEV__` is constant-folded by Metro,
+// so in release this require (and the screen + its store/manifest) is
+// dead-code-eliminated from the bundle entirely.
+const DevHealthCheckScreen: React.ComponentType | null = __DEV__
+  ? // eslint-disable-next-line @typescript-eslint/no-var-requires
+    require('../screens/Dev/DevHealthCheckScreen').default
+  : null;
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -32,7 +41,14 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         freezeOnBlur: true,
       }}
     >
-      <Stack.Screen name={ROUTES.MAIN.TABS}>
+      {/* freezeOnBlur must stay OFF here: the tabs host Home's Google MapView,
+          and freezing/unfreezing a Fabric map while a modal covers it makes
+          react-native-maps re-insert markers into an empty native list —
+          a hard native crash (seen in production as
+          "addViewAt: failed to insert view … IndexOutOfBoundsException"). */}
+      <Stack.Screen
+        name={ROUTES.MAIN.TABS}
+        options={{ freezeOnBlur: false }}>
         {props => <TabNavigation {...props} onLogout={onLogout} />}
       </Stack.Screen>
       <Stack.Screen
@@ -128,8 +144,16 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
           </ErrorBoundary>
         )}
       </Stack.Screen>
+      {__DEV__ && DevHealthCheckScreen ? (
+        <Stack.Screen
+          name={ROUTES.MAIN.DEV_HEALTH}
+          component={DevHealthCheckScreen}
+          options={{ animation: 'slide_from_right' }}
+        />
+      ) : null}
     </Stack.Navigator>
     <VenueActivationBanner />
+    <DailyNudgeBanner />
     </>
   );
 };

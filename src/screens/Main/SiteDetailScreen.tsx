@@ -85,6 +85,22 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 
   const [siteDetail, setSiteDetail] = useState<SiteDetail | null>(null);
+
+  // Hero title: prefer the loaded record, then the nav param, then a readable
+  // fallback derived from the slug — a deep-linked site has an empty `site.name`
+  // until `getSite` resolves, which otherwise renders a blank title.
+  const heroTitle = useMemo(() => {
+    const resolved = siteDetail?.name?.trim() || site.name?.trim();
+    if (resolved) return resolved;
+    const slug = (route.params.slug ?? site.id ?? '').trim();
+    if (slug) {
+      return slug
+        .replace(/[-_]+/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+    }
+    return t('siteDetail.untitled');
+  }, [siteDetail?.name, site.name, site.id, route.params.slug, t]);
+
   // Tracks a hero image that failed to load (e.g. a stale/404 hero_image_url) so
   // we can fall back to the gradient instead of showing a blank box. Reset per site.
   const [heroFailed, setHeroFailed] = useState(false);
@@ -344,7 +360,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Title (Figma 238:62) */}
         <Text className="text-parchment text-[40px] leading-[44px] text-center mt-3 px-6 font-display">
-          {site.name}
+          {heroTitle}
         </Text>
 
         {/* BUILT / DYNASTY cards (Figma 238:65 / 238:68) */}

@@ -18,6 +18,7 @@ import notifee, { AndroidImportance } from '@notifee/react-native';
 import { Platform } from 'react-native';
 
 import type { HeritageZone } from '../core/config/geofence.types';
+import i18n from '../i18n';
 import { getActiveZone } from './geofenceService';
 import { prefetchSiteForMonument } from './sitePrefetchService';
 import { prefetchVenueMarquee } from './glbSource';
@@ -52,10 +53,14 @@ export async function checkZoneEntry(
   accuracyMeters?: number,
 ): Promise<void> {
   const active = getActiveZone(lat, lon, accuracyMeters);
-  const previous = useCurrentZoneStore.getState().zone;
+  const store = useCurrentZoneStore.getState();
+  const previous = store.zone;
 
-  // Same zone (or both null) — nothing to do.
+  // Same zone (or both null) — nothing to change, but record that the geofence
+  // has now been evaluated at least once (the venue gate waits on this so it
+  // never bounces a user before their first fix resolves).
   if (active?.id === previous?.id) {
+    store.markEvaluated();
     return;
   }
 
@@ -81,11 +86,14 @@ async function fireArrivalNotification(zone: HeritageZone): Promise<void> {
   await ensureArrivalChannel();
   try {
     await notifee.displayNotification({
-      title: `Epocheye is now active at ${zone.name}`,
-      body: `${zone.epochLabel} · Point your phone at an exhibit to begin.`,
+      title: i18n.t('arrival.title', { name: zone.name }),
+      body: i18n.t('arrival.body', { epoch: zone.epochLabel }),
       android: {
         channelId: ARRIVAL_CHANNEL_ID,
-        smallIcon: 'ic_launcher',
+        // White-on-transparent status-bar silhouette (see AndroidManifest).
+        smallIcon: 'ic_stat_epocheye',
+        color: '#C9A84C',
+        largeIcon: 'ic_launcher',
         pressAction: { id: 'default' },
       },
       ios: {

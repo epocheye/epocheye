@@ -8,7 +8,8 @@
  *
  * Presentational only — the host screen owns the `acknowledged` state:
  *   - onAcknowledge → proceed into the AR/camera experience
- *   - onExit        → leave the AR section (Android hardware back). Never proceeds.
+ *   - onExit        → leave the AR section (top-right X or Android hardware back).
+ *                     Never proceeds.
  *
  * Styling mirrors `ConfirmDialog` (transparent Modal + scrim + reanimated card,
  * gold glow on the dark card). The scrim is intentionally inert: tapping it does
@@ -17,7 +18,7 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
-import { ShieldCheck } from 'lucide-react-native';
+import { ShieldCheck, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 interface Props {
@@ -47,6 +48,18 @@ const ARSafetyNotice: React.FC<Props> = ({ onAcknowledge, onExit }) => {
             transform: [{ scale: 0.9 }],
           })}
           style={styles.card}>
+          <Pressable
+            onPress={onExit}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('safety.close')}
+            style={({ pressed }) => [
+              styles.closeBtn,
+              pressed && styles.btnPressed,
+            ]}>
+            <X size={18} color="rgba(255,255,255,0.72)" />
+          </Pressable>
+
           <View style={styles.iconWrap}>
             <ShieldCheck size={28} color="#CBA862" />
           </View>
@@ -98,6 +111,18 @@ const styles = StyleSheet.create({
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 0 },
     elevation: 16,
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    zIndex: 1,
   },
   iconWrap: {
     width: 52,

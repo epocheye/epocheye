@@ -103,6 +103,8 @@ export type MainStackParamList = {
   GoToVenue: undefined;
   /** Suggest-a-place: shown after login when no Epocheye site is within 5km. */
   SuggestSite: undefined;
+  /** DEV-only workflow health-check board (screen is only registered in dev builds). */
+  DevHealth: undefined;
 };
 
 /**

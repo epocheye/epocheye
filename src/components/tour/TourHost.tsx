@@ -2,16 +2,21 @@
  * TourHost — driver + renderer for the first-run guided product tour.
  *
  * Mounted once at the app root (App.tsx, next to <DialogHost/>), ABOVE the
- * NavigationContainer, so it overlays every screen incl. fullScreenModal camera /
- * purchase. For each step it (1) navigates via the shared navigationRef, (2) waits
- * for the step's target element to be measured by useTourTarget, then (3) draws a
- * dimmed cutout + bouncing arrow cue + a tooltip card with Back / Next / Skip.
- * Steps without an on-screen target render a centered explainer card.
+ * NavigationContainer, so it overlays every screen. For each step it
+ * (1) navigates via the shared navigationRef, (2) waits for the step's target
+ * element to be measured by useTourTarget, then (3) draws a dimmed cutout +
+ * bouncing arrow cue around it.
  *
- * The dimmed backdrop absorbs all touches (the "forced" walkthrough) — only the
- * card's own buttons advance it. Hardware back steps backwards (or skips at step 0).
+ * The tooltip card (title/body + Back/Next + progress) renders IMMEDIATELY on
+ * every step — centered while the target is still navigating/measuring, then
+ * sliding to its anchored position once the rect resolves. The old behaviour
+ * (dim-only screen with no controls for up to ~2s per step) read as a freeze
+ * and left the user with no escape hatch mid-transition.
+ *
+ * A fixed "Skip tour" pill stays in the top-right on every step. The dimmed
+ * backdrop absorbs touches; hardware back steps backwards (skips at step 0).
  */
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   BackHandler,
   Pressable,
@@ -22,8 +27,10 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeIn,
+  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -35,8 +42,6 @@ import {useTranslation} from 'react-i18next';
 
 import {COLORS, FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants';
-import {DEFAULT_MONUMENT_SLUG} from '../../config/monuments';
-import {getSites} from '../../utils/api/places';
 import {navigateSafe} from '../../navigation/navigationRef';
 import {useTourStore, type TourRect} from '../../stores/tourStore';
 import {TOUR_STEPS, type TourStep} from '../../constants/appTour';
@@ -55,50 +60,17 @@ const TourHost: React.FC = () => {
   const skip = useTourStore(s => s.skip);
 
   const [rect, setRect] = useState<TourRect | null>(null);
-  const [ready, setReady] = useState(false);
-  const sampleRef = useRef<{slug: string; name: string} | null>(null);
 
-  const resolveSample = useCallback(async () => {
-    if (sampleRef.current) return sampleRef.current;
-    let resolved = {slug: DEFAULT_MONUMENT_SLUG, name: 'Konark Sun Temple'};
-    try {
-      const res = await getSites();
-      if (res.success && res.data.length > 0) {
-        const s = res.data[0];
-        resolved = {slug: s.slug ?? s.id, name: s.name};
-      }
-    } catch {
-      // fall back to the default monument
+  const navigateForStep = useCallback((step: TourStep) => {
+    switch (step.nav.kind) {
+      case 'tab':
+        navigateSafe(ROUTES.MAIN.TABS, {screen: step.nav.tab});
+        break;
+      case 'screen':
+        navigateSafe(step.nav.route, step.nav.params);
+        break;
     }
-    sampleRef.current = resolved;
-    return resolved;
   }, []);
-
-  const navigateForStep = useCallback(
-    async (step: TourStep) => {
-      switch (step.nav.kind) {
-        case 'tab':
-          navigateSafe(ROUTES.MAIN.TABS, {screen: step.nav.tab});
-          break;
-        case 'screen':
-          navigateSafe(step.nav.route, step.nav.params);
-          break;
-        case 'site': {
-          const s = await resolveSample();
-          navigateSafe(ROUTES.MAIN.SITE_DETAIL, {
-            site: {id: s.slug, name: s.name},
-          });
-          break;
-        }
-        case 'detectAr': {
-          const s = await resolveSample();
-          navigateSafe(ROUTES.MAIN.DETECT_AR, {venueSlug: s.slug, tour: true});
-          break;
-        }
-      }
-    },
-    [resolveSample],
-  );
 
   const isOnScreen = useCallback(
     (r: TourRect) =>
@@ -109,46 +81,36 @@ const TourHost: React.FC = () => {
     [insets.top, SCREEN_H],
   );
 
-  // Drive each step: navigate → wait → measure target → reveal.
+  // Drive each step: navigate → wait → measure target → spotlight. The card is
+  // visible with its content and controls the whole time (never a dead frame);
+  // only the spotlight cutout waits for the rect.
   useEffect(() => {
     if (!running) return undefined;
     let cancelled = false;
-    setReady(false);
     setRect(null);
     const step = TOUR_STEPS[stepIndex];
 
     (async () => {
       try {
-        await navigateForStep(step);
-        await delay(step.nav.kind === 'tab' ? 380 : 580);
+        navigateForStep(step);
+        if (!step.targetId) return;
+        await delay(step.nav.kind === 'tab' ? 300 : 450);
         if (cancelled) return;
 
-        if (!step.targetId) {
-          setRect(null);
-          setReady(true);
-          return;
-        }
-        // Poll for the registered rect (screen needs to mount + measure).
-        let found: TourRect | null = null;
-        for (let i = 0; i < 16 && !cancelled; i++) {
+        // Poll for the registered rect (screen needs to mount + measure);
+        // hard cap ~1.2s, after which the step stays a centered card.
+        for (let i = 0; i < 12 && !cancelled; i++) {
           const r = useTourStore.getState().targets[step.targetId];
           if (r && isOnScreen(r)) {
-            found = r;
-            break;
+            if (!cancelled) setRect(r);
+            return;
           }
           await delay(100);
         }
-        if (cancelled) return;
-        setRect(found);
-        setReady(true);
       } catch (e) {
-        // Never let a navigation/measure failure crash the app — fall back to the
-        // centered card so the user can still tap Next/Skip.
+        // Never let a navigation/measure failure crash the app — the centered
+        // card with Next/Skip is already showing.
         if (__DEV__) console.warn('[tour] step failed', e);
-        if (!cancelled) {
-          setRect(null);
-          setReady(true);
-        }
       }
     })();
 
@@ -168,9 +130,12 @@ const TourHost: React.FC = () => {
     return () => sub.remove();
   }, [running, back, skip]);
 
-  // Bouncing arrow cue.
+  // Bouncing arrow cue — only animate while the tour runs. TourHost stays
+  // mounted for the app's whole lifetime, so an unconditional infinite
+  // withRepeat would spin forever in the background.
   const bounce = useSharedValue(0);
   useEffect(() => {
+    if (!running) return undefined;
     bounce.value = withRepeat(
       withSequence(
         withTiming(1, {duration: 620, easing: Easing.inOut(Easing.quad)}),
@@ -179,7 +144,11 @@ const TourHost: React.FC = () => {
       -1,
       false,
     );
-  }, [bounce]);
+    return () => {
+      cancelAnimation(bounce);
+      bounce.value = 0;
+    };
+  }, [running, bounce]);
 
   if (!running) return null;
 
@@ -210,7 +179,7 @@ const TourHost: React.FC = () => {
       <Pressable style={StyleSheet.absoluteFill} onPress={() => {}} />
 
       {/* Dimming: full cover, or a 4-panel cutout that leaves the target bright. */}
-      {ready && rect ? (
+      {rect ? (
         <>
           <View style={[styles.dim, {top: 0, left: 0, right: 0, height: rect.y - 6}]} pointerEvents="none" />
           <View
@@ -246,64 +215,64 @@ const TourHost: React.FC = () => {
         <View style={[StyleSheet.absoluteFill, styles.dim]} pointerEvents="none" />
       )}
 
-      {/* Tooltip / explainer card */}
-      {ready ? (
-        <Animated.View
-          entering={FadeIn.duration(220)}
-          style={[styles.card, {width: cardW, left: 20, ...cardPos}]}
-          pointerEvents="auto">
-          <Text style={styles.stepCount}>
-            {t('tour.progress', {current: stepIndex + 1, total})}
-          </Text>
-          <Text style={styles.title}>{t(step.titleKey)}</Text>
-          <Text style={styles.body}>{t(step.bodyKey)}</Text>
+      {/* Fixed, always-visible escape hatch. */}
+      <Pressable
+        onPress={skip}
+        accessibilityRole="button"
+        accessibilityLabel={t('tour.skip')}
+        hitSlop={8}
+        style={[styles.skipPill, {top: insets.top + 10}]}>
+        <Text style={styles.skipPillLabel}>{t('tour.skip')}</Text>
+      </Pressable>
 
-          {/* progress dots */}
-          <View style={styles.dots}>
-            {TOUR_STEPS.map((s, i) => (
-              <View
-                key={s.id}
-                style={[styles.dot, i === stepIndex && styles.dotActive]}
-              />
-            ))}
-          </View>
+      {/* Tooltip / explainer card — always mounted; slides to the anchored
+          position once the target rect resolves (centered until then). */}
+      <Animated.View
+        entering={FadeIn.duration(220)}
+        layout={LinearTransition.duration(220)}
+        style={[styles.card, {width: cardW, left: 20, ...cardPos}]}
+        pointerEvents="auto">
+        <Text style={styles.stepCount}>
+          {t('tour.progress', {current: stepIndex + 1, total})}
+        </Text>
+        <Text style={styles.title}>{t(step.titleKey)}</Text>
+        <Text style={styles.body}>{t(step.bodyKey)}</Text>
 
-          <View style={styles.row}>
-            {!isFirst ? (
-              <Pressable
-                onPress={back}
-                accessibilityRole="button"
-                accessibilityLabel={t('tour.back')}
-                style={styles.backBtn}>
-                <ArrowLeft color={COLORS.textSecondary} size={18} />
-              </Pressable>
-            ) : (
-              <View style={styles.backBtn} />
-            )}
+        {/* slim progress bar */}
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              {width: `${((stepIndex + 1) / total) * 100}%`},
+            ]}
+          />
+        </View>
 
+        <View style={styles.row}>
+          {!isFirst ? (
             <Pressable
-              onPress={next}
+              onPress={back}
               accessibilityRole="button"
-              accessibilityLabel={isLast ? t('tour.done') : t('tour.next')}
-              style={styles.nextBtn}>
-              <Text style={styles.nextLabel}>
-                {isLast ? t('tour.done') : t('tour.next')}
-              </Text>
-              {!isLast ? <ChevronRight color="#0A0A0C" size={18} /> : null}
+              accessibilityLabel={t('tour.back')}
+              style={styles.backBtn}>
+              <ArrowLeft color={COLORS.textSecondary} size={18} />
             </Pressable>
-          </View>
+          ) : (
+            <View style={styles.backBtn} />
+          )}
 
-          {!isLast ? (
-            <Pressable
-              onPress={skip}
-              accessibilityRole="button"
-              hitSlop={8}
-              style={styles.skip}>
-              <Text style={styles.skipLabel}>{t('tour.skip')}</Text>
-            </Pressable>
-          ) : null}
-        </Animated.View>
-      ) : null}
+          <Pressable
+            onPress={next}
+            accessibilityRole="button"
+            accessibilityLabel={isLast ? t('tour.done') : t('tour.next')}
+            style={styles.nextBtn}>
+            <Text style={styles.nextLabel}>
+              {isLast ? t('tour.done') : t('tour.next')}
+            </Text>
+            {!isLast ? <ChevronRight color="#0A0A0C" size={18} /> : null}
+          </Pressable>
+        </View>
+      </Animated.View>
     </View>
   );
 };
@@ -390,21 +359,35 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 8,
   },
-  dots: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 5,
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
     marginTop: 16,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  dotActive: {
+  progressFill: {
+    height: 4,
+    borderRadius: 2,
     backgroundColor: COLORS.gold,
-    width: 18,
+  },
+  skipPill: {
+    position: 'absolute',
+    right: 16,
+    height: 38,
+    paddingHorizontal: 16,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(20,20,20,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(203,168,98,0.5)',
+    zIndex: 2,
+  },
+  skipPillLabel: {
+    fontFamily: FONTS.uiSemiBold,
+    fontSize: 13,
+    color: '#F5F0E8',
   },
   row: {
     flexDirection: 'row',
@@ -433,16 +416,6 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.uiSemiBold,
     fontSize: 15,
     color: '#0A0A0C',
-  },
-  skip: {
-    alignSelf: 'center',
-    marginTop: 12,
-    paddingVertical: 4,
-  },
-  skipLabel: {
-    fontFamily: FONTS.ui,
-    fontSize: 13,
-    color: COLORS.textTertiary,
   },
 });
 

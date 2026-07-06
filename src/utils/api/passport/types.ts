@@ -4,13 +4,18 @@ export interface PassportSummary {
   streak_days: number;
   sites_visited: number;
   sites_goal: number;
-  dynasties_count: number;
+  /**
+   * Distinct dynasties across visited monuments. Absent in the offline/derived
+   * fallback (visit history carries no dynasty data), present from the server.
+   */
+  dynasties_count?: number;
   active_passes: ExplorerPass[];
 
   /**
-   * Server-authoritative gamification (all optional). When the backend ships
-   * these, the UI uses them verbatim; until then the client derives equivalents
-   * from the counters above via `src/shared/utils/achievements.ts`.
+   * Server-authoritative gamification, served by GET /api/v1/passport/summary
+   * (apis/passport on the Go backend). All optional so the offline/derived
+   * fallback can omit them; the UI then derives display equivalents from the
+   * counters above via `src/shared/utils/achievements.ts`.
    */
   /** Total lifetime XP. */
   xp?: number;

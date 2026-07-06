@@ -166,6 +166,13 @@ const GLBViewer: React.FC<GLBViewerProps> = ({
           <GLBSceneErrorBoundary
             onError={(err) => {
               setFailed(true);
+              // Evict R3F's cached rejected promise for this URL. Otherwise a
+              // single transient network failure is cached and every later
+              // open of ANY 3D view for this model re-throws instantly for the
+              // rest of the app session.
+              try {
+                useLoader.clear(GLTFLoader, url);
+              } catch {}
               onError?.(err);
             }}
           >
@@ -183,6 +190,9 @@ const GLBViewer: React.FC<GLBViewerProps> = ({
         <LoadingFallback
           onTimeout={() => {
             setFailed(true);
+            try {
+              useLoader.clear(GLTFLoader, url);
+            } catch {}
             const err = new Error('GLB viewer timed out');
             console.log('[GLBViewer] error', err.message);
             onError?.(err);

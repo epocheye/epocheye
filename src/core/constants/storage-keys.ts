@@ -81,6 +81,14 @@ export const STORAGE_KEYS = {
     ANON_ID: `${STORAGE_PREFIX}/analytics_anon_id`,
     QUEUE: `${STORAGE_PREFIX}/analytics_queue`,
   },
+
+  /**
+   * Crash / stability diagnostics keys (see src/services/crashJournal.ts)
+   */
+  DIAGNOSTICS: {
+    CRASH_JOURNAL: `${STORAGE_PREFIX}/crash_journal`,
+    CRASH_BREADCRUMB: `${STORAGE_PREFIX}/crash_breadcrumb`,
+  },
 } as const;
 
 /**
@@ -94,4 +102,5 @@ export type StorageKey =
   | (typeof STORAGE_KEYS.CACHE)[keyof typeof STORAGE_KEYS.CACHE]
   | (typeof STORAGE_KEYS.TOURS)[keyof typeof STORAGE_KEYS.TOURS]
   | (typeof STORAGE_KEYS.LENS)[keyof typeof STORAGE_KEYS.LENS]
-  | (typeof STORAGE_KEYS.ANALYTICS)[keyof typeof STORAGE_KEYS.ANALYTICS];
+  | (typeof STORAGE_KEYS.ANALYTICS)[keyof typeof STORAGE_KEYS.ANALYTICS]
+  | (typeof STORAGE_KEYS.DIAGNOSTICS)[keyof typeof STORAGE_KEYS.DIAGNOSTICS];

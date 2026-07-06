@@ -1,13 +1,14 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StatusBar,
   Text,
   TextInput,
   View,
 } from 'react-native';
+// Edge-to-edge-aware KAV; the core one was a no-op on Android here
+// (behavior undefined) so the Continue button hid behind the keyboard.
+import {KeyboardAvoidingView} from 'react-native-keyboard-controller';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -69,9 +70,7 @@ const OB02_Name: React.FC<Props> = ({navigation}) => {
         backgroundColor="transparent"
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        className="flex-1">
+      <KeyboardAvoidingView behavior="padding" className="flex-1">
         <View
           className="flex-1 px-[28px]"
           style={{paddingTop: insets.top + 80}}>

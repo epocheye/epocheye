@@ -38,6 +38,8 @@ export const ROUTES = {
     DETECT_AR: 'DetectAr',
     GO_TO_VENUE: 'GoToVenue',
     SUGGEST_SITE: 'SuggestSite',
+    /** Dev-build-only workflow health-check board (not registered in release). */
+    DEV_HEALTH: 'DevHealth',
   },
 
   /**

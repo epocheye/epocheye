@@ -33,7 +33,13 @@ const TabNavigation: React.FC<TabNavigationProps> = ({onLogout}) => {
         tabBarHideOnKeyboard: true,
         sceneStyle: {backgroundColor: '#0A0A0C'},
       }}>
-      <Tab.Screen name={ROUTES.TABS.HOME} component={Home} />
+      {/* Home hosts the Google MapView — never freeze it (see MainNavigation:
+          freezing a Fabric map crashes react-native-maps on unfreeze). */}
+      <Tab.Screen
+        name={ROUTES.TABS.HOME}
+        component={Home}
+        options={{freezeOnBlur: false}}
+      />
       <Tab.Screen name={ROUTES.TABS.PASSPORT} component={Passport} />
       <Tab.Screen name={ROUTES.TABS.DAILY} component={Daily} />
       <Tab.Screen name={ROUTES.TABS.ACCOUNT}>

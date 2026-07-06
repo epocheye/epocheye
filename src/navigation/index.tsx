@@ -14,7 +14,10 @@ import { OnboardingCallbackProvider } from '../context/OnboardingCallbackContext
 import { useSessionStore } from '../stores/sessionStore';
 import { useUserStore } from '../stores/userStore';
 import { usePlacesStore } from '../stores/placesStore';
+import { useCurrentZoneStore } from '../stores/currentZoneStore';
+import { useNotificationsStore } from '../stores/notificationsStore';
 import { analytics } from '../services/analytics';
+import { recordNavBreadcrumb } from '../services/crashJournal';
 
 type AppState = 'loading' | 'onboarding' | 'login' | 'main';
 
@@ -59,7 +62,10 @@ const AppNavigator: React.FC = () => {
     const current = navigationRef.getCurrentRoute()?.name;
     routeNameRef.current = current;
     analytics.setScreen(current);
-    if (current) analytics.track('screen_view', { screen: current });
+    if (current) {
+      analytics.track('screen_view', { screen: current });
+      recordNavBreadcrumb(current);
+    }
   }, []);
 
   const handleNavStateChange = useCallback(() => {
@@ -69,12 +75,17 @@ const AppNavigator: React.FC = () => {
       routeNameRef.current = current;
       analytics.setScreen(current);
       analytics.track('screen_view', { screen: current, prev: previous });
+      recordNavBreadcrumb(current);
     }
   }, []);
 
   const clearAuthenticatedState = useCallback(() => {
     useUserStore.getState().clearUserData();
     usePlacesStore.getState().clearPlacesData();
+    // Also drop venue + notification state, else the next user who logs in sees
+    // the previous user's stale venue banner / unread badge.
+    useCurrentZoneStore.getState().reset();
+    useNotificationsStore.getState().reset();
   }, []);
 
   const checkAppState = useCallback(async () => {

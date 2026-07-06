@@ -1,10 +1,11 @@
 /**
  * Fetches the user's collected stamps + nearby locked sites for the Passport tab.
  *
- * Primary source: GET /api/v1/passport/stamps (not yet implemented). When that
- * fails, the hook falls back to deriving stamps client-side from
- * /api/v1/visits/history. `lockedSites` stays empty until the backend ships
- * a way to suggest nearby unvisited sites.
+ * Primary source: GET /api/v1/passport/stamps — server-authoritative
+ * (apis/passport: visits joined to curated monuments; locked = saved-but-
+ * unvisited curated places). Only when that call fails (offline / backend
+ * down) does the hook fall back to deriving stamps client-side from
+ * /api/v1/visits/history; the fallback has no `lockedSites` data.
  */
 
 import {useCallback, useEffect, useState} from 'react';
