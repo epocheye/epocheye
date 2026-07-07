@@ -2,7 +2,12 @@
  * Theme Constants
  * Centralized design tokens for the EpochEye app.
  * All onboarding and auth screens pull from these values.
+ *
+ * Numeric size tokens (SPACING, RADIUS, FONT_SIZES) are routed through
+ * `moderateScale` so every screen that consumes them shrinks/grows
+ * proportionally with the device (see src/utils/scaling.ts).
  */
+import { moderateScale } from '../../utils/scaling';
 
 export const FONTS = {
   light: 'MontserratAlternates-Light',
@@ -102,35 +107,35 @@ export const COLORS = {
 } as const;
 
 export const SPACING = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  xxxl: 32,
-  section: 40,
-  screen: 48,
+  xs: moderateScale(4),
+  sm: moderateScale(8),
+  md: moderateScale(12),
+  lg: moderateScale(16),
+  xl: moderateScale(20),
+  xxl: moderateScale(24),
+  xxxl: moderateScale(32),
+  section: moderateScale(40),
+  screen: moderateScale(48),
 } as const;
 
 export const RADIUS = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  pill: 40,
+  sm: moderateScale(8),
+  md: moderateScale(12),
+  lg: moderateScale(16),
+  xl: moderateScale(20),
+  pill: moderateScale(40),
 } as const;
 
 export const FONT_SIZES = {
-  caption: 12,
-  small: 13,
-  body: 15,
-  button: 16,
-  subtitle: 18,
-  title: 22,
-  heading: 28,
-  hero: 34,
-  display: 40,
+  caption: moderateScale(12),
+  small: moderateScale(13),
+  body: moderateScale(15),
+  button: moderateScale(16),
+  subtitle: moderateScale(18),
+  title: moderateScale(22),
+  heading: moderateScale(28),
+  hero: moderateScale(34),
+  display: moderateScale(40),
 } as const;
 
 /**

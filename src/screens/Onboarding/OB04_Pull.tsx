@@ -18,6 +18,7 @@ import Animated, {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {COLORS, FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
+import {moderateScale} from '../../utils/scaling';
 import {useOnboardingStore} from '../../stores/onboardingStore';
 import {
   HERITAGE_INTERESTS,
@@ -101,8 +102,8 @@ const OB04_Pull: React.FC<Props> = ({navigation}) => {
         showsVerticalScrollIndicator={false}>
         <Animated.View style={sHead}>
           <Text
-            className="text-[22px] text-[rgba(255,255,255,0.78)] leading-[30px]"
-            style={{fontFamily: FONTS.display}}>
+            className="text-[rgba(255,255,255,0.78)]"
+            style={{fontFamily: FONTS.display, fontSize: moderateScale(22), lineHeight: moderateScale(30)}}>
             So,{' '}
             <Text className="text-brand-lime" style={{fontFamily: FONTS.display}}>
               {greetingName}
@@ -110,8 +111,8 @@ const OB04_Pull: React.FC<Props> = ({navigation}) => {
             ...
           </Text>
           <Text
-            className="text-[30px] text-parchment leading-[38px] mt-3"
-            style={{fontFamily: FONTS.display}}>
+            className="text-parchment mt-3"
+            style={{fontFamily: FONTS.display, fontSize: moderateScale(30), lineHeight: moderateScale(38)}}>
             What pulls you in??
           </Text>
         </Animated.View>
@@ -134,8 +135,8 @@ const OB04_Pull: React.FC<Props> = ({navigation}) => {
                 accessibilityLabel={entry.label}
                 accessibilityState={{selected}}>
                 <View
-                  className={`overflow-hidden rounded-[10px] border-2 ${selected ? 'border-brand-sky' : 'border-transparent'}`}
-                  style={{width: tileWidth, height: TILE_IMAGE_HEIGHT}}>
+                  className={`overflow-hidden border-2 ${selected ? 'border-brand-sky' : 'border-transparent'}`}
+                  style={{width: tileWidth, height: moderateScale(TILE_IMAGE_HEIGHT), borderRadius: moderateScale(10)}}>
                   <Image
                     source={entry.image}
                     className="w-full h-full"
@@ -146,8 +147,13 @@ const OB04_Pull: React.FC<Props> = ({navigation}) => {
                   ) : null}
                 </View>
                 <Text
-                  className={`mt-2 min-h-[20px] text-[14px] leading-[18px] ${selected ? 'text-parchment' : 'text-[rgba(255,255,255,0.82)]'}`}
-                  style={{fontFamily: FONTS.medium}}
+                  className={`mt-2 ${selected ? 'text-parchment' : 'text-[rgba(255,255,255,0.82)]'}`}
+                  style={{
+                    fontFamily: FONTS.medium,
+                    minHeight: moderateScale(20),
+                    fontSize: moderateScale(14),
+                    lineHeight: moderateScale(18),
+                  }}
                   numberOfLines={1}>
                   {entry.label}
                 </Text>
@@ -171,7 +177,9 @@ const OB04_Pull: React.FC<Props> = ({navigation}) => {
           }
           accessibilityRole="button"
           accessibilityLabel="Continue">
-          <Text className="font-ui-medium text-[17px] text-ink tracking-[0.3px]">
+          <Text
+            className="font-ui-medium text-ink tracking-[0.3px]"
+            style={{fontSize: moderateScale(17)}}>
             Continue
           </Text>
         </Pressable>

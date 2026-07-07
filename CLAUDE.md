@@ -108,16 +108,15 @@ The `useUser()` and `usePlaces()` hooks in `src/context/index.ts` delegate direc
 
 ### Onboarding Flow (`src/navigation/OnboardingNavigator.tsx`)
 
-8-screen flow, no headers:
+Flow, no headers (OB02_Name removed — the first-name prompt is no longer collected):
 
 ```
-OB00_Splash → OB01_Welcome → OB02_Name → OB03_Region → OB04_Pull
-→ OB10_SignUp (or OB10_Login branch) → OB11_Notifications → OB12_Arrival
+OB00_Splash → OB01_Welcome → OB03_Region → OB04_Pull
+→ OB10_SignUp (or OB10_Login branch) → OB11_Notifications (final)
 ```
 
-- OB12 has `gestureEnabled: false`
 - OB10 has two variants: `SignupScreen` (default, `fromOnboarding: true`) and `OB10_Login`
-- `OB12_Arrival` calls `completeOnboarding()` on the Zustand store and `onOnboardingComplete()` from `OnboardingCallbackContext` to transition to `main`
+- `OB11_Notifications` is the final screen — it calls `completeOnboarding()` on the Zustand store and `onOnboardingComplete()` from `OnboardingCallbackContext` to transition to `main`
 
 **Onboarding store** tracks: `firstName`, `region`, `pulls`, `onboardingComplete`. `completeOnboarding()` also writes `STORAGE_KEYS.ONBOARDING.COMPLETED = 'true'` to AsyncStorage.
 

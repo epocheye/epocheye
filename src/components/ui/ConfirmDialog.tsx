@@ -189,12 +189,12 @@ const styles = StyleSheet.create({
     color: '#0A0A0A',
   },
   btnCancel: {
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: 'rgba(255,255,255,0.28)',
   },
   btnCancelText: {
-    color: 'rgba(255,255,255,0.78)',
+    color: '#F5F0E8',
   },
   btnDestructive: {
     backgroundColor: 'rgba(239,68,68,0.14)',

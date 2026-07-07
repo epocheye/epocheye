@@ -63,6 +63,7 @@ import { formatRelativeTime } from '../../shared/utils';
 import { COLORS, FONTS, SKY_GRADIENT } from '../../core/constants/theme';
 import StreakFlame from '../../components/ui/StreakFlame';
 import LevelBadge from '../../components/ui/LevelBadge';
+import { moderateScale } from '../../utils/scaling';
 
 type RNFile = { uri: string; type: string; name: string };
 
@@ -320,7 +321,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
         >
           {/* ── Header ── */}
           <View className="px-6 pt-3">
-            <Text style={{ fontFamily: FONTS.display }} className="text-[28px] text-foreground tracking-tight">
+            <Text style={{ fontFamily: FONTS.display, fontSize: moderateScale(28) }} className="text-foreground tracking-tight">
               {t('settings.account')}
             </Text>
           </View>
@@ -344,7 +345,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               ).map(stat => (
                 <View
                   key={stat.label}
-                  className="flex-1 py-[14px] px-[10px] rounded-[14px] bg-white/[0.04] border border-[rgba(203,168,98,0.18)] items-center"
+                  className="flex-1 bg-white/[0.04] border border-[rgba(203,168,98,0.18)] items-center"
+                  style={{
+                    paddingVertical: moderateScale(14),
+                    paddingHorizontal: moderateScale(10),
+                    borderRadius: moderateScale(14),
+                  }}
                 >
                   <Text
                     style={{

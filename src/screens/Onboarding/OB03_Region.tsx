@@ -18,6 +18,7 @@ import Animated, {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {COLORS, FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
+import {moderateScale} from '../../utils/scaling';
 import {useOnboardingStore} from '../../stores/onboardingStore';
 import {
   UNESCO_REGIONS,
@@ -95,8 +96,8 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
         showsVerticalScrollIndicator={false}>
         <Animated.View style={sHead}>
           <Text
-            className="text-[22px] text-[rgba(255,255,255,0.78)] leading-[30px]"
-            style={{fontFamily: FONTS.display}}>
+            className="text-[rgba(255,255,255,0.78)]"
+            style={{fontFamily: FONTS.display, fontSize: moderateScale(22), lineHeight: moderateScale(30)}}>
             So,{' '}
             <Text className="text-brand-lime" style={{fontFamily: FONTS.display}}>
               {greetingName}
@@ -104,8 +105,8 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
             it is..
           </Text>
           <Text
-            className="text-[30px] text-parchment leading-[38px] mt-3"
-            style={{fontFamily: FONTS.display}}>
+            className="text-parchment mt-3"
+            style={{fontFamily: FONTS.display, fontSize: moderateScale(30), lineHeight: moderateScale(38)}}>
             Where does your{'\n'}Heritage belong to?
           </Text>
         </Animated.View>
@@ -128,8 +129,8 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
                 accessibilityLabel={entry.label}
                 accessibilityState={{selected}}>
                 <View
-                  className={`h-[114px] rounded-[10px] overflow-hidden border-2 ${selected ? 'border-brand-sky' : 'border-transparent'}`}
-                  style={{width: tileWidth}}>
+                  className={`overflow-hidden border-2 ${selected ? 'border-brand-sky' : 'border-transparent'}`}
+                  style={{width: tileWidth, height: moderateScale(114), borderRadius: moderateScale(10)}}>
                   <Image
                     source={entry.image}
                     className="w-full h-full"
@@ -140,8 +141,13 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
                   ) : null}
                 </View>
                 <Text
-                  className={`mt-2 min-h-[36px] text-[14px] leading-[18px] ${selected ? 'text-parchment' : 'text-[rgba(255,255,255,0.82)]'}`}
-                  style={{fontFamily: FONTS.medium}}
+                  className={`mt-2 ${selected ? 'text-parchment' : 'text-[rgba(255,255,255,0.82)]'}`}
+                  style={{
+                    fontFamily: FONTS.medium,
+                    minHeight: moderateScale(36),
+                    fontSize: moderateScale(14),
+                    lineHeight: moderateScale(18),
+                  }}
                   numberOfLines={2}>
                   {entry.label}
                 </Text>
@@ -165,7 +171,9 @@ const OB03_Region: React.FC<Props> = ({navigation}) => {
           }
           accessibilityRole="button"
           accessibilityLabel="Continue">
-          <Text className="font-ui-medium text-[17px] text-parchment tracking-[0.3px]">
+          <Text
+            className="font-ui-medium text-parchment tracking-[0.3px]"
+            style={{fontSize: moderateScale(17)}}>
             Continue
           </Text>
         </Pressable>

@@ -89,6 +89,14 @@ export const STORAGE_KEYS = {
     CRASH_JOURNAL: `${STORAGE_PREFIX}/crash_journal`,
     CRASH_BREADCRUMB: `${STORAGE_PREFIX}/crash_breadcrumb`,
   },
+
+  /**
+   * App-update / version-gate keys (see src/utils/api/appConfig)
+   */
+  UPDATE: {
+    /** latest_version the user dismissed the soft "update available" nudge for. */
+    OPTIONAL_DISMISSED_VERSION: `${STORAGE_PREFIX}/update_optional_dismissed_version`,
+  },
 } as const;
 
 /**
@@ -103,4 +111,5 @@ export type StorageKey =
   | (typeof STORAGE_KEYS.TOURS)[keyof typeof STORAGE_KEYS.TOURS]
   | (typeof STORAGE_KEYS.LENS)[keyof typeof STORAGE_KEYS.LENS]
   | (typeof STORAGE_KEYS.ANALYTICS)[keyof typeof STORAGE_KEYS.ANALYTICS]
-  | (typeof STORAGE_KEYS.DIAGNOSTICS)[keyof typeof STORAGE_KEYS.DIAGNOSTICS];
+  | (typeof STORAGE_KEYS.DIAGNOSTICS)[keyof typeof STORAGE_KEYS.DIAGNOSTICS]
+  | (typeof STORAGE_KEYS.UPDATE)[keyof typeof STORAGE_KEYS.UPDATE];

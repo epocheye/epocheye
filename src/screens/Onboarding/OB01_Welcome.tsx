@@ -11,6 +11,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {COLORS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
+import {moderateScale} from '../../utils/scaling';
 import type {OnboardingScreenProps} from '../../core/types/navigation.types';
 
 type Props = OnboardingScreenProps<'OB01_Welcome'>;
@@ -46,7 +47,7 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
   }));
 
   const onGetStarted = () => {
-    navigation.navigate(ROUTES.ONBOARDING.OB02_NAME);
+    navigation.navigate(ROUTES.ONBOARDING.OB03_REGION);
   };
 
   return (
@@ -78,10 +79,18 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
 
       <View className="flex-1 px-[28px] items-center justify-end pt-2">
         <Animated.View className="items-center mb-7" style={sHeadline}>
-          <Text className="font-handwritten text-[44px] text-parchment leading-[52px]">
+          <Text
+            className="font-handwritten text-parchment"
+            style={{fontSize: moderateScale(44), lineHeight: moderateScale(52)}}>
             It's time to
           </Text>
-          <Text className="font-handwritten text-[60px] text-brand-lime leading-[68px] -mt-[6px]">
+          <Text
+            className="font-handwritten text-brand-lime"
+            style={{
+              fontSize: moderateScale(60),
+              lineHeight: moderateScale(68),
+              marginTop: -moderateScale(6),
+            }}>
             Experience
           </Text>
         </Animated.View>
@@ -97,7 +106,9 @@ const OB01_Welcome: React.FC<Props> = ({navigation}) => {
             }
             accessibilityRole="button"
             accessibilityLabel="Get Started">
-            <Text className="font-ui-medium text-[17px] text-ink tracking-[0.3px]">
+            <Text
+              className="font-ui-medium text-ink tracking-[0.3px]"
+              style={{fontSize: moderateScale(17)}}>
               Get Started
             </Text>
           </Pressable>

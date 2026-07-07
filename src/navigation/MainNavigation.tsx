@@ -14,6 +14,7 @@ import GoToVenueScreen from '../screens/Main/GoToVenueScreen';
 import SuggestSiteScreen from '../screens/Main/SuggestSiteScreen';
 import VenueActivationBanner from '../components/VenueActivationBanner';
 import DailyNudgeBanner from '../components/DailyNudgeBanner';
+import UpdateAvailableBanner from '../components/UpdateAvailableBanner';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
 
@@ -154,6 +155,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
     </Stack.Navigator>
     <VenueActivationBanner />
     <DailyNudgeBanner />
+    <UpdateAvailableBanner />
     </>
   );
 };

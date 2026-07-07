@@ -23,6 +23,7 @@ import { login, signup } from '../../utils/api/auth';
 import { googleSignIn } from '../../utils/api/auth/GoogleAuth';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { COLORS } from '../../core/constants/theme';
+import { moderateScale } from '../../utils/scaling';
 import { useOnboardingStore } from '../../stores/onboardingStore';
 import { track } from '../../services/analytics';
 import type { OnboardingScreenProps } from '../../core/types/navigation.types';
@@ -243,7 +244,9 @@ const SignupScreen: React.FC<Props> = ({ navigation, route }) => {
               source={require('../../assets/images/logo-white.png')}
               className="size-20 my-5"
             />
-            <Text className="font-ui text-[18px] text-parchment-muted">
+            <Text
+              className="font-ui text-parchment-muted"
+              style={{ fontSize: moderateScale(18) }}>
               {headingText}
             </Text>
             {fromOnboarding && (

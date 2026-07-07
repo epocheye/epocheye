@@ -10,7 +10,13 @@ import { ROUTES, STORAGE_KEYS } from '../core/constants';
 import type { LinkingOptions } from '@react-navigation/native';
 import type { MainStackParamList } from '../core/types/navigation.types';
 import AnimatedLogo from '../components/ui/AnimatedLogo';
+import UpdateRequiredScreen from '../screens/System/UpdateRequiredScreen';
 import { OnboardingCallbackProvider } from '../context/OnboardingCallbackContext';
+import {
+  resolveUpdateStatus,
+  type AppConfig,
+} from '../utils/api/appConfig';
+import { maybeShowOptionalUpdate } from '../stores/updateStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useUserStore } from '../stores/userStore';
 import { usePlacesStore } from '../stores/placesStore';
@@ -35,6 +41,8 @@ const linking: LinkingOptions<MainStackParamList> = {
 
 const AppNavigator: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('loading');
+  // Hard version gate — non-null blocks the whole app with UpdateRequiredScreen.
+  const [updateGate, setUpdateGate] = useState<AppConfig | null>(null);
   const bootstrapSession = useSessionStore(state => state.bootstrapSession);
   const setSessionAuthenticated = useSessionStore(
     state => state.setAuthenticated,
@@ -47,6 +55,19 @@ const AppNavigator: React.FC = () => {
 
   useEffect(() => {
     void analytics.init();
+  }, []);
+
+  // Version gate: resolve once on launch. FAIL-OPEN — resolveUpdateStatus only
+  // returns 'required'/'optional' on a successful fetch, so a backend outage or
+  // offline start leaves the app fully usable.
+  useEffect(() => {
+    void resolveUpdateStatus().then(status => {
+      if (status.state === 'required') {
+        setUpdateGate(status.config);
+      } else if (status.state === 'optional') {
+        void maybeShowOptionalUpdate(status.config);
+      }
+    });
   }, []);
 
   // The login screen renders outside the NavigationContainer, so capture its
@@ -148,6 +169,12 @@ const AppNavigator: React.FC = () => {
     void useUserStore.getState().ensureUserDataLoaded();
     setAppState('main');
   }, [setSessionAuthenticated]);
+
+  // Hard gate wins over every other state, including loading — once the server
+  // says this build is unsupported, nothing else is reachable until they update.
+  if (updateGate) {
+    return <UpdateRequiredScreen config={updateGate} />;
+  }
 
   if (appState === 'loading') {
     return (

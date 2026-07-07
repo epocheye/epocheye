@@ -1,7 +1,12 @@
 /**
  * Typography Tokens
  * Font families, sizes, and line heights
+ *
+ * `FontSize` is routed through `moderateScale` so type shrinks/grows with the
+ * device. `TextStyles` reads `FontSize.*`, so it inherits the scaling for free.
+ * `LineHeight` stays unscaled — those are ratio multipliers, not pixels.
  */
+import { moderateScale } from '../../utils/scaling';
 
 /**
  * Font family variants
@@ -31,17 +36,17 @@ export const FontFamily = {
  * Font size scale
  */
 export const FontSize = {
-  '2xs': 10,
-  xs: 12,
-  sm: 14,
-  base: 16,
-  lg: 18,
-  xl: 20,
-  '2xl': 24,
-  '3xl': 30,
-  '4xl': 36,
-  '5xl': 48,
-  '6xl': 60,
+  '2xs': moderateScale(10),
+  xs: moderateScale(12),
+  sm: moderateScale(14),
+  base: moderateScale(16),
+  lg: moderateScale(18),
+  xl: moderateScale(20),
+  '2xl': moderateScale(24),
+  '3xl': moderateScale(30),
+  '4xl': moderateScale(36),
+  '5xl': moderateScale(48),
+  '6xl': moderateScale(60),
 } as const;
 
 /**

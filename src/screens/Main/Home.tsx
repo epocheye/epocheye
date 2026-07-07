@@ -24,6 +24,7 @@ import {ROUTES} from '../../core/constants/routes';
 import {usePlaces} from '../../context';
 import {PermissionService} from '../../shared/services/permission.service';
 import {resolveSiteImageSource} from '../../shared/utils/localSiteImages';
+import {moderateScale} from '../../utils/scaling';
 import {getSites, searchPlaces, type SiteDetail} from '../../utils/api/places';
 import {useNotificationsStore} from '../../stores/notificationsStore';
 import {reverseGeocode, reverseGeocodeLabel} from '../../utils/api/geo';
@@ -980,10 +981,10 @@ const Home: React.FC<Props> = ({navigation}) => {
           place shows the calm "not available here" card. */}
       {activePlace && activeSupportedSite ? (
         <View
-          className="absolute left-4 right-4 flex-row bg-white rounded-[14px] overflow-hidden"
-          style={[styles.cardShadow, {bottom: insets.bottom + 88}]}
+          className="absolute left-4 right-4 flex-row bg-white overflow-hidden"
+          style={[styles.cardShadow, {bottom: insets.bottom + 88, borderRadius: moderateScale(14)}]}
           accessibilityRole="summary">
-          <View className="w-[132px] h-[132px] bg-[#222]">
+          <View className="bg-[#222]" style={{width: moderateScale(132), height: moderateScale(132)}}>
             {supportedImageSource ? (
               <Image
                 source={supportedImageSource}
@@ -994,7 +995,7 @@ const Home: React.FC<Props> = ({navigation}) => {
               <View className="flex-1 bg-[rgba(203,168,98,0.22)]" />
             )}
           </View>
-          <View className="flex-1 py-[10px] px-3">
+          <View className="flex-1 px-3" style={{paddingVertical: moderateScale(10)}}>
             <Text
               style={{fontFamily: FONTS.uiSemiBold, fontSize: 11, color: COLORS.goldDeep, letterSpacing: 0.6, textTransform: 'uppercase'}}
               numberOfLines={1}>
@@ -1019,8 +1020,11 @@ const Home: React.FC<Props> = ({navigation}) => {
             <View className="mt-2 flex-row gap-x-[6px]">
               <Pressable
                 onPress={() => handleViewSupported(activeSupportedSite)}
-                style={({pressed}) => (pressed ? {opacity: 0.85} : undefined)}
-                className="px-[14px] py-[6px] rounded-full bg-[#111111]"
+                style={({pressed}) => [
+                  {paddingHorizontal: moderateScale(14), paddingVertical: moderateScale(6)},
+                  pressed ? {opacity: 0.85} : undefined,
+                ]}
+                className="rounded-full bg-[#111111]"
                 accessibilityRole="button"
                 accessibilityLabel={t('home.viewDetailsFor', {
                   name: activeSupportedSite.name,

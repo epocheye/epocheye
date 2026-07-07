@@ -41,6 +41,7 @@ import {ChevronDown, ChevronUp, ChevronRight, ArrowLeft} from 'lucide-react-nati
 import {useTranslation} from 'react-i18next';
 
 import {COLORS, FONTS} from '../../core/constants/theme';
+import {moderateScale} from '../../utils/scaling';
 import {ROUTES} from '../../core/constants';
 import {navigateSafe} from '../../navigation/navigationRef';
 import {useTourStore, type TourRect} from '../../stores/tourStore';
@@ -313,7 +314,7 @@ const styles = StyleSheet.create({
   },
   ring: {
     position: 'absolute',
-    borderRadius: 16,
+    borderRadius: moderateScale(16),
     borderWidth: 2,
     borderColor: COLORS.gold,
   },
@@ -326,13 +327,13 @@ const styles = StyleSheet.create({
   },
   card: {
     position: 'absolute',
-    borderRadius: 20,
+    borderRadius: moderateScale(20),
     backgroundColor: '#141414',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 16,
+    paddingHorizontal: moderateScale(20),
+    paddingTop: moderateScale(18),
+    paddingBottom: moderateScale(16),
     shadowColor: COLORS.gold,
     shadowOpacity: 0.18,
     shadowRadius: 24,
@@ -340,22 +341,22 @@ const styles = StyleSheet.create({
   },
   stepCount: {
     fontFamily: FONTS.uiSemiBold,
-    fontSize: 11,
+    fontSize: moderateScale(11),
     letterSpacing: 1.4,
     color: COLORS.gold,
     textTransform: 'uppercase',
   },
   title: {
     fontFamily: FONTS.display,
-    fontSize: 21,
-    lineHeight: 26,
+    fontSize: moderateScale(21),
+    lineHeight: moderateScale(26),
     color: COLORS.textPrimary,
     marginTop: 6,
   },
   body: {
     fontFamily: FONTS.ui,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: moderateScale(14),
+    lineHeight: moderateScale(21),
     color: COLORS.textSecondary,
     marginTop: 8,
   },
@@ -374,9 +375,9 @@ const styles = StyleSheet.create({
   skipPill: {
     position: 'absolute',
     right: 16,
-    height: 38,
-    paddingHorizontal: 16,
-    borderRadius: 19,
+    height: moderateScale(38),
+    paddingHorizontal: moderateScale(16),
+    borderRadius: moderateScale(19),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(20,20,20,0.92)',
@@ -386,7 +387,7 @@ const styles = StyleSheet.create({
   },
   skipPillLabel: {
     fontFamily: FONTS.uiSemiBold,
-    fontSize: 13,
+    fontSize: moderateScale(13),
     color: '#F5F0E8',
   },
   row: {
@@ -396,9 +397,9 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: moderateScale(22),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.06)',
@@ -407,14 +408,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 22,
-    height: 44,
-    borderRadius: 22,
+    paddingHorizontal: moderateScale(22),
+    height: moderateScale(44),
+    borderRadius: moderateScale(22),
     backgroundColor: COLORS.gold,
   },
   nextLabel: {
     fontFamily: FONTS.uiSemiBold,
-    fontSize: 15,
+    fontSize: moderateScale(15),
     color: '#0A0A0C',
   },
 });

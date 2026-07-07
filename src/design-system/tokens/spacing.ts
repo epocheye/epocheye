@@ -1,7 +1,13 @@
 /**
  * Spacing Tokens
  * Spacing scale, border radius, and layout values
+ *
+ * Numeric leaves are routed through `moderateScale` so spacing/radii/layout
+ * dimensions shrink or grow with the device (see src/utils/scaling.ts).
+ * `SpacingSemantic` and `Layout.screenPadding` read `Spacing.*`, so they
+ * inherit the scaling for free.
  */
+import { moderateScale } from '../../utils/scaling';
 
 /**
  * Spacing scale (in pixels)
@@ -9,27 +15,27 @@
  */
 export const Spacing = {
   '0': 0,
-  '0.5': 2,
-  '1': 4,
-  '1.5': 6,
-  '2': 8,
-  '2.5': 10,
-  '3': 12,
-  '4': 16,
-  '5': 20,
-  '6': 24,
-  '7': 28,
-  '8': 32,
-  '9': 36,
-  '10': 40,
-  '11': 44,
-  '12': 48,
-  '14': 56,
-  '16': 64,
-  '20': 80,
-  '24': 96,
-  '28': 112,
-  '32': 128,
+  '0.5': moderateScale(2),
+  '1': moderateScale(4),
+  '1.5': moderateScale(6),
+  '2': moderateScale(8),
+  '2.5': moderateScale(10),
+  '3': moderateScale(12),
+  '4': moderateScale(16),
+  '5': moderateScale(20),
+  '6': moderateScale(24),
+  '7': moderateScale(28),
+  '8': moderateScale(32),
+  '9': moderateScale(36),
+  '10': moderateScale(40),
+  '11': moderateScale(44),
+  '12': moderateScale(48),
+  '14': moderateScale(56),
+  '16': moderateScale(64),
+  '20': moderateScale(80),
+  '24': moderateScale(96),
+  '28': moderateScale(112),
+  '32': moderateScale(128),
 } as const;
 
 /**
@@ -51,12 +57,12 @@ export const SpacingSemantic = {
  */
 export const BorderRadius = {
   none: 0,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  '2xl': 24,
-  '3xl': 32,
+  sm: moderateScale(8),
+  md: moderateScale(12),
+  lg: moderateScale(16),
+  xl: moderateScale(20),
+  '2xl': moderateScale(24),
+  '3xl': moderateScale(32),
   full: 9999,
 } as const;
 
@@ -123,20 +129,20 @@ export const Shadows = {
  * Layout constants
  */
 export const Layout = {
-  screenPadding: Spacing['6'],      // 24
+  screenPadding: Spacing['6'],      // 24 (scaled)
   containerMaxWidth: 500,
-  inputHeight: 52,
-  buttonHeight: 52,
-  buttonHeightSmall: 40,
-  buttonHeightLarge: 56,
-  headerHeight: 56,
-  tabBarHeight: 60,
+  inputHeight: moderateScale(52),
+  buttonHeight: moderateScale(52),
+  buttonHeightSmall: moderateScale(40),
+  buttonHeightLarge: moderateScale(56),
+  headerHeight: moderateScale(56),
+  tabBarHeight: moderateScale(60),
   iconSize: {
-    xs: 12,
-    sm: 16,
-    md: 24,
-    lg: 32,
-    xl: 40,
+    xs: moderateScale(12),
+    sm: moderateScale(16),
+    md: moderateScale(24),
+    lg: moderateScale(32),
+    xl: moderateScale(40),
   },
   hitSlop: {
     top: 10,

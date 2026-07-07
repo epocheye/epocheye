@@ -36,6 +36,7 @@ import type { PersonalizedFact } from '../../utils/api/user';
 import { getSite } from '../../utils/api/places';
 import type { SiteDetail } from '../../utils/api/places';
 import { resolveSiteImageSource } from '../../shared/utils/localSiteImages';
+import { moderateScale } from '../../utils/scaling';
 import { ROUTES } from '../../core/constants';
 import { analytics } from '../../services/analytics';
 import type {
@@ -348,8 +349,8 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* AR Ready badge (Figma 238:63) — faithful pink/red, shown when ar_ready. */}
           {arReady && (
             <View
-              style={{ top: insets.top + 10 }}
-              className="absolute self-center rounded-[15px] bg-[rgba(203,168,98,0.16)] border border-[rgba(203,168,98,0.4)] px-4 py-1"
+              style={{ top: insets.top + 10, borderRadius: moderateScale(15) }}
+              className="absolute self-center bg-[rgba(203,168,98,0.16)] border border-[rgba(203,168,98,0.4)] px-4 py-1"
             >
               <Text className="text-brand-gold text-[11px] tracking-[0.4px] font-ui-medium">
                 {t('siteDetail.arReady')}
@@ -359,7 +360,9 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         {/* Title (Figma 238:62) */}
-        <Text className="text-parchment text-[40px] leading-[44px] text-center mt-3 px-6 font-display">
+        <Text
+          className="text-parchment text-center mt-3 px-6 font-display"
+          style={{fontSize: moderateScale(40), lineHeight: moderateScale(44)}}>
           {heroTitle}
         </Text>
 
@@ -367,26 +370,32 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         {(builtValue || dynastyValue) && (
           <View className="flex-row gap-3 px-5 mt-5">
             {builtValue && (
-              <View className="flex-1 bg-surface-1 border border-white/10 rounded-[10px] px-3.5 py-3">
+              <View
+                className="flex-1 bg-surface-1 border border-white/10 px-3.5 py-3"
+                style={{borderRadius: moderateScale(10)}}>
                 <Text className="text-parchment-dim text-[9px] tracking-[0.9px] font-ui-semibold">
                   {t('siteDetail.builtLabel')}
                 </Text>
                 <Text
                   numberOfLines={1}
-                  className="text-parchment text-[24px] leading-[30px] mt-0.5 font-display"
+                  className="text-parchment mt-0.5 font-display"
+                  style={{fontSize: moderateScale(24), lineHeight: moderateScale(30)}}
                 >
                   {builtValue}
                 </Text>
               </View>
             )}
             {dynastyValue && (
-              <View className="flex-1 bg-surface-1 border border-white/10 rounded-[10px] px-3.5 py-3">
+              <View
+                className="flex-1 bg-surface-1 border border-white/10 px-3.5 py-3"
+                style={{borderRadius: moderateScale(10)}}>
                 <Text className="text-parchment-dim text-[9px] tracking-[0.9px] font-ui-semibold">
                   {t('siteDetail.dynastyLabel')}
                 </Text>
                 <Text
                   numberOfLines={1}
-                  className="text-parchment text-[22px] leading-[28px] mt-0.5 font-display"
+                  className="text-parchment mt-0.5 font-display"
+                  style={{fontSize: moderateScale(22), lineHeight: moderateScale(28)}}
                 >
                   {dynastyValue}
                 </Text>
@@ -397,7 +406,9 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Italic tagline (Figma 238:71) */}
         {tagline && (
-          <Text className="text-parchment-muted text-[18px] leading-[24px] text-center px-7 mt-5 italic font-display-regular">
+          <Text
+            className="text-parchment-muted text-center px-7 mt-5 italic font-display-regular"
+            style={{fontSize: moderateScale(18), lineHeight: moderateScale(24)}}>
             {tagline}
           </Text>
         )}
@@ -408,12 +419,13 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             <TouchableOpacity
               onPress={handleStartARExperience}
               activeOpacity={0.9}
-              className="h-[53px] rounded-[30px] bg-brand-gold flex-row items-center justify-center gap-2"
+              className="bg-brand-gold flex-row items-center justify-center gap-2"
+              style={{height: moderateScale(53), borderRadius: moderateScale(30)}}
               accessibilityRole="button"
               accessibilityLabel={t('siteDetail.viewInAr')}
             >
               <Camera color="#0A0A0C" size={18} />
-              <Text className="text-ink text-[22px] font-display">
+              <Text className="text-ink font-display" style={{fontSize: moderateScale(22)}}>
                 {t('siteDetail.viewInAr')}
               </Text>
             </TouchableOpacity>
@@ -422,11 +434,12 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           <TouchableOpacity
             onPress={handleAskGuide}
             activeOpacity={0.85}
-            className="h-[53px] rounded-[30px] bg-surface-1 border border-white/12 items-center justify-center"
+            className="bg-surface-1 border border-white/12 items-center justify-center"
+            style={{height: moderateScale(53), borderRadius: moderateScale(30)}}
             accessibilityRole="button"
             accessibilityLabel={t('siteDetail.learnAboutIt')}
           >
-            <Text className="text-brand-gold text-[22px] font-display">
+            <Text className="text-brand-gold font-display" style={{fontSize: moderateScale(22)}}>
               {t('siteDetail.learnAboutIt')}
             </Text>
           </TouchableOpacity>

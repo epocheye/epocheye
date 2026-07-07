@@ -9,6 +9,7 @@ import Animated, {
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import GlassCard from './GlassCard';
 import {GOLD, SPACING, TEXT, TYPE, RADIUS} from '../../constants/onboarding';
+import {moderateScale} from '../../utils/scaling';
 
 interface Props {
   icon: React.ReactNode;
@@ -63,8 +64,15 @@ const OBSelectionTile: React.FC<Props> = ({
 
   return (
     <AnimatedPressable
-      className={`${isGrid ? 'h-[116px]' : 'h-[76px] mx-6'} rounded-[14px] overflow-hidden`}
-      style={[isGrid ? {width: GRID_TILE_WIDTH} : undefined, animatedStyle]}
+      className={`${isGrid ? '' : 'mx-6'} overflow-hidden`}
+      style={[
+        {
+          height: isGrid ? moderateScale(116) : moderateScale(76),
+          borderRadius: moderateScale(14),
+        },
+        isGrid ? {width: GRID_TILE_WIDTH} : undefined,
+        animatedStyle,
+      ]}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={handlePress}>
@@ -82,9 +90,9 @@ const OBSelectionTile: React.FC<Props> = ({
             backgroundColor: selected ? GOLD.primary : 'rgba(255,255,255,0.10)',
           }}>
           <Text
-            className="text-[10px]"
             style={{
               fontFamily: TYPE.label.fontFamily,
+              fontSize: moderateScale(10),
               color: selected ? TEXT.dark : TEXT.muted,
             }}>
             {badge}
@@ -101,8 +109,12 @@ const OBSelectionTile: React.FC<Props> = ({
             <View className="items-center justify-center">{icon}</View>
           </View>
           <Text
-            className="text-[13px] leading-[18px] text-center text-ob-warm"
-            style={{fontFamily: TYPE.uiMedium.fontFamily}}
+            className="text-center text-ob-warm"
+            style={{
+              fontFamily: TYPE.uiMedium.fontFamily,
+              fontSize: moderateScale(13),
+              lineHeight: moderateScale(18),
+            }}
             numberOfLines={2}>
             {label}
           </Text>
@@ -117,14 +129,22 @@ const OBSelectionTile: React.FC<Props> = ({
           </View>
           <View className="flex-1 ml-4">
             <Text
-              className="text-[15px] leading-[22px] text-ob-warm"
-              style={{fontFamily: TYPE.uiMedium.fontFamily}}>
+              className="text-ob-warm"
+              style={{
+                fontFamily: TYPE.uiMedium.fontFamily,
+                fontSize: moderateScale(15),
+                lineHeight: moderateScale(22),
+              }}>
               {label}
             </Text>
             {sublabel ? (
               <Text
-                className="text-[12px] leading-[18px] mt-0.5 text-ob-warmMuted"
-                style={{fontFamily: TYPE.uiSmall.fontFamily}}>
+                className="mt-0.5 text-ob-warmMuted"
+                style={{
+                  fontFamily: TYPE.uiSmall.fontFamily,
+                  fontSize: moderateScale(12),
+                  lineHeight: moderateScale(18),
+                }}>
                 {sublabel}
               </Text>
             ) : null}

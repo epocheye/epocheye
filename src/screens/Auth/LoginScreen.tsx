@@ -24,6 +24,7 @@ import { login } from '../../utils/api/auth';
 import { googleSignIn } from '../../utils/api/auth/GoogleAuth';
 import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { COLORS } from '../../core/constants/theme';
+import { moderateScale } from '../../utils/scaling';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -125,8 +126,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
 
           <View className="mb-12 items-center">
             <View
-              className="w-[76px] h-[76px] rounded-full items-center justify-center mb-6"
+              className="rounded-full items-center justify-center mb-6"
               style={{
+                width: moderateScale(76),
+                height: moderateScale(76),
                 borderWidth: 1,
                 borderColor: 'rgba(203,168,98,0.35)',
                 backgroundColor: 'rgba(203,168,98,0.06)',
@@ -138,10 +141,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                 resizeMode="contain"
               />
             </View>
-            <Text className="font-display text-[26px] leading-[30px] text-parchment">
+            <Text
+              className="font-display text-parchment"
+              style={{ fontSize: moderateScale(26), lineHeight: moderateScale(30) }}>
               EpochEye
             </Text>
-            <Text className="mt-3 font-display text-[20px] leading-[26px] text-center text-brand-gold">
+            <Text
+              className="mt-3 font-display text-center text-brand-gold"
+              style={{ fontSize: moderateScale(20), lineHeight: moderateScale(26) }}>
               {headingText ?? t('auth.welcomeBack')}
             </Text>
             <Text className="mt-2 text-center font-ui text-sm leading-5 text-parchment-muted px-2">

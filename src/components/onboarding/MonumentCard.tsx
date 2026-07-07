@@ -8,6 +8,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
+import { moderateScale } from '../../utils/scaling';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -81,8 +82,8 @@ const MonumentCard: React.FC<MonumentCardProps> = ({
 
   return (
     <View
-      className="h-[440px] self-center overflow-hidden rounded-[20px]"
-      style={{ width: CARD_WIDTH }}
+      className="self-center overflow-hidden"
+      style={{ width: CARD_WIDTH, height: moderateScale(440), borderRadius: moderateScale(20) }}
     >
       {/* Background with Ken Burns animation */}
       <Animated.View className="absolute inset-0" style={imageAnimStyle}>
@@ -118,21 +119,27 @@ const MonumentCard: React.FC<MonumentCardProps> = ({
 
       {/* Monument name — top left */}
       <View className="absolute left-4 top-4 rounded-md bg-[rgba(0,0,0,0.45)] px-2.5 py-1">
-        <Text className="font-ui-semibold text-[12px] uppercase tracking-[1.5px] text-[#B8923F]">
+        <Text
+          className="font-ui-semibold uppercase tracking-[1.5px] text-[#B8923F]"
+          style={{ fontSize: moderateScale(12) }}>
           {monumentName}
         </Text>
       </View>
 
       {/* Year badge — top right */}
       <View className="absolute right-4 top-4 rounded-md bg-[rgba(0,0,0,0.45)] px-2.5 py-1">
-        <Text className="font-ui-semibold text-[12px] tracking-[1.5px] text-[#B8923F]">
+        <Text
+          className="font-ui-semibold tracking-[1.5px] text-[#B8923F]"
+          style={{ fontSize: moderateScale(12) }}>
           {year}
         </Text>
       </View>
 
       {/* Typewriter story text — bottom */}
       <View className="absolute bottom-0 left-0 right-0 p-5">
-        <Text className="font-ui text-[18px] leading-7 text-[#F5E9D8]">
+        <Text
+          className="font-ui leading-7 text-[#F5E9D8]"
+          style={{ fontSize: moderateScale(18) }}>
           {displayedText}
         </Text>
       </View>
