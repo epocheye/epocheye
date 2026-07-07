@@ -102,15 +102,16 @@ const DialogButtonView: React.FC<{
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={button.text}
-      style={({ pressed }) => [
-        styles.btn,
-        fill,
-        isRow && styles.btnFlex,
-        pressed && styles.btnPressed,
-      ]}>
-      <Text style={[styles.btnText, text]} numberOfLines={1}>
-        {button.text}
-      </Text>
+      style={isRow ? styles.btnFlex : undefined}>
+      {({ pressed }) => (
+        <View
+          collapsable={false}
+          style={[styles.btn, fill, pressed && styles.btnPressed]}>
+          <Text style={[styles.btnText, text]} numberOfLines={1}>
+            {button.text}
+          </Text>
+        </View>
+      )}
     </Pressable>
   );
 };
