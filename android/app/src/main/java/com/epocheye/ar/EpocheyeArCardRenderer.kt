@@ -31,9 +31,10 @@ object EpocheyeArCardRenderer {
      * cardJson is a card object: { display_name, period, dynasty, material,
      * origin, identity_confidence, narrative, iconography }.
      *
-     * Pass "continuation": true for follow-on pages of long content — those render
-     * body-only (no badge / title / meta), so a long narration can be split across
-     * 2–3 spread placards.
+     * Pass "continuation": true for follow-on section cards. A continuation card
+     * renders body-only UNLESS it carries a "heading" (e.g. "What to look for" or a
+     * timeline-layer label), in which case the heading is drawn as its title so each
+     * section card is self-labelled and reads as complete.
      */
     fun render(cardJson: String): Bitmap? {
         val o = try {
@@ -43,14 +44,25 @@ object EpocheyeArCardRenderer {
         }
 
         val continuation = o.optBoolean("continuation", false)
+        val heading = o.optString("heading")
         // Source/confidence (grounded vs inferred) is backend-only — never shown to
         // the user. The card renders uniformly with no badge and no "Likely:" prefix.
         val accent = if (continuation) MUTED else GREEN
-        val title = o.optString("display_name").ifBlank { "Unknown object" }
-        val meta = listOf(
-            o.optString("period"), o.optString("dynasty"),
-            o.optString("material"), o.optString("origin"),
-        ).filter { it.isNotBlank() }.joinToString("   ·   ")
+        // First card → object name; a headed section card → its heading; a plain
+        // continuation card → no title (body only).
+        val title = when {
+            !continuation -> o.optString("display_name").ifBlank { "Unknown object" }
+            heading.isNotBlank() -> heading
+            else -> ""
+        }
+        val meta = if (!continuation) {
+            listOf(
+                o.optString("period"), o.optString("dynasty"),
+                o.optString("material"), o.optString("origin"),
+            ).filter { it.isNotBlank() }.joinToString("   ·   ")
+        } else {
+            ""
+        }
         val narrative = o.optString("narrative")
 
         val contentW = (W - PAD * 2).toInt()
@@ -62,15 +74,16 @@ object EpocheyeArCardRenderer {
             color = MUTED; textSize = 30f; typeface = Typeface.SANS_SERIF
         }
         val bodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = INK; textSize = 34f; typeface = Typeface.SANS_SERIF
+            color = INK; textSize = 38f; typeface = Typeface.SANS_SERIF
         }
 
-        val titleLayout = if (!continuation) staticLayout(title, titlePaint, contentW) else null
+        val titleLayout = if (title.isNotBlank()) staticLayout(title, titlePaint, contentW) else null
         val metaLayout =
-            if (!continuation && meta.isNotBlank()) staticLayout(meta, metaPaint, contentW) else null
-        // Cap the narrative so the panel stays a readable size in 3D.
+            if (meta.isNotBlank()) staticLayout(meta, metaPaint, contentW) else null
+        // Each card now holds ONE complete section, so allow the full section to show
+        // (JS caps section length); only guard against a pathological blob.
         val bodyLayout = if (narrative.isNotBlank()) {
-            staticLayout(ellipsize(narrative, 360), bodyPaint, contentW)
+            staticLayout(ellipsize(narrative, 800), bodyPaint, contentW)
         } else {
             null
         }
@@ -82,7 +95,7 @@ object EpocheyeArCardRenderer {
         if (metaLayout != null) y += 18f + metaLayout.height
         if (bodyLayout != null) y += (if (titleLayout != null) 28f else 0f) + bodyLayout.height
         y += PAD
-        val height = y.toInt().coerceIn(240, 1600)
+        val height = y.toInt().coerceIn(240, 2200)
 
         val bmp = Bitmap.createBitmap(W, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)

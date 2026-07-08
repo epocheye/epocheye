@@ -146,6 +146,8 @@ type ResolutionOutcome =
 function extractErrorMessage(err: unknown): string | undefined {
   if (!err || typeof err !== 'object') return undefined;
   const e = err as {
+    code?: string;
+    config?: {url?: string; method?: string};
     response?: {status?: number; data?: unknown};
     message?: string;
   };
@@ -160,72 +162,156 @@ function extractErrorMessage(err: unknown): string | undefined {
   body = body ?? e.message;
   const status = e.response?.status;
   if (body && status) return `[${status}] ${body}`;
+  // No HTTP response = a transport failure (axios surfaces this as the opaque
+  // "Network Error"). In dev, append the axios code + the endpoint + method so
+  // the on-screen "Lens error —" line actually says WHICH call failed and HOW,
+  // instead of a dead-end message (e.g. "ERR_NETWORK · POST …/api/v1/recognize").
+  if (__DEV__ && !e.response) {
+    const endpoint = e.config?.url
+      ? ` · ${(e.config.method ?? 'get').toUpperCase()} ${e.config.url}`
+      : '';
+    const code = e.code ? `${e.code}: ` : '';
+    return `${code}${body ?? 'no response'}${endpoint}`;
+  }
   return body ?? (status ? `HTTP ${status}` : undefined);
 }
 
-/** Split long narration into up to `max` chunks (~`size` chars, on word boundaries). */
-function chunkText(s: string, size: number, max: number): string[] {
-  const text = s.trim();
+// Upper bound on world-anchored placards. Kept in lock-step with the native
+// cardLayoutFor(n) cap in EpocheyeDetectARView.kt so JS never emits more cards
+// than the AR view will place (excess is folded into the last card, not dropped).
+const MAX_AR_CARDS = 6;
+
+/**
+ * Split narration into COMPLETE sections for AR cards — one coherent block per
+ * card, NEVER a mid-sentence cut. Splits on blank-line paragraph breaks first,
+ * then packs whole sentences into ~`targetLen`-char groups. Nothing is dropped:
+ * any sections beyond `maxSections` are merged back into the last one, so a long
+ * narration produces more cards and a short one produces fewer.
+ */
+function splitIntoSections(
+  raw: string | null | undefined,
+  targetLen = 320,
+  maxSections = MAX_AR_CARDS,
+): string[] {
+  const text = (raw ?? '').replace(/\r\n/g, '\n').trim();
   if (!text) return [];
-  const out: string[] = [];
-  let rest = text;
-  while (rest.length > 0 && out.length < max) {
-    if (rest.length <= size) {
-      out.push(rest);
-      break;
+
+  // Paragraph units first (blank-line separated); whole text if there are none.
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  const sections: string[] = [];
+  for (const para of paragraphs) {
+    if (para.length <= targetLen) {
+      sections.push(para);
+      continue;
     }
-    let cut = rest.lastIndexOf(' ', size);
-    if (cut < size * 0.5) cut = size;
-    out.push(rest.slice(0, cut).trim());
-    rest = rest.slice(cut).trim();
+    // Sentence-aware packing: match sentences ending in . ! ? (keeping any
+    // trailing quote/bracket), plus a trailing fragment with no terminator.
+    const sentences = para.match(/[^.!?]+[.!?]+["')\]]*\s*|[^.!?]+$/g) ?? [para];
+    let buf = '';
+    for (const s of sentences) {
+      const sentence = s.trim();
+      if (!sentence) continue;
+      if (buf && buf.length + 1 + sentence.length > targetLen) {
+        sections.push(buf);
+        buf = sentence;
+      } else {
+        buf = buf ? `${buf} ${sentence}` : sentence;
+      }
+    }
+    if (buf) sections.push(buf);
   }
-  return out;
+
+  if (sections.length === 0) return [text];
+  // Never drop content: fold overflow past the cap into the final card.
+  if (sections.length > maxSections) {
+    return [
+      ...sections.slice(0, maxSections - 1),
+      sections.slice(maxSections - 1).join(' '),
+    ];
+  }
+  return sections;
 }
 
 /**
- * Build the JSON cards array for `placeCardsOnly` from an AI interpretation: card 0
- * carries the label + first chunk (amber "inferred" badge); long text spills into
- * 1–2 body-only continuation cards spread at other positions.
+ * Build the JSON cards array for `placeCardsOnly` from an AI interpretation. The
+ * narration is split into complete sentence/paragraph sections (not fixed-length
+ * slices): card 0 carries the label + first section; each further section is its
+ * own body-only continuation card. Card count scales with how much text there is.
  */
 function buildArCards(label: string | null, body: string): string {
-  const chunks = chunkText(body, 300, 3);
+  const name = label ?? i18n.t('lens.thisObject');
+  const sections = splitIntoSections(body);
   const cards =
-    chunks.length === 0
-      ? [{display_name: label ?? i18n.t('lens.thisObject'), identity_confidence: 'inferred', narrative: body}]
-      : chunks.map((chunk, i) =>
+    sections.length === 0
+      ? [{display_name: name, identity_confidence: 'inferred', narrative: body}]
+      : sections.map((section, i) =>
           i === 0
-            ? {
-                display_name: label ?? i18n.t('lens.thisObject'),
-                identity_confidence: 'inferred',
-                narrative: chunk,
-              }
-            : {continuation: true, narrative: chunk},
+            ? {display_name: name, identity_confidence: 'inferred', narrative: section}
+            : {continuation: true, narrative: section},
         );
   return JSON.stringify(cards);
 }
 
 /**
- * Build the `placeCardsOnly` JSON for a GROUNDED card that has no 3D model (e.g. a
- * heritage place with no 3D model). Mirrors buildArCards, but carries the real
- * grounded fields so the native renderer shows the verified styling (no "Likely:"
- * prefix): card 0 holds the identity (name + confidence + meta) and the first
- * narration chunk; longer text spills into body-only continuation cards. The rich
- * flat card (with its layer slider) still renders on-screen — this is the
- * world-anchored placard floated beside the structure.
+ * Build the `placeCardsOnly` JSON for a GROUNDED card with no 3D model. Instead of
+ * blindly char-chunking the narrative, this maps the card's REAL sections to their
+ * own complete placards: an identity card (name + meta + first narrative section),
+ * any further narrative sections, a headed "What to look for" card from the
+ * iconography, and one headed card per context/timeline layer. The count therefore
+ * scales with how much data the object actually has. The rich on-screen flat card
+ * (with its layer slider) still renders separately — these are the world placards.
  */
 function buildGroundedArCards(card: ObjectCard): string {
-  const chunks = chunkText(card.narrative ?? '', 300, 3);
-  const head = {
+  const cards: Record<string, unknown>[] = [];
+
+  const narrativeSections = splitIntoSections(card.narrative);
+  cards.push({
     display_name: card.display_name,
     identity_confidence: card.identity_confidence,
     period: card.period,
     dynasty: card.dynasty,
     material: card.material,
     origin: card.origin,
-    narrative: chunks[0] ?? '',
-  };
-  const rest = chunks.slice(1).map(chunk => ({continuation: true, narrative: chunk}));
-  return JSON.stringify([head, ...rest]);
+    narrative: narrativeSections[0] ?? '',
+  });
+  for (const section of narrativeSections.slice(1)) {
+    cards.push({continuation: true, narrative: section});
+  }
+
+  // "What to look for" — iconography as its own headed card(s). Label matches the
+  // on-screen GroundedObjectCard heading.
+  const iconSections = splitIntoSections(card.iconography);
+  iconSections.forEach((section, i) => {
+    cards.push({
+      continuation: true,
+      ...(i === 0 ? {heading: 'What to look for'} : {}),
+      narrative: section,
+    });
+  });
+
+  // Timeline / context layers — one headed card each (layer label → heading).
+  for (const layer of card.context_layers ?? []) {
+    const layerBody = (layer.body ?? '').trim();
+    if (!layerBody) continue;
+    cards.push({continuation: true, heading: layer.label, narrative: layerBody});
+  }
+
+  // Cap to what native places; fold any overflow into the last card (never drop).
+  if (cards.length > MAX_AR_CARDS) {
+    const tail = cards.slice(MAX_AR_CARDS - 1);
+    const mergedNarrative = tail
+      .map(c => c.narrative as string)
+      .filter(Boolean)
+      .join('\n\n');
+    const capped = cards.slice(0, MAX_AR_CARDS - 1);
+    capped.push({...tail[0], narrative: mergedNarrative});
+    return JSON.stringify(capped);
+  }
+  return JSON.stringify(cards);
 }
 
 /**
@@ -340,6 +426,28 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
       frameBase64: string,
       imageUri?: string,
     ): Promise<ResolutionOutcome> => {
+      // Dev diagnostic: the prepared frame size. prepareImageForGemini normally
+      // resizes to ~100–400 KB, but silently returns the raw full-res base64
+      // (3–10 MB) if Skia resize fails — an oversized body can be dropped by API
+      // Gateway and surface as an opaque "Network Error". A frameKB in the
+      // thousands is the smoking gun; it's appended to the on-screen error below
+      // so it's visible without adb.
+      const frameKB = Math.round((frameBase64.length * 3) / 4 / 1024);
+      if (__DEV__) {
+        console.warn(
+          `[detect] recognize submit venue=${venueSlug} ungrounded=${allowUngrounded} frameKB=${frameKB}`,
+        );
+      }
+      // Elapsed time to failure is the decisive signal for an ERR_NETWORK: a
+      // near-instant fail (<1s) is a real connection reset; a fail at ~10s is the
+      // SUBMIT_TIMEOUT_MS firing (RN surfaces XHR timeouts as ERR_NETWORK), i.e. a
+      // slow/synchronous backend, not a transport problem. Both frameKB and the
+      // elapsed ms are appended to the on-screen error so it's visible without adb.
+      const startedAt = Date.now();
+      const withDiag = (msg?: string) =>
+        __DEV__
+          ? `${msg ?? 'error'} (frameKB=${frameKB}, ${Date.now() - startedAt}ms)`
+          : msg;
       // Cancel any prior in-flight recognize, then run this one under a fresh
       // controller so reset()/unmount can abort the submit + poll loop.
       recognizeAbortRef.current?.abort();
@@ -361,7 +469,7 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
         if (controller.signal.aborted) {
           return {kind: 'aborted'};
         }
-        const message = extractErrorMessage(err);
+        const message = withDiag(extractErrorMessage(err));
         if (__DEV__) {
           console.warn('[detect] recognize failed:', message ?? err);
         }
@@ -460,7 +568,12 @@ const DetectArScreen: React.FC = () => {
   // Guided product tour: show the camera as a preview, bypassing the venue/GPS
   // gate. The tour overlay (TourHost) blocks all touches, so no scan can run.
   const tour = route.params?.tour === true;
-  const bypassGate = devPicker || tour;
+  // Geofence bypass ONLY — the venue lock is skipped in dev builds so the AR
+  // experience can be tested anywhere (e.g. at home), and by the dev picker /
+  // guided tour previews. Production (__DEV__ === false, constant-folded out of
+  // release bundles) always enforces the geofence. NOTE: this deliberately does
+  // NOT bypass the families safety notice below — that must show for everyone.
+  const geofenceBypass = __DEV__ || devPicker || tour;
 
   const {hasPermission, requestPermission} = useCameraPermission();
   const {arAvailable, arChecked} = useARCore();
@@ -486,41 +599,65 @@ const DetectArScreen: React.FC = () => {
   // Make sure GPS is actually being acquired the moment the screen opens, so the
   // venue gate below can decide on a real fix instead of a stale/empty location.
   useEffect(() => {
-    if (bypassGate) return;
+    if (geofenceBypass) return;
     void ensureLocationTracking();
-  }, [bypassGate, ensureLocationTracking]);
+  }, [geofenceBypass, ensureLocationTracking]);
 
   // Stop waiting for a fix after a grace period so a GPS-less device still
   // reaches the "go to your nearest venue" screen instead of hanging.
   useEffect(() => {
-    if (bypassGate || inVenue) return;
+    if (geofenceBypass || inVenue) return;
     const t = setTimeout(() => setGateTimedOut(true), 12000);
     return () => clearTimeout(t);
-  }, [bypassGate, inVenue]);
+  }, [geofenceBypass, inVenue]);
 
   // Venue lock: the live scan/AR experience only runs inside a curated venue.
+  // This runs AFTER the families safety notice below, so a user always sees the
+  // dismissible notice first regardless of location; only after acknowledging
+  // does an out-of-venue user get redirected to GoToVenue.
   // CRITICAL: do NOT bounce the user the instant the screen mounts — and do NOT
   // key the redirect off `currentLocation`. `currentLocation` is set one
   // microtask BEFORE the geofence is evaluated (placesStore sets it
   // synchronously, then schedules checkZoneEntry), so gating on it ejects a
   // user standing INSIDE a venue before their zone is set. Wait until the zone
   // has actually been evaluated (`zoneEvaluated`) or the grace period elapses;
-  // only then redirect if still outside. Dev picker bypasses the gate.
+  // only then redirect if still outside. Dev builds / dev picker / tour bypass
+  // the gate (see geofenceBypass).
   const locating =
-    !bypassGate && !inVenue && !zoneEvaluated && !gateTimedOut;
+    !geofenceBypass && !inVenue && !zoneEvaluated && !gateTimedOut;
   useEffect(() => {
-    if (bypassGate || inVenue) return;
+    if (geofenceBypass || inVenue) return;
     if (zoneEvaluated || gateTimedOut) {
       navigation.replace(ROUTES.MAIN.GO_TO_VENUE);
     }
-  }, [bypassGate, inVenue, zoneEvaluated, gateTimedOut, navigation]);
+  }, [geofenceBypass, inVenue, zoneEvaluated, gateTimedOut, navigation]);
 
   // Route both the in-screen close button AND the Android hardware back button
   // through the safe-back path so exiting the camera can never fall through to
   // finishing the activity (which would close the whole app).
   const handleClose = useSafeBackHandler();
 
-  if (!bypassGate && !inVenue) {
+  // Families-policy gate: the dismissible safety notice is the FIRST thing shown
+  // when the AR session opens — BEFORE the venue gate — so it is reachable
+  // regardless of location (Google Play Families policy; reviewers are never
+  // physically at a venue). Acknowledge ("I understand") to proceed; the X /
+  // Android hardware back exits. It shows for everyone; the only exception is the
+  // guided tour preview, whose TourHost overlay blocks all touches so no scan can
+  // run. It also gates the OS camera prompt (see the effect above) so the two
+  // never stack.
+  if (!tour && !safetyAck) {
+    return (
+      <ARSafetyNotice
+        onAcknowledge={() => setSafetyAck(true)}
+        onExit={handleClose}
+      />
+    );
+  }
+
+  // Venue lock render guard (runs after the safety notice above): outside a
+  // curated venue, show the "locating" state and then redirect to GoToVenue.
+  // Bypassed in dev builds / dev picker / tour (see geofenceBypass).
+  if (!geofenceBypass && !inVenue) {
     if (locating) {
       return (
         <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
@@ -533,19 +670,6 @@ const DetectArScreen: React.FC = () => {
       );
     }
     return <View style={styles.root} />; // redirecting to GoToVenue
-  }
-
-  // Families-policy gate: the safety notice must be acknowledged before the
-  // camera/AR view can mount. Placed after the venue gate (so an out-of-venue
-  // user is bounced to GoToVenue first) and before the permission prompt (so the
-  // two never stack). The guided tour / dev preview bypass the gate.
-  if (!bypassGate && !safetyAck) {
-    return (
-      <ARSafetyNotice
-        onAcknowledge={() => setSafetyAck(true)}
-        onExit={handleClose}
-      />
-    );
   }
 
   // Native AR when the module is registered AND ARCore supports the device (or
@@ -582,10 +706,13 @@ const DetectArScreen: React.FC = () => {
   }
 
   // DEV "scan anything": same live scan UX as production, but the agent runs
-  // ungrounded (any object, no venue) so it can be tested at home. The venue gate
-  // is bypassed above. Production keeps geofencing + grounded recognition.
-  const allowUngrounded = devPicker;
-  const effectiveVenue = devPicker ? venueSlug || 'dev' : venueSlug;
+  // ungrounded (any object, no venue) so it can be tested at home — via the dev
+  // picker, or any dev build reached outside a venue (the geofence is auto-
+  // bypassed above, so grounded recognition would otherwise have no venue to
+  // match against). Production (__DEV__ === false, not devPicker) keeps
+  // geofencing + grounded recognition against the real venueSlug.
+  const allowUngrounded = devPicker || (__DEV__ && !inVenue);
+  const effectiveVenue = allowUngrounded ? venueSlug || 'dev' : venueSlug;
 
   if (useNativeAR) {
     return (

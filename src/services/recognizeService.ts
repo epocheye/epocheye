@@ -27,7 +27,12 @@ const RECOGNIZE_RESULT_URL = `${BACKEND_URL}/api/v1/recognize/result`;
 // API Gateway 29s limit. The submit returns fast — either a terminal result (cache
 // hit / gate / paywall) or {match:'processing', job_id}. On 'processing' we poll the
 // result endpoint until the out-of-band agent finishes.
-const SUBMIT_TIMEOUT_MS = 10_000; // submit just persists + kicks the worker
+// Submit just persists + kicks the worker, so 10s is plenty when the async
+// worker is deployed. In dev we allow up to 28s (just under API Gateway's 29s
+// integration cap) to tolerate a slow/synchronous backend while testing — RN
+// surfaces an XHR timeout as ERR_NETWORK, so too-low a value here masks backend
+// latency as a fake "network error". Production keeps the tight 10s.
+const SUBMIT_TIMEOUT_MS = __DEV__ ? 28_000 : 10_000;
 const POLL_TIMEOUT_MS = 8_000; // per poll request
 const POLL_INTERVAL_MS = 1_500; // between polls
 const POLL_DEADLINE_MS = 45_000; // hard cap → graceful "try again", never an infinite spin
