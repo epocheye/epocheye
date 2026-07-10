@@ -10,12 +10,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../core/constants';
 import type { AppConfig } from '../utils/api/appConfig';
 
+/** An OTA JS bundle that's downloaded, verified, and waiting for a restart. */
+export interface OtaReady {
+  bundleVersion: number;
+  notes: string;
+}
+
 interface UpdateState {
   /** Non-null while the soft banner should be visible. */
   optional: AppConfig | null;
   showOptional: (config: AppConfig) => void;
   /** Dismiss + remember the version so we don't re-nudge for the same release. */
   dismissOptional: () => void;
+
+  /**
+   * Non-null while a verified OTA bundle is staged — drives the separate
+   * "Update ready — Restart now" banner. The actual apply/restart lives in
+   * services/otaService (kept out of the store to avoid an import cycle).
+   */
+  otaReady: OtaReady | null;
+  showOtaReady: (info: OtaReady) => void;
+  dismissOtaReady: () => void;
 }
 
 export const useUpdateStore = create<UpdateState>((set, get) => ({
@@ -31,6 +46,12 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
       );
     }
   },
+
+  otaReady: null,
+  showOtaReady: info => set({ otaReady: info }),
+  // Dismiss just hides the banner for this session; the bundle stays staged and
+  // applies on the next natural cold start, so nothing is lost.
+  dismissOtaReady: () => set({ otaReady: null }),
 }));
 
 /**

@@ -414,6 +414,9 @@
     "cta": "Update now",
     "availableTitle": "A new version is available",
     "availableSubtitle": "Version {{version}} is ready to install",
-    "availableSubtitleGeneric": "Tap to get the latest features and fixes"
+    "availableSubtitleGeneric": "Tap to get the latest features and fixes",
+    "otaReadyTitle": "Update ready",
+    "otaReadySubtitle": "Restart to apply the latest improvements",
+    "otaRestartCta": "Restart"
   }
 }

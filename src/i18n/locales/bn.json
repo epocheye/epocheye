@@ -414,6 +414,9 @@
     "cta": "এখনই আপডেট করুন",
     "availableTitle": "নতুন সংস্করণ উপলল্ধ",
     "availableSubtitle": "সংস্করণ {{version}} ইনস্টলের জন্য প্রস্তুত",
-    "availableSubtitleGeneric": "সর্বশেষ ফিচার ও ফিক্স পেতে ট্যাপ করুন"
+    "availableSubtitleGeneric": "সর্বশেষ ফিচার ও ফিক্স পেতে ট্যাপ করুন",
+    "otaReadyTitle": "আপডেট প্রস্তুত",
+    "otaReadySubtitle": "সর্বশেষ উন্নতি প্রয়োগ করতে পুনরায় চালু করুন",
+    "otaRestartCta": "পুনরায় চালু করুন"
   }
 }

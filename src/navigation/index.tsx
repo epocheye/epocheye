@@ -17,6 +17,7 @@ import {
   type AppConfig,
 } from '../utils/api/appConfig';
 import { maybeShowOptionalUpdate } from '../stores/updateStore';
+import { checkForOtaUpdate, confirmBootHealthy } from '../services/otaService';
 import { useSessionStore } from '../stores/sessionStore';
 import { useUserStore } from '../stores/userStore';
 import { usePlacesStore } from '../stores/placesStore';
@@ -63,12 +64,30 @@ const AppNavigator: React.FC = () => {
   useEffect(() => {
     void resolveUpdateStatus().then(status => {
       if (status.state === 'required') {
+        // A forced STORE update wins over OTA — don't ship JS onto a build the
+        // operator has decided must go to the store.
         setUpdateGate(status.config);
-      } else if (status.state === 'optional') {
+        return;
+      }
+      if (status.state === 'optional') {
         void maybeShowOptionalUpdate(status.config);
       }
+      // Build is allowed to run → check for an OTA JS-bundle update (Android,
+      // fail-open; raises the "Restart now" banner when one is downloaded).
+      void checkForOtaUpdate();
     });
   }, []);
+
+  // Confirm the running bundle booted healthily (promotes a pending OTA bundle to
+  // confirmed, arming native crash-rollback). Reaching a resolved, rendered state
+  // (login/onboarding/main — not the loading splash) is the health signal: a
+  // bundle that crashes at module-eval or first render never gets here, so it is
+  // auto-rolled-back on the next boot. No-op if nothing is pending / on iOS.
+  useEffect(() => {
+    if (appState !== 'loading') {
+      void confirmBootHealthy();
+    }
+  }, [appState]);
 
   // The login screen renders outside the NavigationContainer, so capture its
   // view explicitly (the onStateChange listener only covers in-container routes).

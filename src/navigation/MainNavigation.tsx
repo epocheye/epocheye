@@ -15,6 +15,7 @@ import SuggestSiteScreen from '../screens/Main/SuggestSiteScreen';
 import VenueActivationBanner from '../components/VenueActivationBanner';
 import DailyNudgeBanner from '../components/DailyNudgeBanner';
 import UpdateAvailableBanner from '../components/UpdateAvailableBanner';
+import OtaUpdateBanner from '../components/OtaUpdateBanner';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
 
@@ -156,6 +157,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
     <VenueActivationBanner />
     <DailyNudgeBanner />
     <UpdateAvailableBanner />
+    <OtaUpdateBanner />
     </>
   );
 };

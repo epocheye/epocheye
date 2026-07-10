@@ -11,6 +11,18 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 class MainApplication : Application(), ReactApplication {
 
   override val reactHost: ReactHost by lazy {
+    // Resolve a downloaded OTA bundle to load instead of the packaged one.
+    // Returns null (→ packaged bundle) unless a valid confirmed/pending OTA
+    // bundle exists for this binary's runtime version. Fail-safe: any error
+    // resolving falls back to the packaged bundle.
+    val otaBundlePath =
+      try {
+        com.epocheye.ota.OtaBundle.resolveBundlePath(applicationContext)
+      } catch (t: Throwable) {
+        Log.e("MainApplication", "OTA resolve failed, using packaged bundle", t)
+        null
+      }
+
     getDefaultReactHost(
       context = applicationContext,
       packageList =
@@ -23,7 +35,9 @@ class MainApplication : Application(), ReactApplication {
           } catch (t: Throwable) {
             Log.e("MainApplication", "ARCorePackage skipped", t)
           }
+          add(com.epocheye.ota.OtaPackage())
         },
+      jsBundleFilePath = otaBundlePath,
     )
   }
 

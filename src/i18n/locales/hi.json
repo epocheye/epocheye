@@ -414,6 +414,9 @@
     "cta": "अभी अपडेट करें",
     "availableTitle": "नया संस्करण उपलब्ध है",
     "availableSubtitle": "संस्करण {{version}} इंस्टॉल के लिए तैयार है",
-    "availableSubtitleGeneric": "नवीनतम सुविधाएँ और सुधार पाने के लिए टैप करें"
+    "availableSubtitleGeneric": "नवीनतम सुविधाएँ और सुधार पाने के लिए टैप करें",
+    "otaReadyTitle": "अपडेट तैयार है",
+    "otaReadySubtitle": "नवीनतम सुधार लागू करने के लिए पुनः आरंभ करें",
+    "otaRestartCta": "पुनः आरंभ करें"
   }
 }
