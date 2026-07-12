@@ -46,12 +46,18 @@ import {
 
 import EpocheyeDetectARView, {
   isDetectARAvailable,
+  type CloudAnchorEvent,
   type EpocheyeDetectARHandle,
 } from '../../native/EpocheyeDetectARView';
+import type {DevCloudAnchorOverlayProps} from '../Dev/DevCloudAnchorOverlay';
 import {useARCore} from '../../shared/hooks/useARCore';
 import {prepareImageForGemini} from '../../services/geminiVisionService';
 import {PermissionService} from '../../shared/services/permission.service';
 import {resolveModelGlb} from '../../services/glbSource';
+// getOrFetchGlb runs a full GLB URL through the SAME on-device download+cache
+// path production uses (via glbSource → getOrFetchGlb). Used ONLY by the
+// __DEV__ direct-GLB render test below.
+import {getOrFetchGlb} from '../../services/glbCache';
 import {recognize} from '../../services/recognizeService';
 import {streamMuseumNarration} from '../../services/museumModeService';
 // fetchObjectCard is the grounded data-card lookup (GET /vision/object/{class_id});
@@ -80,6 +86,20 @@ import type {MainStackParamList} from '../../core/types/navigation.types';
 // hex). Named AMBER for historical reasons; it now drives the current palette.
 const AMBER = COLORS.sky;
 const YAW_STEP_DEG = 15;
+
+// __DEV__ only: largest-dimension size (metres) for the "Direct GLB render test"
+// dev path. The native view scales any model so its biggest axis == this many
+// metres (scaleToUnits), and it auto-places ~1.2 m in front of the camera — so
+// ~1.2 gives a human-scale statue that fills the frame. Tune this one line if the
+// test model looks too small/large. Never applied to the real recognition path.
+const DIRECT_GLB_TEST_SCALE_M = 1.2;
+
+// __DEV__ only: Cloud Anchor host/resolve harness overlay. The require is
+// constant-folded away by Metro in release, so the overlay (and its
+// AsyncStorage key handling) never ships. Same pattern as DevHealthCheckScreen
+// in MainNavigation.
+const DevCloudAnchorOverlay: React.ComponentType<DevCloudAnchorOverlayProps> | null =
+  __DEV__ ? require('../Dev/DevCloudAnchorOverlay').default : null;
 
 /** The only venue with a trained detector today. Overridable via route param. */
 const DEFAULT_DETECTOR_VENUE = 'indian-museum';
@@ -568,12 +588,32 @@ const DetectArScreen: React.FC = () => {
   // Guided product tour: show the camera as a preview, bypassing the venue/GPS
   // gate. The tour overlay (TourHost) blocks all touches, so no scan can run.
   const tour = route.params?.tour === true;
+  // __DEV__ direct-GLB render test: a full GLB URL passed from the dev
+  // Health-Check board. When present, the native AR view loads THIS model and
+  // auto-places it ~1.2 m in front of the camera (placeInFront) with NO scan and
+  // NO recognition — a pure "does the native SceneView/Filament renderer show a
+  // GLB on this device" probe. Read only in dev; constant-folded to null in
+  // release so this path is fully inert for normal users. Typed via a local cast
+  // so no shared navigation param type has to change for a dev-only probe.
+  const devDirectGlb = __DEV__
+    ? (route.params as {devDirectGlb?: string} | undefined)?.devDirectGlb ?? null
+    : null;
+  // __DEV__ Cloud Anchor harness: 'host' places the direct-GLB test model then
+  // hosts its anchor as a persistent Cloud Anchor; 'resolve' resolves a saved/
+  // pasted anchor ID and attaches the test model at the resolved pose. Only ever
+  // passed by the dev Health-Check board (always together with devDirectGlb);
+  // constant-folded to null in release like devDirectGlb above.
+  const devCloudAnchor = __DEV__
+    ? (route.params as {devCloudAnchor?: 'host' | 'resolve'} | undefined)
+        ?.devCloudAnchor ?? null
+    : null;
   // Geofence bypass ONLY — the venue lock is skipped in dev builds so the AR
   // experience can be tested anywhere (e.g. at home), and by the dev picker /
-  // guided tour previews. Production (__DEV__ === false, constant-folded out of
-  // release bundles) always enforces the geofence. NOTE: this deliberately does
-  // NOT bypass the families safety notice below — that must show for everyone.
-  const geofenceBypass = __DEV__ || devPicker || tour;
+  // guided tour previews / direct-GLB test. Production (__DEV__ === false,
+  // constant-folded out of release bundles) always enforces the geofence. NOTE:
+  // this deliberately does NOT bypass the families safety notice below — that
+  // must show for everyone.
+  const geofenceBypass = __DEV__ || devPicker || tour || devDirectGlb != null;
 
   const {hasPermission, requestPermission} = useCameraPermission();
   const {arAvailable, arChecked} = useARCore();
@@ -714,12 +754,35 @@ const DetectArScreen: React.FC = () => {
   const allowUngrounded = devPicker || (__DEV__ && !inVenue);
   const effectiveVenue = allowUngrounded ? venueSlug || 'dev' : venueSlug;
 
+  // __DEV__ AR harness params only work on the NATIVE AR path. If this device
+  // fell back to the 2D scan screen (no ARCore / module missing), say so
+  // instead of silently dropping them — a plain scan screen here would fire
+  // real recognize calls and make the harness look unwired.
+  if (__DEV__ && (devCloudAnchor || devDirectGlb) && !useNativeAR) {
+    return (
+      <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+        <View style={styles.fallbackBlock}>
+          <Text style={styles.fallbackHeading}>Dev AR harness unavailable</Text>
+          <Text style={styles.fallbackBody}>
+            This test needs the native ARCore view; this device/emulator fell
+            back to the 2D scan path.
+          </Text>
+          <Pressable onPress={handleClose} hitSlop={8}>
+            <Text style={styles.fallbackDismiss}>Close</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (useNativeAR) {
     return (
       <DetectARNative
         venueSlug={effectiveVenue}
         allowUngrounded={allowUngrounded}
         onClose={handleClose}
+        devDirectGlb={devDirectGlb}
+        devCloudAnchor={devCloudAnchor}
       />
     );
   }
@@ -808,7 +871,25 @@ const DetectARNative: React.FC<{
   venueSlug: string;
   onClose: () => void;
   allowUngrounded?: boolean;
-}> = ({venueSlug, onClose, allowUngrounded = false}) => {
+  /**
+   * __DEV__ direct-GLB render test: a full GLB URL. When set, the model is
+   * loaded through the production cache path and auto-placed in front of the
+   * camera (placeInFront) with no scan. Always null/absent in release.
+   */
+  devDirectGlb?: string | null;
+  /**
+   * __DEV__ Cloud Anchor harness mode. 'host' keeps the direct-GLB auto-place
+   * and adds the host overlay; 'resolve' loads the test GLB WITHOUT placing it
+   * and adds the resolve overlay. Always null/absent in release.
+   */
+  devCloudAnchor?: 'host' | 'resolve' | null;
+}> = ({
+  venueSlug,
+  onClose,
+  allowUngrounded = false,
+  devDirectGlb = null,
+  devCloudAnchor = null,
+}) => {
   const {t} = useTranslation();
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
@@ -842,9 +923,26 @@ const DetectARNative: React.FC<{
   // on reset / a fresh Detect so the next scan re-anchors.
   const placedAiTextRef = useRef<string | null>(null);
 
+  // __DEV__ direct-GLB test: fired-once guard so the auto-place runs a single
+  // time once tracking is up (the effect re-runs on every tracking/render tick).
+  const directPlacedRef = useRef(false);
+
+  // __DEV__ Cloud Anchor harness: last native lifecycle event, surfaced on the
+  // overlay. Cleared when the session rebuilds (onReady re-fires) so the
+  // overlay's state machine returns to idle instead of showing a stale state.
+  const [cloudAnchorEvent, setCloudAnchorEvent] =
+    useState<CloudAnchorEvent | null>(null);
+  const handleCloudAnchorEvent = useCallback((e: CloudAnchorEvent) => {
+    console.log('[cloud-anchor]', e);
+    setCloudAnchorEvent(e);
+  }, []);
+  // __DEV__ resolve mode: fired-once guard for arming the test GLB (no placing).
+  const resolveGlbArmedRef = useRef(false);
+
   const handleReady = useCallback(() => {
     setStatus(prev => (prev === 'placed' ? prev : 'searching'));
-  }, []);
+    if (devCloudAnchor) setCloudAnchorEvent(null);
+  }, [devCloudAnchor]);
 
   const handleDetect = useCallback(() => {
     if (detecting) return;
@@ -983,21 +1081,87 @@ const DetectARNative: React.FC<{
     setArCardShown(true); // AR cards now anchored → hide the on-screen card
   }, [allowUngrounded, resolved]);
 
+  // __DEV__ DIRECT-GLB RENDER TEST — no scan, no recognition.
+  //
+  // When a devDirectGlb URL is supplied (only from the dev Health-Check board),
+  // wait until ARCore is TRACKING, run the URL through the SAME production cache
+  // path (getOrFetchGlb → file:// on the device), set it as the model, and call
+  // the native placeInFront() to anchor it ~1.2 m ahead of the camera. Native
+  // defers the actual placement until BOTH the glbUri prop and TRACKING are
+  // satisfied (tryPlacePending), so the prop update and the command can race
+  // freely. Fires once (directPlacedRef). Fully inert in release: __DEV__ is
+  // false and devDirectGlb is null, so this whole effect body is dead.
+  useEffect(() => {
+    if (!__DEV__ || !devDirectGlb) return;
+    // Cloud Anchor RESOLVE mode must NOT auto-place — the model's pose comes
+    // from the resolved anchor, not from placeInFront. (HOST mode keeps the
+    // auto-place: it hosts the anchor this effect creates.)
+    if (devCloudAnchor === 'resolve') return;
+    if (!tracking || directPlacedRef.current) return;
+    directPlacedRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const uri = await getOrFetchGlb(devDirectGlb);
+        if (cancelled) return;
+        setGlbUri(uri);
+        arRef.current?.placeInFront();
+        setStatus(prev => (prev === 'placed' ? prev : 'ready'));
+      } catch {
+        directPlacedRef.current = false; // allow a retry on the next tracking tick
+        setErrorMessage('Direct GLB load failed');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [devDirectGlb, devCloudAnchor, tracking]);
+
+  // __DEV__ CLOUD ANCHOR RESOLVE MODE — arm the test model WITHOUT placing it.
+  //
+  // The GLB runs through the same production cache path and is set as the
+  // glbUri prop only; the native side attaches it to the anchor returned by
+  // resolveCloudAnchor (immediately if the prop already landed, else via the
+  // setGlbUri progressive-swap branch when the download finishes). Fully inert
+  // in release: devCloudAnchor is constant-folded to null.
+  useEffect(() => {
+    if (!__DEV__ || devCloudAnchor !== 'resolve' || !devDirectGlb) return;
+    if (resolveGlbArmedRef.current) return;
+    resolveGlbArmedRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const uri = await getOrFetchGlb(devDirectGlb);
+        if (cancelled) return;
+        setGlbUri(uri);
+      } catch {
+        resolveGlbArmedRef.current = false;
+        setErrorMessage('Direct GLB load failed');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [devCloudAnchor, devDirectGlb]);
+
   return (
     <View style={styles.root}>
       <EpocheyeDetectARView
         ref={arRef}
         style={StyleSheet.absoluteFill}
         glbUri={glbUri ?? undefined}
+        modelScale={devDirectGlb ? DIRECT_GLB_TEST_SCALE_M : undefined}
         cardData={
           resolved.kind === 'grounded' ? JSON.stringify(resolved.card) : undefined
         }
+        cloudAnchorsEnabled={devCloudAnchor != null}
         onReady={handleReady}
         onTrackingState={handleTrackingState}
         onPlaneDetected={handlePlaneDetected}
         onAnchorPlaced={handleAnchorPlaced}
         onError={handleError}
         onFrameCaptured={handleFrameCaptured}
+        onCloudAnchorEvent={devCloudAnchor ? handleCloudAnchorEvent : undefined}
       />
 
       <ARActivationOverlay
@@ -1006,6 +1170,17 @@ const DetectARNative: React.FC<{
       />
 
       <ScanGuideOverlay phase={scanPhase} ready={tracking} />
+
+      {devCloudAnchor && DevCloudAnchorOverlay ? (
+        <DevCloudAnchorOverlay
+          mode={devCloudAnchor}
+          tracking={tracking}
+          placed={status === 'placed'}
+          lastEvent={cloudAnchorEvent}
+          onHost={ttlDays => arRef.current?.hostCloudAnchor(ttlDays)}
+          onResolve={id => arRef.current?.resolveCloudAnchor(id)}
+        />
+      ) : null}
 
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">
@@ -1020,15 +1195,22 @@ const DetectARNative: React.FC<{
               {`${tracking ? t('lens.stateTracking') : t('lens.stateScanning')} · ${t('lens.worldAnchored')}`}
             </Text>
           </View>
-          <Pressable
-            onPress={handleReset}
-            hitSlop={12}
-            style={[styles.iconButton, status !== 'placed' && styles.iconButtonDisabled]}>
-            <RefreshCcw
-              size={16}
-              color={status === 'placed' ? '#FFFFFF' : 'rgba(255,255,255,0.35)'}
-            />
-          </Pressable>
+          {/* Cloud Anchor harness: Reset detaches the very anchor a host is
+              mapping (and dead-ends the fire-once auto-place), so it is hidden
+              in that dev mode — relaunch from the health board instead. */}
+          {!devCloudAnchor ? (
+            <Pressable
+              onPress={handleReset}
+              hitSlop={12}
+              style={[styles.iconButton, status !== 'placed' && styles.iconButtonDisabled]}>
+              <RefreshCcw
+                size={16}
+                color={status === 'placed' ? '#FFFFFF' : 'rgba(255,255,255,0.35)'}
+              />
+            </Pressable>
+          ) : (
+            <View style={styles.iconButton} />
+          )}
         </View>
         {remaining != null ? (
           <View style={styles.scansPill} pointerEvents="none">
@@ -1068,19 +1250,24 @@ const DetectARNative: React.FC<{
         )}
 
         <View style={styles.buttonRow} pointerEvents="box-none">
-          <Pressable
-            onPress={handleDetect}
-            disabled={detecting}
-            style={[styles.detectButton, detecting && styles.detectButtonBusy]}>
-            {detecting ? (
-              <ActivityIndicator color="#1A0F00" />
-            ) : (
-              <>
-                <ScanSearch size={18} color="#1A0F00" />
-                <Text style={styles.detectButtonText}>{t('lens.detect')}</Text>
-              </>
-            )}
-          </Pressable>
+          {/* Cloud Anchor harness: a Detect scan re-places/clears the anchor
+              being hosted (and can navigate to the paywall), so the scan
+              button is hidden in that dev mode — the overlay drives the flow. */}
+          {!devCloudAnchor && (
+            <Pressable
+              onPress={handleDetect}
+              disabled={detecting}
+              style={[styles.detectButton, detecting && styles.detectButtonBusy]}>
+              {detecting ? (
+                <ActivityIndicator color="#1A0F00" />
+              ) : (
+                <>
+                  <ScanSearch size={18} color="#1A0F00" />
+                  <Text style={styles.detectButtonText}>{t('lens.detect')}</Text>
+                </>
+              )}
+            </Pressable>
+          )}
           {status === 'placed' && (
             <Pressable onPress={handleYaw} style={styles.roundButton}>
               <RotateCw size={20} color="#1A0F00" />

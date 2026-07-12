@@ -97,6 +97,14 @@ export const STORAGE_KEYS = {
     /** latest_version the user dismissed the soft "update available" nudge for. */
     OPTIONAL_DISMISSED_VERSION: `${STORAGE_PREFIX}/update_optional_dismissed_version`,
   },
+
+  /**
+   * Dev-only harness keys — only read/written from __DEV__ code paths.
+   */
+  DEV: {
+    /** Last ARCore Cloud Anchor ID hosted by the dev harness (host → resolve round trip). */
+    CLOUD_ANCHOR_ID: `${STORAGE_PREFIX}/dev_cloud_anchor_id`,
+  },
 } as const;
 
 /**
@@ -112,4 +120,5 @@ export type StorageKey =
   | (typeof STORAGE_KEYS.LENS)[keyof typeof STORAGE_KEYS.LENS]
   | (typeof STORAGE_KEYS.ANALYTICS)[keyof typeof STORAGE_KEYS.ANALYTICS]
   | (typeof STORAGE_KEYS.DIAGNOSTICS)[keyof typeof STORAGE_KEYS.DIAGNOSTICS]
-  | (typeof STORAGE_KEYS.UPDATE)[keyof typeof STORAGE_KEYS.UPDATE];
+  | (typeof STORAGE_KEYS.UPDATE)[keyof typeof STORAGE_KEYS.UPDATE]
+  | (typeof STORAGE_KEYS.DEV)[keyof typeof STORAGE_KEYS.DEV];

@@ -28,18 +28,36 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+/**
+ * Cloud Anchor host/resolve lifecycle event (dev harness).
+ * `state` is 'HOSTING' | 'RESOLVING' while in flight, an ARCore
+ * Anchor.CloudAnchorState name ('SUCCESS', 'ERROR_NOT_AUTHORIZED', …) on
+ * completion, or a native-side guard code ('INSUFFICIENT_QUALITY',
+ * 'ERROR_NO_ANCHOR', …) when the call never left the device.
+ */
+export interface CloudAnchorEvent {
+  phase: 'host' | 'resolve';
+  state: string;
+  cloudAnchorId?: string;
+  quality?: string;
+  message?: string;
+}
+
 interface NativeProps {
   style?: ViewStyle;
   glbUri?: string;
   modelScale?: number;
   /** Grounded card JSON to render as a world-anchored 3D panel. */
   cardData?: string;
+  /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
+  cloudAnchorsEnabled?: boolean;
   onARReady?: () => void;
   onPlaneDetected?: () => void;
   onTrackingState?: (event: {nativeEvent: {state: string}}) => void;
   onAnchorPlaced?: (event: {nativeEvent: {label: string}}) => void;
   onARError?: (event: {nativeEvent: {error: string}}) => void;
   onFrameCaptured?: (event: {nativeEvent: {uri: string}}) => void;
+  onCloudAnchorEvent?: (event: {nativeEvent: CloudAnchorEvent}) => void;
 }
 
 const NativeDetectARView = ((): HostComponent<NativeProps> | null => {
@@ -68,6 +86,10 @@ export interface EpocheyeDetectARHandle {
   clearAnchor: () => void;
   nudgeYaw: (deg: number) => void;
   captureFrame: () => void;
+  /** DEV: host the currently placed anchor as an ARCore Cloud Anchor (TTL 1–365 days). */
+  hostCloudAnchor: (ttlDays: number) => void;
+  /** DEV: resolve a Cloud Anchor ID; the current glbUri model attaches at the resolved pose. */
+  resolveCloudAnchor: (cloudAnchorId: string) => void;
 }
 
 interface Props {
@@ -76,6 +98,8 @@ interface Props {
   modelScale?: number;
   /** Grounded card JSON → world-anchored 3D data panel beside the model. */
   cardData?: string;
+  /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
+  cloudAnchorsEnabled?: boolean;
   onReady?: () => void;
   onPlaneDetected?: () => void;
   /** ARCore camera tracking state, e.g. 'TRACKING' | 'PAUSED' | 'STOPPED'. */
@@ -84,6 +108,8 @@ interface Props {
   onError?: (error: string) => void;
   /** file:// uri of the captured ARCore camera frame. */
   onFrameCaptured?: (uri: string) => void;
+  /** DEV: Cloud Anchor host/resolve lifecycle events. */
+  onCloudAnchorEvent?: (event: CloudAnchorEvent) => void;
 }
 
 const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
@@ -93,12 +119,14 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       glbUri,
       modelScale,
       cardData,
+      cloudAnchorsEnabled,
       onReady,
       onPlaneDetected,
       onTrackingState,
       onAnchorPlaced,
       onError,
       onFrameCaptured,
+      onCloudAnchorEvent,
     },
     ref,
   ) => {
@@ -120,6 +148,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         clearAnchor: commands.clearAnchor,
         nudgeYaw: commands.nudgeYaw,
         captureFrame: commands.captureFrame,
+        hostCloudAnchor: commands.hostCloudAnchor,
+        resolveCloudAnchor: commands.resolveCloudAnchor,
       };
     }, []);
 
@@ -128,7 +158,15 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       args: Array<number | string>,
     ) => {
       const handle = findNodeHandle(viewRef.current as never);
-      if (handle == null || commandId == null) return;
+      if (commandId == null) {
+        // A command missing from getCommandsMap/commandIds is otherwise a
+        // silent no-op — surface it while developing.
+        if (__DEV__) {
+          console.warn('[EpocheyeDetectARView] unknown native command', args);
+        }
+        return;
+      }
+      if (handle == null) return;
       UIManager.dispatchViewManagerCommand(handle, commandId as number, args);
     };
 
@@ -145,6 +183,10 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         clearAnchor: () => dispatch(commandIds?.clearAnchor, []),
         nudgeYaw: deg => dispatch(commandIds?.nudgeYaw, [deg]),
         captureFrame: () => dispatch(commandIds?.captureFrame, []),
+        hostCloudAnchor: ttlDays =>
+          dispatch(commandIds?.hostCloudAnchor, [ttlDays]),
+        resolveCloudAnchor: cloudAnchorId =>
+          dispatch(commandIds?.resolveCloudAnchor, [cloudAnchorId]),
       }),
       [commandIds],
     );
@@ -160,6 +202,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         glbUri={glbUri}
         modelScale={modelScale}
         cardData={cardData}
+        cloudAnchorsEnabled={cloudAnchorsEnabled}
         onARReady={onReady}
         onPlaneDetected={onPlaneDetected}
         onTrackingState={
@@ -183,6 +226,12 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           onFrameCaptured
             ? (e: {nativeEvent: {uri: string}}) =>
                 onFrameCaptured(e.nativeEvent.uri)
+            : undefined
+        }
+        onCloudAnchorEvent={
+          onCloudAnchorEvent
+            ? (e: {nativeEvent: CloudAnchorEvent}) =>
+                onCloudAnchorEvent(e.nativeEvent)
             : undefined
         }
       />

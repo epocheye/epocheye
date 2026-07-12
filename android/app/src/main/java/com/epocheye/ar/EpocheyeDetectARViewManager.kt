@@ -61,6 +61,17 @@ class EpocheyeDetectARViewManager(
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onFrameCaptured", event)
         }
+        view.onCloudAnchorEvent = { phase, state, cloudAnchorId, quality, message ->
+            val event = Arguments.createMap().apply {
+                putString("phase", phase)
+                putString("state", state)
+                cloudAnchorId?.let { putString("cloudAnchorId", it) }
+                quality?.let { putString("quality", it) }
+                message?.let { putString("message", it) }
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onCloudAnchorEvent", event)
+        }
 
         return view
     }
@@ -80,6 +91,11 @@ class EpocheyeDetectARViewManager(
         view.setCardData(json)
     }
 
+    @ReactProp(name = "cloudAnchorsEnabled", defaultBoolean = false)
+    fun setCloudAnchorsEnabled(view: EpocheyeDetectARView, enabled: Boolean) {
+        view.setCloudAnchorsEnabled(enabled)
+    }
+
     override fun getCommandsMap(): Map<String, Int> {
         return MapBuilder.builder<String, Int>()
             .put("placeAtScreenPoint", CMD_PLACE_AT_SCREEN_POINT)
@@ -89,6 +105,8 @@ class EpocheyeDetectARViewManager(
             .put("clearAnchor", CMD_CLEAR_ANCHOR)
             .put("nudgeYaw", CMD_NUDGE_YAW)
             .put("captureFrame", CMD_CAPTURE_FRAME)
+            .put("hostCloudAnchor", CMD_HOST_CLOUD_ANCHOR)
+            .put("resolveCloudAnchor", CMD_RESOLVE_CLOUD_ANCHOR)
             .build()
     }
 
@@ -122,6 +140,14 @@ class EpocheyeDetectARViewManager(
                 view.nudgeYaw(deg)
             }
             CMD_CAPTURE_FRAME -> view.captureFrame()
+            CMD_HOST_CLOUD_ANCHOR -> {
+                val ttlDays = args?.getDouble(0)?.toInt() ?: 365
+                view.hostCloudAnchor(ttlDays)
+            }
+            CMD_RESOLVE_CLOUD_ANCHOR -> {
+                val id = args?.getString(0) ?: return
+                view.resolveCloudAnchor(id)
+            }
         }
     }
 
@@ -154,6 +180,14 @@ class EpocheyeDetectARViewManager(
                 view.nudgeYaw(deg)
             }
             "captureFrame" -> view.captureFrame()
+            "hostCloudAnchor" -> {
+                val ttlDays = args?.getDouble(0)?.toInt() ?: 365
+                view.hostCloudAnchor(ttlDays)
+            }
+            "resolveCloudAnchor" -> {
+                val id = args?.getString(0) ?: return
+                view.resolveCloudAnchor(id)
+            }
         }
     }
 
@@ -165,6 +199,7 @@ class EpocheyeDetectARViewManager(
             .put("onAnchorPlaced", MapBuilder.of("registrationName", "onAnchorPlaced"))
             .put("onARError", MapBuilder.of("registrationName", "onARError"))
             .put("onFrameCaptured", MapBuilder.of("registrationName", "onFrameCaptured"))
+            .put("onCloudAnchorEvent", MapBuilder.of("registrationName", "onCloudAnchorEvent"))
             .build()
     }
 
@@ -181,5 +216,7 @@ class EpocheyeDetectARViewManager(
         private const val CMD_CAPTURE_FRAME = 5
         private const val CMD_PLACE_IN_FRONT = 6
         private const val CMD_PLACE_CARDS_ONLY = 7
+        private const val CMD_HOST_CLOUD_ANCHOR = 8
+        private const val CMD_RESOLVE_CLOUD_ANCHOR = 9
     }
 }

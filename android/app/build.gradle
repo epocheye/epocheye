@@ -180,6 +180,14 @@ dependencies {
     implementation 'io.github.sceneview:arsceneview:4.18.0'
     implementation 'androidx.lifecycle:lifecycle-process:2.7.0'
 
+    // Cloud Anchors KEYLESS auth for the DEV-ONLY host/resolve harness (365-day
+    // TTL requires keyless; an API key caps TTL at 1 day). ARCore discovers this
+    // at runtime via reflection — no code imports it. debugImplementation keeps
+    // the release AAB dependency graph untouched; release builds never enable
+    // cloudAnchorMode anyway.
+    // 21.5.0 matches react-native-firebase_app's play-services-auth pin.
+    debugImplementation 'com.google.android.gms:play-services-auth:21.5.0'
+
     // Jetpack Compose — the native AR views host SceneView 4.18.0's ARSceneView
     // composable inside a ComposeView. BOM matches the one arsceneview 4.18.0
     // resolves (compose-bom 2026.05.01) so runtime/ui versions stay aligned.

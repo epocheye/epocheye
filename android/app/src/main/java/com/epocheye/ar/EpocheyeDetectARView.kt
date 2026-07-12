@@ -17,11 +17,14 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import com.facebook.react.uimanager.ThemedReactContext
 import com.google.android.filament.Engine
 import com.google.android.filament.IndirectLight
+import com.google.ar.core.Anchor
 import com.google.ar.core.Config
 import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
+import com.google.ar.core.HostCloudAnchorFuture
 import com.google.ar.core.Plane
 import com.google.ar.core.Pose
+import com.google.ar.core.ResolveCloudAnchorFuture
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.node.AnchorNode
@@ -78,6 +81,14 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     var onAnchorPlaced: ((String) -> Unit)? = null
     var onARError: ((String) -> Unit)? = null
     var onFrameCaptured: ((String) -> Unit)? = null
+    /** Dev harness: Cloud Anchor host/resolve lifecycle (phase, state, id?, quality?, message?). */
+    var onCloudAnchorEvent: ((
+        phase: String,
+        state: String,
+        cloudAnchorId: String?,
+        quality: String?,
+        message: String?,
+    ) -> Unit)? = null
 
     // ── Compose-hosted scene ─────────────────────────────────────────────────
     // A single root node is created inside the ARSceneView content DSL and captured
@@ -94,6 +105,12 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     @Volatile private var materialLoader: MaterialLoader? = null
     @Volatile private var arSession: Session? = null
     @Volatile private var arFrame: Frame? = null
+
+    // Cloud Anchors stay DISABLED unless the dev harness flips this prop; the
+    // production scan flow never sets it, so release sessions are unchanged.
+    @Volatile private var cloudAnchorsEnabled = false
+    private var hostFuture: HostCloudAnchorFuture? = null
+    private var resolveFuture: ResolveCloudAnchorFuture? = null
 
     private var currentAnchorNode: AnchorNode? = null
     private var currentModelNode: ModelNode? = null
@@ -231,6 +248,17 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         // Hide the dotted plane-visualization grid. Plane DETECTION
                         // stays on (planeFindingMode below) so hit-testing works.
                         planeRenderer = false,
+                        // Cloud Anchor mode MUST be set via this direct composable
+                        // param — SceneView applies its own cloudAnchorMode param
+                        // authoritatively and overrides whatever the
+                        // sessionConfiguration lambda sets (verified on-device: the
+                        // lambda assignment did not enable it). Read at composition
+                        // time; the prop sets the flag before creation, and
+                        // rebuildAR() re-composes for the late-prop case. DISABLED
+                        // (the default) in production, where the flag is never set.
+                        cloudAnchorMode =
+                            if (cloudAnchorsEnabled) Config.CloudAnchorMode.ENABLED
+                            else Config.CloudAnchorMode.DISABLED,
                         sessionConfiguration = { _, config ->
                             config.geospatialMode = Config.GeospatialMode.DISABLED
                             config.planeFindingMode =
@@ -245,6 +273,15 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         },
                         onSessionCreated = { session ->
                             arSession = session
+                            Log.i(
+                                TAG,
+                                "session created cloudAnchorMode=" +
+                                    try {
+                                        session.config.cloudAnchorMode.name
+                                    } catch (t: Throwable) {
+                                        "?"
+                                    },
+                            )
                         },
                         onSessionUpdated = { session, frame ->
                             arSession = session
@@ -749,7 +786,298 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         }
     }
 
+    // ── Cloud Anchors (dev harness) ──────────────────────────────────────────
+
+    /**
+     * Enable/disable ARCore Cloud Anchors on the session. Set from the
+     * `cloudAnchorsEnabled` prop (dev harness only) — a best-effort early enable.
+     * The authoritative enable is just-in-time in [ensureCloudAnchorModeEnabled],
+     * called from host/resolve, because prop timing vs session creation is racy on
+     * some devices. Same live-reconfigure pattern as [setPlaneFinding].
+     */
+    fun setCloudAnchorsEnabled(enabled: Boolean) {
+        if (enabled == cloudAnchorsEnabled) return
+        Log.i(TAG, "setCloudAnchorsEnabled($enabled)")
+        cloudAnchorsEnabled = enabled
+        // SceneView only reliably applies session config through the
+        // sessionConfiguration lambda at session CREATION (a post-hoc
+        // session.configure on its ARSession does not persist — proven on-device:
+        // cloudAnchorMode kept reverting to DISABLED). So when the flag flips on
+        // and a session already exists but nothing is placed yet (the prop flips
+        // once, at mount), rebuild the AR surface so the lambda enables cloud
+        // anchors at creation — exactly how planeFindingMode reliably sticks.
+        if (enabled && composeView != null && currentAnchorNode == null) {
+            Log.i(TAG, "rebuilding AR session to enable cloud anchors")
+            rebuildAR()
+        }
+    }
+
+    /**
+     * Tear down and recreate the Compose AR surface so a fresh ARCore session is
+     * created with the current [cloudAnchorsEnabled] flag applied by the
+     * sessionConfiguration lambda. Only used by the dev cloud-anchor path, and
+     * only before anything is placed, so no world content is lost.
+     */
+    private fun rebuildAR() {
+        composeView?.let {
+            try {
+                removeView(it)
+            } catch (t: Throwable) {
+                Log.w(TAG, "rebuildAR removeView failed", t)
+            }
+        }
+        composeView = null
+        engine = null
+        modelLoader = null
+        materialLoader = null
+        arSession = null
+        arFrame = null
+        sceneRoot = null
+        currentAnchorNode = null
+        currentModelNode = null
+        readyReported = false
+        planeReported = false
+        lastTrackingState = null
+        setupAR()
+    }
+
+    private fun emitCloudAnchorEvent(
+        phase: String,
+        state: String,
+        cloudAnchorId: String? = null,
+        quality: String? = null,
+        message: String? = null,
+    ) {
+        post { onCloudAnchorEvent?.invoke(phase, state, cloudAnchorId, quality, message) }
+    }
+
+    /**
+     * Force Cloud Anchor mode ENABLED on the live session, right before a host or
+     * resolve call. The prop-driven [setCloudAnchorsEnabled] + sessionConfiguration
+     * lambda can race session creation on some devices (observed:
+     * CloudAnchorsNotConfiguredException at host time), so we make the enable
+     * just-in-time and idempotent here. We also flip [cloudAnchorsEnabled] true so
+     * SceneView's per-frame config applier keeps the mode on afterwards (its lambda
+     * reads this flag). Only ever reached from the dev host/resolve commands, so
+     * release sessions — which never dispatch those — stay DISABLED. Returns true
+     * once the session reports ENABLED.
+     */
+    private fun ensureCloudAnchorModeEnabled(session: Session): Boolean {
+        cloudAnchorsEnabled = true
+        return try {
+            val config = session.config
+            if (config.cloudAnchorMode != Config.CloudAnchorMode.ENABLED) {
+                Log.i(TAG, "enabling cloudAnchorMode (was ${config.cloudAnchorMode})")
+                config.cloudAnchorMode = Config.CloudAnchorMode.ENABLED
+                session.configure(config)
+            }
+            session.config.cloudAnchorMode == Config.CloudAnchorMode.ENABLED
+        } catch (t: Throwable) {
+            Log.w(TAG, "ensureCloudAnchorModeEnabled failed", t)
+            false
+        }
+    }
+
+    /**
+     * Dev harness: host the CURRENTLY placed anchor as a persistent Cloud Anchor.
+     * Gates on [Session.estimateFeatureMapQualityForHosting] — an INSUFFICIENT map
+     * aborts with guidance instead of burning a doomed host request. The async
+     * result callback runs on the main thread (ARCore Future contract).
+     *
+     * Fully guarded: the command is dispatchable in release builds (where
+     * cloudAnchorMode is always DISABLED), so every ARCore throw must surface as
+     * an event, never a crash.
+     */
+    fun hostCloudAnchor(ttlDays: Int) {
+        val session = arSession ?: run {
+            emitCloudAnchorEvent("host", "ERROR_SESSION_NOT_READY")
+            return
+        }
+        val anchor = currentAnchorNode?.anchor ?: run {
+            emitCloudAnchorEvent("host", "ERROR_NO_ANCHOR", message = "place the model first")
+            return
+        }
+        // Cancel-and-replace any stale in-flight host (its terminal event can be
+        // swallowed while backgrounded) so a watchdog-driven retry actually runs
+        // instead of being refused forever. cancel() guarantees the old callback
+        // never fires.
+        try {
+            hostFuture?.cancel()
+        } catch (_: Throwable) {
+        }
+        hostFuture = null
+        // Force cloud-anchor mode on the live session NOW — prop-driven enabling
+        // can lose the race with session creation on some devices.
+        if (!ensureCloudAnchorModeEnabled(session)) {
+            emitCloudAnchorEvent(
+                "host",
+                "ERROR_NOT_CONFIGURED",
+                message = "could not enable cloud anchor mode",
+            )
+            return
+        }
+        val frame = arFrame
+        val camera = try {
+            frame?.camera?.takeIf { it.trackingState == TrackingState.TRACKING }
+        } catch (_: Throwable) {
+            null
+        }
+        if (camera == null) {
+            emitCloudAnchorEvent("host", "ERROR_NOT_TRACKING")
+            return
+        }
+        val quality = try {
+            session.estimateFeatureMapQualityForHosting(camera.pose)
+        } catch (t: Throwable) {
+            // NotTracking / SessionPaused / CloudAnchorsNotConfigured all land here.
+            Log.w(TAG, "estimateFeatureMapQualityForHosting failed", t)
+            emitCloudAnchorEvent("host", "ERROR_QUALITY_CHECK_FAILED", message = t.message)
+            return
+        }
+        if (quality == Session.FeatureMapQuality.INSUFFICIENT) {
+            emitCloudAnchorEvent(
+                "host",
+                "INSUFFICIENT_QUALITY",
+                quality = quality.name,
+                message = "move around the object to map more of it, then try again",
+            )
+            return
+        }
+        emitCloudAnchorEvent("host", "HOSTING", quality = quality.name)
+        hostFuture = try {
+            session.hostCloudAnchorAsync(anchor, ttlDays.coerceIn(1, 365)) { id, state ->
+                hostFuture = null
+                emitCloudAnchorEvent(
+                    "host",
+                    state.name,
+                    cloudAnchorId = id,
+                    quality = quality.name,
+                )
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "hostCloudAnchorAsync failed", t)
+            emitCloudAnchorEvent("host", "ERROR_HOST_CALL_FAILED", message = t.message)
+            null
+        }
+    }
+
+    /**
+     * Dev harness: resolve a previously hosted Cloud Anchor ID and attach the
+     * current test model to the resolved pose. The callback runs on the main
+     * thread; the model attaches via the same AnchorNode tail as [doPlaceInFront].
+     */
+    fun resolveCloudAnchor(cloudAnchorId: String) {
+        val session = arSession ?: run {
+            emitCloudAnchorEvent("resolve", "ERROR_SESSION_NOT_READY")
+            return
+        }
+        if (cloudAnchorId.isBlank()) {
+            emitCloudAnchorEvent("resolve", "ERROR_EMPTY_ID")
+            return
+        }
+        // Cancel-and-replace any stale in-flight resolve (see hostCloudAnchor).
+        try {
+            resolveFuture?.cancel()
+        } catch (_: Throwable) {
+        }
+        resolveFuture = null
+        // Force cloud-anchor mode on the live session NOW (see hostCloudAnchor).
+        if (!ensureCloudAnchorModeEnabled(session)) {
+            emitCloudAnchorEvent(
+                "resolve",
+                "ERROR_NOT_CONFIGURED",
+                cloudAnchorId = cloudAnchorId,
+                message = "could not enable cloud anchor mode",
+            )
+            return
+        }
+        emitCloudAnchorEvent("resolve", "RESOLVING", cloudAnchorId = cloudAnchorId)
+        resolveFuture = try {
+            session.resolveCloudAnchorAsync(cloudAnchorId) { anchor, state ->
+                resolveFuture = null
+                if (state == Anchor.CloudAnchorState.SUCCESS && anchor != null) {
+                    onCloudAnchorResolved(anchor, cloudAnchorId)
+                } else {
+                    try {
+                        anchor?.detach()
+                    } catch (_: Throwable) {
+                    }
+                    emitCloudAnchorEvent("resolve", state.name, cloudAnchorId = cloudAnchorId)
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "resolveCloudAnchorAsync failed", t)
+            emitCloudAnchorEvent(
+                "resolve",
+                "ERROR_RESOLVE_CALL_FAILED",
+                cloudAnchorId = cloudAnchorId,
+                message = t.message,
+            )
+            null
+        }
+    }
+
+    /**
+     * Resolve-success tail — mirrors [doPlaceInFront]'s anchor adoption. The
+     * callback can land after teardown (cleanup() nulls engine/sceneRoot), so
+     * everything is null-guarded. If the GLB prop hasn't arrived yet (slow first
+     * download), [setGlbUri]'s progressive-swap branch attaches the model to this
+     * anchor when it lands.
+     */
+    private fun onCloudAnchorResolved(anchor: Anchor, cloudAnchorId: String) {
+        val eng = engine
+        val root = sceneRoot
+        if (eng == null || root == null) {
+            try {
+                anchor.detach()
+            } catch (_: Throwable) {
+            }
+            emitCloudAnchorEvent(
+                "resolve",
+                "ERROR_NODE_CREATE_FAILED",
+                cloudAnchorId = cloudAnchorId,
+                message = "AR scene torn down",
+            )
+            return
+        }
+        clearCurrentAnchor()
+        val anchorNode = try {
+            AnchorNode(eng, anchor).also { root.addChildNode(it) }
+        } catch (t: Throwable) {
+            Log.e(TAG, "resolved anchor node create failed", t)
+            try {
+                anchor.detach()
+            } catch (_: Throwable) {
+            }
+            emitCloudAnchorEvent(
+                "resolve",
+                "ERROR_NODE_CREATE_FAILED",
+                cloudAnchorId = cloudAnchorId,
+                message = t.message,
+            )
+            return
+        }
+        currentAnchorNode = anchorNode
+        val uri = glbUri
+        if (uri != null) {
+            attachModel(anchorNode, uri)
+        }
+        emitCloudAnchorEvent(
+            "resolve",
+            "SUCCESS",
+            cloudAnchorId = cloudAnchorId,
+            message = if (uri == null) "resolved — model attaches when glbUri arrives" else null,
+        )
+    }
+
     private fun clearCurrentAnchor() {
+        // A live host future maps THIS anchor — detaching it mid-host is
+        // undocumented ARCore territory, so cancel first (production no-op).
+        try {
+            hostFuture?.cancel()
+        } catch (_: Throwable) {
+        }
+        hostFuture = null
         // Headlocked cards are parented to the scene (no anchor), so this must NOT
         // early-return on a null anchor — clean up cards explicitly in both cases.
         currentAnchorNode?.let { node ->
@@ -983,6 +1311,20 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     }
 
     fun cleanup() {
+        // Cancel in-flight Cloud Anchor futures BEFORE the anchor detach below and
+        // the Compose disposal (session close) — in-flight behavior across
+        // pause/close is undocumented. cleanup() runs twice (onDetachedFromWindow
+        // + onDropViewInstance); null-after-cancel keeps it idempotent.
+        try {
+            hostFuture?.cancel()
+        } catch (_: Throwable) {
+        }
+        hostFuture = null
+        try {
+            resolveFuture?.cancel()
+        } catch (_: Throwable) {
+        }
+        resolveFuture = null
         clearCurrentAnchor()
         // Removing the ComposeView detaches it → DisposeOnDetachedFromWindow tears
         // down the composition, releasing the AR session + Filament engine.

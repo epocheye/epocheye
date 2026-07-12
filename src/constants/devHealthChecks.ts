@@ -20,8 +20,18 @@ import { ROUTES, STORAGE_KEYS } from '../core/constants';
 import { navigateSafe } from '../navigation/navigationRef';
 import { useTourStore } from '../stores/tourStore';
 import { DEFAULT_MONUMENT_SLUG } from '../config/monuments';
-import { MARQUEE_MODEL_ID } from '../config/glbDelivery';
+import { MARQUEE_MODEL_ID, buildGlbUrl } from '../config/glbDelivery';
 import { resolveModelGlb } from '../services/glbSource';
+
+// ── Direct-GLB render test (no scan) ────────────────────────────────────────
+// A known Indian Museum statue model id that is ALREADY on the production CDN:
+// buildGlbUrl() → `${GLB_BASE_URL}/seated_buddha_oval_halo.glb`, verified to
+// return HTTP 200, Content-Type model/gltf-binary, ~9.66 MB (glTF magic bytes).
+// This is the exact URL the app resolves for this class_id in production, so the
+// test exercises the real delivery + native-render path. SWAP THIS ONE LINE to
+// probe a different model (any modelId under GLB_BASE_URL/<id>.glb).
+const DIRECT_GLB_TEST_MODEL_ID = 'seated_buddha_oval_halo';
+const DIRECT_GLB_TEST_URL = buildGlbUrl(DIRECT_GLB_TEST_MODEL_ID);
 
 export type HealthLaunch =
   | { kind: 'route'; route: string; params?: Record<string, unknown> }
@@ -213,6 +223,81 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
         }),
     },
     howToTest: 'Model renders in orbit/zoom viewer; X closes it.',
+  },
+  {
+    id: 'ar-direct-glb',
+    title: 'Direct GLB render test (no scan)',
+    group: 'Site & AR',
+    launch: {
+      kind: 'action',
+      label: 'Render sample GLB in AR',
+      run: () => {
+        if (!DIRECT_GLB_TEST_URL) {
+          Alert.alert(
+            'No GLB URL',
+            'GLB_BASE_URL is empty — set it in .env to run the direct render test.',
+          );
+          return;
+        }
+        // Straight to the NATIVE AR view with a hardcoded model + no recognition:
+        // DetectArScreen sees devDirectGlb, skips the scan/venue gate, and
+        // auto-places the model in front of the camera via placeInFront().
+        navigateSafe(ROUTES.MAIN.DETECT_AR, { devDirectGlb: DIRECT_GLB_TEST_URL });
+      },
+    },
+    requires: 'arcore',
+    howToTest:
+      'Bypasses recognition entirely: acknowledge the AR safety notice, let ARCore start tracking (move the phone slightly), and the sample statue should appear ~1.2 m in front of the camera in live AR. Proves the native SceneView/Filament renderer shows a GLB on this device. No animation (static model by design).',
+  },
+  {
+    id: 'ar-cloud-anchor-host',
+    title: 'AR — Host Cloud Anchor',
+    group: 'Site & AR',
+    launch: {
+      kind: 'action',
+      label: 'Place + host',
+      run: () => {
+        if (!DIRECT_GLB_TEST_URL) {
+          Alert.alert(
+            'No GLB URL',
+            'GLB_BASE_URL is empty — set it in .env to run the Cloud Anchor test.',
+          );
+          return;
+        }
+        navigateSafe(ROUTES.MAIN.DETECT_AR, {
+          devDirectGlb: DIRECT_GLB_TEST_URL,
+          devCloudAnchor: 'host',
+        });
+      },
+    },
+    requires: 'arcore',
+    howToTest:
+      'Needs the one-time GCP keyless setup (ARCore API enabled + Android OAuth client for the debug SHA-1). The sample statue auto-places ~1.2 m ahead once tracking; walk a slow arc around the spot for ~20 s, then tap "Host anchor (365d)". The overlay shows live quality/state — INSUFFICIENT_QUALITY means keep scanning and retry; ERROR_NOT_AUTHORIZED means the GCP setup is missing. On SUCCESS the Cloud Anchor ID shows on screen, is logged to Metro/adb, and is saved for the resolve test.',
+  },
+  {
+    id: 'ar-cloud-anchor-resolve',
+    title: 'AR — Resolve Cloud Anchor',
+    group: 'Site & AR',
+    launch: {
+      kind: 'action',
+      label: 'Resolve saved anchor',
+      run: () => {
+        if (!DIRECT_GLB_TEST_URL) {
+          Alert.alert(
+            'No GLB URL',
+            'GLB_BASE_URL is empty — set it in .env to run the Cloud Anchor test.',
+          );
+          return;
+        }
+        navigateSafe(ROUTES.MAIN.DETECT_AR, {
+          devDirectGlb: DIRECT_GLB_TEST_URL,
+          devCloudAnchor: 'resolve',
+        });
+      },
+    },
+    requires: 'arcore',
+    howToTest:
+      'Round-trip proof — works after a FULL app kill. The last hosted anchor ID is prefilled (or paste one). Point the camera at the physical spot that was hosted, tap Resolve; on SUCCESS the sample statue appears at the ORIGINAL hosted pose (world-locked, not camera-relative). ERROR_CLOUD_ID_NOT_FOUND = wrong/expired ID.',
   },
   {
     id: 'ai-guide',
