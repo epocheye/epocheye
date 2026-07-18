@@ -51,6 +51,12 @@ interface NativeProps {
   cardData?: string;
   /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
   cloudAnchorsEnabled?: boolean;
+  // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  /** Admin harness — arms depthMode AUTOMATIC at session creation (must be set
+   *  before the session is built; the live toggle alone can't enable it). */
+  depthArmed?: boolean;
+  /** Admin harness — live on/off for depth occlusion (camera-stream flag). */
+  depthOcclusionEnabled?: boolean;
   onARReady?: () => void;
   onPlaneDetected?: () => void;
   onTrackingState?: (event: {nativeEvent: {state: string}}) => void;
@@ -90,6 +96,8 @@ export interface EpocheyeDetectARHandle {
   hostCloudAnchor: (ttlDays: number) => void;
   /** DEV: resolve a Cloud Anchor ID; the current glbUri model attaches at the resolved pose. */
   resolveCloudAnchor: (cloudAnchorId: string) => void;
+  /** DEV: probe ARCore VPS availability at Konark; result logged natively under tag "VPS". */
+  checkKonarkVps: () => void;
 }
 
 interface Props {
@@ -100,6 +108,12 @@ interface Props {
   cardData?: string;
   /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
   cloudAnchorsEnabled?: boolean;
+  // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  /** Admin harness — arms depthMode AUTOMATIC at session creation (must be set
+   *  before the session is built; the live toggle alone can't enable it). */
+  depthArmed?: boolean;
+  /** Admin harness — live on/off for depth occlusion (camera-stream flag). */
+  depthOcclusionEnabled?: boolean;
   onReady?: () => void;
   onPlaneDetected?: () => void;
   /** ARCore camera tracking state, e.g. 'TRACKING' | 'PAUSED' | 'STOPPED'. */
@@ -120,6 +134,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       modelScale,
       cardData,
       cloudAnchorsEnabled,
+      depthArmed, // ADMIN-HARNESS (REMOVE AFTER KONARK)
+      depthOcclusionEnabled, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       onReady,
       onPlaneDetected,
       onTrackingState,
@@ -150,6 +166,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         captureFrame: commands.captureFrame,
         hostCloudAnchor: commands.hostCloudAnchor,
         resolveCloudAnchor: commands.resolveCloudAnchor,
+        checkKonarkVps: commands.checkKonarkVps,
       };
     }, []);
 
@@ -187,6 +204,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           dispatch(commandIds?.hostCloudAnchor, [ttlDays]),
         resolveCloudAnchor: cloudAnchorId =>
           dispatch(commandIds?.resolveCloudAnchor, [cloudAnchorId]),
+        checkKonarkVps: () => dispatch(commandIds?.checkKonarkVps, []),
       }),
       [commandIds],
     );
@@ -203,6 +221,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         modelScale={modelScale}
         cardData={cardData}
         cloudAnchorsEnabled={cloudAnchorsEnabled}
+        depthArmed={depthArmed} // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        depthOcclusionEnabled={depthOcclusionEnabled} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         onARReady={onReady}
         onPlaneDetected={onPlaneDetected}
         onTrackingState={

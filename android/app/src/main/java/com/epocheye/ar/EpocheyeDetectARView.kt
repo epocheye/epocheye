@@ -27,6 +27,8 @@ import com.google.ar.core.Pose
 import com.google.ar.core.ResolveCloudAnchorFuture
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.google.ar.core.VpsAvailability
+import io.github.sceneview.ar.camera.ARCameraStream // ADMIN-HARNESS (REMOVE AFTER KONARK)
 import io.github.sceneview.ar.node.AnchorNode
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.loaders.MaterialLoader
@@ -111,6 +113,19 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     @Volatile private var cloudAnchorsEnabled = false
     private var hostFuture: HostCloudAnchorFuture? = null
     private var resolveFuture: ResolveCloudAnchorFuture? = null
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    // Depth occlusion has two flags. depthArmed decides the SESSION depthMode at
+    // CREATION (AUTOMATIC vs DISABLED) — SceneView applies it authoritatively via
+    // the direct composable param and ignores a post-hoc session.configure (proven
+    // for cloudAnchorMode), so it must be known at creation; it is set from the
+    // admin harness being mounted. depthOcclusionEnabled is the live on/off the
+    // admin toggles — it only flips the captured camera stream's occlusion flag,
+    // which needs no reconfigure, so a placed model is preserved. Both default off,
+    // so regular users' sessions render exactly as before (depthMode DISABLED).
+    @Volatile private var depthArmed = false
+    @Volatile private var depthOcclusionEnabled = false
+    @Volatile private var arCameraStream: ARCameraStream? = null
 
     private var currentAnchorNode: AnchorNode? = null
     private var currentModelNode: ModelNode? = null
@@ -225,10 +240,20 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         }
                     }
                     val mainLight = rememberMainLightNode(eng)
+                    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                    // Own the camera stream so the depth-occlusion toggle can flip
+                    // it live (captured into arCameraStream below).
+                    val camStream = remember(matl) { ARCameraStream(matl) }
                     SideEffect {
                         engine = eng
                         modelLoader = ml
                         materialLoader = matl
+                        // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                        arCameraStream = camStream
+                        try {
+                            camStream.isDepthOcclusionEnabled = depthOcclusionEnabled
+                        } catch (_: Throwable) {
+                        }
                         // Boost the main directional light for some shading/relief.
                         try {
                             mainLight?.let {
@@ -259,6 +284,18 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         cloudAnchorMode =
                             if (cloudAnchorsEnabled) Config.CloudAnchorMode.ENABLED
                             else Config.CloudAnchorMode.DISABLED,
+                        // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                        // Depth mode MUST be set via this direct composable param at
+                        // CREATION — SceneView applies it authoritatively and ignores
+                        // a post-hoc session.configure (proven for cloudAnchorMode).
+                        // Armed whenever the admin harness is mounted; DISABLED
+                        // (default) for regular users, so the render path is
+                        // unchanged. The visible occlusion is the camera-stream flag
+                        // (depthOcclusionEnabled), toggled live in the SideEffect.
+                        cameraStream = camStream,
+                        depthMode =
+                            if (depthArmed) Config.DepthMode.AUTOMATIC
+                            else Config.DepthMode.DISABLED,
                         sessionConfiguration = { _, config ->
                             config.geospatialMode = Config.GeospatialMode.DISABLED
                             config.planeFindingMode =
@@ -282,6 +319,22 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                                         "?"
                                     },
                             )
+                            // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                            if (depthArmed) {
+                                val supported = try {
+                                    session.isDepthModeSupported(
+                                        Config.DepthMode.AUTOMATIC,
+                                    )
+                                } catch (_: Throwable) {
+                                    false
+                                }
+                                val mode = try {
+                                    session.config.depthMode.name
+                                } catch (_: Throwable) {
+                                    "?"
+                                }
+                                Log.i(TAG, "depth armed; AUTOMATIC supported=$supported sessionDepthMode=$mode")
+                            }
                         },
                         onSessionUpdated = { session, frame ->
                             arSession = session
@@ -812,6 +865,44 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         }
     }
 
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    /**
+     * Arm/disarm session depth. Set from the `depthArmed` prop (= admin harness
+     * mounted). Decides the session depthMode at CREATION via the direct composable
+     * param, because SceneView ignores a post-hoc session.configure for these modes
+     * (proven for cloudAnchorMode). Mirrors [setCloudAnchorsEnabled]: when it flips
+     * on and a session already exists but nothing is placed, rebuild so the fresh
+     * session is created with depthMode AUTOMATIC. Never set for regular users, so
+     * their sessions stay depthMode DISABLED.
+     */
+    fun setDepthArmed(enabled: Boolean) {
+        if (enabled == depthArmed) return
+        Log.i(TAG, "setDepthArmed($enabled)")
+        depthArmed = enabled
+        if (enabled && composeView != null && currentAnchorNode == null) {
+            Log.i(TAG, "rebuilding AR session to arm depth")
+            rebuildAR()
+        }
+    }
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    /**
+     * Live on/off for depth occlusion (admin toggle). Only flips the captured
+     * camera stream's occlusion flag — the depth texture is already produced when
+     * [depthArmed] set depthMode AUTOMATIC at creation — so this needs no
+     * reconfigure and a placed model is preserved. No-op until the stream exists.
+     */
+    fun setDepthOcclusionEnabled(enabled: Boolean) {
+        if (enabled == depthOcclusionEnabled) return
+        Log.i(TAG, "setDepthOcclusionEnabled($enabled) armed=$depthArmed")
+        depthOcclusionEnabled = enabled
+        try {
+            arCameraStream?.let { it.isDepthOcclusionEnabled = enabled }
+        } catch (t: Throwable) {
+            Log.w(TAG, "camera-stream occlusion flip failed", t)
+        }
+    }
+
     /**
      * Tear down and recreate the Compose AR surface so a fresh ARCore session is
      * created with the current [cloudAnchorsEnabled] flag applied by the
@@ -832,6 +923,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         materialLoader = null
         arSession = null
         arFrame = null
+        arCameraStream = null // ADMIN-HARNESS (REMOVE AFTER KONARK)
         sceneRoot = null
         currentAnchorNode = null
         currentModelNode = null
@@ -1068,6 +1160,52 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             cloudAnchorId = cloudAnchorId,
             message = if (uri == null) "resolved — model attaches when glbUri arrives" else null,
         )
+    }
+
+    /**
+     * Dev harness: probe ARCore Geospatial VPS coverage at Konark and log the
+     * result under tag [VPS_TAG]. Uses a THROWAWAY bare [Session] — no resume, no
+     * config, no camera — so it never touches the live AR scene; the check is a
+     * network geo-lookup that works on an un-resumed session (Google's documented
+     * temporary-session pattern).
+     *
+     * The check is async and the callback runs on the main thread, so the session
+     * is closed INSIDE the callback (after logging) — closing it earlier would
+     * cancel the future and the result would never arrive. Fully guarded: the
+     * command is dispatchable in release, so a failure must log, never crash.
+     */
+    fun checkKonarkVps() {
+        val session = try {
+            Session(context)
+        } catch (t: Throwable) {
+            // UnavailableArcoreNotInstalled/ApkTooOld/SdkTooOld/DeviceNotCompatible.
+            Log.e(VPS_TAG, "Session creation failed: ${t.message}", t)
+            return
+        }
+        try {
+            session.checkVpsAvailabilityAsync(KONARK_LAT, KONARK_LNG) { availability ->
+                val where = "Konark ($KONARK_LAT, $KONARK_LNG)"
+                when (availability) {
+                    VpsAvailability.AVAILABLE ->
+                        Log.i(VPS_TAG, "AVAILABLE at $where — VPS coverage present")
+                    VpsAvailability.UNAVAILABLE ->
+                        Log.i(VPS_TAG, "UNAVAILABLE at $where — no VPS coverage")
+                    else ->
+                        Log.w(VPS_TAG, "VPS check returned $availability at $where")
+                }
+                try {
+                    session.close()
+                } catch (t: Throwable) {
+                    Log.w(VPS_TAG, "session close failed", t)
+                }
+            }
+        } catch (t: Throwable) {
+            Log.e(VPS_TAG, "checkVpsAvailabilityAsync failed: ${t.message}", t)
+            try {
+                session.close()
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     private fun clearCurrentAnchor() {
@@ -1376,5 +1514,10 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
     companion object {
         private const val TAG = "EpocheyeDetectARView"
+
+        // Dev harness: Konark Sun Temple, for the VPS-availability probe.
+        private const val VPS_TAG = "VPS"
+        private const val KONARK_LAT = 19.8876
+        private const val KONARK_LNG = 86.0945
     }
 }
