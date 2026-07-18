@@ -57,6 +57,8 @@ interface NativeProps {
   depthArmed?: boolean;
   /** Admin harness — live on/off for depth occlusion (camera-stream flag). */
   depthOcclusionEnabled?: boolean;
+  /** Admin harness — start/stop ARCore Geospatial mode + Earth pose logging (tag "GEO"). */
+  geospatialEnabled?: boolean;
   onARReady?: () => void;
   onPlaneDetected?: () => void;
   onTrackingState?: (event: {nativeEvent: {state: string}}) => void;
@@ -114,6 +116,8 @@ interface Props {
   depthArmed?: boolean;
   /** Admin harness — live on/off for depth occlusion (camera-stream flag). */
   depthOcclusionEnabled?: boolean;
+  /** Admin harness — start/stop ARCore Geospatial mode + Earth pose logging (tag "GEO"). */
+  geospatialEnabled?: boolean;
   onReady?: () => void;
   onPlaneDetected?: () => void;
   /** ARCore camera tracking state, e.g. 'TRACKING' | 'PAUSED' | 'STOPPED'. */
@@ -136,6 +140,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       cloudAnchorsEnabled,
       depthArmed, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       depthOcclusionEnabled, // ADMIN-HARNESS (REMOVE AFTER KONARK)
+      geospatialEnabled, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       onReady,
       onPlaneDetected,
       onTrackingState,
@@ -223,6 +228,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         cloudAnchorsEnabled={cloudAnchorsEnabled}
         depthArmed={depthArmed} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         depthOcclusionEnabled={depthOcclusionEnabled} // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        geospatialEnabled={geospatialEnabled} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         onARReady={onReady}
         onPlaneDetected={onPlaneDetected}
         onTrackingState={

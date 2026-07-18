@@ -47,6 +47,10 @@ export interface DevCloudAnchorOverlayProps {
   depthOcclusion: boolean;
   /** Flip depth occlusion on the AR render path. */
   onToggleDepthOcclusion: (enabled: boolean) => void;
+  /** Current Geospatial harness state (START/STOP). */
+  geospatial: boolean;
+  /** Start/stop ARCore Geospatial mode + Earth pose logging (native tag "GEO"). */
+  onToggleGeospatial: (enabled: boolean) => void;
 }
 
 /** Extra operator hint for the states that always mean the same thing. */
@@ -79,6 +83,8 @@ const DevCloudAnchorOverlay: React.FC<DevCloudAnchorOverlayProps> = ({
   onCheckVps,
   depthOcclusion,
   onToggleDepthOcclusion,
+  geospatial,
+  onToggleGeospatial,
 }) => {
   const [anchorId, setAnchorId] = useState('');
   const [hostedId, setHostedId] = useState<string | null>(null);
@@ -248,6 +254,21 @@ const DevCloudAnchorOverlay: React.FC<DevCloudAnchorOverlayProps> = ({
                 : styles.buttonSecondaryText
             }>
             {`Depth occlusion: ${depthOcclusion ? 'ON' : 'OFF'}`}
+          </Text>
+        </Pressable>
+
+        {/* ADMIN-HARNESS (REMOVE AFTER KONARK)
+            Geospatial pipeline probe — START enables ARCore Geospatial mode
+            (rebuilds the session) and logs Earth state + pose accuracies under
+            native tag "GEO"; STOP restores the normal session. */}
+        <Pressable
+          onPress={() => onToggleGeospatial(!geospatial)}
+          style={[
+            styles.button,
+            geospatial ? styles.buttonToggleOn : styles.buttonSecondary,
+          ]}>
+          <Text style={geospatial ? styles.buttonText : styles.buttonSecondaryText}>
+            {`Geospatial tracking: ${geospatial ? 'STOP' : 'START'}`}
           </Text>
         </Pressable>
 

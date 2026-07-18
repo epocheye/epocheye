@@ -108,6 +108,12 @@ class EpocheyeDetectARViewManager(
         view.setDepthOcclusionEnabled(enabled)
     }
 
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    @ReactProp(name = "geospatialEnabled", defaultBoolean = false)
+    fun setGeospatialEnabled(view: EpocheyeDetectARView, enabled: Boolean) {
+        view.setGeospatialEnabled(enabled)
+    }
+
     override fun getCommandsMap(): Map<String, Int> {
         return MapBuilder.builder<String, Int>()
             .put("placeAtScreenPoint", CMD_PLACE_AT_SCREEN_POINT)

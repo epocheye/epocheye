@@ -947,6 +947,9 @@ const DetectARNative: React.FC<{
   // ADMIN-HARNESS (REMOVE AFTER KONARK) — depth-occlusion toggle state (default
   // off ⇒ the native render path is unchanged until an admin flips it).
   const [occlusionOn, setOcclusionOn] = useState(false);
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — geospatial harness START/STOP (default
+  // off ⇒ session stays geospatialMode DISABLED until an admin starts it).
+  const [geoActive, setGeoActive] = useState(false);
 
   const handleReady = useCallback(() => {
     setStatus(prev => (prev === 'placed' ? prev : 'searching'));
@@ -1166,6 +1169,7 @@ const DetectARNative: React.FC<{
         cloudAnchorsEnabled={devCloudAnchor != null}
         depthArmed={showAdminHarness} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         depthOcclusionEnabled={occlusionOn} // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        geospatialEnabled={geoActive} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         onReady={handleReady}
         onTrackingState={handleTrackingState}
         onPlaneDetected={handlePlaneDetected}
@@ -1195,6 +1199,8 @@ const DetectARNative: React.FC<{
           onCheckVps={() => arRef.current?.checkKonarkVps()}
           depthOcclusion={occlusionOn}
           onToggleDepthOcclusion={setOcclusionOn}
+          geospatial={geoActive}
+          onToggleGeospatial={setGeoActive}
         />
       ) : null}
 
