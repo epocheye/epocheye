@@ -40,7 +40,8 @@ export interface DevCloudAnchorOverlayProps {
   lastEvent: CloudAnchorEvent | null;
   onHost: (ttlDays: number) => void;
   onResolve: (cloudAnchorId: string) => void;
-  /** Probe ARCore VPS availability at Konark; result is logged natively (tag "VPS"). */
+  /** Probe ARCore VPS availability at the device's CURRENT location; result is
+   *  logged natively (tag "VPS"). */
   onCheckVps: () => void;
   // ADMIN-HARNESS (REMOVE AFTER KONARK)
   /** Current depth-occlusion toggle state. */
@@ -277,7 +278,7 @@ const DevCloudAnchorOverlay: React.FC<DevCloudAnchorOverlayProps> = ({
         <Pressable
           onPress={onCheckVps}
           style={[styles.button, styles.buttonSecondary]}>
-          <Text style={styles.buttonSecondaryText}>Check Konark VPS</Text>
+          <Text style={styles.buttonSecondaryText}>Check VPS here</Text>
         </Pressable>
       </View>
     </View>

@@ -125,7 +125,7 @@ class EpocheyeDetectARViewManager(
             .put("captureFrame", CMD_CAPTURE_FRAME)
             .put("hostCloudAnchor", CMD_HOST_CLOUD_ANCHOR)
             .put("resolveCloudAnchor", CMD_RESOLVE_CLOUD_ANCHOR)
-            .put("checkKonarkVps", CMD_CHECK_KONARK_VPS)
+            .put("checkVps", CMD_CHECK_VPS)
             .build()
     }
 
@@ -167,7 +167,11 @@ class EpocheyeDetectARViewManager(
                 val id = args?.getString(0) ?: return
                 view.resolveCloudAnchor(id)
             }
-            CMD_CHECK_KONARK_VPS -> view.checkKonarkVps()
+            CMD_CHECK_VPS -> {
+                val lat = args?.getDouble(0) ?: return
+                val lng = args?.getDouble(1) ?: return
+                view.checkVps(lat, lng)
+            }
         }
     }
 
@@ -208,7 +212,11 @@ class EpocheyeDetectARViewManager(
                 val id = args?.getString(0) ?: return
                 view.resolveCloudAnchor(id)
             }
-            "checkKonarkVps" -> view.checkKonarkVps()
+            "checkVps" -> {
+                val lat = args?.getDouble(0) ?: return
+                val lng = args?.getDouble(1) ?: return
+                view.checkVps(lat, lng)
+            }
         }
     }
 
@@ -239,6 +247,6 @@ class EpocheyeDetectARViewManager(
         private const val CMD_PLACE_CARDS_ONLY = 7
         private const val CMD_HOST_CLOUD_ANCHOR = 8
         private const val CMD_RESOLVE_CLOUD_ANCHOR = 9
-        private const val CMD_CHECK_KONARK_VPS = 10
+        private const val CMD_CHECK_VPS = 10
     }
 }

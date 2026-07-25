@@ -98,8 +98,9 @@ export interface EpocheyeDetectARHandle {
   hostCloudAnchor: (ttlDays: number) => void;
   /** DEV: resolve a Cloud Anchor ID; the current glbUri model attaches at the resolved pose. */
   resolveCloudAnchor: (cloudAnchorId: string) => void;
-  /** DEV: probe ARCore VPS availability at Konark; result logged natively under tag "VPS". */
-  checkKonarkVps: () => void;
+  /** DEV: probe ARCore VPS availability at the given lat/lng (the device's current
+   *  location); result logged natively under tag "VPS". */
+  checkVps: (latitude: number, longitude: number) => void;
 }
 
 interface Props {
@@ -171,7 +172,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         captureFrame: commands.captureFrame,
         hostCloudAnchor: commands.hostCloudAnchor,
         resolveCloudAnchor: commands.resolveCloudAnchor,
-        checkKonarkVps: commands.checkKonarkVps,
+        checkVps: commands.checkVps,
       };
     }, []);
 
@@ -209,7 +210,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           dispatch(commandIds?.hostCloudAnchor, [ttlDays]),
         resolveCloudAnchor: cloudAnchorId =>
           dispatch(commandIds?.resolveCloudAnchor, [cloudAnchorId]),
-        checkKonarkVps: () => dispatch(commandIds?.checkKonarkVps, []),
+        checkVps: (latitude, longitude) =>
+          dispatch(commandIds?.checkVps, [latitude, longitude]),
       }),
       [commandIds],
     );

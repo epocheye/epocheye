@@ -1196,7 +1196,26 @@ const DetectARNative: React.FC<{
           lastEvent={cloudAnchorEvent}
           onHost={ttlDays => arRef.current?.hostCloudAnchor(ttlDays)}
           onResolve={id => arRef.current?.resolveCloudAnchor(id)}
-          onCheckVps={() => arRef.current?.checkKonarkVps()}
+          onCheckVps={() => {
+            // Probe VPS at wherever the user is now: reuse the app's live GPS fix
+            // (usePlacesStore.currentLocation), priming tracking if it hasn't
+            // fired yet. Falls back to a warn log if no fix is available.
+            void (async () => {
+              const places = usePlacesStore.getState();
+              let loc = places.currentLocation;
+              if (!loc) {
+                await places.ensureLocationTracking();
+                loc = usePlacesStore.getState().currentLocation;
+              }
+              if (!loc) {
+                console.warn(
+                  '[VPS] no GPS fix yet — wait for location (go outdoors), then retry',
+                );
+                return;
+              }
+              arRef.current?.checkVps(loc.latitude, loc.longitude);
+            })();
+          }}
           depthOcclusion={occlusionOn}
           onToggleDepthOcclusion={setOcclusionOn}
           geospatial={geoActive}

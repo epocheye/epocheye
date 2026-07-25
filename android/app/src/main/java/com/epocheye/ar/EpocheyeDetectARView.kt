@@ -1284,18 +1284,19 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     }
 
     /**
-     * Dev harness: probe ARCore Geospatial VPS coverage at Konark and log the
-     * result under tag [VPS_TAG]. Uses a THROWAWAY bare [Session] — no resume, no
-     * config, no camera — so it never touches the live AR scene; the check is a
-     * network geo-lookup that works on an un-resumed session (Google's documented
-     * temporary-session pattern).
+     * Dev harness: probe ARCore Geospatial VPS coverage at an arbitrary
+     * (latitude, longitude) — the device's CURRENT location, passed down from JS —
+     * and log the result under tag [VPS_TAG]. Uses a THROWAWAY bare [Session] — no
+     * resume, no config, no camera — so it never touches the live AR scene; the
+     * check is a network geo-lookup that works on an un-resumed session (Google's
+     * documented temporary-session pattern).
      *
      * The check is async and the callback runs on the main thread, so the session
      * is closed INSIDE the callback (after logging) — closing it earlier would
      * cancel the future and the result would never arrive. Fully guarded: the
      * command is dispatchable in release, so a failure must log, never crash.
      */
-    fun checkKonarkVps() {
+    fun checkVps(latitude: Double, longitude: Double) {
         val session = try {
             Session(context)
         } catch (t: Throwable) {
@@ -1304,8 +1305,8 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             return
         }
         try {
-            session.checkVpsAvailabilityAsync(KONARK_LAT, KONARK_LNG) { availability ->
-                val where = "Konark ($KONARK_LAT, $KONARK_LNG)"
+            session.checkVpsAvailabilityAsync(latitude, longitude) { availability ->
+                val where = "current location (%.5f, %.5f)".format(latitude, longitude)
                 when (availability) {
                     VpsAvailability.AVAILABLE ->
                         Log.i(VPS_TAG, "AVAILABLE at $where — VPS coverage present")
@@ -1636,10 +1637,9 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     companion object {
         private const val TAG = "EpocheyeDetectARView"
 
-        // Dev harness: Konark Sun Temple, for the VPS-availability probe.
+        // Dev harness: VPS-availability probe log tag. Coordinates are the
+        // device's CURRENT location, passed in from JS per call.
         private const val VPS_TAG = "VPS"
-        private const val KONARK_LAT = 19.8876
-        private const val KONARK_LNG = 86.0945
 
         // ADMIN-HARNESS (REMOVE AFTER KONARK) — geospatial pipeline log tag.
         private const val GEO_TAG = "GEO"
