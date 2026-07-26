@@ -48,8 +48,14 @@ import EpocheyeDetectARView, {
   isDetectARAvailable,
   type CloudAnchorEvent,
   type EpocheyeDetectARHandle,
+  type GeospatialStateEvent, // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  type VpsResultEvent, // ADMIN-HARNESS (REMOVE AFTER KONARK)
 } from '../../native/EpocheyeDetectARView';
-import type {DevCloudAnchorOverlayProps} from '../Dev/DevCloudAnchorOverlay';
+// ADMIN-HARNESS (REMOVE AFTER KONARK) — statically imported (was __DEV__ require)
+// so the admin overlay ships in release, gated at render time by isAdminUser().
+import DevCloudAnchorOverlay from '../Dev/DevCloudAnchorOverlay';
+import {isAdminUser} from '../../shared/auth/isAdminUser';
+import {useUserStore} from '../../stores/userStore';
 import {useARCore} from '../../shared/hooks/useARCore';
 import {prepareImageForGemini} from '../../services/geminiVisionService';
 import {PermissionService} from '../../shared/services/permission.service';
@@ -93,13 +99,6 @@ const YAW_STEP_DEG = 15;
 // ~1.2 gives a human-scale statue that fills the frame. Tune this one line if the
 // test model looks too small/large. Never applied to the real recognition path.
 const DIRECT_GLB_TEST_SCALE_M = 1.2;
-
-// __DEV__ only: Cloud Anchor host/resolve harness overlay. The require is
-// constant-folded away by Metro in release, so the overlay (and its
-// AsyncStorage key handling) never ships. Same pattern as DevHealthCheckScreen
-// in MainNavigation.
-const DevCloudAnchorOverlay: React.ComponentType<DevCloudAnchorOverlayProps> | null =
-  __DEV__ ? require('../Dev/DevCloudAnchorOverlay').default : null;
 
 /** The only venue with a trained detector today. Overridable via route param. */
 const DEFAULT_DETECTOR_VENUE = 'indian-museum';
@@ -595,7 +594,11 @@ const DetectArScreen: React.FC = () => {
   // GLB on this device" probe. Read only in dev; constant-folded to null in
   // release so this path is fully inert for normal users. Typed via a local cast
   // so no shared navigation param type has to change for a dev-only probe.
-  const devDirectGlb = __DEV__
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — the harness now ships in release but is
+  // gated on the admin-email allowlist; __DEV__ keeps it on in debug for everyone.
+  const adminEmail = useUserStore(s => s.profile?.email);
+  const showAdminHarness = __DEV__ || isAdminUser(adminEmail);
+  const devDirectGlb = showAdminHarness
     ? (route.params as {devDirectGlb?: string} | undefined)?.devDirectGlb ?? null
     : null;
   // __DEV__ Cloud Anchor harness: 'host' places the direct-GLB test model then
@@ -603,7 +606,7 @@ const DetectArScreen: React.FC = () => {
   // pasted anchor ID and attaches the test model at the resolved pose. Only ever
   // passed by the dev Health-Check board (always together with devDirectGlb);
   // constant-folded to null in release like devDirectGlb above.
-  const devCloudAnchor = __DEV__
+  const devCloudAnchor = showAdminHarness
     ? (route.params as {devCloudAnchor?: 'host' | 'resolve'} | undefined)
         ?.devCloudAnchor ?? null
     : null;
@@ -758,7 +761,7 @@ const DetectArScreen: React.FC = () => {
   // fell back to the 2D scan screen (no ARCore / module missing), say so
   // instead of silently dropping them — a plain scan screen here would fire
   // real recognize calls and make the harness look unwired.
-  if (__DEV__ && (devCloudAnchor || devDirectGlb) && !useNativeAR) {
+  if (showAdminHarness && (devCloudAnchor || devDirectGlb) && !useNativeAR) {
     return (
       <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
         <View style={styles.fallbackBlock}>
@@ -783,6 +786,7 @@ const DetectArScreen: React.FC = () => {
         onClose={handleClose}
         devDirectGlb={devDirectGlb}
         devCloudAnchor={devCloudAnchor}
+        showAdminHarness={showAdminHarness} // ADMIN-HARNESS (REMOVE AFTER KONARK)
       />
     );
   }
@@ -883,12 +887,16 @@ const DetectARNative: React.FC<{
    * and adds the resolve overlay. Always null/absent in release.
    */
   devCloudAnchor?: 'host' | 'resolve' | null;
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — admin (or dev) → show the harness overlay
+  // (mode-less: VPS probe + depth-occlusion toggle) over the plain scan screen too.
+  showAdminHarness?: boolean;
 }> = ({
   venueSlug,
   onClose,
   allowUngrounded = false,
   devDirectGlb = null,
   devCloudAnchor = null,
+  showAdminHarness = false,
 }) => {
   const {t} = useTranslation();
   const navigation =
@@ -938,6 +946,22 @@ const DetectARNative: React.FC<{
   }, []);
   // __DEV__ resolve mode: fired-once guard for arming the test GLB (no placing).
   const resolveGlbArmedRef = useRef(false);
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — depth-occlusion toggle state (default
+  // off ⇒ the native render path is unchanged until an admin flips it).
+  const [occlusionOn, setOcclusionOn] = useState(false);
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — geospatial harness START/STOP (default
+  // off ⇒ session stays geospatialMode DISABLED until an admin starts it).
+  const [geoActive, setGeoActive] = useState(false);
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — on-screen readouts so the harness is
+  // usable on an UNTETHERED release build (no adb); fed by native onVpsResult /
+  // onGeospatialState events, rendered in the admin overlay.
+  const [vpsResult, setVpsResult] = useState<VpsResultEvent | null>(null);
+  const [geoState, setGeoState] = useState<GeospatialStateEvent | null>(null);
+  const handleToggleGeospatial = useCallback((on: boolean) => {
+    setGeoActive(on);
+    // Clear the stale readout on STOP so the panel doesn't show a frozen pose.
+    if (!on) setGeoState(null);
+  }, []);
 
   const handleReady = useCallback(() => {
     setStatus(prev => (prev === 'placed' ? prev : 'searching'));
@@ -1155,6 +1179,9 @@ const DetectARNative: React.FC<{
           resolved.kind === 'grounded' ? JSON.stringify(resolved.card) : undefined
         }
         cloudAnchorsEnabled={devCloudAnchor != null}
+        depthArmed={showAdminHarness} // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        depthOcclusionEnabled={occlusionOn} // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        geospatialEnabled={geoActive} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         onReady={handleReady}
         onTrackingState={handleTrackingState}
         onPlaneDetected={handlePlaneDetected}
@@ -1162,6 +1189,8 @@ const DetectARNative: React.FC<{
         onError={handleError}
         onFrameCaptured={handleFrameCaptured}
         onCloudAnchorEvent={devCloudAnchor ? handleCloudAnchorEvent : undefined}
+        onVpsResult={showAdminHarness ? setVpsResult : undefined} // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        onGeospatialState={showAdminHarness ? setGeoState : undefined} // ADMIN-HARNESS (REMOVE AFTER KONARK)
       />
 
       <ARActivationOverlay
@@ -1171,14 +1200,42 @@ const DetectARNative: React.FC<{
 
       <ScanGuideOverlay phase={scanPhase} ready={tracking} />
 
-      {devCloudAnchor && DevCloudAnchorOverlay ? (
+      {/* ADMIN-HARNESS (REMOVE AFTER KONARK) — mode-less on the plain scan screen
+          (VPS + occlusion toggle); 'host'/'resolve' when launched from the board. */}
+      {showAdminHarness ? (
         <DevCloudAnchorOverlay
-          mode={devCloudAnchor}
+          mode={devCloudAnchor ?? undefined}
           tracking={tracking}
           placed={status === 'placed'}
           lastEvent={cloudAnchorEvent}
           onHost={ttlDays => arRef.current?.hostCloudAnchor(ttlDays)}
           onResolve={id => arRef.current?.resolveCloudAnchor(id)}
+          onCheckVps={() => {
+            // Probe VPS at wherever the user is now: reuse the app's live GPS fix
+            // (usePlacesStore.currentLocation), priming tracking if it hasn't
+            // fired yet. Falls back to a warn log if no fix is available.
+            void (async () => {
+              const places = usePlacesStore.getState();
+              let loc = places.currentLocation;
+              if (!loc) {
+                await places.ensureLocationTracking();
+                loc = usePlacesStore.getState().currentLocation;
+              }
+              if (!loc) {
+                console.warn(
+                  '[VPS] no GPS fix yet — wait for location (go outdoors), then retry',
+                );
+                return;
+              }
+              arRef.current?.checkVps(loc.latitude, loc.longitude);
+            })();
+          }}
+          depthOcclusion={occlusionOn}
+          onToggleDepthOcclusion={setOcclusionOn}
+          geospatial={geoActive}
+          onToggleGeospatial={handleToggleGeospatial}
+          vpsResult={vpsResult}
+          geoState={geoState}
         />
       ) : null}
 

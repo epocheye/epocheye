@@ -43,6 +43,27 @@ export interface CloudAnchorEvent {
   message?: string;
 }
 
+// ADMIN-HARNESS (REMOVE AFTER KONARK)
+// On-screen readouts so the harness works on an untethered release build (no adb).
+/** VPS probe result — a VpsAvailability enum name ('AVAILABLE' / 'UNAVAILABLE' / …)
+ *  or an error token ('SESSION_FAILED' / 'CALL_FAILED'). */
+export interface VpsResultEvent {
+  result: string;
+  message?: string;
+}
+/** Geospatial readout: Earth/tracking state + camera pose accuracies (pose fields
+ *  absent until Earth is ENABLED + TRACKING). */
+export interface GeospatialStateEvent {
+  earthState: string;
+  trackingState: string;
+  latitude?: number;
+  longitude?: number;
+  horizontalAccuracy?: number;
+  altitude?: number;
+  verticalAccuracy?: number;
+  orientationYawAccuracy?: number;
+}
+
 interface NativeProps {
   style?: ViewStyle;
   glbUri?: string;
@@ -51,6 +72,14 @@ interface NativeProps {
   cardData?: string;
   /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
   cloudAnchorsEnabled?: boolean;
+  // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  /** Admin harness — arms depthMode AUTOMATIC at session creation (must be set
+   *  before the session is built; the live toggle alone can't enable it). */
+  depthArmed?: boolean;
+  /** Admin harness — live on/off for depth occlusion (camera-stream flag). */
+  depthOcclusionEnabled?: boolean;
+  /** Admin harness — start/stop ARCore Geospatial mode + Earth pose logging (tag "GEO"). */
+  geospatialEnabled?: boolean;
   onARReady?: () => void;
   onPlaneDetected?: () => void;
   onTrackingState?: (event: {nativeEvent: {state: string}}) => void;
@@ -58,6 +87,9 @@ interface NativeProps {
   onARError?: (event: {nativeEvent: {error: string}}) => void;
   onFrameCaptured?: (event: {nativeEvent: {uri: string}}) => void;
   onCloudAnchorEvent?: (event: {nativeEvent: CloudAnchorEvent}) => void;
+  // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  onVpsResult?: (event: {nativeEvent: VpsResultEvent}) => void;
+  onGeospatialState?: (event: {nativeEvent: GeospatialStateEvent}) => void;
 }
 
 const NativeDetectARView = ((): HostComponent<NativeProps> | null => {
@@ -90,6 +122,9 @@ export interface EpocheyeDetectARHandle {
   hostCloudAnchor: (ttlDays: number) => void;
   /** DEV: resolve a Cloud Anchor ID; the current glbUri model attaches at the resolved pose. */
   resolveCloudAnchor: (cloudAnchorId: string) => void;
+  /** DEV: probe ARCore VPS availability at the given lat/lng (the device's current
+   *  location); result logged natively under tag "VPS". */
+  checkVps: (latitude: number, longitude: number) => void;
 }
 
 interface Props {
@@ -100,6 +135,14 @@ interface Props {
   cardData?: string;
   /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
   cloudAnchorsEnabled?: boolean;
+  // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  /** Admin harness — arms depthMode AUTOMATIC at session creation (must be set
+   *  before the session is built; the live toggle alone can't enable it). */
+  depthArmed?: boolean;
+  /** Admin harness — live on/off for depth occlusion (camera-stream flag). */
+  depthOcclusionEnabled?: boolean;
+  /** Admin harness — start/stop ARCore Geospatial mode + Earth pose logging (tag "GEO"). */
+  geospatialEnabled?: boolean;
   onReady?: () => void;
   onPlaneDetected?: () => void;
   /** ARCore camera tracking state, e.g. 'TRACKING' | 'PAUSED' | 'STOPPED'. */
@@ -110,6 +153,11 @@ interface Props {
   onFrameCaptured?: (uri: string) => void;
   /** DEV: Cloud Anchor host/resolve lifecycle events. */
   onCloudAnchorEvent?: (event: CloudAnchorEvent) => void;
+  // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  /** VPS availability probe result (on-screen readout for untethered testing). */
+  onVpsResult?: (event: VpsResultEvent) => void;
+  /** Geospatial state + pose accuracies (on-screen readout for untethered testing). */
+  onGeospatialState?: (event: GeospatialStateEvent) => void;
 }
 
 const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
@@ -120,6 +168,9 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       modelScale,
       cardData,
       cloudAnchorsEnabled,
+      depthArmed, // ADMIN-HARNESS (REMOVE AFTER KONARK)
+      depthOcclusionEnabled, // ADMIN-HARNESS (REMOVE AFTER KONARK)
+      geospatialEnabled, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       onReady,
       onPlaneDetected,
       onTrackingState,
@@ -127,6 +178,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       onError,
       onFrameCaptured,
       onCloudAnchorEvent,
+      onVpsResult, // ADMIN-HARNESS (REMOVE AFTER KONARK)
+      onGeospatialState, // ADMIN-HARNESS (REMOVE AFTER KONARK)
     },
     ref,
   ) => {
@@ -150,6 +203,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         captureFrame: commands.captureFrame,
         hostCloudAnchor: commands.hostCloudAnchor,
         resolveCloudAnchor: commands.resolveCloudAnchor,
+        checkVps: commands.checkVps,
       };
     }, []);
 
@@ -187,6 +241,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           dispatch(commandIds?.hostCloudAnchor, [ttlDays]),
         resolveCloudAnchor: cloudAnchorId =>
           dispatch(commandIds?.resolveCloudAnchor, [cloudAnchorId]),
+        checkVps: (latitude, longitude) =>
+          dispatch(commandIds?.checkVps, [latitude, longitude]),
       }),
       [commandIds],
     );
@@ -203,6 +259,9 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         modelScale={modelScale}
         cardData={cardData}
         cloudAnchorsEnabled={cloudAnchorsEnabled}
+        depthArmed={depthArmed} // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        depthOcclusionEnabled={depthOcclusionEnabled} // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        geospatialEnabled={geospatialEnabled} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         onARReady={onReady}
         onPlaneDetected={onPlaneDetected}
         onTrackingState={
@@ -232,6 +291,19 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           onCloudAnchorEvent
             ? (e: {nativeEvent: CloudAnchorEvent}) =>
                 onCloudAnchorEvent(e.nativeEvent)
+            : undefined
+        }
+        onVpsResult={
+          // ADMIN-HARNESS (REMOVE AFTER KONARK)
+          onVpsResult
+            ? (e: {nativeEvent: VpsResultEvent}) => onVpsResult(e.nativeEvent)
+            : undefined
+        }
+        onGeospatialState={
+          // ADMIN-HARNESS (REMOVE AFTER KONARK)
+          onGeospatialState
+            ? (e: {nativeEvent: GeospatialStateEvent}) =>
+                onGeospatialState(e.nativeEvent)
             : undefined
         }
       />

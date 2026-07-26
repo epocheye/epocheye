@@ -22,11 +22,20 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type {CloudAnchorEvent} from '../../native/EpocheyeDetectARView';
+import type {
+  CloudAnchorEvent,
+  GeospatialStateEvent,
+  VpsResultEvent,
+} from '../../native/EpocheyeDetectARView';
 import {STORAGE_KEYS} from '../../core/constants/storage-keys';
 
 export interface DevCloudAnchorOverlayProps {
-  mode: 'host' | 'resolve';
+  /**
+   * Cloud Anchor sub-mode. Undefined on the plain scan screen (admin overlay),
+   * where only the VPS probe + depth-occlusion toggle show; 'host'/'resolve' are
+   * set by the Health-Check board.
+   */
+  mode?: 'host' | 'resolve';
   /** ARCore camera TRACKING (resolve precondition). */
   tracking: boolean;
   /** status === 'placed' — a local anchor exists to host. */
@@ -35,6 +44,22 @@ export interface DevCloudAnchorOverlayProps {
   lastEvent: CloudAnchorEvent | null;
   onHost: (ttlDays: number) => void;
   onResolve: (cloudAnchorId: string) => void;
+  /** Probe ARCore VPS availability at the device's CURRENT location; result is
+   *  logged natively (tag "VPS"). */
+  onCheckVps: () => void;
+  // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  /** Current depth-occlusion toggle state. */
+  depthOcclusion: boolean;
+  /** Flip depth occlusion on the AR render path. */
+  onToggleDepthOcclusion: (enabled: boolean) => void;
+  /** Current Geospatial harness state (START/STOP). */
+  geospatial: boolean;
+  /** Start/stop ARCore Geospatial mode + Earth pose logging (native tag "GEO"). */
+  onToggleGeospatial: (enabled: boolean) => void;
+  /** Latest VPS probe result — on-screen readout for untethered (no-adb) testing. */
+  vpsResult?: VpsResultEvent | null;
+  /** Latest geospatial state + pose accuracies — on-screen readout. */
+  geoState?: GeospatialStateEvent | null;
 }
 
 /** Extra operator hint for the states that always mean the same thing. */
@@ -64,6 +89,13 @@ const DevCloudAnchorOverlay: React.FC<DevCloudAnchorOverlayProps> = ({
   lastEvent,
   onHost,
   onResolve,
+  onCheckVps,
+  depthOcclusion,
+  onToggleDepthOcclusion,
+  geospatial,
+  onToggleGeospatial,
+  vpsResult,
+  geoState,
 }) => {
   const [anchorId, setAnchorId] = useState('');
   const [hostedId, setHostedId] = useState<string | null>(null);
@@ -144,10 +176,13 @@ const DevCloudAnchorOverlay: React.FC<DevCloudAnchorOverlayProps> = ({
     statusLine = placed
       ? 'Model placed — walk a slow arc around it, then host'
       : 'Waiting for the test model to place…';
-  } else {
+  } else if (mode === 'resolve') {
     statusLine = tracking
       ? 'Aim at the hosted spot, then resolve'
       : 'Move the phone until ARCore is tracking…';
+  } else {
+    // ADMIN-HARNESS (REMOVE AFTER KONARK) — mode-less admin tools (plain scan).
+    statusLine = 'Admin tools · VPS probe + depth-occlusion toggle';
   }
 
   const canHost = placed && !busy;
@@ -158,8 +193,10 @@ const DevCloudAnchorOverlay: React.FC<DevCloudAnchorOverlayProps> = ({
       <View style={styles.panel}>
         <Text style={styles.title}>
           {mode === 'host'
-            ? 'DEV · Cloud Anchor — HOST'
-            : 'DEV · Cloud Anchor — RESOLVE'}
+            ? 'Cloud Anchor — HOST'
+            : mode === 'resolve'
+              ? 'Cloud Anchor — RESOLVE'
+              : 'AR admin tools'}
         </Text>
         <Text style={styles.status}>{statusLine}</Text>
 
@@ -183,7 +220,7 @@ const DevCloudAnchorOverlay: React.FC<DevCloudAnchorOverlayProps> = ({
               </Text>
             </Pressable>
           </>
-        ) : (
+        ) : mode === 'resolve' ? (
           <>
             <TextInput
               value={anchorId}
@@ -209,7 +246,86 @@ const DevCloudAnchorOverlay: React.FC<DevCloudAnchorOverlayProps> = ({
               </Text>
             </Pressable>
           </>
-        )}
+        ) : null}
+
+        {/* ADMIN-HARNESS (REMOVE AFTER KONARK)
+            Depth-occlusion toggle — flips ARCore depth occlusion on the live
+            render path so real-world geometry (a hand, a person) cuts into the
+            model. Independent of host/resolve state. */}
+        <Pressable
+          onPress={() => onToggleDepthOcclusion(!depthOcclusion)}
+          style={[
+            styles.button,
+            depthOcclusion ? styles.buttonToggleOn : styles.buttonSecondary,
+          ]}>
+          <Text
+            style={
+              depthOcclusion
+                ? styles.buttonText
+                : styles.buttonSecondaryText
+            }>
+            {`Depth occlusion: ${depthOcclusion ? 'ON' : 'OFF'}`}
+          </Text>
+        </Pressable>
+
+        {/* ADMIN-HARNESS (REMOVE AFTER KONARK)
+            Geospatial pipeline probe — START enables ARCore Geospatial mode
+            (rebuilds the session) and logs Earth state + pose accuracies under
+            native tag "GEO"; STOP restores the normal session. */}
+        <Pressable
+          onPress={() => onToggleGeospatial(!geospatial)}
+          style={[
+            styles.button,
+            geospatial ? styles.buttonToggleOn : styles.buttonSecondary,
+          ]}>
+          <Text style={geospatial ? styles.buttonText : styles.buttonSecondaryText}>
+            {`Geospatial tracking: ${geospatial ? 'STOP' : 'START'}`}
+          </Text>
+        </Pressable>
+
+        {/* ADMIN-HARNESS (REMOVE AFTER KONARK) — on-screen geospatial readout so
+            the harness is usable on an untethered release build (mirrors the GEO
+            logcat lines). Pose fields appear once Earth is ENABLED + TRACKING. */}
+        {geoState ? (
+          <View style={styles.readoutBox}>
+            <Text style={styles.readout}>
+              {`Earth: ${geoState.earthState} · ${geoState.trackingState}`}
+            </Text>
+            {geoState.latitude != null && geoState.longitude != null ? (
+              <Text style={styles.readout}>
+                {`lat ${geoState.latitude.toFixed(5)}  lon ${geoState.longitude.toFixed(5)}`}
+              </Text>
+            ) : null}
+            {geoState.horizontalAccuracy != null ? (
+              <Text style={styles.readout}>
+                {`horiz ±${geoState.horizontalAccuracy.toFixed(1)}m` +
+                  (geoState.verticalAccuracy != null
+                    ? `  vert ±${geoState.verticalAccuracy.toFixed(1)}m`
+                    : '') +
+                  (geoState.orientationYawAccuracy != null
+                    ? `  yaw ±${geoState.orientationYawAccuracy.toFixed(1)}°`
+                    : '')}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Independent VPS coverage probe — its own throwaway session, so it is
+            never gated by the host/resolve busy state. Result → native log tag "VPS". */}
+        <Pressable
+          onPress={onCheckVps}
+          style={[styles.button, styles.buttonSecondary]}>
+          <Text style={styles.buttonSecondaryText}>Check VPS here</Text>
+        </Pressable>
+
+        {/* ADMIN-HARNESS (REMOVE AFTER KONARK) — on-screen VPS readout (untethered). */}
+        {vpsResult ? (
+          <Text style={styles.readout}>
+            {`VPS: ${vpsResult.result}${
+              vpsResult.message ? ` · ${vpsResult.message}` : ''
+            }`}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -268,6 +384,29 @@ const styles = StyleSheet.create({
     color: '#1A0F00',
     fontSize: 13,
     fontWeight: '700',
+  },
+  buttonSecondary: {
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(142,208,255,0.5)',
+  },
+  // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  buttonToggleOn: {
+    backgroundColor: '#7BE38B',
+  },
+  buttonSecondaryText: {
+    color: '#8ED0FF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — on-screen readout for untethered testing.
+  readoutBox: {
+    gap: 2,
+  },
+  readout: {
+    color: '#8ED0FF',
+    fontSize: 11,
+    fontFamily: 'monospace',
   },
 });
 

@@ -61,6 +61,30 @@ class EpocheyeDetectARViewManager(
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onFrameCaptured", event)
         }
+        // ADMIN-HARNESS (REMOVE AFTER KONARK) — on-screen readouts for untethered testing.
+        view.onVpsResult = { result, message ->
+            val event = Arguments.createMap().apply {
+                putString("result", result)
+                message?.let { putString("message", it) }
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onVpsResult", event)
+        }
+        // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        view.onGeospatialState = { earthState, trackingState, lat, lon, horiz, alt, vert, yaw ->
+            val event = Arguments.createMap().apply {
+                putString("earthState", earthState)
+                putString("trackingState", trackingState)
+                lat?.let { putDouble("latitude", it) }
+                lon?.let { putDouble("longitude", it) }
+                horiz?.let { putDouble("horizontalAccuracy", it) }
+                alt?.let { putDouble("altitude", it) }
+                vert?.let { putDouble("verticalAccuracy", it) }
+                yaw?.let { putDouble("orientationYawAccuracy", it) }
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onGeospatialState", event)
+        }
         view.onCloudAnchorEvent = { phase, state, cloudAnchorId, quality, message ->
             val event = Arguments.createMap().apply {
                 putString("phase", phase)
@@ -96,6 +120,24 @@ class EpocheyeDetectARViewManager(
         view.setCloudAnchorsEnabled(enabled)
     }
 
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    @ReactProp(name = "depthArmed", defaultBoolean = false)
+    fun setDepthArmed(view: EpocheyeDetectARView, enabled: Boolean) {
+        view.setDepthArmed(enabled)
+    }
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    @ReactProp(name = "depthOcclusionEnabled", defaultBoolean = false)
+    fun setDepthOcclusionEnabled(view: EpocheyeDetectARView, enabled: Boolean) {
+        view.setDepthOcclusionEnabled(enabled)
+    }
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    @ReactProp(name = "geospatialEnabled", defaultBoolean = false)
+    fun setGeospatialEnabled(view: EpocheyeDetectARView, enabled: Boolean) {
+        view.setGeospatialEnabled(enabled)
+    }
+
     override fun getCommandsMap(): Map<String, Int> {
         return MapBuilder.builder<String, Int>()
             .put("placeAtScreenPoint", CMD_PLACE_AT_SCREEN_POINT)
@@ -107,6 +149,7 @@ class EpocheyeDetectARViewManager(
             .put("captureFrame", CMD_CAPTURE_FRAME)
             .put("hostCloudAnchor", CMD_HOST_CLOUD_ANCHOR)
             .put("resolveCloudAnchor", CMD_RESOLVE_CLOUD_ANCHOR)
+            .put("checkVps", CMD_CHECK_VPS)
             .build()
     }
 
@@ -148,6 +191,11 @@ class EpocheyeDetectARViewManager(
                 val id = args?.getString(0) ?: return
                 view.resolveCloudAnchor(id)
             }
+            CMD_CHECK_VPS -> {
+                val lat = args?.getDouble(0) ?: return
+                val lng = args?.getDouble(1) ?: return
+                view.checkVps(lat, lng)
+            }
         }
     }
 
@@ -188,6 +236,11 @@ class EpocheyeDetectARViewManager(
                 val id = args?.getString(0) ?: return
                 view.resolveCloudAnchor(id)
             }
+            "checkVps" -> {
+                val lat = args?.getDouble(0) ?: return
+                val lng = args?.getDouble(1) ?: return
+                view.checkVps(lat, lng)
+            }
         }
     }
 
@@ -200,6 +253,9 @@ class EpocheyeDetectARViewManager(
             .put("onARError", MapBuilder.of("registrationName", "onARError"))
             .put("onFrameCaptured", MapBuilder.of("registrationName", "onFrameCaptured"))
             .put("onCloudAnchorEvent", MapBuilder.of("registrationName", "onCloudAnchorEvent"))
+            // ADMIN-HARNESS (REMOVE AFTER KONARK)
+            .put("onVpsResult", MapBuilder.of("registrationName", "onVpsResult"))
+            .put("onGeospatialState", MapBuilder.of("registrationName", "onGeospatialState"))
             .build()
     }
 
@@ -218,5 +274,6 @@ class EpocheyeDetectARViewManager(
         private const val CMD_PLACE_CARDS_ONLY = 7
         private const val CMD_HOST_CLOUD_ANCHOR = 8
         private const val CMD_RESOLVE_CLOUD_ANCHOR = 9
+        private const val CMD_CHECK_VPS = 10
     }
 }

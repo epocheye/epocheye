@@ -20,13 +20,17 @@ import com.google.android.filament.IndirectLight
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
 import com.google.ar.core.Coordinates2d
+import com.google.ar.core.Earth // ADMIN-HARNESS (REMOVE AFTER KONARK)
 import com.google.ar.core.Frame
+import com.google.ar.core.GeospatialPose // ADMIN-HARNESS (REMOVE AFTER KONARK)
 import com.google.ar.core.HostCloudAnchorFuture
 import com.google.ar.core.Plane
 import com.google.ar.core.Pose
 import com.google.ar.core.ResolveCloudAnchorFuture
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.google.ar.core.VpsAvailability
+import io.github.sceneview.ar.camera.ARCameraStream // ADMIN-HARNESS (REMOVE AFTER KONARK)
 import io.github.sceneview.ar.node.AnchorNode
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.loaders.MaterialLoader
@@ -90,6 +94,24 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         message: String?,
     ) -> Unit)? = null
 
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    // On-screen readouts so the harness is usable on an UNTETHERED release build
+    // (no adb): the VPS result and the geospatial state/accuracies are pushed to JS
+    // and rendered in the admin overlay, in addition to the VPS/GEO logcat lines.
+    /** VPS probe result — a VpsAvailability enum name, or an error token. */
+    var onVpsResult: ((result: String, message: String?) -> Unit)? = null
+    /** Geospatial readout: Earth/tracking state + camera pose accuracies (pose null until TRACKING). */
+    var onGeospatialState: ((
+        earthState: String,
+        trackingState: String,
+        latitude: Double?,
+        longitude: Double?,
+        horizontalAccuracy: Double?,
+        altitude: Double?,
+        verticalAccuracy: Double?,
+        orientationYawAccuracy: Double?,
+    ) -> Unit)? = null
+
     // ── Compose-hosted scene ─────────────────────────────────────────────────
     // A single root node is created inside the ARSceneView content DSL and captured
     // here; imperative placement attaches/detaches the world-anchored nodes as its
@@ -111,6 +133,31 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     @Volatile private var cloudAnchorsEnabled = false
     private var hostFuture: HostCloudAnchorFuture? = null
     private var resolveFuture: ResolveCloudAnchorFuture? = null
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    // Depth occlusion has two flags. depthArmed decides the SESSION depthMode at
+    // CREATION (AUTOMATIC vs DISABLED) — SceneView applies it authoritatively via
+    // the direct composable param and ignores a post-hoc session.configure (proven
+    // for cloudAnchorMode), so it must be known at creation; it is set from the
+    // admin harness being mounted. depthOcclusionEnabled is the live on/off the
+    // admin toggles — it only flips the captured camera stream's occlusion flag,
+    // which needs no reconfigure, so a placed model is preserved. Both default off,
+    // so regular users' sessions render exactly as before (depthMode DISABLED).
+    @Volatile private var depthArmed = false
+    @Volatile private var depthOcclusionEnabled = false
+    @Volatile private var arCameraStream: ARCameraStream? = null
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    // Geospatial harness. geospatialMode is set at session CREATION via the direct
+    // composable param (SceneView ignores a post-hoc configure — proven for
+    // cloudAnchorMode), so START/STOP rebuild the session. Earth pose is read
+    // per-frame in onSessionTick while active; earthState/trackingState transitions
+    // are logged immediately, the pose is throttled by tick count. Never set for
+    // regular users, so their sessions stay geospatialMode DISABLED.
+    @Volatile private var geospatialEnabled = false
+    private var lastEarthState: String? = null
+    private var lastEarthTracking: String? = null
+    private var geoTickCount = 0
 
     private var currentAnchorNode: AnchorNode? = null
     private var currentModelNode: ModelNode? = null
@@ -225,10 +272,20 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         }
                     }
                     val mainLight = rememberMainLightNode(eng)
+                    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                    // Own the camera stream so the depth-occlusion toggle can flip
+                    // it live (captured into arCameraStream below).
+                    val camStream = remember(matl) { ARCameraStream(matl) }
                     SideEffect {
                         engine = eng
                         modelLoader = ml
                         materialLoader = matl
+                        // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                        arCameraStream = camStream
+                        try {
+                            camStream.isDepthOcclusionEnabled = depthOcclusionEnabled
+                        } catch (_: Throwable) {
+                        }
                         // Boost the main directional light for some shading/relief.
                         try {
                             mainLight?.let {
@@ -259,6 +316,26 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         cloudAnchorMode =
                             if (cloudAnchorsEnabled) Config.CloudAnchorMode.ENABLED
                             else Config.CloudAnchorMode.DISABLED,
+                        // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                        // Depth mode MUST be set via this direct composable param at
+                        // CREATION — SceneView applies it authoritatively and ignores
+                        // a post-hoc session.configure (proven for cloudAnchorMode).
+                        // Armed whenever the admin harness is mounted; DISABLED
+                        // (default) for regular users, so the render path is
+                        // unchanged. The visible occlusion is the camera-stream flag
+                        // (depthOcclusionEnabled), toggled live in the SideEffect.
+                        cameraStream = camStream,
+                        depthMode =
+                            if (depthArmed) Config.DepthMode.AUTOMATIC
+                            else Config.DepthMode.DISABLED,
+                        // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                        // Geospatial mode MUST be set via this direct composable param
+                        // at CREATION (SceneView ignores post-hoc configure). ENABLED
+                        // only while the admin runs the geospatial harness; DISABLED
+                        // (default) for everyone else, so the render path is unchanged.
+                        geospatialMode =
+                            if (geospatialEnabled) Config.GeospatialMode.ENABLED
+                            else Config.GeospatialMode.DISABLED,
                         sessionConfiguration = { _, config ->
                             config.geospatialMode = Config.GeospatialMode.DISABLED
                             config.planeFindingMode =
@@ -282,6 +359,41 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                                         "?"
                                     },
                             )
+                            // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                            if (depthArmed) {
+                                val supported = try {
+                                    session.isDepthModeSupported(
+                                        Config.DepthMode.AUTOMATIC,
+                                    )
+                                } catch (_: Throwable) {
+                                    false
+                                }
+                                val mode = try {
+                                    session.config.depthMode.name
+                                } catch (_: Throwable) {
+                                    "?"
+                                }
+                                Log.i(TAG, "depth armed; AUTOMATIC supported=$supported sessionDepthMode=$mode")
+                            }
+                            // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                            if (geospatialEnabled) {
+                                val supported = try {
+                                    session.isGeospatialModeSupported(
+                                        Config.GeospatialMode.ENABLED,
+                                    )
+                                } catch (_: Throwable) {
+                                    false
+                                }
+                                val mode = try {
+                                    session.config.geospatialMode.name
+                                } catch (_: Throwable) {
+                                    "?"
+                                }
+                                Log.i(
+                                    GEO_TAG,
+                                    "geospatial requested; ENABLED supported=$supported sessionGeospatialMode=$mode",
+                                )
+                            }
                         },
                         onSessionUpdated = { session, frame ->
                             arSession = session
@@ -327,6 +439,10 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         if (ts != null && ts != lastTrackingState) {
             lastTrackingState = ts
             post { onTrackingState?.invoke(ts.name) }
+        }
+        // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        if (geospatialEnabled) {
+            logGeospatial(session)
         }
         if (!planeReported && hasTrackedPlane(session)) {
             planeReported = true
@@ -812,6 +928,138 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         }
     }
 
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    /**
+     * Arm/disarm session depth. Set from the `depthArmed` prop (= admin harness
+     * mounted). Decides the session depthMode at CREATION via the direct composable
+     * param, because SceneView ignores a post-hoc session.configure for these modes
+     * (proven for cloudAnchorMode). Mirrors [setCloudAnchorsEnabled]: when it flips
+     * on and a session already exists but nothing is placed, rebuild so the fresh
+     * session is created with depthMode AUTOMATIC. Never set for regular users, so
+     * their sessions stay depthMode DISABLED.
+     */
+    fun setDepthArmed(enabled: Boolean) {
+        if (enabled == depthArmed) return
+        Log.i(TAG, "setDepthArmed($enabled)")
+        depthArmed = enabled
+        if (enabled && composeView != null && currentAnchorNode == null) {
+            Log.i(TAG, "rebuilding AR session to arm depth")
+            rebuildAR()
+        }
+    }
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    /**
+     * Live on/off for depth occlusion (admin toggle). Only flips the captured
+     * camera stream's occlusion flag — the depth texture is already produced when
+     * [depthArmed] set depthMode AUTOMATIC at creation — so this needs no
+     * reconfigure and a placed model is preserved. No-op until the stream exists.
+     */
+    fun setDepthOcclusionEnabled(enabled: Boolean) {
+        if (enabled == depthOcclusionEnabled) return
+        Log.i(TAG, "setDepthOcclusionEnabled($enabled) armed=$depthArmed")
+        depthOcclusionEnabled = enabled
+        try {
+            arCameraStream?.let { it.isDepthOcclusionEnabled = enabled }
+        } catch (t: Throwable) {
+            Log.w(TAG, "camera-stream occlusion flip failed", t)
+        }
+    }
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    /**
+     * Start/stop the Geospatial harness. geospatialMode is a session-creation param
+     * (SceneView ignores a post-hoc configure), so this mirrors [setDepthArmed]:
+     * flip the flag and rebuild the session so it comes up ENABLED (start) or
+     * DISABLED (stop). STOP therefore restores the normal session and the live AR
+     * scene is unaffected afterward. Rebuild only when nothing is placed. Never set
+     * for regular users ⇒ their sessions stay geospatialMode DISABLED.
+     */
+    fun setGeospatialEnabled(enabled: Boolean) {
+        if (enabled == geospatialEnabled) return
+        Log.i(GEO_TAG, "setGeospatialEnabled($enabled)")
+        geospatialEnabled = enabled
+        // Reset transition trackers so the fresh session logs its first states.
+        lastEarthState = null
+        lastEarthTracking = null
+        geoTickCount = 0
+        if (composeView != null && currentAnchorNode == null) {
+            Log.i(GEO_TAG, "rebuilding AR session (geospatial=$enabled)")
+            rebuildAR()
+        }
+    }
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    /**
+     * Per-frame Earth read while the geospatial harness is active. Logs
+     * earthState/trackingState transitions immediately and the camera geospatial
+     * pose (throttled ~1/sec) once Earth is ENABLED + TRACKING. Uses
+     * orientationYawAccuracy (getHeadingAccuracy is deprecated). Fully guarded so a
+     * geospatial hiccup never crashes the render session.
+     */
+    private fun logGeospatial(session: Session) {
+        try {
+            val earth = session.earth
+            if (earth == null) {
+                if (lastEarthState != "NO_EARTH") {
+                    lastEarthState = "NO_EARTH"
+                    Log.w(GEO_TAG, "session.earth is null (geospatial unavailable)")
+                    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                    emitGeospatialState("NO_EARTH", "-")
+                }
+                return
+            }
+            val earthState = try { earth.earthState.name } catch (_: Throwable) { "?" }
+            val tracking = try { earth.trackingState.name } catch (_: Throwable) { "?" }
+            var changed = false
+            if (earthState != lastEarthState) {
+                lastEarthState = earthState
+                Log.i(GEO_TAG, "earthState -> $earthState")
+                changed = true
+            }
+            if (tracking != lastEarthTracking) {
+                lastEarthTracking = tracking
+                Log.i(GEO_TAG, "trackingState -> $tracking")
+                changed = true
+            }
+            // ADMIN-HARNESS (REMOVE AFTER KONARK) — push state transitions to the overlay.
+            if (changed) emitGeospatialState(earthState, tracking)
+            if (earth.earthState == Earth.EarthState.ENABLED &&
+                earth.trackingState == TrackingState.TRACKING
+            ) {
+                geoTickCount++
+                // ~1 log/sec at 60fps; state transitions above are unthrottled.
+                if (geoTickCount % 60 == 1) {
+                    val pose: GeospatialPose = earth.cameraGeospatialPose
+                    Log.i(
+                        GEO_TAG,
+                        "pose lat=%.7f lon=%.7f horizAcc=%.2fm alt=%.2fm vertAcc=%.2fm orientationYawAccuracy=%.2fdeg".format(
+                            pose.latitude,
+                            pose.longitude,
+                            pose.horizontalAccuracy,
+                            pose.altitude,
+                            pose.verticalAccuracy,
+                            pose.orientationYawAccuracy,
+                        ),
+                    )
+                    // ADMIN-HARNESS (REMOVE AFTER KONARK) — push pose accuracies (~1/sec) to the overlay.
+                    emitGeospatialState(
+                        earthState,
+                        tracking,
+                        pose.latitude,
+                        pose.longitude,
+                        pose.horizontalAccuracy,
+                        pose.altitude,
+                        pose.verticalAccuracy,
+                        pose.orientationYawAccuracy,
+                    )
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w(GEO_TAG, "geospatial read failed", t)
+        }
+    }
+
     /**
      * Tear down and recreate the Compose AR surface so a fresh ARCore session is
      * created with the current [cloudAnchorsEnabled] flag applied by the
@@ -832,6 +1080,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         materialLoader = null
         arSession = null
         arFrame = null
+        arCameraStream = null // ADMIN-HARNESS (REMOVE AFTER KONARK)
         sceneRoot = null
         currentAnchorNode = null
         currentModelNode = null
@@ -839,6 +1088,36 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         planeReported = false
         lastTrackingState = null
         setupAR()
+    }
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    private fun emitVpsResult(result: String, message: String? = null) {
+        post { onVpsResult?.invoke(result, message) }
+    }
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    private fun emitGeospatialState(
+        earthState: String,
+        trackingState: String,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        horizontalAccuracy: Double? = null,
+        altitude: Double? = null,
+        verticalAccuracy: Double? = null,
+        orientationYawAccuracy: Double? = null,
+    ) {
+        post {
+            onGeospatialState?.invoke(
+                earthState,
+                trackingState,
+                latitude,
+                longitude,
+                horizontalAccuracy,
+                altitude,
+                verticalAccuracy,
+                orientationYawAccuracy,
+            )
+        }
     }
 
     private fun emitCloudAnchorEvent(
@@ -1068,6 +1347,59 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             cloudAnchorId = cloudAnchorId,
             message = if (uri == null) "resolved — model attaches when glbUri arrives" else null,
         )
+    }
+
+    /**
+     * Dev harness: probe ARCore Geospatial VPS coverage at an arbitrary
+     * (latitude, longitude) — the device's CURRENT location, passed down from JS —
+     * and log the result under tag [VPS_TAG]. Uses a THROWAWAY bare [Session] — no
+     * resume, no config, no camera — so it never touches the live AR scene; the
+     * check is a network geo-lookup that works on an un-resumed session (Google's
+     * documented temporary-session pattern).
+     *
+     * The check is async and the callback runs on the main thread, so the session
+     * is closed INSIDE the callback (after logging) — closing it earlier would
+     * cancel the future and the result would never arrive. Fully guarded: the
+     * command is dispatchable in release, so a failure must log, never crash.
+     */
+    fun checkVps(latitude: Double, longitude: Double) {
+        val session = try {
+            Session(context)
+        } catch (t: Throwable) {
+            // UnavailableArcoreNotInstalled/ApkTooOld/SdkTooOld/DeviceNotCompatible.
+            Log.e(VPS_TAG, "Session creation failed: ${t.message}", t)
+            // ADMIN-HARNESS (REMOVE AFTER KONARK) — surface on the untethered overlay.
+            emitVpsResult("SESSION_FAILED", t.message)
+            return
+        }
+        try {
+            session.checkVpsAvailabilityAsync(latitude, longitude) { availability ->
+                val where = "current location (%.5f, %.5f)".format(latitude, longitude)
+                when (availability) {
+                    VpsAvailability.AVAILABLE ->
+                        Log.i(VPS_TAG, "AVAILABLE at $where — VPS coverage present")
+                    VpsAvailability.UNAVAILABLE ->
+                        Log.i(VPS_TAG, "UNAVAILABLE at $where — no VPS coverage")
+                    else ->
+                        Log.w(VPS_TAG, "VPS check returned $availability at $where")
+                }
+                // ADMIN-HARNESS (REMOVE AFTER KONARK) — enum name to the overlay.
+                emitVpsResult(availability.name)
+                try {
+                    session.close()
+                } catch (t: Throwable) {
+                    Log.w(VPS_TAG, "session close failed", t)
+                }
+            }
+        } catch (t: Throwable) {
+            Log.e(VPS_TAG, "checkVpsAvailabilityAsync failed: ${t.message}", t)
+            // ADMIN-HARNESS (REMOVE AFTER KONARK)
+            emitVpsResult("CALL_FAILED", t.message)
+            try {
+                session.close()
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     private fun clearCurrentAnchor() {
@@ -1376,5 +1708,12 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
     companion object {
         private const val TAG = "EpocheyeDetectARView"
+
+        // Dev harness: VPS-availability probe log tag. Coordinates are the
+        // device's CURRENT location, passed in from JS per call.
+        private const val VPS_TAG = "VPS"
+
+        // ADMIN-HARNESS (REMOVE AFTER KONARK) — geospatial pipeline log tag.
+        private const val GEO_TAG = "GEO"
     }
 }

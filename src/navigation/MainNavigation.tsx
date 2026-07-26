@@ -19,13 +19,11 @@ import OtaUpdateBanner from '../components/OtaUpdateBanner';
 import { ROUTES } from '../core/constants';
 import type { MainStackParamList } from '../core/types';
 
-// Dev-only workflow health-check board. `__DEV__` is constant-folded by Metro,
-// so in release this require (and the screen + its store/manifest) is
-// dead-code-eliminated from the bundle entirely.
-const DevHealthCheckScreen: React.ComponentType | null = __DEV__
-  ? // eslint-disable-next-line @typescript-eslint/no-var-requires
-    require('../screens/Dev/DevHealthCheckScreen').default
-  : null;
+// ADMIN-HARNESS (REMOVE AFTER KONARK)
+// Workflow health-check board. Statically imported (was a __DEV__ require) so it
+// ships in release for the admin harness; the ENTRY (DevHealthCheckButton) is
+// gated on __DEV__ || isAdminUser(), so non-admins can never reach it.
+import DevHealthCheckScreen from '../screens/Dev/DevHealthCheckScreen';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -146,13 +144,13 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
           </ErrorBoundary>
         )}
       </Stack.Screen>
-      {__DEV__ && DevHealthCheckScreen ? (
-        <Stack.Screen
-          name={ROUTES.MAIN.DEV_HEALTH}
-          component={DevHealthCheckScreen}
-          options={{ animation: 'slide_from_right' }}
-        />
-      ) : null}
+      {/* ADMIN-HARNESS (REMOVE AFTER KONARK) — registered unconditionally so the
+          admin harness can reach it in release; the entry button gates access. */}
+      <Stack.Screen
+        name={ROUTES.MAIN.DEV_HEALTH}
+        component={DevHealthCheckScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
     </Stack.Navigator>
     <VenueActivationBanner />
     <DailyNudgeBanner />

@@ -100,8 +100,8 @@ android {
         applicationId "com.epocheye"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 16
-        versionName "1.4.1"
+        versionCode 17
+        versionName "1.4.2"
         // OTA Hermes-compat runtime version. The client only fetches/accepts OTA
         // bundles built for this exact value. Bump ONLY when a native/store build
         // ships (new native code, new native dep, RN upgrade) — NOT for JS-only
@@ -180,13 +180,16 @@ dependencies {
     implementation 'io.github.sceneview:arsceneview:4.18.0'
     implementation 'androidx.lifecycle:lifecycle-process:2.7.0'
 
-    // Cloud Anchors KEYLESS auth for the DEV-ONLY host/resolve harness (365-day
-    // TTL requires keyless; an API key caps TTL at 1 day). ARCore discovers this
-    // at runtime via reflection — no code imports it. debugImplementation keeps
-    // the release AAB dependency graph untouched; release builds never enable
-    // cloudAnchorMode anyway.
-    // 21.5.0 matches react-native-firebase_app's play-services-auth pin.
-    debugImplementation 'com.google.android.gms:play-services-auth:21.5.0'
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    // ARCore API KEYLESS auth for the admin harness (Cloud Anchors + Geospatial).
+    // ARCore discovers this at runtime via reflection — no code imports it. Now
+    // `implementation` (was debugImplementation) so the RELEASE variant carries it:
+    // the Geospatial harness authorizes against the ARCore API in release too.
+    // (react-native-firebase_app also pulls 21.5.0 transitively; this makes it
+    // explicit.) NOTE: keyless auth binds (package, SHA-1) — the RELEASE keystore's
+    // SHA-1 must be registered as an Android OAuth client in the same GCP project,
+    // else geospatial returns ERROR_NOT_AUTHORIZED in release.
+    implementation 'com.google.android.gms:play-services-auth:21.5.0'
 
     // Jetpack Compose — the native AR views host SceneView 4.18.0's ARSceneView
     // composable inside a ComposeView. BOM matches the one arsceneview 4.18.0
