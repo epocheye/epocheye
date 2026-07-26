@@ -61,6 +61,30 @@ class EpocheyeDetectARViewManager(
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onFrameCaptured", event)
         }
+        // ADMIN-HARNESS (REMOVE AFTER KONARK) — on-screen readouts for untethered testing.
+        view.onVpsResult = { result, message ->
+            val event = Arguments.createMap().apply {
+                putString("result", result)
+                message?.let { putString("message", it) }
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onVpsResult", event)
+        }
+        // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        view.onGeospatialState = { earthState, trackingState, lat, lon, horiz, alt, vert, yaw ->
+            val event = Arguments.createMap().apply {
+                putString("earthState", earthState)
+                putString("trackingState", trackingState)
+                lat?.let { putDouble("latitude", it) }
+                lon?.let { putDouble("longitude", it) }
+                horiz?.let { putDouble("horizontalAccuracy", it) }
+                alt?.let { putDouble("altitude", it) }
+                vert?.let { putDouble("verticalAccuracy", it) }
+                yaw?.let { putDouble("orientationYawAccuracy", it) }
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onGeospatialState", event)
+        }
         view.onCloudAnchorEvent = { phase, state, cloudAnchorId, quality, message ->
             val event = Arguments.createMap().apply {
                 putString("phase", phase)
@@ -229,6 +253,9 @@ class EpocheyeDetectARViewManager(
             .put("onARError", MapBuilder.of("registrationName", "onARError"))
             .put("onFrameCaptured", MapBuilder.of("registrationName", "onFrameCaptured"))
             .put("onCloudAnchorEvent", MapBuilder.of("registrationName", "onCloudAnchorEvent"))
+            // ADMIN-HARNESS (REMOVE AFTER KONARK)
+            .put("onVpsResult", MapBuilder.of("registrationName", "onVpsResult"))
+            .put("onGeospatialState", MapBuilder.of("registrationName", "onGeospatialState"))
             .build()
     }
 

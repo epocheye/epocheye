@@ -22,7 +22,11 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type {CloudAnchorEvent} from '../../native/EpocheyeDetectARView';
+import type {
+  CloudAnchorEvent,
+  GeospatialStateEvent,
+  VpsResultEvent,
+} from '../../native/EpocheyeDetectARView';
 import {STORAGE_KEYS} from '../../core/constants/storage-keys';
 
 export interface DevCloudAnchorOverlayProps {
@@ -52,6 +56,10 @@ export interface DevCloudAnchorOverlayProps {
   geospatial: boolean;
   /** Start/stop ARCore Geospatial mode + Earth pose logging (native tag "GEO"). */
   onToggleGeospatial: (enabled: boolean) => void;
+  /** Latest VPS probe result — on-screen readout for untethered (no-adb) testing. */
+  vpsResult?: VpsResultEvent | null;
+  /** Latest geospatial state + pose accuracies — on-screen readout. */
+  geoState?: GeospatialStateEvent | null;
 }
 
 /** Extra operator hint for the states that always mean the same thing. */
@@ -86,6 +94,8 @@ const DevCloudAnchorOverlay: React.FC<DevCloudAnchorOverlayProps> = ({
   onToggleDepthOcclusion,
   geospatial,
   onToggleGeospatial,
+  vpsResult,
+  geoState,
 }) => {
   const [anchorId, setAnchorId] = useState('');
   const [hostedId, setHostedId] = useState<string | null>(null);
@@ -273,6 +283,33 @@ const DevCloudAnchorOverlay: React.FC<DevCloudAnchorOverlayProps> = ({
           </Text>
         </Pressable>
 
+        {/* ADMIN-HARNESS (REMOVE AFTER KONARK) — on-screen geospatial readout so
+            the harness is usable on an untethered release build (mirrors the GEO
+            logcat lines). Pose fields appear once Earth is ENABLED + TRACKING. */}
+        {geoState ? (
+          <View style={styles.readoutBox}>
+            <Text style={styles.readout}>
+              {`Earth: ${geoState.earthState} · ${geoState.trackingState}`}
+            </Text>
+            {geoState.latitude != null && geoState.longitude != null ? (
+              <Text style={styles.readout}>
+                {`lat ${geoState.latitude.toFixed(5)}  lon ${geoState.longitude.toFixed(5)}`}
+              </Text>
+            ) : null}
+            {geoState.horizontalAccuracy != null ? (
+              <Text style={styles.readout}>
+                {`horiz ±${geoState.horizontalAccuracy.toFixed(1)}m` +
+                  (geoState.verticalAccuracy != null
+                    ? `  vert ±${geoState.verticalAccuracy.toFixed(1)}m`
+                    : '') +
+                  (geoState.orientationYawAccuracy != null
+                    ? `  yaw ±${geoState.orientationYawAccuracy.toFixed(1)}°`
+                    : '')}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {/* Independent VPS coverage probe — its own throwaway session, so it is
             never gated by the host/resolve busy state. Result → native log tag "VPS". */}
         <Pressable
@@ -280,6 +317,15 @@ const DevCloudAnchorOverlay: React.FC<DevCloudAnchorOverlayProps> = ({
           style={[styles.button, styles.buttonSecondary]}>
           <Text style={styles.buttonSecondaryText}>Check VPS here</Text>
         </Pressable>
+
+        {/* ADMIN-HARNESS (REMOVE AFTER KONARK) — on-screen VPS readout (untethered). */}
+        {vpsResult ? (
+          <Text style={styles.readout}>
+            {`VPS: ${vpsResult.result}${
+              vpsResult.message ? ` · ${vpsResult.message}` : ''
+            }`}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -352,6 +398,15 @@ const styles = StyleSheet.create({
     color: '#8ED0FF',
     fontSize: 13,
     fontWeight: '700',
+  },
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — on-screen readout for untethered testing.
+  readoutBox: {
+    gap: 2,
+  },
+  readout: {
+    color: '#8ED0FF',
+    fontSize: 11,
+    fontFamily: 'monospace',
   },
 });
 

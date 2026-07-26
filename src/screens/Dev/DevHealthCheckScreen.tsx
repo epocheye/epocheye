@@ -8,9 +8,10 @@
  * breadcrumb) and a collapsible list of recorded errors. "Export" shares the
  * whole board as JSON for pasting into a bug report / chat.
  *
- * Registered in MainNavigation behind `__DEV__ ? require(...) : null`, so this
- * file (and everything only it imports) is dead-code-eliminated from release
- * bundles. The runtime guard below is belt-and-braces.
+ * ADMIN-HARNESS (REMOVE AFTER KONARK): statically imported + registered in
+ * MainNavigation so it ships in release for the admin harness. Access is gated at
+ * render time by `__DEV__ || isAdminUser()` — both here and on the entry button
+ * (DevHealthCheckButton) — so non-admins in release can never reach or render it.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -54,6 +55,8 @@ import {
 } from '../../services/crashJournal';
 import { navigateSafe } from '../../navigation/navigationRef';
 import { APP_CONFIG } from '../../core/config';
+// ADMIN-HARNESS (REMOVE AFTER KONARK)
+import { isAdminUser } from '../../shared/auth/isAdminUser';
 
 const GOLD = '#CBA862';
 const STATUS_META: Record<
@@ -128,7 +131,10 @@ const DevHealthCheckScreen: React.FC = () => {
     else if (l.kind === 'preview') setPreview(l.previewId);
   }, []);
 
-  if (!__DEV__) return null;
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — was `if (!__DEV__)`, which returned null
+  // (white screen) in release. Now mirrors the entry button's gate so admin emails
+  // can render it in release while non-admins still get null.
+  if (!(__DEV__ || isAdminUser())) return null;
 
   const sections = GROUP_ORDER.map(group => ({
     title: group,

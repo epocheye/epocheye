@@ -48,6 +48,8 @@ import EpocheyeDetectARView, {
   isDetectARAvailable,
   type CloudAnchorEvent,
   type EpocheyeDetectARHandle,
+  type GeospatialStateEvent, // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  type VpsResultEvent, // ADMIN-HARNESS (REMOVE AFTER KONARK)
 } from '../../native/EpocheyeDetectARView';
 // ADMIN-HARNESS (REMOVE AFTER KONARK) — statically imported (was __DEV__ require)
 // so the admin overlay ships in release, gated at render time by isAdminUser().
@@ -950,6 +952,16 @@ const DetectARNative: React.FC<{
   // ADMIN-HARNESS (REMOVE AFTER KONARK) — geospatial harness START/STOP (default
   // off ⇒ session stays geospatialMode DISABLED until an admin starts it).
   const [geoActive, setGeoActive] = useState(false);
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — on-screen readouts so the harness is
+  // usable on an UNTETHERED release build (no adb); fed by native onVpsResult /
+  // onGeospatialState events, rendered in the admin overlay.
+  const [vpsResult, setVpsResult] = useState<VpsResultEvent | null>(null);
+  const [geoState, setGeoState] = useState<GeospatialStateEvent | null>(null);
+  const handleToggleGeospatial = useCallback((on: boolean) => {
+    setGeoActive(on);
+    // Clear the stale readout on STOP so the panel doesn't show a frozen pose.
+    if (!on) setGeoState(null);
+  }, []);
 
   const handleReady = useCallback(() => {
     setStatus(prev => (prev === 'placed' ? prev : 'searching'));
@@ -1177,6 +1189,8 @@ const DetectARNative: React.FC<{
         onError={handleError}
         onFrameCaptured={handleFrameCaptured}
         onCloudAnchorEvent={devCloudAnchor ? handleCloudAnchorEvent : undefined}
+        onVpsResult={showAdminHarness ? setVpsResult : undefined} // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        onGeospatialState={showAdminHarness ? setGeoState : undefined} // ADMIN-HARNESS (REMOVE AFTER KONARK)
       />
 
       <ARActivationOverlay
@@ -1219,7 +1233,9 @@ const DetectARNative: React.FC<{
           depthOcclusion={occlusionOn}
           onToggleDepthOcclusion={setOcclusionOn}
           geospatial={geoActive}
-          onToggleGeospatial={setGeoActive}
+          onToggleGeospatial={handleToggleGeospatial}
+          vpsResult={vpsResult}
+          geoState={geoState}
         />
       ) : null}
 

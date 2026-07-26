@@ -94,6 +94,24 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         message: String?,
     ) -> Unit)? = null
 
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    // On-screen readouts so the harness is usable on an UNTETHERED release build
+    // (no adb): the VPS result and the geospatial state/accuracies are pushed to JS
+    // and rendered in the admin overlay, in addition to the VPS/GEO logcat lines.
+    /** VPS probe result — a VpsAvailability enum name, or an error token. */
+    var onVpsResult: ((result: String, message: String?) -> Unit)? = null
+    /** Geospatial readout: Earth/tracking state + camera pose accuracies (pose null until TRACKING). */
+    var onGeospatialState: ((
+        earthState: String,
+        trackingState: String,
+        latitude: Double?,
+        longitude: Double?,
+        horizontalAccuracy: Double?,
+        altitude: Double?,
+        verticalAccuracy: Double?,
+        orientationYawAccuracy: Double?,
+    ) -> Unit)? = null
+
     // ── Compose-hosted scene ─────────────────────────────────────────────────
     // A single root node is created inside the ARSceneView content DSL and captured
     // here; imperative placement attaches/detaches the world-anchored nodes as its
@@ -986,19 +1004,26 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 if (lastEarthState != "NO_EARTH") {
                     lastEarthState = "NO_EARTH"
                     Log.w(GEO_TAG, "session.earth is null (geospatial unavailable)")
+                    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+                    emitGeospatialState("NO_EARTH", "-")
                 }
                 return
             }
             val earthState = try { earth.earthState.name } catch (_: Throwable) { "?" }
             val tracking = try { earth.trackingState.name } catch (_: Throwable) { "?" }
+            var changed = false
             if (earthState != lastEarthState) {
                 lastEarthState = earthState
                 Log.i(GEO_TAG, "earthState -> $earthState")
+                changed = true
             }
             if (tracking != lastEarthTracking) {
                 lastEarthTracking = tracking
                 Log.i(GEO_TAG, "trackingState -> $tracking")
+                changed = true
             }
+            // ADMIN-HARNESS (REMOVE AFTER KONARK) — push state transitions to the overlay.
+            if (changed) emitGeospatialState(earthState, tracking)
             if (earth.earthState == Earth.EarthState.ENABLED &&
                 earth.trackingState == TrackingState.TRACKING
             ) {
@@ -1016,6 +1041,17 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                             pose.verticalAccuracy,
                             pose.orientationYawAccuracy,
                         ),
+                    )
+                    // ADMIN-HARNESS (REMOVE AFTER KONARK) — push pose accuracies (~1/sec) to the overlay.
+                    emitGeospatialState(
+                        earthState,
+                        tracking,
+                        pose.latitude,
+                        pose.longitude,
+                        pose.horizontalAccuracy,
+                        pose.altitude,
+                        pose.verticalAccuracy,
+                        pose.orientationYawAccuracy,
                     )
                 }
             }
@@ -1052,6 +1088,36 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         planeReported = false
         lastTrackingState = null
         setupAR()
+    }
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    private fun emitVpsResult(result: String, message: String? = null) {
+        post { onVpsResult?.invoke(result, message) }
+    }
+
+    // ADMIN-HARNESS (REMOVE AFTER KONARK)
+    private fun emitGeospatialState(
+        earthState: String,
+        trackingState: String,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        horizontalAccuracy: Double? = null,
+        altitude: Double? = null,
+        verticalAccuracy: Double? = null,
+        orientationYawAccuracy: Double? = null,
+    ) {
+        post {
+            onGeospatialState?.invoke(
+                earthState,
+                trackingState,
+                latitude,
+                longitude,
+                horizontalAccuracy,
+                altitude,
+                verticalAccuracy,
+                orientationYawAccuracy,
+            )
+        }
     }
 
     private fun emitCloudAnchorEvent(
@@ -1302,6 +1368,8 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         } catch (t: Throwable) {
             // UnavailableArcoreNotInstalled/ApkTooOld/SdkTooOld/DeviceNotCompatible.
             Log.e(VPS_TAG, "Session creation failed: ${t.message}", t)
+            // ADMIN-HARNESS (REMOVE AFTER KONARK) — surface on the untethered overlay.
+            emitVpsResult("SESSION_FAILED", t.message)
             return
         }
         try {
@@ -1315,6 +1383,8 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     else ->
                         Log.w(VPS_TAG, "VPS check returned $availability at $where")
                 }
+                // ADMIN-HARNESS (REMOVE AFTER KONARK) — enum name to the overlay.
+                emitVpsResult(availability.name)
                 try {
                     session.close()
                 } catch (t: Throwable) {
@@ -1323,6 +1393,8 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             }
         } catch (t: Throwable) {
             Log.e(VPS_TAG, "checkVpsAvailabilityAsync failed: ${t.message}", t)
+            // ADMIN-HARNESS (REMOVE AFTER KONARK)
+            emitVpsResult("CALL_FAILED", t.message)
             try {
                 session.close()
             } catch (_: Throwable) {

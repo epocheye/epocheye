@@ -43,6 +43,27 @@ export interface CloudAnchorEvent {
   message?: string;
 }
 
+// ADMIN-HARNESS (REMOVE AFTER KONARK)
+// On-screen readouts so the harness works on an untethered release build (no adb).
+/** VPS probe result — a VpsAvailability enum name ('AVAILABLE' / 'UNAVAILABLE' / …)
+ *  or an error token ('SESSION_FAILED' / 'CALL_FAILED'). */
+export interface VpsResultEvent {
+  result: string;
+  message?: string;
+}
+/** Geospatial readout: Earth/tracking state + camera pose accuracies (pose fields
+ *  absent until Earth is ENABLED + TRACKING). */
+export interface GeospatialStateEvent {
+  earthState: string;
+  trackingState: string;
+  latitude?: number;
+  longitude?: number;
+  horizontalAccuracy?: number;
+  altitude?: number;
+  verticalAccuracy?: number;
+  orientationYawAccuracy?: number;
+}
+
 interface NativeProps {
   style?: ViewStyle;
   glbUri?: string;
@@ -66,6 +87,9 @@ interface NativeProps {
   onARError?: (event: {nativeEvent: {error: string}}) => void;
   onFrameCaptured?: (event: {nativeEvent: {uri: string}}) => void;
   onCloudAnchorEvent?: (event: {nativeEvent: CloudAnchorEvent}) => void;
+  // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  onVpsResult?: (event: {nativeEvent: VpsResultEvent}) => void;
+  onGeospatialState?: (event: {nativeEvent: GeospatialStateEvent}) => void;
 }
 
 const NativeDetectARView = ((): HostComponent<NativeProps> | null => {
@@ -129,6 +153,11 @@ interface Props {
   onFrameCaptured?: (uri: string) => void;
   /** DEV: Cloud Anchor host/resolve lifecycle events. */
   onCloudAnchorEvent?: (event: CloudAnchorEvent) => void;
+  // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  /** VPS availability probe result (on-screen readout for untethered testing). */
+  onVpsResult?: (event: VpsResultEvent) => void;
+  /** Geospatial state + pose accuracies (on-screen readout for untethered testing). */
+  onGeospatialState?: (event: GeospatialStateEvent) => void;
 }
 
 const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
@@ -149,6 +178,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       onError,
       onFrameCaptured,
       onCloudAnchorEvent,
+      onVpsResult, // ADMIN-HARNESS (REMOVE AFTER KONARK)
+      onGeospatialState, // ADMIN-HARNESS (REMOVE AFTER KONARK)
     },
     ref,
   ) => {
@@ -260,6 +291,19 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           onCloudAnchorEvent
             ? (e: {nativeEvent: CloudAnchorEvent}) =>
                 onCloudAnchorEvent(e.nativeEvent)
+            : undefined
+        }
+        onVpsResult={
+          // ADMIN-HARNESS (REMOVE AFTER KONARK)
+          onVpsResult
+            ? (e: {nativeEvent: VpsResultEvent}) => onVpsResult(e.nativeEvent)
+            : undefined
+        }
+        onGeospatialState={
+          // ADMIN-HARNESS (REMOVE AFTER KONARK)
+          onGeospatialState
+            ? (e: {nativeEvent: GeospatialStateEvent}) =>
+                onGeospatialState(e.nativeEvent)
             : undefined
         }
       />
