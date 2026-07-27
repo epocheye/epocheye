@@ -100,7 +100,7 @@ android {
         applicationId "com.epocheye"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 19
+        versionCode 20
         versionName "1.4.2"
         // OTA Hermes-compat runtime version. The client only fetches/accepts OTA
         // bundles built for this exact value. Bump ONLY when a native/store build
