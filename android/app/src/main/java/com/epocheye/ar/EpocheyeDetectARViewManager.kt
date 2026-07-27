@@ -85,6 +85,25 @@ class EpocheyeDetectARViewManager(
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onGeospatialState", event)
         }
+        // Site-readiness pipeline (PERMANENT) — geospatial anchor capture/place.
+        view.onGeospatialAnchorEvent = { phase, state, message, lat, lng, alt, qx, qy, qz, qw, horiz, yaw ->
+            val event = Arguments.createMap().apply {
+                putString("phase", phase)
+                putString("state", state)
+                message?.let { putString("message", it) }
+                lat?.let { putDouble("lat", it) }
+                lng?.let { putDouble("lng", it) }
+                alt?.let { putDouble("alt", it) }
+                qx?.let { putDouble("qx", it) }
+                qy?.let { putDouble("qy", it) }
+                qz?.let { putDouble("qz", it) }
+                qw?.let { putDouble("qw", it) }
+                horiz?.let { putDouble("horizontalAccuracy", it) }
+                yaw?.let { putDouble("orientationYawAccuracy", it) }
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onGeospatialAnchorEvent", event)
+        }
         view.onCloudAnchorEvent = { phase, state, cloudAnchorId, quality, message ->
             val event = Arguments.createMap().apply {
                 putString("phase", phase)
@@ -150,6 +169,8 @@ class EpocheyeDetectARViewManager(
             .put("hostCloudAnchor", CMD_HOST_CLOUD_ANCHOR)
             .put("resolveCloudAnchor", CMD_RESOLVE_CLOUD_ANCHOR)
             .put("checkVps", CMD_CHECK_VPS)
+            .put("captureGeospatialPose", CMD_CAPTURE_GEO_POSE)
+            .put("placeGeospatialAnchor", CMD_PLACE_GEO_ANCHOR)
             .build()
     }
 
@@ -196,6 +217,19 @@ class EpocheyeDetectARViewManager(
                 val lng = args?.getDouble(1) ?: return
                 view.checkVps(lat, lng)
             }
+            CMD_CAPTURE_GEO_POSE -> view.captureGeospatialPose()
+            CMD_PLACE_GEO_ANCHOR -> {
+                val lat = args?.getDouble(0) ?: return
+                val lng = args?.getDouble(1) ?: return
+                val alt = args?.getDouble(2) ?: return
+                view.placeGeospatialAnchor(
+                    lat, lng, alt,
+                    args.getDouble(3).toFloat(),
+                    args.getDouble(4).toFloat(),
+                    args.getDouble(5).toFloat(),
+                    args.getDouble(6).toFloat(),
+                )
+            }
         }
     }
 
@@ -241,6 +275,19 @@ class EpocheyeDetectARViewManager(
                 val lng = args?.getDouble(1) ?: return
                 view.checkVps(lat, lng)
             }
+            "captureGeospatialPose" -> view.captureGeospatialPose()
+            "placeGeospatialAnchor" -> {
+                val lat = args?.getDouble(0) ?: return
+                val lng = args?.getDouble(1) ?: return
+                val alt = args?.getDouble(2) ?: return
+                view.placeGeospatialAnchor(
+                    lat, lng, alt,
+                    args.getDouble(3).toFloat(),
+                    args.getDouble(4).toFloat(),
+                    args.getDouble(5).toFloat(),
+                    args.getDouble(6).toFloat(),
+                )
+            }
         }
     }
 
@@ -256,6 +303,7 @@ class EpocheyeDetectARViewManager(
             // ADMIN-HARNESS (REMOVE AFTER KONARK)
             .put("onVpsResult", MapBuilder.of("registrationName", "onVpsResult"))
             .put("onGeospatialState", MapBuilder.of("registrationName", "onGeospatialState"))
+            .put("onGeospatialAnchorEvent", MapBuilder.of("registrationName", "onGeospatialAnchorEvent"))
             .build()
     }
 
@@ -275,5 +323,7 @@ class EpocheyeDetectARViewManager(
         private const val CMD_HOST_CLOUD_ANCHOR = 8
         private const val CMD_RESOLVE_CLOUD_ANCHOR = 9
         private const val CMD_CHECK_VPS = 10
+        private const val CMD_CAPTURE_GEO_POSE = 11
+        private const val CMD_PLACE_GEO_ANCHOR = 12
     }
 }

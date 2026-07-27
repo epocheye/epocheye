@@ -24,6 +24,10 @@ import type { MainStackParamList } from '../core/types';
 // ships in release for the admin harness; the ENTRY (DevHealthCheckButton) is
 // gated on __DEV__ || isAdminUser(), so non-admins can never reach it.
 import DevHealthCheckScreen from '../screens/Dev/DevHealthCheckScreen';
+// Admin on-site AR authoring tool (site-readiness pipeline). Admin-gated at render.
+import StationAuthoringScreen from '../screens/Admin/StationAuthoringScreen';
+// Prod site-readiness experience: guide to a station + world-lock the reconstruction.
+import SiteReconstructionScreen from '../screens/Main/SiteReconstructionScreen';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -150,6 +154,16 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         name={ROUTES.MAIN.DEV_HEALTH}
         component={DevHealthCheckScreen}
         options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name={ROUTES.MAIN.STATION_AUTHORING}
+        component={StationAuthoringScreen}
+        options={{ animation: 'fade', presentation: 'fullScreenModal' }}
+      />
+      <Stack.Screen
+        name={ROUTES.MAIN.SITE_RECONSTRUCTION}
+        component={SiteReconstructionScreen}
+        options={{ animation: 'fade', presentation: 'fullScreenModal' }}
       />
     </Stack.Navigator>
     <VenueActivationBanner />

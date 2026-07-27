@@ -14,7 +14,11 @@ class ARCorePackage : ReactPackage {
     override fun createNativeModules(
         reactContext: ReactApplicationContext
     ): List<NativeModule> {
-        return listOf(ARCoreModule(reactContext))
+        return listOf(
+            ARCoreModule(reactContext),
+            // Site-readiness pipeline (PERMANENT) — compass heading for pre-AR guidance.
+            HeadingModule(reactContext),
+        )
     }
 
     override fun createViewManagers(

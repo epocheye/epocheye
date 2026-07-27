@@ -112,6 +112,26 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         orientationYawAccuracy: Double?,
     ) -> Unit)? = null
 
+    // Site-readiness pipeline (PERMANENT product feature — NOT admin harness).
+    // Geospatial anchor capture (authoring: read the placed model's WGS84 pose)
+    // and placement (prod: create a geospatial anchor from a saved pose and
+    // attach the model). phase = "capture" | "place"; pose fields present on a
+    // successful capture. Requires the geospatial session to be TRACKING.
+    var onGeospatialAnchorEvent: ((
+        phase: String,
+        state: String,
+        message: String?,
+        lat: Double?,
+        lng: Double?,
+        alt: Double?,
+        qx: Double?,
+        qy: Double?,
+        qz: Double?,
+        qw: Double?,
+        horizontalAccuracy: Double?,
+        orientationYawAccuracy: Double?,
+    ) -> Unit)? = null
+
     // ── Compose-hosted scene ─────────────────────────────────────────────────
     // A single root node is created inside the ARSceneView content DSL and captured
     // here; imperative placement attaches/detaches the world-anchored nodes as its
@@ -989,6 +1009,108 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         }
     }
 
+    // Site-readiness pipeline (PERMANENT product feature). Authoring: read the
+    // WGS84 geospatial pose of the currently-placed model (local anchor → Earth
+    // frame) so it can be saved to a viewing station. Requires geospatial ENABLED
+    // + Earth TRACKING and a placed anchor. Result → onGeospatialAnchorEvent.
+    fun captureGeospatialPose() {
+        val session = arSession ?: run {
+            emitGeoAnchor("capture", "ERROR_SESSION_NOT_READY")
+            return
+        }
+        val earth = session.earth
+        if (earth == null || earth.earthState != Earth.EarthState.ENABLED ||
+            earth.trackingState != TrackingState.TRACKING
+        ) {
+            emitGeoAnchor("capture", "ERROR_EARTH_NOT_TRACKING")
+            return
+        }
+        val node = currentAnchorNode ?: run {
+            emitGeoAnchor("capture", "ERROR_NO_ANCHOR", "place the model first")
+            return
+        }
+        val pose = node.anchor?.pose ?: run {
+            emitGeoAnchor("capture", "ERROR_NO_POSE")
+            return
+        }
+        val geo = try {
+            earth.getGeospatialPose(pose)
+        } catch (t: Throwable) {
+            Log.e(GEO_TAG, "getGeospatialPose failed", t)
+            emitGeoAnchor("capture", "ERROR_READ_FAILED", t.message)
+            return
+        }
+        // EastUpSouth quaternion [x, y, z, w] — the same frame createAnchor expects.
+        val q = try { geo.eastUpSouthQuaternion } catch (_: Throwable) { floatArrayOf(0f, 0f, 0f, 1f) }
+        val cam = try { earth.cameraGeospatialPose } catch (_: Throwable) { null }
+        emitGeoAnchor(
+            "capture", "SUCCESS", null,
+            geo.latitude, geo.longitude, geo.altitude,
+            q.getOrElse(0) { 0f }.toDouble(),
+            q.getOrElse(1) { 0f }.toDouble(),
+            q.getOrElse(2) { 0f }.toDouble(),
+            q.getOrElse(3) { 1f }.toDouble(),
+            cam?.horizontalAccuracy,
+            cam?.orientationYawAccuracy,
+        )
+    }
+
+    // Site-readiness pipeline (PERMANENT). Prod resolve + authoring re-verify:
+    // create a geospatial (WGS84) anchor from a saved pose and attach the current
+    // glbUri model to it, world-locked. Requires geospatial ENABLED + TRACKING.
+    // Result → onGeospatialAnchorEvent (phase "place").
+    fun placeGeospatialAnchor(
+        lat: Double,
+        lng: Double,
+        alt: Double,
+        qx: Float,
+        qy: Float,
+        qz: Float,
+        qw: Float,
+    ) {
+        val session = arSession ?: run {
+            emitGeoAnchor("place", "ERROR_SESSION_NOT_READY")
+            return
+        }
+        val earth = session.earth
+        if (earth == null || earth.earthState != Earth.EarthState.ENABLED ||
+            earth.trackingState != TrackingState.TRACKING
+        ) {
+            emitGeoAnchor("place", "ERROR_EARTH_NOT_TRACKING")
+            return
+        }
+        val eng = engine ?: run {
+            emitGeoAnchor("place", "ERROR_NOT_READY")
+            return
+        }
+        val root = sceneRoot ?: run {
+            emitGeoAnchor("place", "ERROR_NOT_READY")
+            return
+        }
+        val anchor = try {
+            earth.createAnchor(lat, lng, alt, qx, qy, qz, qw)
+        } catch (t: Throwable) {
+            Log.e(GEO_TAG, "createAnchor failed", t)
+            emitGeoAnchor("place", "ERROR_CREATE_FAILED", t.message)
+            return
+        }
+        clearCurrentAnchor()
+        val anchorNode = try {
+            AnchorNode(eng, anchor).also { root.addChildNode(it) }
+        } catch (t: Throwable) {
+            Log.e(GEO_TAG, "geo anchor node create failed", t)
+            try { anchor.detach() } catch (_: Throwable) {}
+            emitGeoAnchor("place", "ERROR_NODE_FAILED")
+            return
+        }
+        currentAnchorNode = anchorNode
+        val uri = glbUri
+        if (uri != null) {
+            attachModel(anchorNode, uri)
+        }
+        emitGeoAnchor("place", "SUCCESS")
+    }
+
     // ADMIN-HARNESS (REMOVE AFTER KONARK)
     /**
      * Per-frame Earth read while the geospatial harness is active. Logs
@@ -1116,6 +1238,30 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 altitude,
                 verticalAccuracy,
                 orientationYawAccuracy,
+            )
+        }
+    }
+
+    // Site-readiness pipeline (PERMANENT).
+    private fun emitGeoAnchor(
+        phase: String,
+        state: String,
+        message: String? = null,
+        lat: Double? = null,
+        lng: Double? = null,
+        alt: Double? = null,
+        qx: Double? = null,
+        qy: Double? = null,
+        qz: Double? = null,
+        qw: Double? = null,
+        horizontalAccuracy: Double? = null,
+        orientationYawAccuracy: Double? = null,
+    ) {
+        post {
+            onGeospatialAnchorEvent?.invoke(
+                phase, state, message,
+                lat, lng, alt, qx, qy, qz, qw,
+                horizontalAccuracy, orientationYawAccuracy,
             )
         }
     }

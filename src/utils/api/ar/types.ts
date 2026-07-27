@@ -133,6 +133,75 @@ export interface AnchorsResponse {
 }
 
 /**
+ * A per-site AR viewing station (backend table viewing_stations, migration 075).
+ * One station = where a visitor STANDS + which way to FACE to see a
+ * reconstruction, plus the hybrid anchor that world-locks the model there:
+ * a geospatial (WGS84) pose (geo_*) and/or a hosted Cloud Anchor
+ * (cloud_anchor_id). model_id → GLB via GLB_BASE_URL, or asset_id → a curated
+ * monument_objects row.
+ */
+export interface ViewingStation {
+  id: string;
+  monument_id: string;
+  title: string;
+  active: boolean;
+  stand_lat?: number | null;
+  stand_lng?: number | null;
+  stand_alt?: number | null;
+  face_bearing_deg?: number | null;
+  view_radius_min_m: number;
+  view_radius_max_m: number;
+  geo_lat?: number | null;
+  geo_lng?: number | null;
+  geo_alt?: number | null;
+  geo_qx?: number | null;
+  geo_qy?: number | null;
+  geo_qz?: number | null;
+  geo_qw?: number | null;
+  cloud_anchor_id?: string;
+  cloud_anchor_expiry?: string | null;
+  asset_id?: string;
+  model_id: string;
+  model_scale: number;
+  captured_horiz_acc_m?: number | null;
+  captured_yaw_acc_deg?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Upsert payload — id omitted = create, id present = update. */
+export interface ViewingStationUpsertRequest {
+  id?: string;
+  monument_id: string;
+  title?: string;
+  active?: boolean;
+  stand_lat?: number;
+  stand_lng?: number;
+  stand_alt?: number;
+  face_bearing_deg?: number;
+  view_radius_min_m?: number;
+  view_radius_max_m?: number;
+  geo_lat?: number;
+  geo_lng?: number;
+  geo_alt?: number;
+  geo_qx?: number;
+  geo_qy?: number;
+  geo_qz?: number;
+  geo_qw?: number;
+  cloud_anchor_id?: string;
+  cloud_anchor_expiry?: string;
+  asset_id?: string;
+  model_id?: string;
+  model_scale?: number;
+  captured_horiz_acc_m?: number;
+  captured_yaw_acc_deg?: number;
+}
+
+export interface ViewingStationsResponse {
+  stations: ViewingStation[];
+}
+
+/**
  * One renderable object in the curated AR site catalog. Joined view of
  * monument_anchors + monument_objects + ar_reconstruction_cache.
  */

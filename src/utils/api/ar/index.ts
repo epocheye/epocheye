@@ -27,4 +27,7 @@ export type {
   SubmitUnknownScanResponse,
   SiteBundleAsset,
   SiteBundlePlacement,
+  ViewingStation,
+  ViewingStationsResponse,
+  ViewingStationUpsertRequest,
 } from './types';

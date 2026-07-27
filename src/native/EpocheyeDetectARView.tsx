@@ -64,6 +64,25 @@ export interface GeospatialStateEvent {
   orientationYawAccuracy?: number;
 }
 
+// Site-readiness pipeline (PERMANENT product feature).
+/** Result of captureGeospatialPose (phase 'capture' → the placed model's WGS84
+ *  pose, to save on a viewing station) or placeGeospatialAnchor (phase 'place'
+ *  → world-lock result). Pose fields present on a successful 'capture'. */
+export interface GeospatialAnchorEvent {
+  phase: 'capture' | 'place';
+  state: string;
+  message?: string;
+  lat?: number;
+  lng?: number;
+  alt?: number;
+  qx?: number;
+  qy?: number;
+  qz?: number;
+  qw?: number;
+  horizontalAccuracy?: number;
+  orientationYawAccuracy?: number;
+}
+
 interface NativeProps {
   style?: ViewStyle;
   glbUri?: string;
@@ -90,6 +109,8 @@ interface NativeProps {
   // ADMIN-HARNESS (REMOVE AFTER KONARK)
   onVpsResult?: (event: {nativeEvent: VpsResultEvent}) => void;
   onGeospatialState?: (event: {nativeEvent: GeospatialStateEvent}) => void;
+  // Site-readiness pipeline (PERMANENT).
+  onGeospatialAnchorEvent?: (event: {nativeEvent: GeospatialAnchorEvent}) => void;
 }
 
 const NativeDetectARView = ((): HostComponent<NativeProps> | null => {
@@ -125,6 +146,21 @@ export interface EpocheyeDetectARHandle {
   /** DEV: probe ARCore VPS availability at the given lat/lng (the device's current
    *  location); result logged natively under tag "VPS". */
   checkVps: (latitude: number, longitude: number) => void;
+  // Site-readiness pipeline (PERMANENT).
+  /** Authoring: read the currently-placed model's WGS84 geospatial pose →
+   *  onGeospatialAnchorEvent (phase 'capture'). Requires geospatial TRACKING. */
+  captureGeospatialPose: () => void;
+  /** Prod/authoring: create a geospatial anchor from a saved WGS84 pose and
+   *  attach the current model, world-locked → onGeospatialAnchorEvent ('place'). */
+  placeGeospatialAnchor: (
+    lat: number,
+    lng: number,
+    alt: number,
+    qx: number,
+    qy: number,
+    qz: number,
+    qw: number,
+  ) => void;
 }
 
 interface Props {
@@ -158,6 +194,9 @@ interface Props {
   onVpsResult?: (event: VpsResultEvent) => void;
   /** Geospatial state + pose accuracies (on-screen readout for untethered testing). */
   onGeospatialState?: (event: GeospatialStateEvent) => void;
+  // Site-readiness pipeline (PERMANENT).
+  /** Geospatial anchor capture (authoring) / placement (prod) result. */
+  onGeospatialAnchorEvent?: (event: GeospatialAnchorEvent) => void;
 }
 
 const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
@@ -180,6 +219,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       onCloudAnchorEvent,
       onVpsResult, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       onGeospatialState, // ADMIN-HARNESS (REMOVE AFTER KONARK)
+      onGeospatialAnchorEvent, // site-readiness pipeline (PERMANENT)
     },
     ref,
   ) => {
@@ -204,6 +244,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         hostCloudAnchor: commands.hostCloudAnchor,
         resolveCloudAnchor: commands.resolveCloudAnchor,
         checkVps: commands.checkVps,
+        captureGeospatialPose: commands.captureGeospatialPose,
+        placeGeospatialAnchor: commands.placeGeospatialAnchor,
       };
     }, []);
 
@@ -243,6 +285,18 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           dispatch(commandIds?.resolveCloudAnchor, [cloudAnchorId]),
         checkVps: (latitude, longitude) =>
           dispatch(commandIds?.checkVps, [latitude, longitude]),
+        captureGeospatialPose: () =>
+          dispatch(commandIds?.captureGeospatialPose, []),
+        placeGeospatialAnchor: (lat, lng, alt, qx, qy, qz, qw) =>
+          dispatch(commandIds?.placeGeospatialAnchor, [
+            lat,
+            lng,
+            alt,
+            qx,
+            qy,
+            qz,
+            qw,
+          ]),
       }),
       [commandIds],
     );
@@ -304,6 +358,13 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           onGeospatialState
             ? (e: {nativeEvent: GeospatialStateEvent}) =>
                 onGeospatialState(e.nativeEvent)
+            : undefined
+        }
+        onGeospatialAnchorEvent={
+          // Site-readiness pipeline (PERMANENT).
+          onGeospatialAnchorEvent
+            ? (e: {nativeEvent: GeospatialAnchorEvent}) =>
+                onGeospatialAnchorEvent(e.nativeEvent)
             : undefined
         }
       />

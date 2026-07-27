@@ -20,6 +20,9 @@ import type {
   SubmitUnknownScanRequest,
   SubmitUnknownScanResponse,
   UserArConfig,
+  ViewingStation,
+  ViewingStationsResponse,
+  ViewingStationUpsertRequest,
 } from './types';
 
 export async function getArConfig(): Promise<ArResult<UserArConfig>> {
@@ -196,6 +199,46 @@ export async function captureAnchor(
   try {
     const client = createAuthenticatedClient();
     const resp = await client.post<ArAnchor>('/api/v1/ar/anchor-capture', req);
+    return { success: true, data: resp.data };
+  } catch (error) {
+    return createErrorResult(error);
+  }
+}
+
+/**
+ * List the active viewing stations for a site (prod read). Drives on-site
+ * guidance + world-locked reconstruction placement. Reads are venue-scoped by
+ * the caller (monument slug), same key as anchors/site-bundle.
+ */
+export async function listViewingStations(
+  monumentId: string,
+): Promise<ArResult<ViewingStationsResponse>> {
+  try {
+    const client = createAuthenticatedClient();
+    const resp = await client.get<ViewingStationsResponse>(
+      '/api/v1/ar/viewing-stations',
+      { params: { monument_id: monumentId } },
+    );
+    return { success: true, data: resp.data };
+  } catch (error) {
+    return createErrorResult(error);
+  }
+}
+
+/**
+ * Admin-only: create (no id) or update (with id) a viewing station from the
+ * on-site authoring tool. Backend re-checks the is_admin claim — the mobile UI
+ * hides the entry point for non-admins, but this is the authoritative gate.
+ */
+export async function upsertViewingStation(
+  req: ViewingStationUpsertRequest,
+): Promise<ArResult<ViewingStation>> {
+  try {
+    const client = createAuthenticatedClient();
+    const resp = await client.post<ViewingStation>(
+      '/api/v1/ar/viewing-stations',
+      req,
+    );
     return { success: true, data: resp.data };
   } catch (error) {
     return createErrorResult(error);

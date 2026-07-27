@@ -186,6 +186,30 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
       'devPicker bypasses the venue gate for home testing. At a real site, also test the full gate → safety notice → scan flow.',
   },
   {
+    id: 'station-authoring',
+    title: 'Author viewing station (admin)',
+    group: 'Site & AR',
+    launch: {
+      kind: 'route',
+      route: ROUTES.MAIN.STATION_AUTHORING,
+    },
+    requires: 'arcore',
+    howToTest:
+      'On-site: load a model, place it, capture the geospatial pose + host a cloud anchor, then save a viewing station so prod visitors can be guided to it and see it world-locked.',
+  },
+  {
+    id: 'site-reconstruction',
+    title: 'Site reconstruction (prod experience)',
+    group: 'Site & AR',
+    launch: {
+      kind: 'route',
+      route: ROUTES.MAIN.SITE_RECONSTRUCTION,
+    },
+    requires: 'arcore',
+    howToTest:
+      'The visitor experience: guides you to the nearest authored viewing station and world-locks the reconstruction. Needs a saved station at your current site.',
+  },
+  {
     id: 'ar-safety-notice',
     title: 'AR safety notice (preview)',
     group: 'Site & AR',

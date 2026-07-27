@@ -38,6 +38,10 @@ export const ROUTES = {
     DETECT_AR: 'DetectAr',
     GO_TO_VENUE: 'GoToVenue',
     SUGGEST_SITE: 'SuggestSite',
+    /** Admin on-site AR authoring tool: place a reconstruction + save a viewing station. */
+    STATION_AUTHORING: 'StationAuthoring',
+    /** Prod: guide the visitor to a viewing station and world-lock the reconstruction. */
+    SITE_RECONSTRUCTION: 'SiteReconstruction',
     /** Dev-build-only workflow health-check board (not registered in release). */
     DEV_HEALTH: 'DevHealth',
   },

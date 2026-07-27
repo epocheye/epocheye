@@ -105,6 +105,10 @@ export type MainStackParamList = {
   SuggestSite: undefined;
   /** DEV-only workflow health-check board (screen is only registered in dev builds). */
   DevHealth: undefined;
+  /** Admin on-site AR authoring tool: place a reconstruction + save a viewing station. */
+  StationAuthoring: undefined;
+  /** Prod: guide to a viewing station + world-lock the reconstruction. */
+  SiteReconstruction: {venueSlug?: string} | undefined;
 };
 
 /**

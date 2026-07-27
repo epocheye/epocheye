@@ -38,6 +38,7 @@ import type { SiteDetail } from '../../utils/api/places';
 import { resolveSiteImageSource } from '../../shared/utils/localSiteImages';
 import { moderateScale } from '../../utils/scaling';
 import { ROUTES } from '../../core/constants';
+import { listViewingStations } from '../../utils/api/ar';
 import { analytics } from '../../services/analytics';
 import type {
   MainScreenProps,
@@ -235,6 +236,29 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     navigation.navigate(ROUTES.MAIN.DETECT_AR, {venueSlug: slug});
   }, [navigation, siteDetail, site]);
 
+  // Site-readiness: surface the guided reconstruction CTA only when an admin has
+  // authored at least one viewing station for this site.
+  const [hasReconstruction, setHasReconstruction] = useState(false);
+  useEffect(() => {
+    const slug = siteDetail?.slug ?? site.id;
+    if (!slug) {
+      return;
+    }
+    let cancelled = false;
+    void listViewingStations(slug).then(res => {
+      if (!cancelled && res.success) {
+        setHasReconstruction((res.data.stations ?? []).length > 0);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [siteDetail?.slug, site.id]);
+  const handleReconstruction = useCallback(() => {
+    const slug = siteDetail?.slug ?? site.id;
+    navigation.navigate(ROUTES.MAIN.SITE_RECONSTRUCTION, {venueSlug: slug});
+  }, [navigation, siteDetail, site]);
+
   // Record a site view once per opened site (the auto screen_view carries no slug).
   useEffect(() => {
     analytics.track('site_viewed', {slug: site.id});
@@ -430,6 +454,27 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
             </TouchableOpacity>
           </TourTarget>
+
+          {hasReconstruction && (
+            <TouchableOpacity
+              onPress={handleReconstruction}
+              activeOpacity={0.9}
+              className="flex-row items-center justify-center gap-2"
+              style={{
+                height: moderateScale(53),
+                borderRadius: moderateScale(30),
+                borderWidth: 1,
+                borderColor: '#C9A84C',
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="See the reconstruction">
+              <Text
+                className="text-brand-gold font-display"
+                style={{fontSize: moderateScale(20)}}>
+                See the reconstruction
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             onPress={handleAskGuide}

@@ -145,3 +145,65 @@ export function getBoundingBox(
     maxLon: longitude + lonDegrees,
   };
 }
+
+/**
+ * Initial bearing (forward azimuth) from point 1 → point 2, in degrees
+ * clockwise from TRUE north (0..360). Pair with a true-north device heading
+ * (useHeading) to compute which way to face / turn toward a target.
+ *
+ * @example bearingBetween(userLat, userLon, stationLat, stationLon) // e.g. 47.3
+ */
+export function bearingBetween(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x =
+    Math.cos(φ1) * Math.sin(φ2) -
+    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  const θ = Math.atan2(y, x);
+  return (((θ * 180) / Math.PI + 360) % 360);
+}
+
+/**
+ * Signed relative bearing = targetBearing − heading, normalised to (-180, 180].
+ * Negative = target is to your LEFT, positive = to your RIGHT, ~0 = ahead.
+ * Feed a rotating arrow (rotate by this) and turn cues.
+ */
+export function relativeBearing(
+  targetBearingDeg: number,
+  headingDeg: number
+): number {
+  let d = ((targetBearingDeg - headingDeg + 540) % 360) - 180;
+  if (d === -180) {
+    d = 180;
+  }
+  return d;
+}
+
+/**
+ * Human turn instruction from a signed relative bearing (see relativeBearing).
+ * Returns an aligned message when within ±toleranceDeg.
+ */
+export function formatTurnInstruction(
+  relBearingDeg: number,
+  toleranceDeg = 15
+): string {
+  const a = Math.abs(relBearingDeg);
+  if (a <= toleranceDeg) {
+    return 'Facing the right way';
+  }
+  const side = relBearingDeg < 0 ? 'left' : 'right';
+  if (a > 150) {
+    return 'Turn around';
+  }
+  if (a > 60) {
+    return `Turn ${side}`;
+  }
+  return `Turn slightly ${side}`;
+}
