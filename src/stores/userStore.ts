@@ -8,6 +8,9 @@ import {
   type UserProfile,
   type UserStats,
 } from '../utils/api/user';
+// ADMIN-HARNESS (REMOVE AFTER KONARK)
+import { getAccessToken } from '../utils/api/auth';
+import { decodeAccessToken } from '../utils/api/auth/jwtClaims';
 
 interface UserStoreState {
   profile: UserProfile | null;
@@ -32,8 +35,27 @@ async function fetchUserSnapshot(): Promise<{
     getUserStats(),
   ]);
 
+  const profile = profileResult.success ? profileResult.data : null;
+
+  // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  // Some backend accounts (seen with email/password logins) come back from
+  // /api/user/profile with an empty top-level `email`, which silently breaks the
+  // admin-email allowlist (isAdminUser reads profile.email). The access token
+  // carries the same identity via its `email` claim and is minted identically by
+  // both /login and /auth/google, so backfill from it when the profile omits
+  // email. Best-effort: any failure leaves profile.email untouched.
+  if (profile && !profile.email) {
+    try {
+      const token = await getAccessToken();
+      const claimEmail = token ? decodeAccessToken(token)?.email : null;
+      if (claimEmail) profile.email = claimEmail;
+    } catch {
+      // leave profile.email as-is
+    }
+  }
+
   return {
-    profile: profileResult.success ? profileResult.data : null,
+    profile,
     stats: statsResult.success ? statsResult.data : null,
     error: profileResult.success ? null : profileResult.error.message,
   };
