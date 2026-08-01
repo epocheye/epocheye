@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppAlert as Alert } from '../../shared/ui/appAlert';
 import { Box, ExternalLink, X } from 'lucide-react-native';
+import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 
 // Lazy-loaded so @react-three/fiber + expo-gl are NOT evaluated at app startup.
@@ -52,8 +53,12 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
   } = route.params;
   const insets = useSafeAreaInsets();
   const [inlineViewerFailed, setInlineViewerFailed] = useState(false);
+  // The in-app GL viewer is not AR, so this screen is NOT gated on mount — only
+  // the Scene Viewer hand-off below is, since `mode=ar_preferred` launches a
+  // live-camera AR session (Google Play Families policy).
+  const [pendingAr, setPendingAr] = useState(false);
 
-  const openExternally = useCallback(() => {
+  const launchSceneViewer = useCallback(() => {
     const intentUrl = `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(glbUrl)}&mode=ar_preferred#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;end;`;
     Linking.canOpenURL(intentUrl)
       .then(canOpen => (canOpen ? Linking.openURL(intentUrl) : Linking.openURL(glbUrl)))
@@ -64,6 +69,22 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
         );
       });
   }, [glbUrl]);
+
+  const acknowledgeAr = useCallback(() => {
+    setPendingAr(false);
+    launchSceneViewer();
+  }, [launchSceneViewer]);
+
+  // Safety warning first; only then hand off to the system AR viewer. Exiting
+  // the notice cancels the hand-off and leaves the user on the 3D viewer.
+  if (pendingAr) {
+    return (
+      <ARSafetyNotice
+        onAcknowledge={acknowledgeAr}
+        onExit={() => setPendingAr(false)}
+      />
+    );
+  }
 
   return (
     <View className="flex-1 bg-surface-1">
@@ -160,7 +181,7 @@ const ARComposer: React.FC<Props> = ({ navigation, route }) => {
         )}
         <Pressable
           className="flex-row items-center gap-x-2 px-[22px] py-[13px] rounded-xl bg-accent-amber"
-          onPress={openExternally}
+          onPress={() => setPendingAr(true)}
           accessibilityRole="button"
         >
           <ExternalLink size={16} color="#0D0D0D" />

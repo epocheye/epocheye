@@ -34,10 +34,11 @@ import EpocheyeDetectARView, {
 import type {ViewingStation} from '../../utils/api/ar';
 import {listViewingStations} from '../../utils/api/ar';
 import {resolveModelGlb} from '../../services/glbSource';
+import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
 import {useActiveMonument} from '../../shared/hooks/useActiveMonument';
 import {usePlacesStore} from '../../stores/placesStore';
+import {useARSafetyGate} from '../../shared/hooks/useARSafetyGate';
 import {useHeading} from '../../shared/hooks/useHeading';
-import {useSafeGoBack} from '../../shared/hooks/useSafeGoBack';
 import {
   bearingBetween,
   calculateDistance,
@@ -64,7 +65,11 @@ function standCoords(s: ViewingStation): {lat: number; lng: number} | null {
 const SiteReconstructionScreen: React.FC<
   MainScreenProps<'SiteReconstruction'>
 > = ({route}) => {
-  const goBack = useSafeGoBack();
+  // Families-policy safety gate. `safety.exit` is the safe-back callback (and
+  // owns the Android hardware-back interception for this camera screen), so it
+  // doubles as this screen's close handler.
+  const safety = useARSafetyGate();
+  const goBack = safety.exit;
   const activeMonument = useActiveMonument();
   const slug = route.params?.venueSlug ?? activeMonument?.slug ?? null;
   const arRef = useRef<EpocheyeDetectARHandle>(null);
@@ -260,6 +265,22 @@ const SiteReconstructionScreen: React.FC<
   }, [phase, distance, inRange, accuracyOk, rel, target]);
 
   const showAr = phase === 'resolving' || phase === 'locked' || inRange;
+
+  // Families-policy gate (Google Play): the safety warning is the FIRST thing
+  // rendered when this AR section opens — before the station data has loaded and
+  // regardless of how far the visitor is from a viewing station — so it is
+  // reachable off-site. A Play reviewer is never physically at a heritage site,
+  // so a warning gated behind `showAr` would be a warning they could never see.
+  // Nothing below this line mounts until "I understand" is tapped, so the ARCore
+  // camera can never appear first.
+  if (!safety.acknowledged) {
+    return (
+      <ARSafetyNotice
+        onAcknowledge={safety.acknowledge}
+        onExit={safety.exit}
+      />
+    );
+  }
 
   return (
     <View style={styles.root}>

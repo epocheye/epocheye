@@ -301,11 +301,16 @@ const DevHealthCheckScreen: React.FC = () => {
         }}
       />
 
+      {/* ARSafetyNotice is a full-screen `flex: 1` surface (the host screens
+          early-return it), so on this board it needs an absolute-fill wrapper to
+          overlay the list instead of sharing space with it. */}
       {preview === 'ar-safety-notice' ? (
-        <ARSafetyNotice
-          onAcknowledge={() => setPreview(null)}
-          onExit={() => setPreview(null)}
-        />
+        <View style={StyleSheet.absoluteFill}>
+          <ARSafetyNotice
+            onAcknowledge={() => setPreview(null)}
+            onExit={() => setPreview(null)}
+          />
+        </View>
       ) : null}
     </View>
   );

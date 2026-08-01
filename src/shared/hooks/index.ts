@@ -62,6 +62,9 @@ export type { UseExitConfirmOptions } from './useExitConfirm';
 
 export { useSafeGoBack, useSafeBackHandler } from './useSafeGoBack';
 
+export { useARSafetyGate } from './useARSafetyGate';
+export type { ARSafetyGate } from './useARSafetyGate';
+
 export { useVoiceInput } from './useVoiceInput';
 export type {
   UseVoiceInputOptions,

@@ -205,11 +205,13 @@
     "accountCreatedBody": "Your account was created. Please sign in from the login screen if needed."
   },
   "safety": {
-    "title": "Before you begin",
-    "supervise": "Younger explorers should have an adult nearby.",
-    "surroundings": "Stay aware of your surroundings while the camera is open.",
+    "title": "Safety first",
+    "supervise": "Parental supervision is important. A parent or guardian should supervise children while they use augmented reality.",
+    "surroundings": "Be aware of your surroundings. Watch out for real-world hazards such as traffic, stairs, ledges, other people and obstacles.",
+    "movement": "Do not use AR while walking, cycling or driving. Stop and stand still before you point the camera.",
     "acknowledge": "I understand",
-    "close": "Close and go back"
+    "acknowledgeWait": "I understand ({{seconds}})",
+    "close": "Go back"
   },
   "arrival": {
     "title": "Epocheye is now active at {{name}}",

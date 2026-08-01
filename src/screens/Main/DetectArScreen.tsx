@@ -72,7 +72,7 @@ import {streamMuseumNarration} from '../../services/museumModeService';
 // repo behind ROBOFLOW_ENABLED for a possible future cheap pre-filter.
 import {fetchObjectCard, type ObjectCard} from '../../services/detectorResolver';
 import {useVenueGate} from '../../shared/hooks/useVenueGate';
-import {useSafeBackHandler} from '../../shared/hooks/useSafeGoBack';
+import {useARSafetyGate} from '../../shared/hooks/useARSafetyGate';
 import {useMuseumPrefsStore} from '../../stores/museumPrefsStore';
 import {usePlacesStore} from '../../stores/placesStore';
 import {analytics} from '../../services/analytics';
@@ -627,7 +627,10 @@ const DetectArScreen: React.FC = () => {
   const [gateTimedOut, setGateTimedOut] = useState(false);
   // Families-policy safety notice must be acknowledged before the camera opens.
   // Resets on every fresh mount (fullScreenModal), so it shows each AR launch.
-  const [safetyAck, setSafetyAck] = useState(false);
+  // `safety.exit` also owns the Android hardware-back interception for this
+  // screen (see useARSafetyGate), so it doubles as the screen's close handler.
+  const safety = useARSafetyGate();
+  const safetyAck = safety.acknowledged;
 
   // Defer the OS camera prompt until the safety notice is acknowledged, so the
   // two never stack.
@@ -677,21 +680,22 @@ const DetectArScreen: React.FC = () => {
 
   // Route both the in-screen close button AND the Android hardware back button
   // through the safe-back path so exiting the camera can never fall through to
-  // finishing the activity (which would close the whole app).
-  const handleClose = useSafeBackHandler();
+  // finishing the activity (which would close the whole app). This is the same
+  // callback the safety gate exits through (useARSafetyGate wraps
+  // useSafeBackHandler), so the hardware-back listener is registered once.
+  const handleClose = safety.exit;
 
-  // Families-policy gate: the dismissible safety notice is the FIRST thing shown
-  // when the AR session opens — BEFORE the venue gate — so it is reachable
-  // regardless of location (Google Play Families policy; reviewers are never
-  // physically at a venue). Acknowledge ("I understand") to proceed; the X /
-  // Android hardware back exits. It shows for everyone; the only exception is the
-  // guided tour preview, whose TourHost overlay blocks all touches so no scan can
-  // run. It also gates the OS camera prompt (see the effect above) so the two
-  // never stack.
-  if (!tour && !safetyAck) {
+  // Families-policy gate: the safety notice is the FIRST thing shown when the AR
+  // session opens — BEFORE the venue gate — so it is reachable regardless of
+  // location (Google Play Families policy; reviewers are never physically at a
+  // venue). Acknowledge ("I understand") to proceed; "Go back" / Android
+  // hardware back exits. It shows for EVERYONE with no exceptions — do not add a
+  // bypass here. It also gates the OS camera prompt (see the effect above) so
+  // the two never stack.
+  if (!safetyAck) {
     return (
       <ARSafetyNotice
-        onAcknowledge={() => setSafetyAck(true)}
+        onAcknowledge={safety.acknowledge}
         onExit={handleClose}
       />
     );

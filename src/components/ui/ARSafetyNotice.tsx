@@ -1,28 +1,47 @@
 /**
- * ARSafetyNotice — safety gate shown the moment an AR/live-camera section opens,
- * before the camera becomes interactive (Google Play Families policy).
+ * ARSafetyNotice — the Google Play Families safety warning shown the moment an
+ * AR / live-camera section opens, before the camera becomes interactive.
  *
- * It reminds the user about parental supervision and staying aware of their
- * surroundings, and blocks entry to the camera until acknowledged. It is shown on
- * every fresh AR launch (the host screens keep no "don't show again" flag).
+ * Families policy requires a warning "immediately upon launch of the AR section"
+ * containing (a) a message about the importance of parental supervision and
+ * (b) a reminder to be aware of physical hazards in the real world. Both live in
+ * `safety.*` (see `src/i18n/locales/en.json`) and are rendered verbatim below —
+ * keep the policy wording intact when editing the copy.
  *
- * Presentational only — the host screen owns the `acknowledged` state:
+ * It is a FULL-SCREEN OPAQUE surface, not a card on a scrim, for two reasons:
+ *   1. Nothing of the camera can ever show behind it, so there is no way to read
+ *      the screen as "AR already started".
+ *   2. The host screens are themselves `presentation: 'fullScreenModal'`, and a
+ *      nested RN <Modal> on Android/Fabric is a known source of paint glitches.
+ * Host screens therefore render this as an EARLY RETURN, before any camera view
+ * is mounted.
+ *
+ * Because it is not a <Modal>, there is no `onRequestClose` — the host owns the
+ * Android hardware-back wiring. `useARSafetyGate()` does that for you.
+ *
+ * Presentational only; the host owns the acknowledged state:
  *   - onAcknowledge → proceed into the AR/camera experience ("I understand")
- *   - onExit        → leave the AR section (Android hardware back). Never proceeds.
+ *   - onExit        → leave the AR section. Never proceeds.
  *
- * There is no on-card close (X) button — acknowledging is the intended way
- * forward and the hardware back button still exits — so the single "I understand"
- * call-to-action reads unambiguously.
+ * The primary CTA is deliberately disabled for SAFETY_ACK_DELAY_MS with a
+ * visible countdown so the warning cannot be dismissed in a single frame. The
+ * secondary "Go back" is enabled from t=0 — the user is never trapped here.
  *
- * Styling mirrors `ConfirmDialog` (transparent Modal + scrim + reanimated card,
- * gold glow on the dark card). The scrim is intentionally inert: tapping it does
- * nothing, so the user cannot slip into the camera without acknowledging.
+ * It is shown on EVERY fresh AR launch: the hosts keep the acknowledgement in
+ * component state with no "don't show again" flag persisted anywhere.
  */
-import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
-import { ShieldCheck } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { Eye, Footprints, ShieldCheck, Users } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+
+/** How long the "I understand" button stays disabled, in ms. */
+export const SAFETY_ACK_DELAY_MS = 3000;
+
+const AMBER = '#F2A007';
+const GOLD = '#CBA862';
 
 interface Props {
   onAcknowledge: () => void;
@@ -32,36 +51,53 @@ interface Props {
 const ARSafetyNotice: React.FC<Props> = ({ onAcknowledge, onExit }) => {
   const { t } = useTranslation();
 
+  // Counts down to 0, at which point the CTA enables. Starts at the whole
+  // number of seconds in the delay so the label reads "(3)", "(2)", "(1)".
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    Math.ceil(SAFETY_ACK_DELAY_MS / 1000),
+  );
+
+  useEffect(() => {
+    if (secondsLeft <= 0) {
+      return;
+    }
+    const id = setTimeout(() => setSecondsLeft(s => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [secondsLeft]);
+
+  const waiting = secondsLeft > 0;
+
   return (
-    <Modal
-      transparent
-      visible
-      animationType="none"
-      statusBarTranslucent
-      onRequestClose={onExit}>
+    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <Animated.View
-        entering={FadeIn.duration(160)}
-        exiting={FadeOut.duration(140)}
-        style={styles.scrim}>
-        {/* Inert scrim: acknowledging is the only way forward. */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none" />
+        entering={FadeIn.duration(180)}
+        style={styles.content}
+        accessibilityViewIsModal
+        importantForAccessibility="yes">
+        <View style={styles.iconWrap}>
+          <ShieldCheck size={30} color={GOLD} />
+        </View>
 
-        <Animated.View
-          entering={ZoomIn.duration(180).withInitialValues({
-            transform: [{ scale: 0.9 }],
-          })}
-          style={styles.card}>
-          <View style={styles.iconWrap}>
-            <ShieldCheck size={28} color="#CBA862" />
+        <Text style={styles.title} accessibilityRole="header">
+          {t('safety.title')}
+        </Text>
+
+        <View style={styles.lines}>
+          <View style={styles.line}>
+            <Users size={20} color={GOLD} style={styles.lineIcon} />
+            <Text style={styles.lineText}>{t('safety.supervise')}</Text>
           </View>
-
-          <Text style={styles.title}>{t('safety.title')}</Text>
-
-          <View style={styles.lines}>
-            <Text style={styles.line}>{t('safety.supervise')}</Text>
-            <Text style={styles.line}>{t('safety.surroundings')}</Text>
+          <View style={styles.line}>
+            <Eye size={20} color={GOLD} style={styles.lineIcon} />
+            <Text style={styles.lineText}>{t('safety.surroundings')}</Text>
           </View>
+          <View style={styles.line}>
+            <Footprints size={20} color={GOLD} style={styles.lineIcon} />
+            <Text style={styles.lineText}>{t('safety.movement')}</Text>
+          </View>
+        </View>
 
+        <View style={styles.actions}>
           {/*
             The amber fill lives on this inner View, NOT on the Pressable. On
             New-Arch/Fabric Android the Pressable's own backgroundColor does not
@@ -72,92 +108,122 @@ const ARSafetyNotice: React.FC<Props> = ({ onAcknowledge, onExit }) => {
           */}
           <Pressable
             onPress={onAcknowledge}
+            disabled={waiting}
             accessibilityRole="button"
+            accessibilityState={{ disabled: waiting }}
             accessibilityLabel={t('safety.acknowledge')}
-            style={({ pressed }) => [styles.btnHit, pressed && styles.btnPressed]}>
-            <View style={styles.btnFill}>
+            style={({ pressed }) => [
+              styles.btnHit,
+              pressed && !waiting && styles.btnPressed,
+            ]}>
+            <View style={[styles.btnFill, waiting && styles.btnFillWaiting]}>
               <Text style={styles.btnText} numberOfLines={1}>
-                {t('safety.acknowledge')}
+                {waiting
+                  ? t('safety.acknowledgeWait', { seconds: secondsLeft })
+                  : t('safety.acknowledge')}
               </Text>
             </View>
           </Pressable>
-        </Animated.View>
+
+          {/* Always enabled — acknowledging is the way forward, but leaving must
+              never be blocked by the countdown. */}
+          <Pressable
+            onPress={onExit}
+            accessibilityRole="button"
+            accessibilityLabel={t('safety.close')}
+            hitSlop={12}
+            style={({ pressed }) => [
+              styles.exitHit,
+              pressed && styles.btnPressed,
+            ]}>
+            <Text style={styles.exitText}>{t('safety.close')}</Text>
+          </Pressable>
+        </View>
       </Animated.View>
-    </Modal>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  scrim: {
+  root: {
+    // Fully opaque: no camera preview can ever be visible behind the warning.
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
+    backgroundColor: '#0A0A0C',
   },
-  card: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 22,
-    paddingHorizontal: 22,
-    paddingTop: 24,
-    paddingBottom: 18,
+  content: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    // Gold glow instead of drop shadow on dark backgrounds.
-    shadowColor: '#CBA862',
-    shadowOpacity: 0.18,
-    shadowRadius: 28,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 16,
+    paddingHorizontal: 28,
+    paddingVertical: 32,
   },
   iconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(203,168,98,0.14)',
-    marginBottom: 14,
+    // Gold glow instead of a drop shadow on the dark background.
+    shadowColor: GOLD,
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 12,
+    marginBottom: 20,
   },
   title: {
     fontFamily: 'Fraunces-Regular',
-    fontSize: 24,
-    lineHeight: 28,
+    fontSize: 30,
+    lineHeight: 36,
     color: '#F5F0E8',
     textAlign: 'center',
   },
   lines: {
-    marginTop: 12,
-    gap: 8,
+    marginTop: 26,
+    gap: 18,
+    maxWidth: 420,
   },
   line: {
-    fontFamily: 'PlusJakartaSans-Regular',
-    fontSize: 14,
-    lineHeight: 21,
-    color: 'rgba(255,255,255,0.66)',
-    textAlign: 'center',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
   },
-  // Pressable is only the touch target + spacing; the visible fill is the inner
-  // View below (Fabric paints View backgrounds reliably, Pressable ones not).
+  lineIcon: {
+    marginTop: 2,
+  },
+  lineText: {
+    flex: 1,
+    fontFamily: 'PlusJakartaSans-Regular',
+    fontSize: 16,
+    lineHeight: 24,
+    color: 'rgba(245,240,232,0.86)',
+  },
+  actions: {
+    alignSelf: 'stretch',
+    maxWidth: 420,
+    width: '100%',
+    marginTop: 36,
+  },
   btnHit: {
-    marginTop: 22,
     alignSelf: 'stretch',
   },
   btnFill: {
-    height: 52,
+    height: 54,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
     // Bright, saturated amber so the sole call-to-action stands out clearly
-    // against the near-black card (the muted gold read too dark). Dark text on
-    // bright amber keeps a high contrast ratio.
-    backgroundColor: '#F2A007',
+    // against the near-black background. Dark text on bright amber keeps a high
+    // contrast ratio.
+    backgroundColor: AMBER,
     borderWidth: 1,
     borderColor: '#FFC24D',
+  },
+  btnFillWaiting: {
+    backgroundColor: 'rgba(242,160,7,0.42)',
+    borderColor: 'rgba(255,194,77,0.42)',
   },
   btnPressed: {
     opacity: 0.82,
@@ -166,6 +232,18 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans-SemiBold',
     fontSize: 16,
     color: '#0A0A0A',
+  },
+  exitHit: {
+    marginTop: 16,
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  exitText: {
+    fontFamily: 'PlusJakartaSans-Medium',
+    fontSize: 15,
+    color: 'rgba(245,240,232,0.62)',
+    textAlign: 'center',
   },
 });
 
