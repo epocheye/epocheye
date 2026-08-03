@@ -103,6 +103,14 @@ export type MainStackParamList = {
   GoToVenue: undefined;
   /** Suggest-a-place: shown after login when no Epocheye site is within 5km. */
   SuggestSite: undefined;
+  /** Venue audio guide: pre-generated narration stops + transcripts. */
+  AudioGuide: { venueSlug: string; siteName?: string };
+  /**
+   * Frozen-frame restoration. `imageUrl` is already resolved to a playable URL
+   * by the caller; `caption` is the clip's authored provenance line and is
+   * passed through verbatim, never composed here.
+   */
+  Restoration: { imageUrl: string; caption?: string; title?: string };
   /** DEV-only workflow health-check board (screen is only registered in dev builds). */
   DevHealth: undefined;
   /** Admin on-site AR authoring tool: place a reconstruction + save a viewing station. */

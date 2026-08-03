@@ -19,6 +19,16 @@ interface NetworkContextType {
   isConnected: boolean;
   isInternetReachable: boolean | null;
   connectionType: string | null;
+  /**
+   * True only when connectivity is KNOWN to be gone. `isInternetReachable` is
+   * null until the first probe resolves, and null must not read as offline —
+   * hence the explicit `=== false` on both, never a truthiness check.
+   *
+   * Screens use this to degrade individually (inline empty state, disabled
+   * submit). The app is never swapped out wholesale for an offline screen:
+   * that unmounts every screen, losing cached content and the nav stack.
+   */
+  isOffline: boolean;
   checkConnection: () => Promise<boolean>;
 }
 
@@ -26,10 +36,21 @@ const NetworkContext = createContext<NetworkContextType>({
   isConnected: true,
   isInternetReachable: true,
   connectionType: null,
+  isOffline: false,
   checkConnection: async () => true,
 });
 
 const LAST_STATE_KEY = '@epocheye/last_navigation_state';
+
+/*
+ * UNUSED as of this writing: the three navigation-state helpers below have no
+ * callers anywhere in the app (they are re-exported by src/context/index.ts and
+ * invoked by nothing), and LAST_STATE_KEY is never written or read. Their shape
+ * — save, swap screens, restore — suggests they were meant to compensate for the
+ * offline full-screen swap that used to live in App.tsx, but that swap never
+ * called them either, so they were already inert before it was removed. Left in
+ * place deliberately; delete or wire up as a separate decision.
+ */
 
 /**
  * Saves the current navigation state for restoration after reconnection
@@ -102,14 +123,23 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({
     };
   }, [checkConnection, handleConnectivityChange]);
 
+  const isOffline = isConnected === false || isInternetReachable === false;
+
   const value = useMemo<NetworkContextType>(
     () => ({
       isConnected,
       isInternetReachable,
       connectionType,
+      isOffline,
       checkConnection,
     }),
-    [isConnected, isInternetReachable, connectionType, checkConnection],
+    [
+      isConnected,
+      isInternetReachable,
+      connectionType,
+      isOffline,
+      checkConnection,
+    ],
   );
 
   return (

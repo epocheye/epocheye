@@ -22,17 +22,24 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import Animated, {FadeIn, FadeInUp} from 'react-native-reanimated';
 import {Check, Compass, MapPin, X} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
+import {useTranslation} from 'react-i18next';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
 import {COLORS, FONTS, FONT_SIZES, RADIUS, SPACING} from '../../core/constants/theme';
 import {usePlacesStore} from '../../stores/placesStore';
 import {suggestPlace} from '../../utils/api/suggestions';
+import OfflineInline from '../../components/ui/OfflineInline';
+import {useNetwork} from '../../context/NetworkContext';
 import type {MainStackParamList} from '../../core/types/navigation.types';
 
 const SuggestSiteScreen: React.FC = () => {
+  const {t} = useTranslation();
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const currentLocation = usePlacesStore(s => s.currentLocation);
+  // The form stays visible and editable offline — only sending is blocked, so a
+  // typed suggestion isn't thrown away by a dropped connection.
+  const {isOffline} = useNetwork();
 
   const [placeName, setPlaceName] = useState('');
   const [placeDetails, setPlaceDetails] = useState('');
@@ -46,6 +53,12 @@ const SuggestSiteScreen: React.FC = () => {
     const name = placeName.trim();
     if (!name) {
       setError('Please enter the name of the place.');
+      return;
+    }
+    // The button is already disabled offline; this covers connectivity dropping
+    // between render and press.
+    if (isOffline) {
+      setError(t('offline.suggestMessage'));
       return;
     }
     setSubmitting(true);
@@ -64,7 +77,7 @@ const SuggestSiteScreen: React.FC = () => {
     } else {
       setError("Couldn't send that just now. Please try again.");
     }
-  }, [placeName, placeDetails, currentLocation]);
+  }, [placeName, placeDetails, currentLocation, isOffline, t]);
 
   return (
     <View style={styles.root}>
@@ -147,10 +160,17 @@ const SuggestSiteScreen: React.FC = () => {
 
                 {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+                {isOffline ? (
+                  <OfflineInline compact message={t('offline.suggestMessage')} />
+                ) : null}
+
                 <Pressable
                   onPress={handleSubmit}
-                  disabled={submitting}
-                  style={[styles.primaryBtn, submitting && styles.primaryBtnDisabled]}>
+                  disabled={submitting || isOffline}
+                  style={[
+                    styles.primaryBtn,
+                    (submitting || isOffline) && styles.primaryBtnDisabled,
+                  ]}>
                   {submitting ? (
                     <ActivityIndicator color={COLORS.bg} />
                   ) : (

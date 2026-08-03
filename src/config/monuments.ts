@@ -24,6 +24,8 @@
  * Changing the global last-resort fallback requires editing this
  * constant and only this constant.
  */
+import {CDN_BASE} from '../core/constants/theme';
+
 export const DEFAULT_MONUMENT_SLUG = 'konark-sun-temple';
 
 /**
@@ -32,3 +34,16 @@ export const DEFAULT_MONUMENT_SLUG = 'konark-sun-temple';
  * match. Beyond this the resolver falls through to DEFAULT_MONUMENT_SLUG.
  */
 export const NEAREST_SITE_FALLBACK_KM = 50;
+
+/**
+ * Decorative heritage backdrop behind the AR safety warning
+ * (src/components/ui/ARSafetyNotice.tsx).
+ *
+ * Deliberately a CDN URL rather than a local `require()`: adding a new bundled
+ * asset is one of the changes the OTA pipeline refuses to ship (see docs/ota.md),
+ * so a remote image keeps the safety screen re-skinnable without a store build.
+ *
+ * It is purely atmospheric — the warning is fully legible on the solid
+ * background if the image never loads, so nothing gates on it.
+ */
+export const AR_SAFETY_BACKDROP_URL = `${CDN_BASE}monuments/Konarka_Temple-2.jpg`;

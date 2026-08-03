@@ -38,6 +38,10 @@ export const ROUTES = {
     DETECT_AR: 'DetectAr',
     GO_TO_VENUE: 'GoToVenue',
     SUGGEST_SITE: 'SuggestSite',
+    /** Pre-generated narration for a venue, stop by stop. */
+    AUDIO_GUIDE: 'AudioGuide',
+    /** Frozen-frame restoration reveal: capture, dissolve, wipe. Not tracked AR. */
+    RESTORATION: 'Restoration',
     /** Admin on-site AR authoring tool: place a reconstruction + save a viewing station. */
     STATION_AUTHORING: 'StationAuthoring',
     /** Prod: guide the visitor to a viewing station and world-lock the reconstruction. */

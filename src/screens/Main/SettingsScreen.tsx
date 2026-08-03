@@ -23,6 +23,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   Camera,
   ChevronRight,
+  Headphones,
   Languages,
   LogOut,
   MapPin,
@@ -31,6 +32,7 @@ import {
   Shield,
   Sparkles,
   Trash2,
+  Volume2,
 } from 'lucide-react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { logout } from '../../utils/api/auth';
@@ -51,8 +53,12 @@ import {
 import { useDevSettingsStore } from '../../stores/devSettingsStore';
 import {
   useMuseumPrefsStore,
+  useNarrationLangResolution,
+  narrationLangLabel,
   NARRATION_LANGS,
 } from '../../stores/museumPrefsStore';
+import { AUDIO_PERSONAS, type AudioPersona } from '../../utils/api/audio';
+import { PERSONA_LABEL_KEY } from '../../shared/utils/audioGuide';
 import {setAppLanguage} from '../../i18n';
 import {useTourStore} from '../../stores/tourStore';
 import DevLoadTestArModelButton from './components/DevLoadTestArModelButton';
@@ -79,8 +85,19 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
   const { t } = useTranslation();
   const { hasAnyActivePass, loading: explorerPassLoading } = useExplorerPass();
   const profile = useUser(state => state.profile);
-  const narrationLang = useMuseumPrefsStore(s => s.narrationLang);
-  const setNarrationLang = useMuseumPrefsStore(s => s.setNarrationLang);
+  // App language is the source of truth; narration derives from it unless the
+  // user sets an explicit override below.
+  const {
+    lang: narrationLang,
+    appLang,
+    isOverridden: narrationOverridden,
+  } = useNarrationLangResolution();
+  const setNarrationLangOverride = useMuseumPrefsStore(
+    s => s.setNarrationLangOverride,
+  );
+  const narrationOverride = useMuseumPrefsStore(s => s.narrationLangOverride);
+  const narrationPersona = useMuseumPrefsStore(s => s.narrationPersona);
+  const setNarrationPersona = useMuseumPrefsStore(s => s.setNarrationPersona);
   const isLoading = useUser(state => state.isLoading);
   const updateProfile = useUser(state => state.updateProfile);
   const isAdmin = useIsAdmin();
@@ -749,7 +766,9 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </Animated.View>
           )}
 
-          {/* ── Museum narration language ── */}
+          {/* ── App language — the single source of truth ──
+              Narration derives from this. The TourTarget stays on THIS block:
+              it is an existing walkthrough step keyed to the language control. */}
           <TourTarget id="account.language">
           <Animated.View
             entering={FadeInDown.delay(280).duration(350)}
@@ -761,27 +780,27 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               </View>
               <View className="flex-1">
                 <Text className="text-parchment text-base font-ui-semibold">
-                  {t('settings.narrationLanguage')}
+                  {t('settings.appLanguage')}
                 </Text>
                 <Text className="text-parchment-dim text-xs font-ui mt-0.5">
-                  {t('settings.narrationLanguageDesc')}
+                  {t('settings.appLanguageDesc')}
                 </Text>
               </View>
             </View>
             <View className="flex-row gap-2">
               {NARRATION_LANGS.map(({ code, label }) => {
-                const active = narrationLang === code;
+                const active = appLang === code;
                 return (
                   <Pressable
                     key={code}
                     onPress={() => {
-                      // One control drives both the AI-narration language and the
-                      // whole-app UI language (i18n), keeping them in sync.
-                      setNarrationLang(code);
+                      // Sets i18n ONLY. Narration follows unless overridden
+                      // below — there is no second language value to keep in
+                      // step any more.
                       void setAppLanguage(code);
                     }}
                     accessibilityRole="button"
-                    accessibilityLabel={t('settings.setNarrationLanguage', { name: label })}
+                    accessibilityLabel={t('settings.setAppLanguage', { name: label })}
                     accessibilityState={{ selected: active }}
                     className={`flex-1 items-center py-2.5 rounded-xl border ${
                       active
@@ -802,6 +821,136 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
             </View>
           </Animated.View>
           </TourTarget>
+
+          {/* ── Narration language — follows the app unless overridden ── */}
+          <Animated.View
+            entering={FadeInDown.delay(285).duration(350)}
+            className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-4"
+          >
+            <View className="flex-row items-center gap-2.5 mb-3">
+              <View className="w-9 h-9 rounded-full bg-surface-2 items-center justify-center">
+                <Volume2 size={16} color="#CBA862" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-parchment text-base font-ui-semibold">
+                  {t('settings.narrationLanguage')}
+                </Text>
+                <Text className="text-parchment-dim text-xs font-ui mt-0.5">
+                  {t('settings.narrationLanguageDesc')}
+                </Text>
+              </View>
+            </View>
+
+            {/* Clearing the override is a first-class choice, not a hidden gesture. */}
+            <Pressable
+              onPress={() => setNarrationLangOverride(null)}
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.followAppLanguage')}
+              accessibilityState={{ selected: narrationOverride == null }}
+              className={`items-center py-2.5 rounded-xl border mb-2 ${
+                narrationOverride == null
+                  ? 'bg-brand-amber border-brand-amber'
+                  : 'bg-surface-2 border-white/[0.08]'
+              }`}
+            >
+              <Text
+                className={`text-sm font-ui-semibold ${
+                  narrationOverride == null ? 'text-[#0D0D0D]' : 'text-parchment'
+                }`}
+              >
+                {t('settings.followAppLanguage')}
+              </Text>
+            </Pressable>
+
+            <View className="flex-row gap-2">
+              {NARRATION_LANGS.map(({ code, label }) => {
+                const active = narrationOverride === code;
+                return (
+                  <Pressable
+                    key={code}
+                    onPress={() => setNarrationLangOverride(code)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('settings.setNarrationLanguage', { name: label })}
+                    accessibilityState={{ selected: active }}
+                    className={`flex-1 items-center py-2.5 rounded-xl border ${
+                      active
+                        ? 'bg-brand-amber border-brand-amber'
+                        : 'bg-surface-2 border-white/[0.08]'
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm font-ui-semibold ${
+                        active ? 'text-[#0D0D0D]' : 'text-parchment'
+                      }`}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* The divergence is stated in words, not implied by two highlighted
+                chips in different cards — that is the whole point of the override
+                being explicit. */}
+            {narrationOverridden && (
+              <Text className="text-parchment-dim text-xs font-ui mt-3">
+                {t('settings.narrationOverrideNotice', {
+                  narration: narrationLangLabel(narrationLang),
+                  app: narrationLangLabel(appLang),
+                })}
+              </Text>
+            )}
+          </Animated.View>
+
+          {/* ── Narration voice (persona) ── */}
+          <Animated.View
+            entering={FadeInDown.delay(290).duration(350)}
+            className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-4"
+          >
+            <View className="flex-row items-center gap-2.5 mb-3">
+              <View className="w-9 h-9 rounded-full bg-surface-2 items-center justify-center">
+                <Headphones size={16} color="#CBA862" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-parchment text-base font-ui-semibold">
+                  {t('settings.narrationVoice')}
+                </Text>
+                <Text className="text-parchment-dim text-xs font-ui mt-0.5">
+                  {t('settings.narrationVoiceDesc')}
+                </Text>
+              </View>
+            </View>
+            <View className="flex-row gap-2">
+              {AUDIO_PERSONAS.map((code: AudioPersona) => {
+                const active = narrationPersona === code;
+                const label = t(PERSONA_LABEL_KEY[code]);
+                return (
+                  <Pressable
+                    key={code}
+                    onPress={() => setNarrationPersona(code)}
+                    accessibilityRole="button"
+                    accessibilityLabel={label}
+                    accessibilityState={{ selected: active }}
+                    className={`flex-1 items-center py-2.5 rounded-xl border ${
+                      active
+                        ? 'bg-brand-amber border-brand-amber'
+                        : 'bg-surface-2 border-white/[0.08]'
+                    }`}
+                  >
+                    <Text
+                      numberOfLines={1}
+                      className={`text-sm font-ui-semibold ${
+                        active ? 'text-[#0D0D0D]' : 'text-parchment'
+                      }`}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Animated.View>
 
           {/* ── Permissions ── */}
           <Animated.View

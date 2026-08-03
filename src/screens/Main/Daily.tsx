@@ -30,6 +30,8 @@ import StreakModule from '../../components/ui/StreakModule';
 import {AmbientGlow, ImageScrim} from '../../components/ui/premium';
 import {TourTarget} from '../../components/tour/useTourTarget';
 import {useDailyToday} from '../../shared/hooks';
+import OfflineInline from '../../components/ui/OfflineInline';
+import {useNetwork} from '../../context/NetworkContext';
 import type {DailyStreakDay} from '../../utils/api/daily';
 import type {TabScreenProps} from '../../core/types/navigation.types';
 
@@ -75,6 +77,7 @@ const ExploreButton: React.FC<{label: string; onPress: () => void}> = ({label, o
 const Daily: React.FC<Props> = ({navigation}) => {
   const {t} = useTranslation();
   const {daily, loading, refresh: refreshDaily} = useDailyToday();
+  const {isOffline} = useNetwork();
   const [refreshing, setRefreshing] = useState(false);
   // Bumped on pull-to-refresh to replay the staggered entrance animations.
   const [cycle, setCycle] = useState(0);
@@ -267,6 +270,11 @@ const Daily: React.FC<Props> = ({navigation}) => {
                       </View>
                     ) : null}
                   </>
+                ) : isOffline ? (
+                  // Checked BEFORE `loading`: today's story is fetched fresh, so
+                  // offline it will never arrive and a spinner would just lie. A
+                  // story already in hand (hasStory, above) still renders offline.
+                  <OfflineInline compact message={t('offline.dailyMessage')} />
                 ) : loading ? (
                   <Text style={{fontFamily: FONTS.ui, fontSize: 14, color: 'rgba(244,239,231,0.6)'}}>
                     {t('daily.loading')}
