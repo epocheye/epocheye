@@ -232,6 +232,7 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
                     imageUrl: restorationUri,
                     caption: selected.clip?.restoration_caption,
                     title: selected.title,
+                    siteName,
                   })
                 }
                 accessibilityRole="button"

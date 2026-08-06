@@ -110,7 +110,18 @@ export type MainStackParamList = {
    * by the caller; `caption` is the clip's authored provenance line and is
    * passed through verbatim, never composed here.
    */
-  Restoration: { imageUrl: string; caption?: string; title?: string };
+  /**
+   * `title` names the STOP (shown in the header); `siteName` names the MONUMENT
+   * and is what gets burned into the shared image's branding band. They are not
+   * interchangeable — a share captioned "The colour that is gone" tells a
+   * stranger nothing about which place they are looking at.
+   */
+  Restoration: {
+    imageUrl: string;
+    caption?: string;
+    title?: string;
+    siteName?: string;
+  };
   /** DEV-only workflow health-check board (screen is only registered in dev builds). */
   DevHealth: undefined;
   /** Admin on-site AR authoring tool: place a reconstruction + save a viewing station. */

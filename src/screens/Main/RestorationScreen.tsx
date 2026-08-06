@@ -30,6 +30,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Camera as VisionCamera,
   useCameraDevice,
+  useCameraFormat,
   useCameraPermission,
 } from 'react-native-vision-camera';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -39,7 +40,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Share from 'react-native-share';
-import { Share2, X, Zap, ZapOff } from 'lucide-react-native';
+import { Minus, Plus, Share2, Sun, X, Zap, ZapOff } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -59,11 +60,18 @@ type Props = MainScreenProps<'Restoration'>;
 /** Cross-dissolve duration, per the brief. */
 const DISSOLVE_MS = 2000;
 
+/**
+ * Number of steps across the device's exposure range. The range itself varies
+ * wildly by device (some report ±2 EV, others ±12 compensation units), so the
+ * control is expressed in steps and the EV value is derived, never hardcoded.
+ */
+const EXPOSURE_STEPS = 8;
+
 type Phase = 'framing' | 'revealing' | 'wipe';
 
 const RestorationScreen: React.FC<Props> = ({ route }) => {
   const { t } = useTranslation();
-  const { imageUrl, caption, title } = route.params;
+  const { imageUrl, caption, title, siteName } = route.params;
   const goBack = useSafeGoBack();
   const { width } = useWindowDimensions();
 
@@ -71,11 +79,49 @@ const RestorationScreen: React.FC<Props> = ({ route }) => {
   const device = useCameraDevice('back');
   const { hasPermission, requestPermission } = useCameraPermission();
 
+  // Prefer a format that can do HDR stills. On Android this is a vendor
+  // extension that brackets a low- and a high-exposure frame, which is exactly
+  // the right trade in a dim room: the shadows come up without the surviving
+  // bright fragments blowing out. supportsPhotoHdr lives on the FORMAT, not the
+  // device, so it can only be read after a format has been chosen.
+  // Filter on HDR only. An earlier draft also asked for photoResolution 'max',
+  // which is a trap here: the share composite allocates an offscreen Skia
+  // surface at the captured photo's full dimensions, so a 100MP sensor would
+  // turn a working export into an OOM. Resolution stays at the library default.
+  const format = useCameraFormat(device, [{ photoHdr: true }]);
+  const photoHdr = format?.supportsPhotoHdr ?? false;
+
   const [phase, setPhase] = useState<Phase>('framing');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [torch, setTorch] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sharing, setSharing] = useState(false);
+  // Exposure bias in the device's own units. Starts NEUTRAL, deliberately:
+  // stop 1 is on an open lawn and stop 3 is a windowless upper room, and nothing
+  // available here can tell them apart — vision-camera exposes no ambient-light
+  // reading, so any automatic "it's dark" bias would be a guess that blows out
+  // the outdoor stops. The visitor can see the preview; they decide.
+  const [exposure, setExposure] = useState(0);
+
+  const minExposure = device?.minExposure ?? 0;
+  const maxExposure = device?.maxExposure ?? 0;
+  const canAdjustExposure = maxExposure > minExposure;
+  const exposureStep = canAdjustExposure
+    ? (maxExposure - minExposure) / EXPOSURE_STEPS
+    : 0;
+
+  const nudgeExposure = useCallback(
+    (direction: 1 | -1) => {
+      if (!canAdjustExposure) return;
+      setExposure(prev =>
+        Math.min(
+          maxExposure,
+          Math.max(minExposure, prev + direction * exposureStep),
+        ),
+      );
+    },
+    [canAdjustExposure, exposureStep, maxExposure, minExposure],
+  );
 
   // The restored image fades in over the frozen photo; the same value later
   // drives nothing, since the wipe uses `splitX`. Kept separate so the dissolve
@@ -133,7 +179,10 @@ const RestorationScreen: React.FC<Props> = ({ route }) => {
         // matches the handle exactly where the user left it.
         splitFraction: splitX.value / width,
         caption,
-        siteName: title,
+        // The MONUMENT, not the stop. Falling back to the stop title is better
+        // than an unbranded export, but a share reading "The colour that is
+        // gone" identifies nothing to whoever receives it.
+        siteName: siteName ?? title,
       });
       // The composite stays in the app cache; the share sheet is the only way
       // it leaves. Nothing is written to the photo library, which is why this
@@ -153,7 +202,7 @@ const RestorationScreen: React.FC<Props> = ({ route }) => {
     } finally {
       setSharing(false);
     }
-  }, [photoUri, imageUrl, caption, title, sharing, splitX, width, t]);
+  }, [photoUri, imageUrl, caption, title, siteName, sharing, splitX, width, t]);
 
   const pan = Gesture.Pan()
     .onBegin(() => {
@@ -225,37 +274,100 @@ const RestorationScreen: React.FC<Props> = ({ route }) => {
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
           device={device}
+          format={format}
           isActive
           photo
           torch={torch ? 'on' : 'off'}
           // A dark interior is the expected case here, not an edge case — the
           // rooms worth restoring are the ones with no windows.
           lowLightBoost={device.supportsLowLightBoost}
+          photoHdr={photoHdr}
+          exposure={exposure}
         />
         <SafeAreaView style={styles.overlay} edges={['top', 'bottom']}>
-          <View style={styles.topRow}>
-            <Pressable onPress={goBack} hitSlop={12} style={styles.iconBtn}>
-              <X size={18} color="#FFFFFF" />
-            </Pressable>
-            <Text style={styles.topTitle} numberOfLines={1}>
-              {title || t('restoration.title')}
-            </Text>
-            <Pressable
-              onPress={() => setTorch(v => !v)}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel={t('restoration.torch')}
-              style={styles.iconBtn}>
-              {torch ? (
-                <Zap size={18} color={COLORS.gold} />
-              ) : (
-                <ZapOff size={18} color="#FFFFFF" />
-              )}
-            </Pressable>
+          {/* Grouped so the space-between overlay keeps treating the header and
+              its torch notice as one top block. */}
+          <View>
+            <View style={styles.topRow}>
+              <Pressable onPress={goBack} hitSlop={12} style={styles.iconBtn}>
+                <X size={18} color="#FFFFFF" />
+              </Pressable>
+              <Text style={styles.topTitle} numberOfLines={1}>
+                {title || t('restoration.title')}
+              </Text>
+              <Pressable
+                onPress={() => setTorch(v => !v)}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={t('restoration.torch')}
+                style={styles.iconBtn}>
+                {torch ? (
+                  <Zap size={18} color={COLORS.gold} />
+                ) : (
+                  <ZapOff size={18} color="#FFFFFF" />
+                )}
+              </Pressable>
+            </View>
+
+            {/* The ASI lists torches among prohibited items at protected
+                monuments (its "do not use flashlights" rule means handheld
+                lamps, not camera flash). We cannot know which venue the visitor
+                is standing in, and they can read the signage we cannot — so
+                this informs rather than blocks. Shown only while the lamp is
+                actually on, so it reads as a consequence of their action. */}
+            {torch ? (
+              <View style={styles.torchNotice}>
+                <Text style={styles.torchNoticeText}>
+                  {t('restoration.torchWarning')}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.bottomBlock}>
-            <Text style={styles.hint}>{t('restoration.frameHint')}</Text>
+            {canAdjustExposure ? (
+              <View style={styles.exposureRow}>
+                <Pressable
+                  onPress={() => nudgeExposure(-1)}
+                  disabled={exposure <= minExposure}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('restoration.exposureDown')}
+                  style={[
+                    styles.exposureBtn,
+                    exposure <= minExposure && styles.exposureBtnOff,
+                  ]}>
+                  <Minus size={16} color="#FFFFFF" />
+                </Pressable>
+                <View style={styles.exposureLabel}>
+                  <Sun size={14} color={COLORS.gold} />
+                  <Text style={styles.exposureText}>
+                    {exposure === 0
+                      ? t('restoration.brightness')
+                      : `${exposure > 0 ? '+' : ''}${exposure.toFixed(1)}`}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => nudgeExposure(1)}
+                  disabled={exposure >= maxExposure}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('restoration.exposureUp')}
+                  style={[
+                    styles.exposureBtn,
+                    exposure >= maxExposure && styles.exposureBtnOff,
+                  ]}>
+                  <Plus size={16} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            ) : null}
+            {/* A raised exposure buys light by holding the shutter open longer,
+                so camera shake is the thing that ruins the frame, not darkness. */}
+            <Text style={styles.hint}>
+              {exposure > 0
+                ? t('restoration.holdStill')
+                : t('restoration.frameHint')}
+            </Text>
             <Pressable
               onPress={() => void handleCapture()}
               disabled={busy}
@@ -367,7 +479,52 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
+  torchNotice: {
+    marginHorizontal: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderLeftWidth: 2,
+    borderLeftColor: COLORS.gold,
+  },
+  torchNoticeText: {
+    fontFamily: FONTS.sans,
+    fontSize: FONT_SIZES.caption,
+    color: '#F4EFE7',
+    lineHeight: 17,
+  },
   bottomBlock: { alignItems: 'center', paddingBottom: SPACING.xxl, gap: SPACING.lg },
+  exposureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+  },
+  exposureBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  exposureBtnOff: { opacity: 0.35 },
+  exposureLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    minWidth: 74,
+    justifyContent: 'center',
+  },
+  exposureText: {
+    fontFamily: FONTS.sans,
+    fontSize: FONT_SIZES.caption,
+    color: '#FFFFFF',
+  },
   hint: {
     fontFamily: FONTS.sans,
     fontSize: FONT_SIZES.small,

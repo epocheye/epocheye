@@ -471,6 +471,11 @@
     "permissionTitle": "Camera access needed",
     "permissionBody": "The restoration is drawn over a photo you take, so the camera has to be on.",
     "share": "Share",
-    "shareFailed": "Couldn't prepare that image to share."
+    "shareFailed": "Couldn't prepare that image to share.",
+    "brightness": "Brightness",
+    "exposureUp": "Brighter",
+    "exposureDown": "Darker",
+    "holdStill": "Hold still — a brighter shot takes longer to capture",
+    "torchWarning": "Many protected monuments prohibit torches. Check the site's signage before using this."
   }
 }
