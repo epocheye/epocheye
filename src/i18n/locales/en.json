@@ -135,7 +135,7 @@
     "captureAnchor": "Capture Anchor",
     "captureAnchorSubtitle": "Admin only · Record an object's geo position on-site",
     "narrationLanguage": "Narration language",
-    "narrationLanguageDesc": "Language for AI narration when you explore objects",
+    "narrationLanguageDesc": "Language for audio guides and AI narration",
     "setNarrationLanguage": "Set narration language {{name}}",
     "permissions": "Permissions",
     "granted": "Granted",
@@ -151,7 +151,14 @@
     "logOut": "Log Out",
     "comingSoon": "Coming Soon",
     "deleteAccountComingSoon": "Account deletion will be available in a future update.",
-    "deleteAccount": "Delete Account"
+    "deleteAccount": "Delete Account",
+    "appLanguage": "App language",
+    "appLanguageDesc": "Used for the interface, and for narration unless you change it below",
+    "setAppLanguage": "Set app language {{name}}",
+    "followAppLanguage": "Follow app language",
+    "narrationOverrideNotice": "Narration is set to {{narration}} while the app is in {{app}}.",
+    "narrationVoice": "Narration voice",
+    "narrationVoiceDesc": "How the guide is told — the same story, pitched differently"
   },
   "venue": {
     "errorLabel": "COULDN'T CHECK YOUR LOCATION",
@@ -205,12 +212,13 @@
     "accountCreatedBody": "Your account was created. Please sign in from the login screen if needed."
   },
   "safety": {
-    "title": "Safety first",
-    "supervise": "Parental supervision is important. A parent or guardian should supervise children while they use augmented reality.",
-    "surroundings": "Be aware of your surroundings. Watch out for real-world hazards such as traffic, stairs, ledges, other people and obstacles.",
-    "movement": "Do not use AR while walking, cycling or driving. Stop and stand still before you point the camera.",
+    "eyebrow": "AR Safety",
+    "title": "Before you point the camera",
+    "supervise": "Parental supervision is important",
+    "surroundings": "Be aware of your surroundings",
+    "movement": "Never use AR while walking or cycling",
     "acknowledge": "I understand",
-    "acknowledgeWait": "I understand ({{seconds}})",
+    "acknowledgeHint": "Available in a moment",
     "close": "Go back"
   },
   "arrival": {
@@ -420,5 +428,54 @@
     "otaReadyTitle": "Update ready",
     "otaReadySubtitle": "Restart to apply the latest improvements",
     "otaRestartCta": "Restart"
+  },
+  "offline": {
+    "bannerTitle": "You're offline — showing saved content",
+    "bannerRetryA11y": "Check connection again",
+    "inlineTitle": "This needs a connection",
+    "inlineMessage": "You're offline right now. Reconnect and this will pick up where it left off.",
+    "guideMessage": "The guide needs a connection to answer. Reconnect and your questions will go through.",
+    "dailyMessage": "Today's story is fetched fresh each day. Reconnect to read it.",
+    "scanMessage": "Scanning needs a connection to identify what you’re pointing at. Reconnect to try again.",
+    "suggestMessage": "You're offline, so this suggestion can't be sent yet. Reconnect and send it then.",
+    "purchaseMessage": "Payments need a secure connection. Reconnect to continue."
+  },
+  "audioGuide": {
+    "title": "Audio guide",
+    "subtitle": "Listen as you walk",
+    "play": "Play",
+    "pause": "Pause",
+    "skip15": "Skip forward 15 seconds",
+    "speedLabel": "Playback speed {{rate}}x",
+    "personaCasual": "Casual",
+    "personaHistoryBuff": "History buff",
+    "personaChild": "For kids",
+    "personaLabel": "Choose how the guide is told",
+    "transcriptTitle": "Transcript",
+    "notRecorded": "Not recorded yet",
+    "emptyTitle": "No audio guide yet",
+    "emptyBody": "Nothing has been recorded for this place. Check back soon.",
+    "fallbackNotice": "Playing in English — this guide has not been recorded in your language yet.",
+    "ungroupedZone": "The guide",
+    "listenCta": "Listen — audio guide",
+    "loadError": "Couldn't load the audio guide. Pull to try again."
+  },
+  "restoration": {
+    "title": "Restoration",
+    "cta": "See it restored",
+    "frameHint": "Frame the wall, then tap to capture",
+    "capture": "Capture",
+    "captureFailed": "Couldn't capture that. Try again.",
+    "torch": "Torch",
+    "noCamera": "No camera available on this device",
+    "permissionTitle": "Camera access needed",
+    "permissionBody": "The restoration is drawn over a photo you take, so the camera has to be on.",
+    "share": "Share",
+    "shareFailed": "Couldn't prepare that image to share.",
+    "brightness": "Brightness",
+    "exposureUp": "Brighter",
+    "exposureDown": "Darker",
+    "holdStill": "Hold still — a brighter shot takes longer to capture",
+    "torchWarning": "Many protected monuments prohibit torches. Check the site's signage before using this."
   }
 }
