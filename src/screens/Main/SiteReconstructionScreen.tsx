@@ -17,16 +17,17 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {useTranslation} from 'react-i18next';
 import {X} from 'lucide-react-native';
 
 import EpocheyeDetectARView, {
-  isDetectARAvailable,
   type ElementTappedEvent,
   type EpocheyeDetectARHandle,
   type GeospatialAnchorEvent,
@@ -34,13 +35,24 @@ import EpocheyeDetectARView, {
 } from '../../native/EpocheyeDetectARView';
 import {
   discoveryLayerFor,
+  discoveryTextFor,
   type DiscoveryCard,
   type TapTarget,
 } from '../../features/ar/discoveryLayers';
 import type {ViewingStation} from '../../utils/api/ar';
 import {listViewingStations} from '../../utils/api/ar';
 import {resolveModelGlb} from '../../services/glbSource';
+import {ROUTES} from '../../core/constants';
 import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
+import ARCapabilityNotice from '../../components/ui/ARCapabilityNotice';
+import RecordingWatermark from '../../components/ar/RecordingWatermark';
+import ClipReadySheet from '../../components/ar/ClipReadySheet';
+import {useScreenRecording} from '../../shared/hooks/useScreenRecording';
+import {siteBrandingFor} from '../../features/ar/siteBranding';
+import {
+  useARCapability,
+  isNonArCapability,
+} from '../../shared/hooks/useARCapability';
 import {useActiveMonument} from '../../shared/hooks/useActiveMonument';
 import {usePlacesStore} from '../../stores/placesStore';
 import {useARSafetyGate} from '../../shared/hooks/useARSafetyGate';
@@ -56,8 +68,26 @@ import type {MainScreenProps} from '../../core/types/navigation.types';
 
 const MAX_HORIZ_ACC_M = 3;
 const MAX_YAW_ACC_DEG = 12;
+// A hard 3 m / 12 deg gate with no timeout and no escape means a site that never
+// reaches it — tree cover, tall buildings, thin VPS coverage — leaves the visitor
+// staring at "move the phone slowly" forever, with no way to see the thing they
+// walked to. The geospatial pose is the COARSE lock; a hosted cloud anchor is
+// what makes it precise. So past this wider bound we offer an explicit
+// "lock on anyway", and the achieved accuracy is shown on the button.
+const OVERRIDE_HORIZ_ACC_M = 8;
+const OVERRIDE_YAW_ACC_DEG = 25;
+/** Only offer the override once it is clear waiting is not working. */
+const OVERRIDE_OFFER_AFTER_MS = 12000;
 
-type Phase = 'loading' | 'none' | 'error' | 'guiding' | 'resolving' | 'locked';
+type Phase =
+  | 'loading'
+  | 'none'
+  | 'error'
+  /** This device cannot do world-locked AR — explained, never blamed on the site. */
+  | 'no-ar'
+  | 'guiding'
+  | 'resolving'
+  | 'locked';
 
 function standCoords(s: ViewingStation): {lat: number; lng: number} | null {
   const lat = s.stand_lat ?? s.geo_lat;
@@ -70,10 +100,11 @@ function standCoords(s: ViewingStation): {lat: number; lng: number} | null {
 
 const SiteReconstructionScreen: React.FC<
   MainScreenProps<'SiteReconstruction'>
-> = ({route}) => {
+> = ({route, navigation}) => {
   // Families-policy safety gate. `safety.exit` is the safe-back callback (and
   // owns the Android hardware-back interception for this camera screen), so it
   // doubles as this screen's close handler.
+  const {t} = useTranslation();
   const safety = useARSafetyGate();
   const goBack = safety.exit;
   const activeMonument = useActiveMonument();
@@ -88,6 +119,11 @@ const SiteReconstructionScreen: React.FC<
   const resolvedRef = useRef(false);
   const pendingStationsRef = useRef<ViewingStation[] | null>(null);
   const layer = useMemo(() => discoveryLayerFor(slug), [slug]);
+  const {capability} = useARCapability();
+  const branding = useMemo(() => siteBrandingFor(slug), [slug]);
+  const rec = useScreenRecording({fileNameHint: slug ?? undefined});
+  const [lockOverride, setLockOverride] = useState(false);
+  const [waitedForLock, setWaitedForLock] = useState(false);
   const [tapped, setTapped] = useState<{
     title: string;
     meta?: string;
@@ -101,37 +137,42 @@ const SiteReconstructionScreen: React.FC<
 
   // 1. Load the site's stations.
   useEffect(() => {
-    if (!isDetectARAvailable) {
-      // Non-ARCore device — geospatial resolve isn't possible here.
-      setPhase('error');
+    // Capability is resolved by useARCapability, not by isDetectARAvailable —
+    // that constant only says whether the native view is REGISTERED, so
+    // branching on it told ARCore-less phones "Could not load this site",
+    // blaming the site for the handset. 'checking' is not an answer yet.
+    if (capability === 'checking') {
       return;
     }
     if (!slug) {
       setPhase('none');
       return;
     }
+    // Fetch stations even on a non-AR device: the station carries the model_id
+    // the 3D fallback needs, so this is what lets the notice offer a real
+    // alternative instead of a dead end.
+    const nonAr = isNonArCapability(capability);
     let cancelled = false;
     void listViewingStations(slug).then(res => {
       if (cancelled) {
         return;
       }
       if (!res.success) {
-        setPhase('error');
+        setPhase(nonAr ? 'no-ar' : 'error');
         return;
       }
       const stations = res.data.stations ?? [];
+      pendingStationsRef.current = stations;
       if (stations.length === 0) {
         setPhase('none');
         return;
       }
-      setPhase('guiding');
-      // Remember the stations so the nearest can be chosen once we have a fix.
-      pendingStationsRef.current = stations;
+      setPhase(nonAr ? 'no-ar' : 'guiding');
     });
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, capability]);
 
   // 2. Pick the nearest station once (frozen so guidance doesn't flip-flop).
   useEffect(() => {
@@ -193,10 +234,31 @@ const SiteReconstructionScreen: React.FC<
   const inRange = distance != null && distance <= maxR;
   const tracking =
     geo?.earthState === 'ENABLED' && geo?.trackingState === 'TRACKING';
-  const accuracyOk =
+  const accuracyIdeal =
     tracking &&
     (geo?.horizontalAccuracy ?? 99) <= MAX_HORIZ_ACC_M &&
     (geo?.orientationYawAccuracy ?? 99) <= MAX_YAW_ACC_DEG;
+  /** Wide enough to still be worth placing, once waiting has clearly failed. */
+  const overrideAvailable =
+    tracking &&
+    !accuracyIdeal &&
+    waitedForLock &&
+    (geo?.horizontalAccuracy ?? 99) <= OVERRIDE_HORIZ_ACC_M &&
+    (geo?.orientationYawAccuracy ?? 99) <= OVERRIDE_YAW_ACC_DEG;
+  const accuracyOk = accuracyIdeal || (lockOverride && overrideAvailable);
+
+  // Start the clock once the visitor is actually standing at the station: only
+  // then is "it isn't locking" a real answer rather than impatience.
+  useEffect(() => {
+    if (phase !== 'guiding' || !inRange || accuracyIdeal) {
+      return;
+    }
+    const timer = setTimeout(
+      () => setWaitedForLock(true),
+      OVERRIDE_OFFER_AFTER_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [phase, inRange, accuracyIdeal]);
 
   const placeLayer = useCallback(() => {
     if (!layer) {
@@ -282,41 +344,92 @@ const SiteReconstructionScreen: React.FC<
         }
         return;
       }
-      const box = layer?.tapTargets.find((t: TapTarget) => t.id === e.id);
+      const box = layer?.tapTargets.find(
+        (target_: TapTarget) => target_.id === e.id,
+      );
       setTapped({
-        title: box?.label ?? 'This part of the fort',
+        title: box?.label ?? t('reconstruction.thisPart'),
         meta: e.id,
         body: undefined,
       });
     },
-    [layer],
+    [layer, t],
   );
+
+  /**
+   * Hand a non-AR visitor the reconstruction anyway: the same GLB, in the 3D
+   * orbit viewer, carrying the same authored history. `preferParamGlb` is not
+   * optional — without it Ar3dViewer silently prefers the site's era table and
+   * can show "coming soon" instead of the model we just passed it.
+   */
+  const goToFallback = useCallback(() => {
+    const station = pendingStationsRef.current?.[0];
+    const modelId = station?.model_id;
+    const finish = (url: string | null) => {
+      if (!url) {
+        goBack();
+        return;
+      }
+      navigation.replace(ROUTES.MAIN.AR_3D_VIEWER, {
+        monumentId: slug ?? '',
+        objectLabel: station?.title ?? slug ?? '',
+        glbUrl: url,
+        preferParamGlb: true,
+        siteName: station?.title ?? undefined,
+        knowledgeText: discoveryTextFor(slug) ?? undefined,
+      });
+    };
+    if (!modelId) {
+      finish(null);
+      return;
+    }
+    void resolveModelGlb(modelId).then(finish);
+  }, [navigation, slug, goBack]);
+
+  /** ARCore is missing but the phone is capable — one tap from fixed. */
+  const openArCoreInstall = useCallback(() => {
+    Linking.openURL('market://details?id=com.google.ar.core').catch(() =>
+      Linking.openURL(
+        'https://play.google.com/store/apps/details?id=com.google.ar.core',
+      ).catch(() => {
+        // Never leave the user on a screen whose primary button does nothing.
+        goToFallback();
+      }),
+    );
+  }, [goToFallback]);
 
   const banner = useMemo(() => {
     switch (phase) {
       case 'loading':
-        return 'Loading…';
+        return t('reconstruction.loading');
       case 'none':
-        return 'No reconstruction is set up here yet.';
+        return t('reconstruction.none');
       case 'error':
-        return 'Could not load this site.';
+        return t('reconstruction.error');
+      case 'no-ar':
+        return t('arCapability.eyebrow');
       case 'resolving':
-        return 'Hold steady — locking the reconstruction in place…';
+        return t('reconstruction.resolving');
       case 'locked':
-        return target?.title || 'Reconstruction in place';
+        return target?.title || t('reconstruction.locked');
       case 'guiding': {
         if (distance == null) {
-          return 'Finding your position…';
+          return t('reconstruction.finding');
         }
         if (inRange && !accuracyOk) {
-          return 'You’re here — move the phone slowly to lock on…';
+          return t('reconstruction.hereMoveSlowly');
         }
         const turn =
-          rel != null ? formatTurnInstruction(rel) : 'Point the phone around';
-        return `${formatDistance(distance)} away · ${turn}`;
+          rel != null
+            ? formatTurnInstruction(rel)
+            : t('reconstruction.pointAround');
+        return t('reconstruction.away', {
+          distance: formatDistance(distance),
+          turn,
+        });
       }
     }
-  }, [phase, distance, inRange, accuracyOk, rel, target]);
+  }, [phase, distance, inRange, accuracyOk, rel, target, t]);
 
   const showAr = phase === 'resolving' || phase === 'locked' || inRange;
 
@@ -332,6 +445,25 @@ const SiteReconstructionScreen: React.FC<
       <ARSafetyNotice
         onAcknowledge={safety.acknowledge}
         onExit={safety.exit}
+      />
+    );
+  }
+
+  // This device cannot do world-locked AR. Say so plainly, and hand the visitor
+  // the 3D reconstruction instead — never a dead end, and never "the site failed
+  // to load", which is what this screen used to say.
+  if (phase === 'no-ar') {
+    return (
+      <ARCapabilityNotice
+        capability={capability}
+        intent="reconstruction"
+        onPrimary={
+          capability === 'arcore-missing' ? openArCoreInstall : goToFallback
+        }
+        onSecondary={
+          capability === 'arcore-missing' ? goToFallback : undefined
+        }
+        onExit={goBack}
       />
     );
   }
@@ -366,6 +498,12 @@ const SiteReconstructionScreen: React.FC<
         <View style={styles.mapPlaceholder} />
       )}
 
+      {/*
+        MediaProjection records the literal screen, so every pixel of chrome
+        visible here is burned into the user's clip forever. All of it goes
+        away for the duration, and the watermark takes its place.
+      */}
+      {!rec.chromeHidden ? (
       <SafeAreaView style={styles.overlay} edges={['top']} pointerEvents="box-none">
         <View style={styles.topRow}>
           <Pressable onPress={() => goBack()} hitSlop={12} style={styles.close}>
@@ -375,6 +513,30 @@ const SiteReconstructionScreen: React.FC<
             <Text style={styles.banner}>{banner}</Text>
           </View>
         </View>
+
+        {/*
+          Waiting has visibly failed and the accuracy is still usable. Offer the
+          lock rather than leaving the visitor stuck: the geospatial pose is the
+          coarse lock, and a hosted cloud anchor is what makes it precise. The
+          achieved accuracy is on the button so the choice is informed.
+        */}
+        {phase === 'guiding' && overrideAvailable && !lockOverride ? (
+          <View style={styles.overrideWrap}>
+            <Pressable
+              onPress={() => setLockOverride(true)}
+              accessibilityRole="button"
+              style={({pressed}) => [
+                styles.overrideHit,
+                pressed && {opacity: 0.85},
+              ]}>
+              <Text style={styles.overrideText}>
+                {t('reconstruction.lockAnyway', {
+                  acc: (geo?.horizontalAccuracy ?? 0).toFixed(1),
+                })}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {phase === 'guiding' && rel != null && !inRange ? (
           <View style={styles.arrowWrap} pointerEvents="none">
@@ -390,8 +552,65 @@ const SiteReconstructionScreen: React.FC<
           </View>
         ) : null}
       </SafeAreaView>
+      ) : null}
 
-      {tapped ? (
+      <RecordingWatermark
+        title={branding.title ?? target?.title ?? ''}
+        era={branding.era}
+        visible={rec.chromeHidden}
+      />
+
+      {/*
+        The stop control is INVISIBLE and full-screen. A visible button would be
+        permanently in the corner of every clip; the trade is that tapping the
+        model for a card is disabled while recording, which a 30 s cap makes
+        acceptable. The instruction is given during the preroll, which is not
+        recorded.
+      */}
+      {rec.state === 'recording' ? (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => {
+            void rec.stop();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t('clip.stop')}
+        />
+      ) : null}
+
+      {rec.state === 'preroll' ? (
+        <View style={styles.center} pointerEvents="none">
+          <Text style={styles.preroll}>{rec.prerollCount}</Text>
+          <Text style={styles.prerollHint}>{t('clip.tapToStop')}</Text>
+        </View>
+      ) : null}
+
+      {/* Offered only once the reconstruction is actually in place — recording
+          the walk-up guidance would be pointless. */}
+      {rec.supported && rec.state === 'idle' && phase === 'locked' ? (
+        <View style={styles.recWrap} pointerEvents="box-none">
+          <Pressable
+            onPress={() => {
+              void rec.begin();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('clip.record')}
+            style={({pressed}) => [styles.recHit, pressed && {opacity: 0.85}]}>
+            <View style={styles.recDot} />
+            <Text style={styles.recText}>{t('clip.record')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {rec.clip && rec.state === 'ready' ? (
+        <ClipReadySheet
+          clip={rec.clip}
+          siteName={branding.title ?? target?.title ?? ''}
+          onClose={rec.discard}
+        />
+      ) : null}
+
+      {tapped && !rec.chromeHidden ? (
         <Pressable style={styles.sheetScrim} onPress={() => setTapped(null)}>
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>{tapped.title}</Text>
@@ -401,7 +620,9 @@ const SiteReconstructionScreen: React.FC<
             {tapped.body ? (
               <Text style={styles.sheetBody}>{tapped.body}</Text>
             ) : null}
-            <Text style={styles.sheetHint}>Tap anywhere to close</Text>
+            <Text style={styles.sheetHint}>
+              {t('reconstruction.tapToClose')}
+            </Text>
           </View>
         </Pressable>
       ) : null}
@@ -444,6 +665,32 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   banner: {color: '#FFF', fontSize: 14, fontWeight: '600'},
+  overrideWrap: {alignItems: 'center', marginTop: 12},
+  overrideHit: {
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(224,167,60,0.55)',
+    backgroundColor: 'rgba(224,167,60,0.14)',
+  },
+  overrideText: {color: '#E0A73C', fontSize: 13, fontWeight: '600'},
+  preroll: {color: '#FFF', fontSize: 96, fontWeight: '800'},
+  prerollHint: {color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 8},
+  recWrap: {position: 'absolute', right: 18, bottom: 38},
+  recHit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 24,
+    backgroundColor: 'rgba(10,10,10,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  recDot: {width: 10, height: 10, borderRadius: 5, backgroundColor: '#E5484D'},
+  recText: {color: '#FFF', fontSize: 13, fontWeight: '600'},
   arrowWrap: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   arrow: {color: '#8ED0FF', fontSize: 120, fontWeight: '900'},
   center: {

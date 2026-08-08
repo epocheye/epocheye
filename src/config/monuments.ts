@@ -47,3 +47,12 @@ export const NEAREST_SITE_FALLBACK_KM = 50;
  * background if the image never loads, so nothing gates on it.
  */
 export const AR_SAFETY_BACKDROP_URL = `${CDN_BASE}monuments/Konarka_Temple-2.jpg`;
+
+/**
+ * DEV/ADMIN SWEEP ONLY — the site the health board's A/B rows target.
+ * Not referenced by any production code path; production resolves the active
+ * site through useActiveMonument(). Lives here because this file is the single
+ * permitted home for a monument-slug literal in post-auth code.
+ */
+export const DEV_SWEEP_MONUMENT_SLUG = 'bangalore-fort';
+export const DEV_SWEEP_MODEL_ID = 'bangalore_fort_recon';

@@ -2186,3 +2186,21 @@ export function discoveryLayerFor(slug?: string | null): DiscoveryLayer | null {
   if (!slug) return null;
   return LAYERS[slug] ?? null;
 }
+
+/**
+ * The discovery layer flattened into prose, for surfaces that cannot place
+ * cards in the world — chiefly the 3D orbit viewer a non-AR device falls back
+ * to.
+ *
+ * Without this, a visitor whose phone lacks ARCore gets a rotating mesh and
+ * none of the history: every fact, tier and source lives only inside the native
+ * card renderer. Passing this as `knowledgeText` is what makes the non-AR path
+ * a different experience rather than a lesser one.
+ */
+export function discoveryTextFor(slug?: string | null): string | null {
+  const layer = discoveryLayerFor(slug);
+  if (!layer || layer.cards.length === 0) return null;
+  return layer.cards
+    .map(c => [c.title, c.meta, c.body].join('\n'))
+    .join('\n\n');
+}

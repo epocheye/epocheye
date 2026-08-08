@@ -98,6 +98,22 @@ export type MainStackParamList = {
     siteName?: string;
     /** Default era subtitle when no era slider applies (e.g. catalog viewer_only callers). */
     defaultEraLabel?: string;
+    /**
+     * Render `glbUrl` unconditionally, ignoring the site's era table.
+     * Set by callers that have already resolved exactly which model to show —
+     * without it a site with era data silently overrides `glbUrl` and can land
+     * on "Reconstruction coming soon" instead of the model just passed in.
+     */
+    preferParamGlb?: boolean;
+  };
+  /**
+   * Explains how AR behaves on THIS phone before the user invests anything, and
+   * always routes forward — to AR, to the Play Store, or to the 3D viewer.
+   */
+  ArCapability: {
+    intent: 'detect' | 'reconstruction';
+    venueSlug?: string;
+    siteName?: string;
   };
   /** Away-from-venue gate: shown when the user tries to scan outside any venue. */
   GoToVenue: undefined;

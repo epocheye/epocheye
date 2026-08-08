@@ -42,6 +42,8 @@ export const ROUTES = {
     STATION_AUTHORING: 'StationAuthoring',
     /** Prod: guide the visitor to a viewing station and world-lock the reconstruction. */
     SITE_RECONSTRUCTION: 'SiteReconstruction',
+    /** Pre-flight: what AR will do on this phone, and the way forward either way. */
+    AR_CAPABILITY: 'ArCapability',
     /** Dev-build-only workflow health-check board (not registered in release). */
     DEV_HEALTH: 'DevHealth',
   },

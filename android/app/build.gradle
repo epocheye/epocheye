@@ -100,13 +100,13 @@ android {
         applicationId "com.epocheye"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 21
-        versionName "1.4.3"
+        versionCode 22
+        versionName "1.5.0"
         // OTA Hermes-compat runtime version. The client only fetches/accepts OTA
         // bundles built for this exact value. Bump ONLY when a native/store build
         // ships (new native code, new native dep, RN upgrade) — NOT for JS-only
         // releases. Must equal the `runtime_version` passed to tools/ota-publish.mjs.
-        buildConfigField "String", "OTA_RUNTIME_VERSION", "\"1.4\""
+        buildConfigField "String", "OTA_RUNTIME_VERSION", "\"1.5.0\""
         ndk {
             abiFilters 'arm64-v8a', 'armeabi-v7a'
         }

@@ -61,7 +61,10 @@ const VenueActivationBanner: React.FC = () => {
         <Pressable
           onPress={() => {
             setShown(false);
-            navigation.navigate(ROUTES.MAIN.DETECT_AR, {
+            // Through the capability pre-flight, so a phone without AR is
+            // told so plainly instead of walking into a camera that can't work.
+            navigation.navigate(ROUTES.MAIN.AR_CAPABILITY, {
+              intent: 'detect',
               venueSlug: zone.monument_id,
             });
           }}

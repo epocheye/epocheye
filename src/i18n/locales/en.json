@@ -477,5 +477,62 @@
     "exposureDown": "Darker",
     "holdStill": "Hold still — a brighter shot takes longer to capture",
     "torchWarning": "Many protected monuments prohibit torches. Check the site's signage before using this."
+  },
+  "arCapability": {
+    "eyebrow": "AR ON THIS DEVICE",
+    "checkingBody": "Checking what this phone can do…",
+    "install": {
+      "title": "One quick install and you're in.",
+      "body": "Your phone supports AR. It just needs Google's AR software, which isn't installed yet.",
+      "primary": "Install AR support",
+      "secondary3d": "See it in 3D instead",
+      "secondaryScan": "Continue without AR"
+    },
+    "unsupported": {
+      "title": "You'll see this one a different way.",
+      "body": "Locking the reconstruction onto the real walls needs hardware this phone doesn't have. Everything else is the same — the same reconstruction, the same evidence behind it.",
+      "primary3d": "See the reconstruction in 3D",
+      "primaryScan": "Continue"
+    },
+    "platform": {
+      "title": "Not on iPhone yet.",
+      "body": "The world-locked view isn't in this build for iPhone yet. You can explore the full reconstruction in 3D in the meantime."
+    },
+    "none": {
+      "title": "Nothing to stand in front of here — yet.",
+      "body": "No reconstruction has been set up at this site."
+    },
+    "back": "Go back",
+    "storeFailed": "Couldn't open the Play Store."
+  },
+  "reconstruction": {
+    "loading": "Loading…",
+    "none": "No reconstruction is set up here yet.",
+    "error": "Could not load this site.",
+    "resolving": "Hold steady — locking the reconstruction in place…",
+    "locked": "Reconstruction in place",
+    "finding": "Finding your position…",
+    "hereMoveSlowly": "You’re here — move the phone slowly to lock on…",
+    "pointAround": "Point the phone around",
+    "away": "{{distance}} away · {{turn}}",
+    "lockAnyway": "Lock on anyway ({{acc}} m)",
+    "thisPart": "This part of the fort",
+    "tapToClose": "Tap anywhere to close"
+  },
+  "clip": {
+    "record": "Record",
+    "stop": "Stop recording",
+    "tapToStop": "Tap anywhere to stop",
+    "saved": "Clip saved",
+    "meta": "{{seconds}}s · {{width}}×{{height}}",
+    "inGallery": "in your gallery",
+    "share": "Share",
+    "opening": "Opening…",
+    "done": "Done",
+    "noSound": "Recorded without sound.",
+    "saveFailed": "Couldn't add it to your gallery — you can still share it.",
+    "endedEarly": "Recording ended early — the clip up to that point was saved.",
+    "diskFull": "Storage ran out — the clip up to that point was saved.",
+    "rotated": "The screen rotated — the clip up to that point was saved."
   }
 }

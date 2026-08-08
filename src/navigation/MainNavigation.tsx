@@ -28,6 +28,8 @@ import DevHealthCheckScreen from '../screens/Dev/DevHealthCheckScreen';
 import StationAuthoringScreen from '../screens/Admin/StationAuthoringScreen';
 // Prod site-readiness experience: guide to a station + world-lock the reconstruction.
 import SiteReconstructionScreen from '../screens/Main/SiteReconstructionScreen';
+// Pre-flight: what AR does on THIS phone. Invisible on capable devices.
+import ARCapabilityScreen from '../screens/Main/ARCapabilityScreen';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -165,6 +167,16 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         component={SiteReconstructionScreen}
         options={{ animation: 'fade', presentation: 'fullScreenModal' }}
       />
+      <Stack.Screen
+        name={ROUTES.MAIN.AR_CAPABILITY}
+        options={{ animation: 'fade', presentation: 'fullScreenModal' }}
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <ARCapabilityScreen {...props} />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
     </Stack.Navigator>
     <VenueActivationBanner />
     <DailyNudgeBanner />

@@ -36,6 +36,13 @@ class MainApplication : Application(), ReactApplication {
             Log.e("MainApplication", "ARCorePackage skipped", t)
           }
           add(com.epocheye.ota.OtaPackage())
+              // Screen recorder for shareable AR clips. Wrapped like ARCorePackage:
+              // a registration failure must degrade the feature, not the app.
+              try {
+                add(com.epocheye.record.ScreenRecordPackage())
+              } catch (t: Throwable) {
+                android.util.Log.e("MainApplication", "ScreenRecordPackage skipped", t)
+              }
         },
       jsBundleFilePath = otaBundlePath,
     )

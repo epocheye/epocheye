@@ -14,6 +14,17 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
 
+    <!-- AR clip recording. FOREGROUND_SERVICE_MEDIA_PROJECTION is mandatory from
+         API 34: getMediaProjection() throws SecurityException unless a foreground
+         service of type mediaProjection is already running. POST_NOTIFICATIONS only
+         governs whether the FGS notification is VISIBLE - the service runs either
+         way, so nothing gates on it. Deliberately NO WRITE_EXTERNAL_STORAGE: clips
+         are published through MediaStore, which needs no permission for own-app
+         inserts on API 29+. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -73,5 +84,26 @@
             <data android:scheme="epocheye" />
         </intent-filter>
       </activity>
+
+      <!-- START_NOT_STICKY and no android:process: the projection token is
+           single-use and process-local, so a system restart could only ever
+           resurrect this service holding a dead token. Never restart it. -->
+      <service
+        android:name=".record.ScreenRecordService"
+        android:exported="false"
+        android:foregroundServiceType="mediaProjection" />
+
+      <!-- Shares the recorded MP4 as a content:// uri. The authority is
+           deliberately not "...fileprovider": other libraries declare that name
+           and a manifest-merge authority collision fails the build. -->
+      <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="${applicationId}.clipprovider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+        <meta-data
+          android:name="android.support.FILE_PROVIDER_PATHS"
+          android:resource="@xml/file_paths" />
+      </provider>
     </application>
 </manifest>

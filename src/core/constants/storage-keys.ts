@@ -99,6 +99,21 @@ export const STORAGE_KEYS = {
   },
 
   /**
+   * AR capability + experience keys.
+   */
+  AR: {
+    /**
+     * Intents whose "AR works differently on this phone" explanation has
+     * already been shown, as a JSON string[] of intent names.
+     *
+     * Only PERMANENT states are recorded here. A fixable state
+     * ('arcore-missing') is deliberately never persisted — hiding a one-tap
+     * fix behind a seen-flag is a bug dressed as politeness.
+     */
+    CAPABILITY_NOTICE_SEEN: `${STORAGE_PREFIX}/ar_capability_notice_seen`,
+  },
+
+  /**
    * Dev-only harness keys — only read/written from __DEV__ code paths.
    */
   DEV: {
@@ -121,4 +136,5 @@ export type StorageKey =
   | (typeof STORAGE_KEYS.ANALYTICS)[keyof typeof STORAGE_KEYS.ANALYTICS]
   | (typeof STORAGE_KEYS.DIAGNOSTICS)[keyof typeof STORAGE_KEYS.DIAGNOSTICS]
   | (typeof STORAGE_KEYS.UPDATE)[keyof typeof STORAGE_KEYS.UPDATE]
+  | (typeof STORAGE_KEYS.AR)[keyof typeof STORAGE_KEYS.AR]
   | (typeof STORAGE_KEYS.DEV)[keyof typeof STORAGE_KEYS.DEV];

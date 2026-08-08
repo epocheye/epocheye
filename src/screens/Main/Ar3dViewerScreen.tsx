@@ -90,6 +90,7 @@ const Ar3dViewerScreen: React.FC = () => {
     monumentId,
     siteName,
     defaultEraLabel,
+    preferParamGlb,
   } = route.params;
 
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -127,11 +128,23 @@ const Ar3dViewerScreen: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eraSignature]);
 
-  // Dev-only opt-in to drei OrbitControls (drag-rotate, pinch-zoom).
-  const interactive = __DEV__ && monumentId === DEV_MONUMENT_ID;
+  // Orbit controls (drag-rotate, pinch-zoom). Previously dev-only and pinned to
+  // one monument, which meant a visitor sent here BECAUSE their phone has no AR
+  // could not even turn the model — making the fallback a worse experience
+  // rather than a different one. Anyone who arrived via preferParamGlb (i.e. the
+  // capability fallback) gets it, as does the dev picker.
+  const interactive =
+    preferParamGlb || (__DEV__ && monumentId === DEV_MONUMENT_ID);
 
-  // Target URL = whatever the current era points at, or the raw glbUrl when no era table applies.
-  const targetUrl: string | null = eras ? eras[activeIndex]?.glbUrl ?? null : glbUrl || null;
+  // Target URL = whatever the current era points at, or the raw glbUrl when no
+  // era table applies. preferParamGlb overrides the era table entirely: the
+  // caller has already decided which model this is, and an era row with a null
+  // glb_url would otherwise silently swallow it into "coming soon".
+  const targetUrl: string | null = preferParamGlb
+    ? glbUrl || null
+    : eras
+      ? eras[activeIndex]?.glbUrl ?? null
+      : glbUrl || null;
 
   // Debounce URL flips so rapid slider scrubs don't churn the GL context.
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(targetUrl);

@@ -19,7 +19,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ROUTES, STORAGE_KEYS } from '../core/constants';
 import { navigateSafe } from '../navigation/navigationRef';
 import { useTourStore } from '../stores/tourStore';
-import { DEFAULT_MONUMENT_SLUG } from '../config/monuments';
+import {
+  DEFAULT_MONUMENT_SLUG,
+  DEV_SWEEP_MODEL_ID,
+  DEV_SWEEP_MONUMENT_SLUG,
+} from '../config/monuments';
+import { listViewingStations } from '../utils/api/ar';
 import { MARQUEE_MODEL_ID, buildGlbUrl } from '../config/glbDelivery';
 import { resolveModelGlb } from '../services/glbSource';
 
@@ -50,10 +55,16 @@ export type HealthRequires =
 export interface HealthCheckItem {
   id: string;
   title: string;
-  group: 'Entry' | 'Tabs' | 'Site & AR' | 'Commerce' | 'System';
+  group: 'Entry' | 'Tabs' | 'Site & AR' | 'Commerce' | 'System' | 'A/B Sweep';
   launch: HealthLaunch;
   requires?: HealthRequires;
   howToTest: string;
+  /**
+   * Which arm of the AR/non-AR comparison this row belongs to. Each variant
+   * keeps its OWN id, so both results persist independently and the pass/fail
+   * store needs no change.
+   */
+  variant?: 'ar' | 'non-ar';
 }
 
 const SAMPLE_SITE_NAME = 'Konark Sun Temple';
@@ -204,6 +215,9 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
     launch: {
       kind: 'route',
       route: ROUTES.MAIN.SITE_RECONSTRUCTION,
+      // Without an explicit slug this falls through to useActiveMonument() and
+      // silently tests whatever site you happen to be near — i.e. nothing, off site.
+      params: { venueSlug: DEFAULT_MONUMENT_SLUG },
     },
     requires: 'arcore',
     howToTest:
@@ -421,5 +435,126 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
     },
     howToTest:
       'Throws an uncaught JS error: dev shows RedBox; the crash log section below must gain a js-… entry with this screen’s route.',
+  },
+
+  // ── A/B Sweep ───────────────────────────────────────────────────────────
+  // Two variants of the same site, so the AR and non-AR experiences can be
+  // verified against each other. Flip "Force non-AR path" in the header above
+  // to switch arms — that override is the only practical way to test both on
+  // one handset. Groups 1, 2 and the non-AR rows all run away from the site.
+  {
+    id: 'bfort-stations-probe',
+    title: '1. Viewing stations exist',
+    group: 'A/B Sweep',
+    launch: {
+      kind: 'action',
+      label: 'Probe stations',
+      run: async () => {
+        const res = await listViewingStations(DEV_SWEEP_MONUMENT_SLUG);
+        if (!res.success) {
+          const message =
+            'error' in res ? res.error.message : 'request was not successful';
+          Alert.alert('Stations FAILED', message);
+          return;
+        }
+        const stations = res.data.stations ?? [];
+        const first = stations[0];
+        Alert.alert(
+          stations.length > 0 ? 'Stations OK' : 'No stations',
+          [
+            `count: ${stations.length}`,
+            first ? `model_id: ${first.model_id}` : 'no rows — author one on site',
+            first ? `geo: ${first.geo_lat ?? 'null'}, ${first.geo_lng ?? 'null'}` : '',
+            first?.cloud_anchor_id ? 'cloud anchor: yes' : 'cloud anchor: no',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        );
+      },
+    },
+    requires: 'auth',
+    howToTest:
+      'PASS = count >= 1 and model_id is exactly bangalore_fort_recon. count 0 means no station row (author one on site). 401 means the token expired — re-login.',
+  },
+  {
+    id: 'bfort-glb-probe',
+    title: '2. Reconstruction GLB resolves',
+    group: 'A/B Sweep',
+    launch: {
+      kind: 'action',
+      label: 'Probe GLB',
+      run: async () => {
+        const uri = await resolveModelGlb(DEV_SWEEP_MODEL_ID);
+        Alert.alert(
+          uri ? 'GLB OK' : 'GLB FAILED',
+          uri
+            ? `${uri.startsWith('file://') ? 'cached (file://)' : 'remote'}
+${uri}`
+            : 'resolveModelGlb returned null — GLB_BASE_URL is empty or the CDN is unreachable. GLB_BASE_URL is read at BUILD time, so fixing .env needs a rebuild, not a reload.',
+        );
+      },
+    },
+    howToTest:
+      'PASS = a non-null uri. First run should be remote; a second run should return file:// from the cache. A silent failure here shows on site as an anchor with no model.',
+  },
+  {
+    id: 'bfort-recon-ar',
+    title: '3. Reconstruction, world-locked',
+    group: 'A/B Sweep',
+    variant: 'ar',
+    launch: {
+      kind: 'route',
+      route: ROUTES.MAIN.SITE_RECONSTRUCTION,
+      params: { venueSlug: DEV_SWEEP_MONUMENT_SLUG },
+    },
+    requires: 'arcore',
+    howToTest:
+      'ON SITE, override OFF. PASS = safety notice first, guidance updates as you walk, locks inside 30 m, fort renders at TRUE SIZE (not a 0.5 m toy), cards visible and tappable. If it sticks on "move the phone slowly", wait 12 s for the "Lock on anyway" button.',
+  },
+  {
+    id: 'bfort-recon-nonar',
+    title: '3. Reconstruction, non-AR fallback',
+    group: 'A/B Sweep',
+    variant: 'non-ar',
+    launch: {
+      kind: 'route',
+      route: ROUTES.MAIN.SITE_RECONSTRUCTION,
+      params: { venueSlug: DEV_SWEEP_MONUMENT_SLUG },
+    },
+    howToTest:
+      'Override ON, anywhere. PASS = the capability notice (NOT "Could not load this site"), then the 3D viewer showing the fort — rotatable — with the (i) sheet carrying the card history. "Reconstruction coming soon" means preferParamGlb is not being honoured.',
+  },
+  {
+    id: 'bfort-capability-repeat',
+    title: '4. Notice shows once, then steps aside',
+    group: 'A/B Sweep',
+    variant: 'non-ar',
+    launch: {
+      kind: 'action',
+      label: 'Clear seen-flag',
+      run: async () => {
+        await AsyncStorage.removeItem(STORAGE_KEYS.AR.CAPABILITY_NOTICE_SEEN);
+        Alert.alert(
+          'Cleared',
+          'The capability notice will show once more per intent. Run the non-AR row twice: first launch explains, second goes straight to 3D.',
+        );
+      },
+    },
+    howToTest:
+      'PASS = first launch after clearing shows the notice; the second goes straight to the 3D viewer. A permanent fact explained twice is nagging; a fixable one (ARCore missing) must repeat every time.',
+  },
+  {
+    id: 'bfort-record-clip',
+    title: '5. Record a clip with the watermark',
+    group: 'A/B Sweep',
+    variant: 'ar',
+    launch: {
+      kind: 'route',
+      route: ROUTES.MAIN.SITE_RECONSTRUCTION,
+      params: { venueSlug: DEV_SWEEP_MONUMENT_SLUG },
+    },
+    requires: 'arcore',
+    howToTest:
+      'Once locked, tap Record → consent → 3-2-1 → tap anywhere to stop. PASS = the clip is in Movies/Epocheye, contains the camera feed AND the 3D model AND the watermark, and contains NO close button, banner or stop control. Then upload it to Instagram and confirm the site name survives the 9:16 crop.',
   },
 ];

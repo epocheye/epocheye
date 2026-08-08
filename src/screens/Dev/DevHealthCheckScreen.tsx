@@ -47,6 +47,8 @@ import {
   useDevHealthStore,
   type HealthStatus,
 } from '../../stores/devHealthStore';
+import { useDevOverridesStore } from '../../stores/devOverridesStore';
+import { useARCapability } from '../../shared/hooks/useARCapability';
 import {
   clearCrashJournal,
   getCrashJournal,
@@ -74,12 +76,20 @@ const GROUP_ORDER: HealthCheckItem['group'][] = [
   'Site & AR',
   'Commerce',
   'System',
+  'A/B Sweep',
 ];
 
 const DevHealthCheckScreen: React.FC = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { results, cycleStatus, setNote, resetAll } = useDevHealthStore();
+  // A/B lever: forces the non-AR branch on a perfectly capable phone, which is
+  // the only practical way to test both arms on one handset. Because it lives
+  // in a store, flipping it re-renders every consumer live — no reload needed
+  // between run A and run B.
+  const forceNoAr = useDevOverridesStore(s2 => s2.forceNoAr);
+  const setForceNoAr = useDevOverridesStore(s2 => s2.setForceNoAr);
+  const { capability } = useARCapability();
   const [preview, setPreview] = useState<'ar-safety-notice' | null>(null);
   const [journal, setJournal] = useState<CrashEntry[]>([]);
   const [journalOpen, setJournalOpen] = useState(false);
@@ -186,6 +196,25 @@ const DevHealthCheckScreen: React.FC = () => {
               </View>
             </View>
 
+            {/* A/B variant switch. The resolved capability is shown underneath
+                so a tester can tell "the override worked" from "this phone
+                genuinely has no ARCore". */}
+            <Pressable
+              onPress={() => setForceNoAr(!forceNoAr)}
+              style={[styles.abRow, forceNoAr && styles.abRowOn]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.abTitle}>
+                  {forceNoAr
+                    ? 'Variant B — non-AR path FORCED'
+                    : 'Variant A — normal AR path'}
+                </Text>
+                <Text style={styles.abSub}>
+                  resolved capability: {capability}
+                  {forceNoAr ? '  ·  tap to restore AR' : '  ·  tap to force non-AR'}
+                </Text>
+              </View>
+            </Pressable>
+
             {/* Previous-run death banner */}
             {lastDeath ? (
               <View style={styles.deathBanner}>
@@ -274,7 +303,26 @@ const DevHealthCheckScreen: React.FC = () => {
                 </Pressable>
               </View>
               {item.requires ? (
-                <Text style={styles.requiresChip}>needs: {item.requires}</Text>
+                <Text
+                  style={[
+                    styles.requiresChip,
+                    item.requires === 'arcore' &&
+                      (capability === 'ready'
+                        ? styles.requiresOk
+                        : styles.requiresBad),
+                  ]}>
+                  needs: {item.requires}
+                  {item.requires === 'arcore'
+                    ? capability === 'ready'
+                      ? ' ✓'
+                      : ` — ${capability}`
+                    : ''}
+                </Text>
+              ) : null}
+              {item.variant ? (
+                <Text style={styles.variantChip}>
+                  {item.variant === 'ar' ? 'VARIANT A · AR' : 'VARIANT B · NON-AR'}
+                </Text>
               ) : null}
               <Text style={styles.howTo}>{item.howToTest}</Text>
               <View style={styles.cardFooter}>
@@ -344,6 +392,32 @@ const styles = StyleSheet.create({
   },
   summaryText: { fontSize: 13, fontWeight: '600', color: '#FFFFFF' },
   summaryActions: { flexDirection: 'row', gap: 10 },
+  abRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  abRowOn: {
+    borderColor: 'rgba(224,167,60,0.6)',
+    backgroundColor: 'rgba(224,167,60,0.12)',
+  },
+  abTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  abSub: { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 3 },
+  requiresOk: { color: '#7BC47F' },
+  requiresBad: { color: '#C4574B' },
+  variantChip: {
+    marginTop: 4,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: 'rgba(224,167,60,0.9)',
+  },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',

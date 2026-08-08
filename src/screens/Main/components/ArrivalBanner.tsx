@@ -45,7 +45,10 @@ const ArrivalBanner: React.FC<ArrivalBannerProps> = ({
 
   const handleOpenLens = useCallback(() => {
     // Single AR surface — open the detector/agent scanner for this site.
-    navigation.navigate(ROUTES.MAIN.DETECT_AR, {venueSlug: site.slug});
+    navigation.navigate(ROUTES.MAIN.AR_CAPABILITY, {
+      intent: 'detect',
+      venueSlug: site.slug,
+    });
   }, [navigation, site.slug]);
 
   return (

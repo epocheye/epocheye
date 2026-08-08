@@ -233,7 +233,10 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     const slug = siteDetail?.slug ?? site.id;
     // Single AR surface: the detector→grounded-card→AR flow (DetectARScreen).
     // It runs the agent recognizer for the venue and is gated by useVenueGate.
-    navigation.navigate(ROUTES.MAIN.DETECT_AR, {venueSlug: slug});
+    navigation.navigate(ROUTES.MAIN.AR_CAPABILITY, {
+      intent: 'detect',
+      venueSlug: slug,
+    });
   }, [navigation, siteDetail, site]);
 
   // Site-readiness: surface the guided reconstruction CTA only when an admin has
@@ -256,7 +259,11 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [siteDetail?.slug, site.id]);
   const handleReconstruction = useCallback(() => {
     const slug = siteDetail?.slug ?? site.id;
-    navigation.navigate(ROUTES.MAIN.SITE_RECONSTRUCTION, {venueSlug: slug});
+    navigation.navigate(ROUTES.MAIN.AR_CAPABILITY, {
+      intent: 'reconstruction',
+      venueSlug: slug,
+      siteName: siteDetail?.name ?? undefined,
+    });
   }, [navigation, siteDetail, site]);
 
   // Record a site view once per opened site (the auto screen_view carries no slug).
