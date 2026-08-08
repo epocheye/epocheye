@@ -75,6 +75,8 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
     private var glbUri: String? = null
     private var modelScale: Float = 0.5f
+    /** See [setModelTrueScale]. Off by default so the detect→place path is unchanged. */
+    private var modelTrueScale: Boolean = false
     private var currentYawDeg: Float = 0f
     /** Grounded card JSON (display_name/period/.../identity_confidence). */
     private var cardData: String? = null
@@ -131,6 +133,11 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         horizontalAccuracy: Double?,
         orientationYawAccuracy: Double?,
     ) -> Unit)? = null
+
+    // Discovery layer (Bangalore Fort and any authored site): a tap on a card or on
+    // a named part of the reconstruction. `id` is the authored element id, so JS can
+    // open the right detail sheet without a second round trip.
+    var onElementTapped: ((id: String, kind: String, payload: String?) -> Unit)? = null
 
     // ── Compose-hosted scene ─────────────────────────────────────────────────
     // A single root node is created inside the ARSceneView content DSL and captured
@@ -193,6 +200,36 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     // positions. TUNABLE on-device (arc span, radius, base height).
     private var activeCardLayout: List<Position> = emptyList()
     private val cardOnlyScale = 0.42f
+
+    // ── Discovery layer ──────────────────────────────────────────────────────
+    // placeCardsOnly hangs up to `maxCards` cards on a fixed arc it generates itself.
+    // A site discovery layer is the opposite: the author supplies the pose of every
+    // card in the anchor's local frame, and there are more of them than six. These
+    // nodes are deliberately kept OUT of `cardNodes` so the per-frame billboard loop
+    // never touches them — a card hung on a wall must keep the wall's facing, not
+    // swing to the camera.
+    private class DiscoveryCard(
+        val id: String,
+        val node: ImageNode,
+        val local: Position,
+        val yawDeg: Float,
+        val halfW: Float,
+        val halfH: Float,
+        val payload: String,
+    )
+    private val discoveryCards = mutableListOf<DiscoveryCard>()
+
+    /** A named box in the anchor's local frame — how a tap resolves to part of the model. */
+    private class TapTarget(
+        val id: String,
+        val minX: Float, val minY: Float, val minZ: Float,
+        val maxX: Float, val maxY: Float, val maxZ: Float,
+        val payload: String,
+    )
+    private val tapTargets = mutableListOf<TapTarget>()
+    private var tapDownX = 0f
+    private var tapDownY = 0f
+    private var tapDownTimeMs = 0L
 
     /**
      * Positions for [n] cards spread in a shallow arc close around the anchor
@@ -556,6 +593,15 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
     fun setModelScale(scale: Float) {
         if (scale > 0f) modelScale = scale
+    }
+
+    /**
+     * True-to-life sizing: keep the GLB's own metres instead of normalising the
+     * model to [modelScale] metres across. Set this for surveyed reconstructions;
+     * leave it off for detected objects whose real size is unknown.
+     */
+    fun setModelTrueScale(enabled: Boolean) {
+        modelTrueScale = enabled
     }
 
     /**
@@ -1548,6 +1594,319 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         }
     }
 
+    // ── Discovery layer: authored poses, and tap-to-identify ─────────────────
+
+    /**
+     * Place a whole authored discovery layer on ONE anchor.
+     *
+     * [cardsJson] is a JSON array; each element carries the card fields
+     * EpocheyeArCardRenderer already reads, plus its pose in the anchor's local
+     * frame:
+     *
+     *   { "id": "bfort_card_breach",
+     *     "x": 6.73, "y": 1.45, "z": -5.29,   // metres, anchor-local
+     *     "yaw": 138.8,                        // degrees about +Y; the face normal
+     *     "w": 1.75,                           // card width in metres
+     *     ...display_name / period / narrative / ... }
+     *
+     * Unlike placeCardsOnly there is no six-card cap and no generated arc: the
+     * author decided where every card goes, so this method only obeys. The anchor
+     * comes from a plane hit under the aim point when there is one, otherwise from
+     * a point ~1.5 m ahead — a resolved Cloud Anchor is the intended production
+     * source, and callers should resolve first and then call this.
+     */
+    fun placeDiscoveryCards(cardsJson: String) {
+        val eng = engine ?: run {
+            post { onARError?.invoke("engine not ready") }
+            return
+        }
+        val session = arSession ?: run {
+            post { onARError?.invoke("session not ready") }
+            return
+        }
+        val frame = arFrame ?: run {
+            post { onARError?.invoke("no frame") }
+            return
+        }
+        val cards = try {
+            JSONArray(cardsJson)
+        } catch (t: Throwable) {
+            post { onARError?.invoke("discovery cards json invalid") }
+            return
+        }
+        if (cards.length() == 0) return
+
+        val anchor = try {
+            val existing = currentAnchorNode?.anchor
+            if (existing != null && existing.trackingState == TrackingState.TRACKING) {
+                // Re-use an anchor that is already world-locked (the Cloud Anchor
+                // resolve path puts one here) rather than dropping a fresh one.
+                existing
+            } else {
+                val hit = try {
+                    frame.hitTest(width / 2f, height / 2f).firstOrNull { r ->
+                        val tr = r.trackable
+                        tr is Plane && tr.trackingState == TrackingState.TRACKING &&
+                            tr.isPoseInPolygon(r.hitPose)
+                    }
+                } catch (_: Throwable) {
+                    null
+                }
+                if (hit != null) {
+                    hit.createAnchor()
+                } else {
+                    val target = frame.camera.pose.compose(Pose.makeTranslation(0f, 0f, -1.5f))
+                    session.createAnchor(Pose.makeTranslation(target.tx(), target.ty(), target.tz()))
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "placeDiscoveryCards anchor failed", t)
+            post { onARError?.invoke("anchor creation failed") }
+            return
+        }
+
+        val anchorNode = currentAnchorNode?.takeIf { it.anchor === anchor } ?: run {
+            clearCurrentAnchor()
+            try {
+                AnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
+            } catch (t: Throwable) {
+                Log.e(TAG, "discovery anchor node create failed", t)
+                post { onARError?.invoke("anchor node create failed") }
+                return
+            }
+        }
+        currentAnchorNode = anchorNode
+        removeAllDiscoveryCards()
+
+        val matl = materialLoader
+        var placed = 0
+        for (i in 0 until cards.length()) {
+            val obj = cards.optJSONObject(i) ?: continue
+            val id = obj.optString("id", "card_$i")
+            val json = obj.toString()
+            if (matl == null) continue
+            try {
+                val bitmap = EpocheyeArCardRenderer.renderDiscovery(json)
+                    ?: EpocheyeArCardRenderer.render(json)
+                    ?: continue
+                // ImageNode extends PlaneNode and takes an explicit size in METRES, so
+                // the card is built at its authored width rather than scale-guessed
+                // from the bitmap's pixel count. Height follows the bitmap's aspect.
+                val widthM = obj.optDouble("w", 1.75).toFloat()
+                val heightM = widthM * bitmap.height.toFloat() / bitmap.width.toFloat()
+                val local = Position(
+                    obj.optDouble("x", 0.0).toFloat(),
+                    obj.optDouble("y", 1.5).toFloat(),
+                    obj.optDouble("z", 0.0).toFloat(),
+                )
+                val yaw = obj.optDouble("yaw", 0.0).toFloat()
+                val node = ImageNode(
+                    materialLoader = matl,
+                    bitmap = bitmap,
+                    size = Position(widthM, heightM, 0f),
+                ).apply {
+                    this.position = local
+                    this.rotation = Rotation(0f, yaw, 0f)
+                }
+                anchorNode.addChildNode(node)
+                val halfW = widthM / 2f
+                val halfH = heightM / 2f
+                discoveryCards.add(DiscoveryCard(id, node, local, yaw, halfW, halfH, json))
+                placed++
+            } catch (t: Throwable) {
+                Log.w(TAG, "discovery card skipped: $id", t)
+            }
+        }
+        if (placed == 0) {
+            post { onARError?.invoke("no discovery cards could be rendered") }
+            return
+        }
+        setPlaneFinding(false)
+        cardsCameraLocked = false
+        post { onAnchorPlaced?.invoke("discovery_layer") }
+    }
+
+    /**
+     * Register the named parts of the reconstruction a tap can resolve to.
+     * [targetsJson] is an array of { id, min:[x,y,z], max:[x,y,z], ...payload },
+     * all in the anchor's local frame — the same frame the discovery poses use.
+     * Boxes are tested nearest-first, so overlapping boxes resolve to the closest.
+     */
+    fun setTapTargets(targetsJson: String) {
+        tapTargets.clear()
+        val arr = try {
+            JSONArray(targetsJson)
+        } catch (t: Throwable) {
+            post { onARError?.invoke("tap targets json invalid") }
+            return
+        }
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val mn = o.optJSONArray("min") ?: continue
+            val mx = o.optJSONArray("max") ?: continue
+            if (mn.length() < 3 || mx.length() < 3) continue
+            tapTargets.add(
+                TapTarget(
+                    o.optString("id", "target_$i"),
+                    mn.optDouble(0).toFloat(), mn.optDouble(1).toFloat(), mn.optDouble(2).toFloat(),
+                    mx.optDouble(0).toFloat(), mx.optDouble(1).toFloat(), mx.optDouble(2).toFloat(),
+                    o.toString(),
+                ),
+            )
+        }
+    }
+
+    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        when (event.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> {
+                tapDownX = event.x
+                tapDownY = event.y
+                tapDownTimeMs = System.currentTimeMillis()
+                return true
+            }
+            android.view.MotionEvent.ACTION_UP -> {
+                val dx = event.x - tapDownX
+                val dy = event.y - tapDownY
+                val moved = dx * dx + dy * dy
+                val heldMs = System.currentTimeMillis() - tapDownTimeMs
+                // A tap, not a drag and not a long press. 24 px slop matches the
+                // platform touch slop closely enough for a full-screen AR surface.
+                if (moved <= 24f * 24f && heldMs <= 500L) {
+                    hitTestElements(event.x, event.y)
+                }
+                return true
+            }
+        }
+        return super.onTouchEvent(event)
+    }
+
+    /**
+     * Resolve a screen tap to an authored element.
+     *
+     * Deliberately NOT Filament/SceneView node picking: everything here is placed
+     * relative to one ARCore anchor whose pose we already have, so the ray test is
+     * done in the anchor's local frame with ARCore's own Pose maths. That keeps the
+     * result NAMED (picking would hand back an untagged node) and keeps it working
+     * across SceneView upgrades.
+     *
+     * Cards are tested first — a card in front of a wall should win over the wall.
+     */
+    private fun hitTestElements(screenX: Float, screenY: Float) {
+        if (discoveryCards.isEmpty() && tapTargets.isEmpty()) return
+        val frame = arFrame ?: return
+        val anchorPose = currentAnchorNode?.anchor?.pose ?: return
+        if (width <= 0 || height <= 0) return
+
+        val view = FloatArray(16)
+        val proj = FloatArray(16)
+        val vp = FloatArray(16)
+        val inv = FloatArray(16)
+        try {
+            frame.camera.getViewMatrix(view, 0)
+            frame.camera.getProjectionMatrix(proj, 0, 0.05f, 200f)
+        } catch (t: Throwable) {
+            return
+        }
+        android.opengl.Matrix.multiplyMM(vp, 0, proj, 0, view, 0)
+        if (!android.opengl.Matrix.invertM(inv, 0, vp, 0)) return
+
+        val ndcX = 2f * screenX / width.toFloat() - 1f
+        val ndcY = 1f - 2f * screenY / height.toFloat()
+        val near = FloatArray(4)
+        val far = FloatArray(4)
+        android.opengl.Matrix.multiplyMV(near, 0, inv, 0, floatArrayOf(ndcX, ndcY, -1f, 1f), 0)
+        android.opengl.Matrix.multiplyMV(far, 0, inv, 0, floatArrayOf(ndcX, ndcY, 1f, 1f), 0)
+        if (near[3] == 0f || far[3] == 0f) return
+        val ox = near[0] / near[3]
+        val oy = near[1] / near[3]
+        val oz = near[2] / near[3]
+        var dx = far[0] / far[3] - ox
+        var dy = far[1] / far[3] - oy
+        var dz = far[2] / far[3] - oz
+        val dlen = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+        if (dlen <= 1e-6f) return
+        dx /= dlen; dy /= dlen; dz /= dlen
+
+        // Into the anchor's local frame, where every authored pose lives.
+        val invPose = anchorPose.inverse()
+        val lo = invPose.transformPoint(floatArrayOf(ox, oy, oz))
+        val ld = invPose.rotateVector(floatArrayOf(dx, dy, dz))
+
+        var bestT = Float.MAX_VALUE
+        var bestId: String? = null
+        var bestKind = ""
+        var bestPayload: String? = null
+
+        for (c in discoveryCards) {
+            val rad = Math.toRadians(c.yawDeg.toDouble())
+            val s = kotlin.math.sin(rad).toFloat()
+            val co = kotlin.math.cos(rad).toFloat()
+            // ImageNode's face is +Z locally; yaw about +Y turns it.
+            val nx = s; val nz = co
+            val denom = ld[0] * nx + ld[2] * nz
+            if (kotlin.math.abs(denom) < 1e-5f) continue
+            val t = ((c.local.x - lo[0]) * nx + (c.local.z - lo[2]) * nz) / denom
+            if (t <= 0f || t >= bestT) continue
+            val px = lo[0] + ld[0] * t
+            val py = lo[1] + ld[1] * t
+            val pz = lo[2] + ld[2] * t
+            // Right vector of a +Z-facing quad yawed by `yaw`.
+            val rx = co; val rz = -s
+            val u = (px - c.local.x) * rx + (pz - c.local.z) * rz
+            val v = py - c.local.y
+            if (kotlin.math.abs(u) <= c.halfW && kotlin.math.abs(v) <= c.halfH) {
+                bestT = t; bestId = c.id; bestKind = "card"; bestPayload = c.payload
+            }
+        }
+
+        if (bestId == null) {
+            for (b in tapTargets) {
+                val t = rayBoxT(lo, ld, b) ?: continue
+                if (t < bestT) {
+                    bestT = t; bestId = b.id; bestKind = "element"; bestPayload = b.payload
+                }
+            }
+        }
+
+        val id = bestId ?: return
+        val kind = bestKind
+        val payload = bestPayload
+        post { onElementTapped?.invoke(id, kind, payload) }
+    }
+
+    /** Slab test; returns the near intersection distance, or null when the ray misses. */
+    private fun rayBoxT(o: FloatArray, d: FloatArray, b: TapTarget): Float? {
+        var tmin = 0f
+        var tmax = Float.MAX_VALUE
+        val mn = floatArrayOf(b.minX, b.minY, b.minZ)
+        val mx = floatArrayOf(b.maxX, b.maxY, b.maxZ)
+        for (i in 0..2) {
+            if (kotlin.math.abs(d[i]) < 1e-6f) {
+                if (o[i] < mn[i] || o[i] > mx[i]) return null
+            } else {
+                val inv = 1f / d[i]
+                var t1 = (mn[i] - o[i]) * inv
+                var t2 = (mx[i] - o[i]) * inv
+                if (t1 > t2) { val tmp = t1; t1 = t2; t2 = tmp }
+                if (t1 > tmin) tmin = t1
+                if (t2 < tmax) tmax = t2
+                if (tmin > tmax) return null
+            }
+        }
+        return if (tmin > 0f) tmin else null
+    }
+
+    private fun removeAllDiscoveryCards() {
+        for (c in discoveryCards) {
+            try {
+                currentAnchorNode?.removeChildNode(c.node)
+            } catch (t: Throwable) {
+                Log.w(TAG, "remove discovery card failed", t)
+            }
+        }
+        discoveryCards.clear()
+    }
+
     private fun clearCurrentAnchor() {
         // A live host future maps THIS anchor — detaching it mid-host is
         // undocumented ARCore territory, so cancel first (production no-op).
@@ -1570,6 +1929,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 Log.w(TAG, "anchor.detach failed", t)
             }
         }
+        removeAllDiscoveryCards()
         removeAllCardNodes()
         currentAnchorNode = null
         currentModelNode = null
@@ -1646,10 +2006,23 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     Log.w(TAG, "material fix-up skipped", t)
                 }
                 try {
-                    val modelNode = ModelNode(
-                        modelInstance = modelInstance,
-                        scaleToUnits = modelScale,
-                    )
+                    // scaleToUnits NORMALISES: it resizes the model so its largest
+                    // bounding-box dimension equals that many metres. That is right for
+                    // a detected object of unknown size, and catastrophically wrong for
+                    // a surveyed reconstruction — a 48 m fort would render at 0.5 m.
+                    // modelTrueScale keeps the GLB's own metres and treats modelScale as
+                    // a fine trim (1.0 = as authored), which is what a world-locked
+                    // heritage reconstruction needs.
+                    val modelNode = if (modelTrueScale) {
+                        ModelNode(modelInstance = modelInstance).apply {
+                            if (modelScale > 0f) setScale(modelScale)
+                        }
+                    } else {
+                        ModelNode(
+                            modelInstance = modelInstance,
+                            scaleToUnits = modelScale,
+                        )
+                    }
                     try {
                         modelNode.rotation = Rotation(0f, currentYawDeg, 0f)
                     } catch (_: Throwable) {

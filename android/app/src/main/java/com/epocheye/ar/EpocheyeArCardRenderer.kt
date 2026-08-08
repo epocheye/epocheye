@@ -36,6 +36,85 @@ object EpocheyeArCardRenderer {
      * timeline-layer label), in which case the heading is drawn as its title so each
      * section card is self-labelled and reads as complete.
      */
+    /**
+     * Renders a HERITAGE DISCOVERY card — a different surface from the recognition
+     * card above, and it deliberately DOES draw its evidence line.
+     *
+     * The no-source rule on [render] exists because a recognition card's confidence
+     * is a statement about *our model* ("we think this is a Buddha, 0.71"), and
+     * showing that to a visitor is noise at best. A discovery card's line is the
+     * opposite: it is the provenance of the fact itself — "CONFIRMED · C. Mackenzie
+     * 1791, key 4" — and on an evidence-led reconstruction it is the most important
+     * thing on the card. A card that says a dimension is UNRECORDED is only
+     * meaningful if it says so.
+     *
+     * cardJson: { title, meta, body, accent? } where accent is "green" (the fact is
+     * confirmed) or anything else (muted).
+     */
+    fun renderDiscovery(cardJson: String): Bitmap? {
+        val o = try {
+            JSONObject(cardJson)
+        } catch (_: Throwable) {
+            return null
+        }
+        val title = o.optString("title").trim()
+        val meta = o.optString("meta").trim()
+        val body = o.optString("body").trim()
+        if (title.isEmpty() && body.isEmpty()) return null
+        val accent = if (o.optString("accent", "muted") == "green") GREEN else MUTED
+
+        val inner = (W - PAD * 2).toInt()
+        val tp = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = INK; textSize = 68f; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+        }
+        val mp = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent; textSize = 30f; typeface = Typeface.SANS_SERIF
+        }
+        val bp = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E2DCD2"); textSize = 38f; typeface = Typeface.SANS_SERIF
+        }
+        val tl = if (title.isEmpty()) null else StaticLayout.Builder
+            .obtain(title, 0, title.length, tp, inner).build()
+        val ml = if (meta.isEmpty()) null else StaticLayout.Builder
+            .obtain(meta, 0, meta.length, mp, inner).build()
+        val bl = if (body.isEmpty()) null else StaticLayout.Builder
+            .obtain(body, 0, body.length, bp, inner).build()
+
+        val h = (PAD + (tl?.height ?: 0) + (if (ml != null) 18f + ml.height else 0f) +
+            (if (bl != null) 28f + bl.height else 0f) + PAD).toInt().coerceIn(220, 2200)
+        val bmp = Bitmap.createBitmap(W, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(240, 10, 8, 12) }
+        val rect = RectF(8f, 8f, W - 8f, h - 8f)
+        c.drawRoundRect(rect, 40f, 40f, bg)
+        c.drawRoundRect(
+            rect, 40f, 40f,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE; strokeWidth = 6f
+                color = Color.argb(150, Color.red(accent), Color.green(accent), Color.blue(accent))
+            },
+        )
+        // Accent spine down the left edge — the tier at a glance, before reading.
+        c.drawRoundRect(
+            RectF(8f, 8f, 20f, h - 8f), 6f, 6f,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent },
+        )
+        var y = PAD
+        c.save(); c.translate(PAD, y)
+        tl?.draw(c); c.restore()
+        y += (tl?.height ?: 0).toFloat()
+        if (ml != null) {
+            y += 18f
+            c.save(); c.translate(PAD, y); ml.draw(c); c.restore()
+            y += ml.height
+        }
+        if (bl != null) {
+            y += 28f
+            c.save(); c.translate(PAD, y); bl.draw(c); c.restore()
+        }
+        return bmp
+    }
+
     fun render(cardJson: String): Bitmap? {
         val o = try {
             JSONObject(cardJson)

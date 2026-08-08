@@ -45,6 +45,13 @@ import {upsertViewingStation} from '../../utils/api/ar';
 // Author only when localisation is this good (metres / degrees).
 const MAX_HORIZ_ACC_M = 2.5;
 const MAX_YAW_ACC_DEG = 8;
+// Absolute floor for an explicit override. The geospatial pose is the COARSE lock —
+// a hosted cloud anchor is what makes it centimetre-precise — so a hard 2.5 m gate is
+// stricter than the pipeline actually needs, and a site that only ever reports 2.6 m
+// would otherwise be unauthorable. The achieved accuracy is stored either way
+// (captured_horiz_acc_m / captured_yaw_acc_deg), so the quality signal is never lost.
+const OVERRIDE_HORIZ_ACC_M = 6;
+const OVERRIDE_YAW_ACC_DEG = 18;
 const CLOUD_ANCHOR_TTL_DAYS = 365;
 
 interface CapturedPose {
@@ -67,7 +74,10 @@ const StationAuthoringScreen: React.FC = () => {
   const arRef = useRef<EpocheyeDetectARHandle>(null);
 
   const [monumentId, setMonumentId] = useState(activeMonument?.slug ?? '');
-  const [modelId, setModelId] = useState('');
+  const [modelId, setModelId] = useState(
+    // Convenience only: saves typing the id at the site. Any value can be entered.
+    activeMonument?.slug === 'bangalore-fort' ? 'bangalore_fort_recon' : '',
+  );
   const [title, setTitle] = useState('');
   const [viewRadiusMax, setViewRadiusMax] = useState('30');
   const [glbUri, setGlbUri] = useState<string | undefined>(undefined);
@@ -76,14 +86,21 @@ const StationAuthoringScreen: React.FC = () => {
   const [captured, setCaptured] = useState<CapturedPose | null>(null);
   const [cloudAnchorId, setCloudAnchorId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [override, setOverride] = useState(false);
   const placedOnceRef = useRef(false);
 
   const tracking =
     geo?.earthState === 'ENABLED' && geo?.trackingState === 'TRACKING';
-  const accuracyOk =
+  const accuracyIdeal =
     tracking &&
     (geo?.horizontalAccuracy ?? 99) <= MAX_HORIZ_ACC_M &&
     (geo?.orientationYawAccuracy ?? 99) <= MAX_YAW_ACC_DEG;
+  const overrideAvailable =
+    tracking &&
+    !accuracyIdeal &&
+    (geo?.horizontalAccuracy ?? 99) <= OVERRIDE_HORIZ_ACC_M &&
+    (geo?.orientationYawAccuracy ?? 99) <= OVERRIDE_YAW_ACC_DEG;
+  const accuracyOk = accuracyIdeal || (override && overrideAvailable);
 
   const loadAndPlace = useCallback(async () => {
     const id = modelId.trim();
@@ -184,6 +201,9 @@ const StationAuthoringScreen: React.FC = () => {
         geo_qw: captured.qw,
         cloud_anchor_id: cloudAnchorId ?? undefined,
         model_id: modelId.trim(),
+        // Surveyed reconstructions are authored at true scale, so the stored scale
+        // is a 1.0 trim, not a normalisation target. See modelTrueScale.
+        model_scale: 1,
         captured_horiz_acc_m: captured.horizAcc,
         captured_yaw_acc_deg: captured.yawAcc,
       });
@@ -231,6 +251,11 @@ const StationAuthoringScreen: React.FC = () => {
         ref={arRef}
         style={StyleSheet.absoluteFill}
         glbUri={glbUri}
+        // Author at the model's real size. Without this SceneView normalises the
+        // GLB to `modelScale` metres across, and the pose captured below would
+        // world-lock a scaled-down toy.
+        modelTrueScale
+        modelScale={1}
         geospatialEnabled
         cloudAnchorsEnabled
         onReady={handleReady}
@@ -316,9 +341,27 @@ const StationAuthoringScreen: React.FC = () => {
         </View>
         {!accuracyOk && placed ? (
           <Text style={styles.hint}>
-            Waiting for accuracy ≤ {MAX_HORIZ_ACC_M} m / {MAX_YAW_ACC_DEG}° — walk
-            a slow arc.
+            {`Waiting for accuracy ≤ ${MAX_HORIZ_ACC_M} m / ${MAX_YAW_ACC_DEG}° — walk a slow arc.`}
+            {geo?.horizontalAccuracy != null
+              ? ` Now ±${geo.horizontalAccuracy.toFixed(1)} m / ${(
+                  geo.orientationYawAccuracy ?? 0
+                ).toFixed(0)}°.`
+              : ''}
           </Text>
+        ) : null}
+
+        {overrideAvailable && placed ? (
+          <Pressable
+            onPress={() => setOverride(v => !v)}
+            style={[styles.btnSecondary, override && styles.btnOverrideOn]}>
+            <Text style={styles.btnSecondaryText}>
+              {override
+                ? `Override ON — capturing at ±${(
+                    geo?.horizontalAccuracy ?? 0
+                  ).toFixed(1)} m (recorded)`
+                : 'Capture anyway at this accuracy'}
+            </Text>
+          </Pressable>
         ) : null}
 
         {captured ? (
@@ -398,6 +441,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   btnSecondaryText: {color: '#8ED0FF', fontSize: 13, fontWeight: '700'},
+  btnOverrideOn: {borderColor: '#E0A73C', backgroundColor: 'rgba(224,167,60,0.16)'},
   btnDisabled: {opacity: 0.35},
   hint: {color: 'rgba(255,220,150,0.9)', fontSize: 11, marginTop: 4},
   captured: {color: '#7BE38B', fontSize: 11, fontFamily: 'monospace', marginTop: 4},

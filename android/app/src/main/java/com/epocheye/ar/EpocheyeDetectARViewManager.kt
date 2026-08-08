@@ -104,6 +104,15 @@ class EpocheyeDetectARViewManager(
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onGeospatialAnchorEvent", event)
         }
+        view.onElementTapped = { id, kind, payload ->
+            val event = Arguments.createMap().apply {
+                putString("id", id)
+                putString("kind", kind)
+                payload?.let { putString("payload", it) }
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onElementTapped", event)
+        }
         view.onCloudAnchorEvent = { phase, state, cloudAnchorId, quality, message ->
             val event = Arguments.createMap().apply {
                 putString("phase", phase)
@@ -151,6 +160,12 @@ class EpocheyeDetectARViewManager(
         view.setDepthOcclusionEnabled(enabled)
     }
 
+    /** True-to-life sizing for surveyed reconstructions — see setModelTrueScale. */
+    @ReactProp(name = "modelTrueScale", defaultBoolean = false)
+    fun setModelTrueScale(view: EpocheyeDetectARView, enabled: Boolean) {
+        view.setModelTrueScale(enabled)
+    }
+
     // ADMIN-HARNESS (REMOVE AFTER KONARK)
     @ReactProp(name = "geospatialEnabled", defaultBoolean = false)
     fun setGeospatialEnabled(view: EpocheyeDetectARView, enabled: Boolean) {
@@ -171,6 +186,8 @@ class EpocheyeDetectARViewManager(
             .put("checkVps", CMD_CHECK_VPS)
             .put("captureGeospatialPose", CMD_CAPTURE_GEO_POSE)
             .put("placeGeospatialAnchor", CMD_PLACE_GEO_ANCHOR)
+            .put("placeDiscoveryCards", CMD_PLACE_DISCOVERY_CARDS)
+            .put("setTapTargets", CMD_SET_TAP_TARGETS)
             .build()
     }
 
@@ -196,6 +213,14 @@ class EpocheyeDetectARViewManager(
                 val ny = args?.getDouble(1)?.toFloat() ?: return
                 val cards = args.getString(2) ?: return
                 view.placeCardsOnly(nx, ny, cards)
+            }
+            CMD_PLACE_DISCOVERY_CARDS -> {
+                val cards = args?.getString(0) ?: return
+                view.placeDiscoveryCards(cards)
+            }
+            CMD_SET_TAP_TARGETS -> {
+                val targets = args?.getString(0) ?: return
+                view.setTapTargets(targets)
             }
             CMD_PLACE_IN_FRONT -> view.placeInFront()
             CMD_CLEAR_ANCHOR -> view.clearAnchor()
@@ -275,6 +300,14 @@ class EpocheyeDetectARViewManager(
                 val lng = args?.getDouble(1) ?: return
                 view.checkVps(lat, lng)
             }
+            "placeDiscoveryCards" -> {
+                val cards = args?.getString(0) ?: return
+                view.placeDiscoveryCards(cards)
+            }
+            "setTapTargets" -> {
+                val targets = args?.getString(0) ?: return
+                view.setTapTargets(targets)
+            }
             "captureGeospatialPose" -> view.captureGeospatialPose()
             "placeGeospatialAnchor" -> {
                 val lat = args?.getDouble(0) ?: return
@@ -304,6 +337,7 @@ class EpocheyeDetectARViewManager(
             .put("onVpsResult", MapBuilder.of("registrationName", "onVpsResult"))
             .put("onGeospatialState", MapBuilder.of("registrationName", "onGeospatialState"))
             .put("onGeospatialAnchorEvent", MapBuilder.of("registrationName", "onGeospatialAnchorEvent"))
+            .put("onElementTapped", MapBuilder.of("registrationName", "onElementTapped"))
             .build()
     }
 
@@ -325,5 +359,7 @@ class EpocheyeDetectARViewManager(
         private const val CMD_CHECK_VPS = 10
         private const val CMD_CAPTURE_GEO_POSE = 11
         private const val CMD_PLACE_GEO_ANCHOR = 12
+        private const val CMD_PLACE_DISCOVERY_CARDS = 13
+        private const val CMD_SET_TAP_TARGETS = 14
     }
 }

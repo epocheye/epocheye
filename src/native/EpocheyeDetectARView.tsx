@@ -83,12 +83,24 @@ export interface GeospatialAnchorEvent {
   orientationYawAccuracy?: number;
 }
 
+/** A tap resolved to an authored element — a discovery card or a named part of
+ *  the reconstruction. `payload` is the element's own JSON, so the sheet can open
+ *  without a second lookup. */
+export interface ElementTappedEvent {
+  id: string;
+  kind: 'card' | 'element';
+  payload?: string;
+}
+
 interface NativeProps {
   style?: ViewStyle;
   glbUri?: string;
   modelScale?: number;
   /** Grounded card JSON to render as a world-anchored 3D panel. */
   cardData?: string;
+  /** Keep the GLB's own metres instead of normalising it to `modelScale` metres
+   *  across. Required for surveyed reconstructions. */
+  modelTrueScale?: boolean;
   /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
   cloudAnchorsEnabled?: boolean;
   // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -111,6 +123,7 @@ interface NativeProps {
   onGeospatialState?: (event: {nativeEvent: GeospatialStateEvent}) => void;
   // Site-readiness pipeline (PERMANENT).
   onGeospatialAnchorEvent?: (event: {nativeEvent: GeospatialAnchorEvent}) => void;
+  onElementTapped?: (event: {nativeEvent: ElementTappedEvent}) => void;
 }
 
 const NativeDetectARView = ((): HostComponent<NativeProps> | null => {
@@ -161,6 +174,19 @@ export interface EpocheyeDetectARHandle {
     qz: number,
     qw: number,
   ) => void;
+  /**
+   * Place a whole authored discovery layer on ONE anchor. Unlike placeCardsOnly
+   * there is no six-card cap and no generated arc: every card carries its own
+   * pose in the anchor's local frame ({id, x, y, z, yaw, w, ...card fields}).
+   * Resolve a Cloud Anchor first when the layer has to be world-locked — this
+   * re-uses a TRACKING anchor if one is already placed.
+   */
+  placeDiscoveryCards: (cardsJson: string) => void;
+  /**
+   * Register the named parts of the reconstruction a tap can resolve to:
+   * [{id, min:[x,y,z], max:[x,y,z], ...payload}] in the anchor's local frame.
+   */
+  setTapTargets: (targetsJson: string) => void;
 }
 
 interface Props {
@@ -169,6 +195,10 @@ interface Props {
   modelScale?: number;
   /** Grounded card JSON → world-anchored 3D data panel beside the model. */
   cardData?: string;
+  /** Keep the GLB's own metres instead of normalising it to `modelScale` metres
+   *  across. Required for surveyed reconstructions; without it a 48 m fort renders
+   *  at `modelScale` metres wide. */
+  modelTrueScale?: boolean;
   /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
   cloudAnchorsEnabled?: boolean;
   // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -197,6 +227,8 @@ interface Props {
   // Site-readiness pipeline (PERMANENT).
   /** Geospatial anchor capture (authoring) / placement (prod) result. */
   onGeospatialAnchorEvent?: (event: GeospatialAnchorEvent) => void;
+  /** A tap landed on a discovery card or a named part of the reconstruction. */
+  onElementTapped?: (event: ElementTappedEvent) => void;
 }
 
 const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
@@ -206,6 +238,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       glbUri,
       modelScale,
       cardData,
+      modelTrueScale,
       cloudAnchorsEnabled,
       depthArmed, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       depthOcclusionEnabled, // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -220,6 +253,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       onVpsResult, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       onGeospatialState, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       onGeospatialAnchorEvent, // site-readiness pipeline (PERMANENT)
+      onElementTapped,
     },
     ref,
   ) => {
@@ -246,6 +280,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         checkVps: commands.checkVps,
         captureGeospatialPose: commands.captureGeospatialPose,
         placeGeospatialAnchor: commands.placeGeospatialAnchor,
+        placeDiscoveryCards: commands.placeDiscoveryCards,
+        setTapTargets: commands.setTapTargets,
       };
     }, []);
 
@@ -297,6 +333,10 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
             qz,
             qw,
           ]),
+        placeDiscoveryCards: cardsJson =>
+          dispatch(commandIds?.placeDiscoveryCards, [cardsJson]),
+        setTapTargets: targetsJson =>
+          dispatch(commandIds?.setTapTargets, [targetsJson]),
       }),
       [commandIds],
     );
@@ -312,6 +352,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         glbUri={glbUri}
         modelScale={modelScale}
         cardData={cardData}
+        modelTrueScale={modelTrueScale}
         cloudAnchorsEnabled={cloudAnchorsEnabled}
         depthArmed={depthArmed} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         depthOcclusionEnabled={depthOcclusionEnabled} // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -365,6 +406,12 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           onGeospatialAnchorEvent
             ? (e: {nativeEvent: GeospatialAnchorEvent}) =>
                 onGeospatialAnchorEvent(e.nativeEvent)
+            : undefined
+        }
+        onElementTapped={
+          onElementTapped
+            ? (e: {nativeEvent: ElementTappedEvent}) =>
+                onElementTapped(e.nativeEvent)
             : undefined
         }
       />

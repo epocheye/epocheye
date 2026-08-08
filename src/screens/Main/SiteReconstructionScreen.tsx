@@ -27,10 +27,16 @@ import {X} from 'lucide-react-native';
 
 import EpocheyeDetectARView, {
   isDetectARAvailable,
+  type ElementTappedEvent,
   type EpocheyeDetectARHandle,
   type GeospatialAnchorEvent,
   type GeospatialStateEvent,
 } from '../../native/EpocheyeDetectARView';
+import {
+  discoveryLayerFor,
+  type DiscoveryCard,
+  type TapTarget,
+} from '../../features/ar/discoveryLayers';
 import type {ViewingStation} from '../../utils/api/ar';
 import {listViewingStations} from '../../utils/api/ar';
 import {resolveModelGlb} from '../../services/glbSource';
@@ -81,6 +87,12 @@ const SiteReconstructionScreen: React.FC<
   const [geo, setGeo] = useState<GeospatialStateEvent | null>(null);
   const resolvedRef = useRef(false);
   const pendingStationsRef = useRef<ViewingStation[] | null>(null);
+  const layer = useMemo(() => discoveryLayerFor(slug), [slug]);
+  const [tapped, setTapped] = useState<{
+    title: string;
+    meta?: string;
+    body?: string;
+  } | null>(null);
 
   const heading = useHeading(
     loc ? {latitude: loc.latitude, longitude: loc.longitude} : null,
@@ -186,6 +198,14 @@ const SiteReconstructionScreen: React.FC<
     (geo?.horizontalAccuracy ?? 99) <= MAX_HORIZ_ACC_M &&
     (geo?.orientationYawAccuracy ?? 99) <= MAX_YAW_ACC_DEG;
 
+  const placeLayer = useCallback(() => {
+    if (!layer) {
+      return;
+    }
+    arRef.current?.setTapTargets(JSON.stringify(layer.tapTargets));
+    arRef.current?.placeDiscoveryCards(JSON.stringify(layer.cards));
+  }, [layer]);
+
   // 4. When in range + localised, place the geospatial anchor.
   useEffect(() => {
     if (phase !== 'guiding' || !target || resolvedRef.current) {
@@ -228,6 +248,11 @@ const SiteReconstructionScreen: React.FC<
         if (cloudLive && target?.cloud_anchor_id) {
           arRef.current?.resolveCloudAnchor(target.cloud_anchor_id);
         }
+        // Hang the discovery layer off the geospatial anchor now. If a cloud
+        // anchor is also resolving it will REPLACE this anchor (the native resolve
+        // clears the current one), so the layer is placed again on that event —
+        // placeDiscoveryCards clears its own nodes first, so re-placing is safe.
+        placeLayer();
         setPhase('locked');
       } else {
         // Placement failed — let the visitor try again.
@@ -235,7 +260,36 @@ const SiteReconstructionScreen: React.FC<
         setPhase('guiding');
       }
     },
-    [target],
+    [target, placeLayer],
+  );
+
+  // Re-place the layer whenever the cloud anchor swaps the anchor underneath it.
+  const handleCloudAnchorEvent = useCallback(
+    (e: {phase: string; state: string}) => {
+      if (e.phase === 'resolve' && e.state === 'SUCCESS') {
+        placeLayer();
+      }
+    },
+    [placeLayer],
+  );
+
+  const handleElementTapped = useCallback(
+    (e: ElementTappedEvent) => {
+      if (e.kind === 'card') {
+        const card = layer?.cards.find((c: DiscoveryCard) => c.id === e.id);
+        if (card) {
+          setTapped({title: card.title, meta: card.meta, body: card.body});
+        }
+        return;
+      }
+      const box = layer?.tapTargets.find((t: TapTarget) => t.id === e.id);
+      setTapped({
+        title: box?.label ?? 'This part of the fort',
+        meta: e.id,
+        body: undefined,
+      });
+    },
+    [layer],
   );
 
   const banner = useMemo(() => {
@@ -289,10 +343,24 @@ const SiteReconstructionScreen: React.FC<
           ref={arRef}
           style={StyleSheet.absoluteFill}
           glbUri={glbUri}
+          // A surveyed reconstruction must keep the GLB's own metres. Without this
+          // SceneView normalises the model to `modelScale` metres across, which would
+          // render a 48 m fort at half a metre.
+          // Depth occlusion: this reconstruction is built ON the surviving fabric,
+          // so the real wall in the camera feed SHOULD hide the parts of the model
+          // behind it — including the rampart core's far face. Armed at session
+          // creation; ARCore checks isDepthModeSupported and degrades to no
+          // occlusion on devices without depth, so this is safe everywhere.
+          depthArmed
+          depthOcclusionEnabled
+          modelTrueScale
+          modelScale={target?.model_scale && target.model_scale > 0 ? target.model_scale : 1}
+          onElementTapped={handleElementTapped}
           geospatialEnabled
           cloudAnchorsEnabled={!!target?.cloud_anchor_id}
           onGeospatialState={setGeo}
           onGeospatialAnchorEvent={handleGeoAnchor}
+          onCloudAnchorEvent={handleCloudAnchorEvent}
         />
       ) : (
         <View style={styles.mapPlaceholder} />
@@ -322,6 +390,21 @@ const SiteReconstructionScreen: React.FC<
           </View>
         ) : null}
       </SafeAreaView>
+
+      {tapped ? (
+        <Pressable style={styles.sheetScrim} onPress={() => setTapped(null)}>
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>{tapped.title}</Text>
+            {tapped.meta ? (
+              <Text style={styles.sheetMeta}>{tapped.meta}</Text>
+            ) : null}
+            {tapped.body ? (
+              <Text style={styles.sheetBody}>{tapped.body}</Text>
+            ) : null}
+            <Text style={styles.sheetHint}>Tap anywhere to close</Text>
+          </View>
+        </Pressable>
+      ) : null}
 
       {(phase === 'none' || phase === 'error') && (
         <View style={styles.center}>
@@ -375,6 +458,25 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backText: {color: '#FFF', fontSize: 14, fontWeight: '600'},
+  sheetScrim: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  sheet: {
+    backgroundColor: 'rgba(10,8,12,0.96)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 28,
+    borderTopWidth: 2,
+    borderTopColor: '#4CAF50',
+  },
+  sheetTitle: {color: '#F5F0E8', fontSize: 20, fontWeight: '700'},
+  sheetMeta: {color: '#4CAF50', fontSize: 12, marginTop: 6},
+  sheetBody: {color: '#E2DCD2', fontSize: 14, lineHeight: 21, marginTop: 12},
+  sheetHint: {color: '#7A7A7A', fontSize: 11, marginTop: 16},
 });
 
 export default SiteReconstructionScreen;
