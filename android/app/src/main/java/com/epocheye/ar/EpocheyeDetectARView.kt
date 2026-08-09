@@ -394,10 +394,26 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                             if (geospatialEnabled) Config.GeospatialMode.ENABLED
                             else Config.GeospatialMode.DISABLED,
                         sessionConfiguration = { _, config ->
-                            config.geospatialMode = Config.GeospatialMode.DISABLED
+                            // These two used to be hard-set to DISABLED here, which
+                            // silently contradicted the geospatialMode/depthMode
+                            // composable params set immediately above and won —
+                            // proven on-device 2026-08-10:
+                            //   "geospatial requested; ENABLED supported=true
+                            //    sessionGeospatialMode=DISABLED"
+                            //   "session.earth is null (geospatial unavailable)"
+                            // ARCore returns a null Earth when the mode is DISABLED,
+                            // so the whole geospatial pipeline was unreachable and
+                            // read on screen as a site/coverage problem. Mirror the
+                            // params instead of overriding them; production leaves
+                            // both flags false, so both stay DISABLED there.
+                            config.geospatialMode =
+                                if (geospatialEnabled) Config.GeospatialMode.ENABLED
+                                else Config.GeospatialMode.DISABLED
                             config.planeFindingMode =
                                 Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-                            config.depthMode = Config.DepthMode.DISABLED
+                            config.depthMode =
+                                if (depthArmed) Config.DepthMode.AUTOMATIC
+                                else Config.DepthMode.DISABLED
                             // Light estimation DISABLED — on this device it produced no
                             // usable scene light (models stayed black). Our own bright
                             // diffuse IBL (env above) is the only light source.

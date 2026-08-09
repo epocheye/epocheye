@@ -53,6 +53,26 @@ function siteToZone(site: SiteDetail): HeritageZone | null {
 }
 
 /**
+ * Re-evaluate the geofence against the last known fix. Both imports are lazy:
+ * placesStore and siteDetectionService each reach back into this module, so a
+ * static import would close an import cycle.
+ *
+ * Best-effort by design — a failure here must never break the zone fetch that
+ * triggered it.
+ */
+async function revalidateGeofence(): Promise<void> {
+  try {
+    const {usePlacesStore} = await import('../stores/placesStore');
+    const loc = usePlacesStore.getState().currentLocation;
+    if (!loc) return;
+    const {checkZoneEntry} = await import('./siteDetectionService');
+    await checkZoneEntry(loc.latitude, loc.longitude, loc.accuracy);
+  } catch {
+    // best-effort
+  }
+}
+
+/**
  * Fetch the curated venues and cache them as heritage zones. The lat/lon args are
  * accepted for call-site compatibility but unused — the curated list is small and
  * nearest/within-range is computed client-side (see geofenceService).
@@ -76,6 +96,17 @@ export async function fetchZones(
     if (zones.length > 0) {
       cachedZones = zones;
       everLoaded = true;
+      // Re-run the geofence against the last known fix now that there is
+      // something to test against.
+      //
+      // `checkZoneEntry` only ever runs from a GPS tick (placesStore.applyLocation).
+      // On a cold start the first fix routinely arrives BEFORE this fetch resolves,
+      // so it evaluates against an empty cache, concludes "outside every venue" and
+      // clears the zone. A visitor who then stands still — exactly what someone does
+      // on arriving at a monument — produces no further ticks, so nothing ever
+      // re-evaluates and the venue gate stays wrong for the whole session. Observed
+      // on site: the app reported the fort "20 m away" while the user stood in it.
+      void revalidateGeofence();
       return zones;
     }
   } catch {

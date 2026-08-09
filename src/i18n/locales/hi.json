@@ -49,7 +49,10 @@
     "exitConfirmTitle": "Epocheye छोड़ें?",
     "exitConfirmMessage": "आप ऐप बंद करने वाले हैं।",
     "exitConfirmConfirm": "बाहर निकलें",
-    "exitConfirmCancel": "रुकें"
+    "exitConfirmCancel": "रुकें",
+    "venueAtSite": "आप यहाँ हैं",
+    "venueAwayM": "{{d}} मीटर दूर",
+    "venueAwayKm": "{{d}} किमी दूर"
   },
   "daily": {
     "todayLabel": "आज · {{month}} {{day}}",

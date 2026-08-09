@@ -49,7 +49,10 @@
     "exitConfirmTitle": "Leave Epocheye?",
     "exitConfirmMessage": "You're about to close the app.",
     "exitConfirmConfirm": "Exit",
-    "exitConfirmCancel": "Stay"
+    "exitConfirmCancel": "Stay",
+    "venueAtSite": "You're here",
+    "venueAwayM": "{{d}} m away",
+    "venueAwayKm": "{{d}} km away"
   },
   "daily": {
     "todayLabel": "TODAY · {{month}} {{day}}",

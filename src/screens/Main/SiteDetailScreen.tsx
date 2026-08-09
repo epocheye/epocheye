@@ -408,9 +408,15 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   {t('siteDetail.builtLabel')}
                 </Text>
                 <Text
-                  numberOfLines={1}
+                  // Two lines, not one. These cards are half the screen wide and
+                  // the values are real prose — "18th century", "Kingdom of
+                  // Mysore" — which cannot fit on one line at display size on any
+                  // normal handset, so a single line simply clipped them to "…".
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
                   className="text-parchment mt-0.5 font-display"
-                  style={{fontSize: moderateScale(24), lineHeight: moderateScale(30)}}
+                  style={{fontSize: moderateScale(18), lineHeight: moderateScale(22)}}
                 >
                   {builtValue}
                 </Text>
@@ -424,9 +430,11 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   {t('siteDetail.dynastyLabel')}
                 </Text>
                 <Text
-                  numberOfLines={1}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
                   className="text-parchment mt-0.5 font-display"
-                  style={{fontSize: moderateScale(22), lineHeight: moderateScale(28)}}
+                  style={{fontSize: moderateScale(18), lineHeight: moderateScale(22)}}
                 >
                   {dynastyValue}
                 </Text>

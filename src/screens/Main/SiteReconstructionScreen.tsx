@@ -43,6 +43,7 @@ import type {ViewingStation} from '../../utils/api/ar';
 import {listViewingStations} from '../../utils/api/ar';
 import {resolveModelGlb} from '../../services/glbSource';
 import {ROUTES} from '../../core/constants';
+import {isAdminUser} from '../../shared/auth/isAdminUser';
 import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
 import ARCapabilityNotice from '../../components/ui/ARCapabilityNotice';
 import RecordingWatermark from '../../components/ar/RecordingWatermark';
@@ -113,6 +114,7 @@ const SiteReconstructionScreen: React.FC<
 
   const loc = usePlacesStore(s => s.currentLocation);
   const [phase, setPhase] = useState<Phase>('loading');
+  const [arError, setArError] = useState<string | null>(null);
   const [target, setTarget] = useState<ViewingStation | null>(null);
   const [glbUri, setGlbUri] = useState<string | undefined>(undefined);
   const [geo, setGeo] = useState<GeospatialStateEvent | null>(null);
@@ -493,6 +495,11 @@ const SiteReconstructionScreen: React.FC<
           onGeospatialState={setGeo}
           onGeospatialAnchorEvent={handleGeoAnchor}
           onCloudAnchorEvent={handleCloudAnchorEvent}
+          // The native view emits real diagnostics ("model load failed",
+          // "anchor creation failed", "AR session not ready") that nothing was
+          // listening for, so every failure here looked to the user like the
+          // screen simply doing nothing.
+          onError={setArError}
         />
       ) : (
         <View style={styles.mapPlaceholder} />
@@ -511,6 +518,13 @@ const SiteReconstructionScreen: React.FC<
           </Pressable>
           <View style={styles.bannerWrap}>
             <Text style={styles.banner}>{banner}</Text>
+            {/* Admin-only: raw native diagnostics. A visitor gets the calm
+                banner; whoever is debugging the site gets the reason. */}
+            {arError && isAdminUser() ? (
+              <Text style={styles.arError} numberOfLines={2}>
+                AR: {arError}
+              </Text>
+            ) : null}
           </View>
         </View>
 
@@ -657,6 +671,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
+  arError: {color: '#FFB4A2', fontSize: 11, marginTop: 2},
   bannerWrap: {
     flex: 1,
     backgroundColor: 'rgba(10,10,10,0.7)',

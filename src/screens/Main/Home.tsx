@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
+import type {TFunction} from 'i18next';
 import {
   ActivityIndicator,
   AppState,
@@ -78,11 +79,28 @@ function deriveLocationTitle(places: Place[]): string {
   return '';
 }
 
-function formatVenueDistance(meters: number): string {
-  if (meters < 950) {
-    return `${Math.max(1, Math.round(meters / 10) * 10)} m away`;
+/**
+ * A monument is an area, not a point. Bangalore Fort's footprint is 47 x 48 m
+ * and its seeded coordinate is one spot inside it, so a visitor standing in the
+ * courtyard is legitimately tens of metres from it. Reporting that as "20 m
+ * away" while they are plainly standing in the fort reads as a broken geofence.
+ * Below the AT_SITE threshold — chosen to exceed both a large monument footprint
+ * and ordinary GPS error — say so instead of quoting a distance.
+ */
+const AT_SITE_M = 60;
+
+function formatVenueDistance(meters: number, t: TFunction): string {
+  if (meters <= AT_SITE_M) {
+    return t('home.venueAtSite');
   }
-  return `${(meters / 1000).toFixed(meters < 9500 ? 1 : 0)} km away`;
+  if (meters < 950) {
+    return t('home.venueAwayM', {
+      d: Math.max(1, Math.round(meters / 10) * 10),
+    });
+  }
+  return t('home.venueAwayKm', {
+    d: (meters / 1000).toFixed(meters < 9500 ? 1 : 0),
+  });
 }
 
 function openVenueDirections(zone: HeritageZone): void {
@@ -796,7 +814,7 @@ const Home: React.FC<Props> = ({navigation}) => {
             accessibilityRole="button"
             accessibilityLabel={t('home.getDirectionsTo', {
               name: nearestVenue.zone.name,
-              distance: formatVenueDistance(nearestVenue.distance),
+              distance: formatVenueDistance(nearestVenue.distance, t),
             })}>
             <View
               className="w-9 h-9 rounded-full items-center justify-center mr-3"
@@ -814,7 +832,7 @@ const Home: React.FC<Props> = ({navigation}) => {
                 numberOfLines={1}
                 style={{fontFamily: FONTS.uiSemiBold}}
                 className="text-sm text-foreground mt-0.5">
-                {nearestVenue.zone.name} · {formatVenueDistance(nearestVenue.distance)}
+                {nearestVenue.zone.name} · {formatVenueDistance(nearestVenue.distance, t)}
               </Text>
             </View>
             <LinearGradient

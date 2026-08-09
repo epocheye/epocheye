@@ -34,6 +34,7 @@ import EpocheyeDetectARView, {
   type GeospatialAnchorEvent,
   type GeospatialStateEvent,
 } from '../../native/EpocheyeDetectARView';
+import {buildGlbUrl} from '../../config/glbDelivery';
 import {resolveModelGlb} from '../../services/glbSource';
 import {useActiveMonument} from '../../shared/hooks/useActiveMonument';
 import {useSafeGoBack} from '../../shared/hooks/useSafeGoBack';
@@ -97,6 +98,21 @@ const StationAuthoringScreen: React.FC = () => {
   // makes the save an UPDATE of the row you are fixing.
   const [existing, setExisting] = useState<ViewingStation[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The form is a full-screen scrim over the camera. Aligning the reconstruction
+  // against the real walls needs an unobstructed view, so it can be folded away
+  // to a single pill without losing any entered state.
+  const [panelHidden, setPanelHidden] = useState(false);
+  // The native view emits real diagnostics ("not tracking yet", "model load
+  // failed", "anchor creation failed") that nothing was listening for, so every
+  // placement failure looked like the button doing nothing at all.
+  const [arError, setArError] = useState<string | null>(null);
+  // Desk preview. At true scale this reconstruction is 47 x 48 x 13.5 m, so
+  // indoors you stand inside a wall and cannot judge whether the model, its
+  // cards or its orientation are right at all. Turning modelTrueScale OFF makes
+  // SceneView normalise the whole fort to `modelScale` metres across — a
+  // tabletop model — which is exactly what desk verification needs and exactly
+  // what must never be used to author a pose.
+  const [deskPreview, setDeskPreview] = useState(false);
   const placedOnceRef = useRef(false);
 
   const tracking =
@@ -186,6 +202,19 @@ const StationAuthoringScreen: React.FC = () => {
     [monumentId, refreshExisting],
   );
 
+  /**
+   * Ask native to put the model ~1.2 m ahead. Safe to call before the GLB prop
+   * has reached native or before the camera is TRACKING: `tryPlacePending`
+   * latches the request and runs it once BOTH preconditions hold (it is invoked
+   * from placeInFront, setGlbUri and every frame), so JS never has to sequence
+   * the prop update against the command.
+   */
+  const requestPlacement = useCallback(() => {
+    placedOnceRef.current = true;
+    setPlaced(false);
+    arRef.current?.placeInFront();
+  }, []);
+
   const loadAndPlace = useCallback(async () => {
     const id = modelId.trim();
     if (!id) {
@@ -196,27 +225,44 @@ const StationAuthoringScreen: React.FC = () => {
     try {
       const uri = await resolveModelGlb(id);
       if (!uri) {
-        Alert.alert('Load failed', 'Could not resolve that model GLB.');
+        Alert.alert(
+          'Load failed',
+          `No GLB for "${id}". Expected ${buildGlbUrl(id) ?? '(no GLB_BASE_URL in this build)'}`,
+        );
         return;
       }
       setGlbUri(uri);
-      placedOnceRef.current = false;
-      setPlaced(false);
       setCaptured(null);
+      // Issue the placement HERE, not only from onARReady. onARReady fires on
+      // the first ARCore session tick — seconds after the screen opens and long
+      // before a model id has been typed — so a handler that only placed on
+      // ready could never fire for a model loaded afterwards, and Load appeared
+      // to do nothing at all.
+      requestPlacement();
     } catch {
       Alert.alert('Load failed', 'Could not load that model GLB.');
     } finally {
       setBusy(false);
     }
-  }, [modelId]);
+  }, [modelId, requestPlacement]);
 
-  // Once the model URI is set and AR is ready, auto-place it ~1.2 m ahead.
+  // Covers the reverse order only: a model already resolved when AR becomes
+  // ready (e.g. a fast re-entry). The Load path places on its own.
   const handleReady = useCallback(() => {
     if (glbUri && !placedOnceRef.current) {
-      placedOnceRef.current = true;
-      arRef.current?.placeInFront();
+      requestPlacement();
     }
-  }, [glbUri]);
+  }, [glbUri, requestPlacement]);
+
+  // Scale is read natively at PLACEMENT time, so flipping desk preview only
+  // takes effect on the next place. Re-place from an effect rather than from the
+  // press handler, so the new prop has reached native before the command goes.
+  const deskPreviewRef = useRef(deskPreview);
+  useEffect(() => {
+    if (deskPreviewRef.current === deskPreview) return;
+    deskPreviewRef.current = deskPreview;
+    if (glbUri) requestPlacement();
+  }, [deskPreview, glbUri, requestPlacement]);
 
   const handleAnchorPlaced = useCallback(() => setPlaced(true), []);
 
@@ -345,24 +391,60 @@ const StationAuthoringScreen: React.FC = () => {
         glbUri={glbUri}
         // Author at the model's real size. Without this SceneView normalises the
         // GLB to `modelScale` metres across, and the pose captured below would
-        // world-lock a scaled-down toy.
-        modelTrueScale
+        // world-lock a scaled-down toy. Desk preview deliberately turns it off —
+        // and Save is blocked while it is off, for exactly that reason.
+        modelTrueScale={!deskPreview}
         modelScale={1}
         geospatialEnabled
         cloudAnchorsEnabled
         onReady={handleReady}
+        onError={setArError}
         onAnchorPlaced={handleAnchorPlaced}
         onGeospatialState={setGeo}
         onGeospatialAnchorEvent={handleGeoAnchorEvent}
         onCloudAnchorEvent={handleCloudAnchorEvent}
       />
 
-      <ScrollView
-        style={[styles.panel, {paddingTop: insets.top + 8}]}
-        contentContainerStyle={styles.panelContent}
-        keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Author viewing station</Text>
-        <Text style={styles.status}>{statusLine}</Text>
+      {panelHidden ? (
+        <View style={[styles.hiddenBar, {top: insets.top + 8}]}>
+          <Text style={styles.hiddenStatus} numberOfLines={1}>
+            {statusLine}
+          </Text>
+          {arError ? (
+            <Text style={styles.arError} numberOfLines={2}>
+              AR: {arError}
+            </Text>
+          ) : null}
+          <View style={styles.hiddenActions}>
+            <Pressable
+              onPress={() => arRef.current?.nudgeYaw(15)}
+              disabled={!placed}
+              style={[styles.btnSecondary, !placed && styles.btnDisabled]}>
+              <Text style={styles.btnSecondaryText}>Yaw 15°</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setPanelHidden(false)}
+              style={styles.btnSecondary}>
+              <Text style={styles.btnSecondaryText}>Show panel</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <ScrollView
+          style={[styles.panel, {paddingTop: insets.top + 8}]}
+          contentContainerStyle={styles.panelContent}
+          keyboardShouldPersistTaps="handled">
+          <Text style={styles.title}>Author viewing station</Text>
+          <Text style={styles.status}>{statusLine}</Text>
+          {arError ? <Text style={styles.arError}>AR: {arError}</Text> : null}
+
+          <Pressable
+            onPress={() => setPanelHidden(true)}
+            style={styles.btnSecondary}>
+            <Text style={styles.btnSecondaryText}>
+              Hide panel (see the model)
+            </Text>
+          </Pressable>
 
         <Text style={styles.label}>Monument slug</Text>
         <TextInput
@@ -460,7 +542,49 @@ const StationAuthoringScreen: React.FC = () => {
           placeholderTextColor="rgba(255,255,255,0.35)"
         />
 
+        {glbUri ? (
+          <Text style={styles.status} numberOfLines={1}>
+            {`GLB ✓ ${glbUri.startsWith('file://') ? 'cached' : 'remote'} · ${glbUri.split('/').pop()}`}
+          </Text>
+        ) : null}
+
+        {glbUri ? (
+          <Pressable
+            onPress={() => setDeskPreview(v => !v)}
+            style={[styles.btnSecondary, deskPreview && styles.btnOverrideOn]}>
+            <Text style={styles.btnSecondaryText}>
+              {deskPreview
+                ? 'DESK PREVIEW (1 m) — tap for true scale'
+                : 'True scale (47 m) — tap for desk preview'}
+            </Text>
+          </Pressable>
+        ) : null}
+        {deskPreview ? (
+          <Text style={styles.hint}>
+            Preview only: the fort is normalised to 1 m so you can see all of it
+            indoors. Saving is blocked — a pose captured at this scale would
+            world-lock a toy.
+          </Text>
+        ) : null}
+
+        {glbUri && !placed ? (
+          <Text style={styles.hint}>
+            Model loaded. It drops in as soon as the camera is TRACKING — sweep
+            the phone slowly across a textured surface. Still nothing? Tap
+            Re-place.
+          </Text>
+        ) : null}
+
         <View style={styles.actions}>
+          <Pressable
+            onPress={requestPlacement}
+            disabled={!glbUri}
+            style={[styles.btnSecondary, !glbUri && styles.btnDisabled]}>
+            <Text style={styles.btnSecondaryText}>
+              {placed ? 'Re-place' : 'Place'}
+            </Text>
+          </Pressable>
+
           <Pressable
             onPress={() => arRef.current?.nudgeYaw(15)}
             disabled={!placed}
@@ -525,16 +649,22 @@ const StationAuthoringScreen: React.FC = () => {
 
           <Pressable
             onPress={save}
-            disabled={!captured || busy}
-            style={[styles.btn, (!captured || busy) && styles.btnDisabled]}>
-            <Text style={styles.btnText}>Save station</Text>
+            disabled={!captured || busy || deskPreview}
+            style={[
+              styles.btn,
+              (!captured || busy || deskPreview) && styles.btnDisabled,
+            ]}>
+            <Text style={styles.btnText}>
+              {deskPreview ? 'Save (blocked in preview)' : 'Save station'}
+            </Text>
           </Pressable>
         </View>
 
         <Pressable onPress={() => goBack()} style={styles.close}>
           <Text style={styles.closeText}>Close</Text>
         </Pressable>
-      </ScrollView>
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -546,6 +676,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10,10,10,0.6)',
   },
   panelContent: {padding: 16, gap: 6, paddingBottom: 48},
+  hiddenBar: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    backgroundColor: 'rgba(10,10,10,0.75)',
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+  },
+  hiddenStatus: {color: '#8ED0FF', fontSize: 12},
+  arError: {color: '#FFB4A2', fontSize: 12},
+  hiddenActions: {flexDirection: 'row', gap: 8},
   title: {color: '#FFF', fontSize: 16, fontWeight: '700'},
   status: {color: '#8ED0FF', fontSize: 12, marginBottom: 6},
   label: {color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 6},
