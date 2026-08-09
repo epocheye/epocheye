@@ -16,7 +16,7 @@
  *
  * Gated so capture is only allowed once Earth is TRACKING with good accuracy.
  */
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   Alert,
   Pressable,
@@ -40,7 +40,11 @@ import {useSafeGoBack} from '../../shared/hooks/useSafeGoBack';
 import {isAdminUser} from '../../shared/auth/isAdminUser';
 import {useUserStore} from '../../stores/userStore';
 import {bearingBetween} from '../../shared/utils/geo.utils';
-import {upsertViewingStation} from '../../utils/api/ar';
+import {
+  listViewingStations,
+  upsertViewingStation,
+  type ViewingStation,
+} from '../../utils/api/ar';
 
 // Author only when localisation is this good (metres / degrees).
 const MAX_HORIZ_ACC_M = 2.5;
@@ -87,6 +91,12 @@ const StationAuthoringScreen: React.FC = () => {
   const [cloudAnchorId, setCloudAnchorId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [override, setOverride] = useState(false);
+  // Correction workflow. Saving with no id INSERTS a new row, so re-authoring a
+  // mis-placed station used to leave the bad one behind — and the prod screen
+  // picks the NEAREST station, so the bad row could still win. Carrying the id
+  // makes the save an UPDATE of the row you are fixing.
+  const [existing, setExisting] = useState<ViewingStation[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const placedOnceRef = useRef(false);
 
   const tracking =
@@ -101,6 +111,80 @@ const StationAuthoringScreen: React.FC = () => {
     (geo?.horizontalAccuracy ?? 99) <= OVERRIDE_HORIZ_ACC_M &&
     (geo?.orientationYawAccuracy ?? 99) <= OVERRIDE_YAW_ACC_DEG;
   const accuracyOk = accuracyIdeal || (override && overrideAvailable);
+
+  const refreshExisting = useCallback(async (slug: string) => {
+    if (!slug.trim()) {
+      setExisting([]);
+      return;
+    }
+    const res = await listViewingStations(slug.trim());
+    setExisting(res.success ? res.data.stations ?? [] : []);
+  }, []);
+
+  useEffect(() => {
+    void refreshExisting(monumentId);
+  }, [monumentId, refreshExisting]);
+
+  /** Fix the station that is already there rather than stacking another on top. */
+  const startCorrection = useCallback((station: ViewingStation) => {
+    setEditingId(station.id);
+    setTitle(station.title || '');
+    if (station.model_id) setModelId(station.model_id);
+    setViewRadiusMax(String(station.view_radius_max_m ?? 30));
+    setCaptured(null);
+    setCloudAnchorId(null);
+    setPlaced(false);
+    placedOnceRef.current = false;
+    Alert.alert(
+      'Correcting a station',
+      'Re-place the model, capture a new pose and save. This UPDATES the existing station instead of adding a second one.',
+    );
+  }, []);
+
+  /** Take a bad placement out of the visitor experience without deleting it. */
+  const deactivate = useCallback(
+    async (station: ViewingStation) => {
+      setBusy(true);
+      try {
+        // The read type allows nulls where the write type wants undefined, so
+        // the pose is copied field by field rather than spread — a spread would
+        // also carry created_at/updated_at, which the write endpoint ignores.
+        const res = await upsertViewingStation({
+          id: station.id,
+          monument_id: station.monument_id,
+          title: station.title,
+          active: false,
+          stand_lat: station.stand_lat ?? undefined,
+          stand_lng: station.stand_lng ?? undefined,
+          stand_alt: station.stand_alt ?? undefined,
+          face_bearing_deg: station.face_bearing_deg ?? undefined,
+          view_radius_max_m: station.view_radius_max_m,
+          geo_lat: station.geo_lat ?? undefined,
+          geo_lng: station.geo_lng ?? undefined,
+          geo_alt: station.geo_alt ?? undefined,
+          geo_qx: station.geo_qx ?? undefined,
+          geo_qy: station.geo_qy ?? undefined,
+          geo_qz: station.geo_qz ?? undefined,
+          geo_qw: station.geo_qw ?? undefined,
+          cloud_anchor_id: station.cloud_anchor_id || undefined,
+          model_id: station.model_id,
+          model_scale: station.model_scale,
+        });
+        if (res.success) {
+          Alert.alert(
+            'Deactivated',
+            'Visitors will no longer be guided to it. The row and its audit trail are kept.',
+          );
+          await refreshExisting(monumentId);
+        } else if ('error' in res) {
+          Alert.alert('Could not deactivate', res.error.message);
+        }
+      } finally {
+        setBusy(false);
+      }
+    },
+    [monumentId, refreshExisting],
+  );
 
   const loadAndPlace = useCallback(async () => {
     const id = modelId.trim();
@@ -184,6 +268,9 @@ const StationAuthoringScreen: React.FC = () => {
     setBusy(true);
     try {
       const res = await upsertViewingStation({
+        // Present only when correcting: the backend inserts on a blank id and
+        // updates on a real one.
+        ...(editingId ? {id: editingId} : {}),
         monument_id: slug,
         title: title.trim(),
         active: true,
@@ -208,9 +295,13 @@ const StationAuthoringScreen: React.FC = () => {
         captured_yaw_acc_deg: captured.yawAcc,
       });
       if (res.success) {
-        Alert.alert('Saved', 'Viewing station saved.', [
-          {text: 'OK', onPress: () => goBack()},
-        ]);
+        Alert.alert(
+          'Saved',
+          editingId
+            ? 'Viewing station corrected. The change is recorded against your account.'
+            : 'Viewing station saved. The placement is recorded against your account.',
+          [{text: 'OK', onPress: () => goBack()}],
+        );
       } else if ('error' in res) {
         Alert.alert('Save failed', res.error.message);
       }
@@ -219,6 +310,7 @@ const StationAuthoringScreen: React.FC = () => {
     }
   }, [
     captured,
+    editingId,
     monumentId,
     geo,
     viewRadiusMax,
@@ -308,6 +400,55 @@ const StationAuthoringScreen: React.FC = () => {
           placeholder="e.g. Main gate reconstruction"
           placeholderTextColor="rgba(255,255,255,0.35)"
         />
+
+        {existing.length > 0 ? (
+          <View style={styles.existingWrap}>
+            <Text style={styles.label}>
+              Already placed here ({existing.length})
+            </Text>
+            <Text style={styles.existingHint}>
+              A visitor is guided to the NEAREST active station. If one of these
+              is in the wrong place, correct it or take it down — do not just
+              save another on top.
+            </Text>
+            {existing.map(st => (
+              <View
+                key={st.id}
+                style={[
+                  styles.existingRow,
+                  editingId === st.id && styles.existingRowEditing,
+                ]}>
+                <View style={{flex: 1}}>
+                  <Text style={styles.existingTitle} numberOfLines={1}>
+                    {st.title || '(untitled)'}
+                    {editingId === st.id ? '  · CORRECTING' : ''}
+                  </Text>
+                  <Text style={styles.existingMeta} numberOfLines={1}>
+                    {st.model_id || 'no model'}
+                    {st.captured_horiz_acc_m != null
+                      ? ` · ±${st.captured_horiz_acc_m.toFixed(1)} m`
+                      : ''}
+                    {st.cloud_anchor_id ? ' · cloud' : ''}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => startCorrection(st)}
+                  disabled={busy}
+                  style={styles.existingBtn}>
+                  <Text style={styles.existingBtnText}>Correct</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    void deactivate(st);
+                  }}
+                  disabled={busy}
+                  style={[styles.existingBtn, styles.existingBtnDanger]}>
+                  <Text style={styles.existingBtnText}>Off</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <Text style={styles.label}>Max view radius (m)</Text>
         <TextInput
@@ -441,6 +582,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   btnSecondaryText: {color: '#8ED0FF', fontSize: 13, fontWeight: '700'},
+  existingWrap: {marginTop: 6},
+  existingHint: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  existingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  existingRowEditing: {
+    borderColor: 'rgba(224,167,60,0.7)',
+    backgroundColor: 'rgba(224,167,60,0.12)',
+  },
+  existingTitle: {color: '#FFFFFF', fontSize: 13, fontWeight: '600'},
+  existingMeta: {color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2},
+  existingBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  existingBtnDanger: {borderColor: 'rgba(224,90,80,0.6)'},
+  existingBtnText: {color: '#FFFFFF', fontSize: 12, fontWeight: '600'},
   btnOverrideOn: {borderColor: '#E0A73C', backgroundColor: 'rgba(224,167,60,0.16)'},
   btnDisabled: {opacity: 0.35},
   hint: {color: 'rgba(255,220,150,0.9)', fontSize: 11, marginTop: 4},
