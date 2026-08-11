@@ -33,6 +33,7 @@ import com.google.ar.core.VpsAvailability
 import io.github.sceneview.ar.ARDefaultCameraNode
 import io.github.sceneview.ar.camera.ARCameraStream // ADMIN-HARNESS (REMOVE AFTER KONARK)
 import io.github.sceneview.ar.node.AnchorNode
+import io.github.sceneview.ar.scene.SceneUnderstanding
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.loaders.MaterialLoader
 import io.github.sceneview.loaders.ModelLoader
@@ -83,6 +84,9 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     private var cardData: String? = null
 
     var onARReady: (() -> Unit)? = null
+
+    /** Depth occlusion as it is ACTUALLY in force, read back from the camera stream. */
+    var onDepthOcclusionState: ((Boolean) -> Unit)? = null
     var onPlaneDetected: (() -> Unit)? = null
     var onTrackingState: ((String) -> Unit)? = null
     var onAnchorPlaced: ((String) -> Unit)? = null
@@ -282,6 +286,9 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     /** Last logged anchor tracking/visibility signature, so only changes print. */
     private var lastAnchorSig: String? = null
 
+    /** Last EFFECTIVE depth-occlusion value read back from the camera stream. */
+    private var lastEffectiveOcclusion: Boolean? = null
+
     // Alignment of the model WITHIN its anchor, in anchor-local metres. Applied to
     // the model node, folded into the captured geospatial pose, and applied to the
     // discovery layer so the cards travel with the walls they annotate.
@@ -369,9 +376,19 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     val arCamera = remember(eng) {
                         ARDefaultCameraNode(eng).apply {
                             try {
-                                near = 0.02f
+                                // Depth precision is governed by the near:far RATIO,
+                                // and almost all of it sits near the near plane. An
+                                // aggressive near of 0.02 m bought close-range viewing
+                                // and paid for it with z-fighting across the whole
+                                // model — surfaces flickering even with the camera
+                                // still. 0.08 m still lets a visitor put the phone
+                                // against a wall, and capping far at 400 m (the fort
+                                // is 48 m across) recovers roughly two orders of
+                                // magnitude of precision versus the default far.
+                                near = 0.08f
+                                far = 400f
                             } catch (t: Throwable) {
-                                Log.w(TAG, "near-plane set failed", t)
+                                Log.w(TAG, "camera clip planes not set", t)
                             }
                         }
                     }
@@ -425,6 +442,25 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         // (depthOcclusionEnabled), toggled live in the SideEffect.
                         cameraStream = camStream,
                         cameraNode = arCamera,
+                        // SceneUnderstanding.occlusion is what actually drives the
+                        // camera stream's depth occlusion: SceneView writes
+                        // `cameraStream.isDepthOcclusionEnabled` from THIS value on
+                        // every update, so our own SideEffect assignment was being
+                        // stamped back over milliseconds later. That is why
+                        // `setDepthOcclusionEnabled(true)` logged success while a
+                        // hand still passed behind the model. Same trap as the
+                        // geospatialMode lambda: a SceneView parameter silently
+                        // overriding a post-hoc setting.
+                        //
+                        // lighting stays FALSE deliberately — ARCore light
+                        // estimation left models pitch black indoors, which is why
+                        // this scene uses its own bright diffuse IBL.
+                        sceneUnderstanding = SceneUnderstanding(
+                            occlusion = depthArmed,
+                            lighting = false,
+                            physics = false,
+                            planeVisualization = false,
+                        ),
                         depthMode =
                             if (depthArmed) Config.DepthMode.AUTOMATIC
                             else Config.DepthMode.DISABLED,
@@ -559,6 +595,30 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         // ADMIN-HARNESS (REMOVE AFTER KONARK)
         if (geospatialEnabled) {
             logGeospatial(session)
+        }
+        // Read the occlusion flag BACK from the camera stream, rather than trusting
+        // the value we wrote. SceneView drives this from its own
+        // sceneUnderstanding.occlusion on every update, so a write that "succeeded"
+        // could be stamped over a frame later — which is exactly how depth
+        // occlusion appeared enabled while a hand still passed behind the model.
+        // Logging the effective value makes that verifiable instead of assumed.
+        if (depthArmed) {
+            val effective = try {
+                arCameraStream?.isDepthOcclusionEnabled
+            } catch (_: Throwable) {
+                null
+            }
+            if (effective != lastEffectiveOcclusion) {
+                lastEffectiveOcclusion = effective
+                Log.i(
+                    TAG,
+                    "depth occlusion EFFECTIVE=$effective (requested=$depthOcclusionEnabled)",
+                )
+                // Surface it on screen too. Whoever is standing at the site cannot
+                // read logcat, and "I set the flag" has already proved to be a
+                // different thing from "the flag is in force".
+                post { onDepthOcclusionState?.invoke(effective == true) }
+            }
         }
         if (!planeReported && hasTrackedPlane(session)) {
             planeReported = true

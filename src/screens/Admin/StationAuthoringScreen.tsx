@@ -73,6 +73,20 @@ const WALK_IN_SCALE = 0.1;
 const TABLETOP_SCALE = 0.02;
 const PREVIEW_CYCLE = [TRUE_SCALE, WALK_IN_SCALE, TABLETOP_SCALE];
 
+/**
+ * Reconstruction GLB currently published for a site.
+ *
+ * `_v2` carries the z-fighting fix — the rampart core's top faces sat 1–2 mm
+ * under the rampart above them, so the two solids fought for every pixel and the
+ * whole wall flickered even with the camera still. It ships under a NEW id
+ * because the old URL is cached both on CloudFront (immutable, one year) and in
+ * the on-device GLB cache, so overwriting it would have kept serving the old
+ * model to the one person who most needs the new one.
+ */
+const DEFAULT_MODEL_FOR_SLUG: Record<string, string> = {
+  'bangalore-fort': 'bangalore_fort_recon_v2',
+};
+
 function scaleLabel(k: number): string {
   if (k === TRUE_SCALE) return 'TRUE SCALE (47 m) — tap to shrink';
   if (k === WALK_IN_SCALE) return 'WALK-IN 1:10 (~4.8 m) — tap to shrink';
@@ -101,7 +115,12 @@ const StationAuthoringScreen: React.FC = () => {
   const [monumentId, setMonumentId] = useState(activeMonument?.slug ?? '');
   const [modelId, setModelId] = useState(
     // Convenience only: saves typing the id at the site. Any value can be entered.
-    activeMonument?.slug === 'bangalore-fort' ? 'bangalore_fort_recon' : '',
+    // _v2 carries the z-fighting fix: the rampart core's top faces used to sit
+    // 1-2 mm under the rampart above them, so the two solids fought for every
+    // pixel and the whole wall flickered even with the camera still. Published
+    // under a NEW id because the old URL is cached both on CloudFront
+    // (immutable, 1 year) and in the on-device GLB cache.
+    activeMonument?.slug === 'bangalore-fort' ? 'bangalore_fort_recon_v2' : '',
   );
   const [title, setTitle] = useState('');
   const [viewRadiusMax, setViewRadiusMax] = useState('30');
@@ -127,10 +146,18 @@ const StationAuthoringScreen: React.FC = () => {
   // placement failure looked like the button doing nothing at all.
   const [arError, setArError] = useState<string | null>(null);
   const [planeFound, setPlaneFound] = useState(false);
+  // Depth occlusion as ACTUALLY in force, read back from the camera stream.
+  // Writing the flag was never proof it held: SceneView drives it from its own
+  // sceneUnderstanding.occlusion and used to stamp our value straight back.
+  const [depthEffective, setDepthEffective] = useState<boolean | null>(null);
   // Coarse gets the model roughly onto the wall; fine seats it. A single step
   // size cannot do both — 1 m is uselessly blunt at the end, 10 cm is an hour of
   // tapping at the start.
   const [coarse, setCoarse] = useState(true);
+  // ARCore Depth API occlusion. On by default: a reconstruction that ignores
+  // real geometry reads as a decal pasted on the lens. Toggleable because not
+  // every handset supports depth, and a bad depth map is worse than none.
+  const [depthOcclusion, setDepthOcclusion] = useState(true);
   // Desk preview. At true scale this reconstruction is 47 x 48 x 13.5 m, so
   // indoors you stand inside a wall and cannot judge whether the model, its
   // cards or its orientation are right at all.
@@ -174,6 +201,22 @@ const StationAuthoringScreen: React.FC = () => {
   useEffect(() => {
     void refreshExisting(monumentId);
   }, [monumentId, refreshExisting]);
+
+  /**
+   * Fill the model id from the slug once the slug is recognised.
+   *
+   * The prefill above only fires when the app has already resolved the user to
+   * this site, which it cannot do from anywhere but the site itself — so in
+   * practice the author types both fields by hand at the moment they are least
+   * able to check them. A typo in either one saves a station nobody will ever
+   * find, and typing the superseded model id silently serves the OLD cached GLB.
+   * Only ever fills a blank field, so a deliberate entry is never overwritten.
+   */
+  useEffect(() => {
+    const slug = monumentId.trim().toLowerCase();
+    const known = DEFAULT_MODEL_FOR_SLUG[slug];
+    if (known && !modelId.trim()) setModelId(known);
+  }, [monumentId, modelId]);
 
   /** Fix the station that is already there rather than stacking another on top. */
   const startCorrection = useCallback((station: ViewingStation) => {
@@ -504,9 +547,13 @@ const StationAuthoringScreen: React.FC = () => {
   const statusLine = useMemo(() => {
     // Surface state first: it is the difference between a model that rests on a
     // real plane and one pinned to empty air, which drifts and tips away.
+    // A surface is a SCAFFOLD, not the lock. Nothing about the plane is saved —
+    // the station stores a WGS84 pose and a cloud anchor id. A plane merely holds
+    // the model steady while it is being aligned, so its absence is worth saying
+    // but must never read as "you cannot proceed".
     const surface = planeFound
       ? 'Surface ✓'
-      : 'NO SURFACE YET — sweep the phone slowly across a textured area';
+      : 'No surface yet (optional — steadier alignment; Load works anyway)';
     if (!geo) {
       return `${surface} · Move the phone so ARCore Geospatial starts…`;
     }
@@ -516,8 +563,14 @@ const StationAuthoringScreen: React.FC = () => {
             geo.orientationYawAccuracy ?? 0
           ).toFixed(1)}°`
         : '';
-    return `${surface} · Earth: ${geo.earthState} · ${geo.trackingState} ${acc}`;
-  }, [geo, planeFound]);
+    const depth =
+      depthEffective == null
+        ? 'Depth ?'
+        : depthEffective
+          ? 'Depth LIVE ✓'
+          : 'Depth NOT in force';
+    return `${surface} · ${depth} · Earth: ${geo.earthState} · ${geo.trackingState} ${acc}`;
+  }, [geo, planeFound, depthEffective]);
 
   if (!isAdminUser(email)) {
     return <View style={styles.root} />;
@@ -534,6 +587,14 @@ const StationAuthoringScreen: React.FC = () => {
         // captured at); the preview scales shrink model AND layer by one factor.
         modelTrueScale
         modelScale={previewScale}
+        // ARCore Depth API. Without it the reconstruction is painted OVER
+        // everything — your own hand passes behind a stone wall — and the scene
+        // reads as a flat sticker rather than a building standing in the world.
+        // depthMode must be armed at session CREATION (SceneView ignores a
+        // post-hoc reconfigure), so this prop is constant; the visible occlusion
+        // is the camera-stream flag below, which flips live.
+        depthArmed
+        depthOcclusionEnabled={depthOcclusion}
         onElementTapped={handleElementTapped}
         geospatialEnabled
         cloudAnchorsEnabled
@@ -543,6 +604,7 @@ const StationAuthoringScreen: React.FC = () => {
         // to tell "ARCore has found a surface" from "it never will" — which is
         // exactly the state that made the model float in mid-air and drift.
         onPlaneDetected={() => setPlaneFound(true)}
+        onDepthOcclusionState={setDepthEffective}
         onAnchorPlaced={handleAnchorPlaced}
         onGeospatialState={setGeo}
         onGeospatialAnchorEvent={handleGeoAnchorEvent}
@@ -717,12 +779,31 @@ const StationAuthoringScreen: React.FC = () => {
                 {showCards ? 'Cards ✓' : 'Show cards'}
               </Text>
             </Pressable>
+            {/* ARCore Depth API occlusion. Off, the reconstruction paints over
+                everything and your own hand passes behind a stone wall. */}
+            <Pressable
+              onPress={() => setDepthOcclusion(v => !v)}
+              style={[
+                styles.btnSecondary,
+                depthOcclusion && styles.btnOverrideOn,
+              ]}>
+              <Text style={styles.btnSecondaryText}>
+                {depthOcclusion ? 'Depth ✓' : 'Depth off'}
+              </Text>
+            </Pressable>
           </View>
         ) : null}
         {previewScale !== TRUE_SCALE ? (
           <Text style={styles.hint}>
             Preview only — the fort and its cards are scaled together. Saving is
             blocked: a pose captured at this scale would world-lock a toy.
+            {'\n\n'}
+            DO NOT JUDGE FLICKER HERE. Scaling divides every gap between
+            surfaces by the same factor: the closest pair in this model is 20 mm
+            apart at true scale, which is 2 mm at 1:10 and 0.4 mm at 1:50 — under
+            the depth buffer's resolving power, so surfaces fight for pixels and
+            the model shimmers. That is the preview, not the reconstruction.
+            Check flicker at TRUE SCALE only.
           </Text>
         ) : null}
 

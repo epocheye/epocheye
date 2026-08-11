@@ -37,6 +37,11 @@ class EpocheyeDetectARViewManager(
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onARReady", null)
         }
+        view.onDepthOcclusionState = { effective ->
+            val event = Arguments.createMap().apply { putBoolean("effective", effective) }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onDepthOcclusionState", event)
+        }
         view.onPlaneDetected = {
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onPlaneDetected", null)
@@ -343,6 +348,10 @@ class EpocheyeDetectARViewManager(
     override fun getExportedCustomDirectEventTypeConstants(): Map<String, Any> {
         return MapBuilder.builder<String, Any>()
             .put("onARReady", MapBuilder.of("registrationName", "onARReady"))
+            .put(
+                "onDepthOcclusionState",
+                MapBuilder.of("registrationName", "onDepthOcclusionState"),
+            )
             .put("onPlaneDetected", MapBuilder.of("registrationName", "onPlaneDetected"))
             .put("onTrackingState", MapBuilder.of("registrationName", "onTrackingState"))
             .put("onAnchorPlaced", MapBuilder.of("registrationName", "onAnchorPlaced"))

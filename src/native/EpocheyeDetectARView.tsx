@@ -112,6 +112,7 @@ interface NativeProps {
   /** Admin harness — start/stop ARCore Geospatial mode + Earth pose logging (tag "GEO"). */
   geospatialEnabled?: boolean;
   onARReady?: () => void;
+  onDepthOcclusionState?: (event: {nativeEvent: {effective: boolean}}) => void;
   onPlaneDetected?: () => void;
   onTrackingState?: (event: {nativeEvent: {state: string}}) => void;
   onAnchorPlaced?: (event: {nativeEvent: {label: string}}) => void;
@@ -219,6 +220,10 @@ interface Props {
   /** Admin harness — start/stop ARCore Geospatial mode + Earth pose logging (tag "GEO"). */
   geospatialEnabled?: boolean;
   onReady?: () => void;
+  /** Depth occlusion as ACTUALLY in force, read back from the camera stream —
+   *  SceneView drives this from its own sceneUnderstanding.occlusion, so a
+   *  successful write is not proof the flag survived. */
+  onDepthOcclusionState?: (effective: boolean) => void;
   onPlaneDetected?: () => void;
   /** ARCore camera tracking state, e.g. 'TRACKING' | 'PAUSED' | 'STOPPED'. */
   onTrackingState?: (state: string) => void;
@@ -253,6 +258,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       depthOcclusionEnabled, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       geospatialEnabled, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       onReady,
+      onDepthOcclusionState,
       onPlaneDetected,
       onTrackingState,
       onAnchorPlaced,
@@ -372,6 +378,11 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         depthOcclusionEnabled={depthOcclusionEnabled} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         geospatialEnabled={geospatialEnabled} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         onARReady={onReady}
+        onDepthOcclusionState={
+          onDepthOcclusionState
+            ? e => onDepthOcclusionState(e.nativeEvent.effective)
+            : undefined
+        }
         onPlaneDetected={onPlaneDetected}
         onTrackingState={
           onTrackingState
