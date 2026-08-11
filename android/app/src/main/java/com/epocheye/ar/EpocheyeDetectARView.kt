@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
@@ -289,6 +290,18 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     /** Last EFFECTIVE depth-occlusion value read back from the camera stream. */
     private var lastEffectiveOcclusion: Boolean? = null
 
+    /**
+     * Depth occlusion as COMPOSE STATE.
+     *
+     * SceneView writes cameraStream.isDepthOcclusionEnabled from its
+     * sceneUnderstanding.occlusion on every update. A plain Kotlin var is read
+     * once at composition and never re-read, so the live toggle could never move
+     * it — and writing the stream flag directly just created a value SceneView
+     * immediately contradicted. Compose state makes the composable recompose, so
+     * ONE value drives the whole thing and nothing fights.
+     */
+    private val occlusionState = mutableStateOf(false)
+
     // Alignment of the model WITHIN its anchor, in anchor-local metres. Applied to
     // the model node, folded into the captured geospatial pose, and applied to the
     // discovery layer so the cards travel with the walls they annotate.
@@ -456,7 +469,18 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         // estimation left models pitch black indoors, which is why
                         // this scene uses its own bright diffuse IBL.
                         sceneUnderstanding = SceneUnderstanding(
-                            occlusion = depthArmed,
+                            // Must track the LIVE toggle, not just depthArmed.
+                            //
+                            // SceneView writes cameraStream.isDepthOcclusionEnabled
+                            // from this value every update, while the SideEffect
+                            // below writes it from depthOcclusionEnabled. Keying
+                            // this off depthArmed alone made the two disagree the
+                            // moment occlusion was switched off: SceneView kept
+                            // re-enabling it, the toggle did nothing, and the stream
+                            // sat in a contradictory half-configured state — the
+                            // most likely cause of the whole scene, cards included,
+                            // flickering. One source of truth, so they cannot fight.
+                            occlusion = occlusionState.value,
                             lighting = false,
                             physics = false,
                             planeVisualization = false,
@@ -1339,6 +1363,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         if (enabled == depthArmed) return
         Log.i(TAG, "setDepthArmed($enabled)")
         depthArmed = enabled
+        occlusionState.value = enabled && depthOcclusionEnabled
         if (enabled && composeView != null && currentAnchorNode == null) {
             Log.i(TAG, "rebuilding AR session to arm depth")
             rebuildAR()
@@ -1356,11 +1381,10 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         if (enabled == depthOcclusionEnabled) return
         Log.i(TAG, "setDepthOcclusionEnabled($enabled) armed=$depthArmed")
         depthOcclusionEnabled = enabled
-        try {
-            arCameraStream?.let { it.isDepthOcclusionEnabled = enabled }
-        } catch (t: Throwable) {
-            Log.w(TAG, "camera-stream occlusion flip failed", t)
-        }
+        // Drive the Compose state only. Writing arCameraStream.isDepthOcclusionEnabled
+        // here as well would put a value in the stream that SceneView contradicts on
+        // its next update — the half-configured state this whole fix is about.
+        occlusionState.value = depthArmed && enabled
     }
 
     // ADMIN-HARNESS (REMOVE AFTER KONARK)
