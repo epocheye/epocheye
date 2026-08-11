@@ -1,6 +1,3 @@
 <resources>
     <string name="app_name">Epocheye</string>
-    <string name="clip_recording_channel">Recording</string>
-    <string name="clip_recording_title">Epocheye is recording</string>
-    <string name="clip_recording_text">Your reconstruction clip is being captured.</string>
 </resources>

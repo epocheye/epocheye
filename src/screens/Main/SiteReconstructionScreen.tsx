@@ -46,10 +46,6 @@ import {ROUTES} from '../../core/constants';
 import {isAdminUser} from '../../shared/auth/isAdminUser';
 import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
 import ARCapabilityNotice from '../../components/ui/ARCapabilityNotice';
-import RecordingWatermark from '../../components/ar/RecordingWatermark';
-import ClipReadySheet from '../../components/ar/ClipReadySheet';
-import {useScreenRecording} from '../../shared/hooks/useScreenRecording';
-import {siteBrandingFor} from '../../features/ar/siteBranding';
 import {
   useARCapability,
   isNonArCapability,
@@ -122,8 +118,6 @@ const SiteReconstructionScreen: React.FC<
   const pendingStationsRef = useRef<ViewingStation[] | null>(null);
   const layer = useMemo(() => discoveryLayerFor(slug), [slug]);
   const {capability} = useARCapability();
-  const branding = useMemo(() => siteBrandingFor(slug), [slug]);
-  const rec = useScreenRecording({fileNameHint: slug ?? undefined});
   const [lockOverride, setLockOverride] = useState(false);
   const [waitedForLock, setWaitedForLock] = useState(false);
   const [tapped, setTapped] = useState<{
@@ -505,13 +499,10 @@ const SiteReconstructionScreen: React.FC<
         <View style={styles.mapPlaceholder} />
       )}
 
-      {/*
-        MediaProjection records the literal screen, so every pixel of chrome
-        visible here is burned into the user's clip forever. All of it goes
-        away for the duration, and the watermark takes its place.
-      */}
-      {!rec.chromeHidden ? (
-      <SafeAreaView style={styles.overlay} edges={['top']} pointerEvents="box-none">
+      <SafeAreaView
+        style={styles.overlay}
+        edges={['top']}
+        pointerEvents="box-none">
         <View style={styles.topRow}>
           <Pressable onPress={() => goBack()} hitSlop={12} style={styles.close}>
             <X size={18} color="#FFF" />
@@ -566,65 +557,8 @@ const SiteReconstructionScreen: React.FC<
           </View>
         ) : null}
       </SafeAreaView>
-      ) : null}
 
-      <RecordingWatermark
-        title={branding.title ?? target?.title ?? ''}
-        era={branding.era}
-        visible={rec.chromeHidden}
-      />
-
-      {/*
-        The stop control is INVISIBLE and full-screen. A visible button would be
-        permanently in the corner of every clip; the trade is that tapping the
-        model for a card is disabled while recording, which a 30 s cap makes
-        acceptable. The instruction is given during the preroll, which is not
-        recorded.
-      */}
-      {rec.state === 'recording' ? (
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={() => {
-            void rec.stop();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={t('clip.stop')}
-        />
-      ) : null}
-
-      {rec.state === 'preroll' ? (
-        <View style={styles.center} pointerEvents="none">
-          <Text style={styles.preroll}>{rec.prerollCount}</Text>
-          <Text style={styles.prerollHint}>{t('clip.tapToStop')}</Text>
-        </View>
-      ) : null}
-
-      {/* Offered only once the reconstruction is actually in place — recording
-          the walk-up guidance would be pointless. */}
-      {rec.supported && rec.state === 'idle' && phase === 'locked' ? (
-        <View style={styles.recWrap} pointerEvents="box-none">
-          <Pressable
-            onPress={() => {
-              void rec.begin();
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={t('clip.record')}
-            style={({pressed}) => [styles.recHit, pressed && {opacity: 0.85}]}>
-            <View style={styles.recDot} />
-            <Text style={styles.recText}>{t('clip.record')}</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {rec.clip && rec.state === 'ready' ? (
-        <ClipReadySheet
-          clip={rec.clip}
-          siteName={branding.title ?? target?.title ?? ''}
-          onClose={rec.discard}
-        />
-      ) : null}
-
-      {tapped && !rec.chromeHidden ? (
+      {tapped ? (
         <Pressable style={styles.sheetScrim} onPress={() => setTapped(null)}>
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>{tapped.title}</Text>
@@ -690,22 +624,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(224,167,60,0.14)',
   },
   overrideText: {color: '#E0A73C', fontSize: 13, fontWeight: '600'},
-  preroll: {color: '#FFF', fontSize: 96, fontWeight: '800'},
-  prerollHint: {color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 8},
-  recWrap: {position: 'absolute', right: 18, bottom: 38},
-  recHit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderRadius: 24,
-    backgroundColor: 'rgba(10,10,10,0.72)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-  recDot: {width: 10, height: 10, borderRadius: 5, backgroundColor: '#E5484D'},
-  recText: {color: '#FFF', fontSize: 13, fontWeight: '600'},
   arrowWrap: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   arrow: {color: '#8ED0FF', fontSize: 120, fontWeight: '900'},
   center: {

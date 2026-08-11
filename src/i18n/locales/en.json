@@ -521,21 +521,5 @@
     "lockAnyway": "Lock on anyway ({{acc}} m)",
     "thisPart": "This part of the fort",
     "tapToClose": "Tap anywhere to close"
-  },
-  "clip": {
-    "record": "Record",
-    "stop": "Stop recording",
-    "tapToStop": "Tap anywhere to stop",
-    "saved": "Clip saved",
-    "meta": "{{seconds}}s · {{width}}×{{height}}",
-    "inGallery": "in your gallery",
-    "share": "Share",
-    "opening": "Opening…",
-    "done": "Done",
-    "noSound": "Recorded without sound.",
-    "saveFailed": "Couldn't add it to your gallery — you can still share it.",
-    "endedEarly": "Recording ended early — the clip up to that point was saved.",
-    "diskFull": "Storage ran out — the clip up to that point was saved.",
-    "rotated": "The screen rotated — the clip up to that point was saved."
   }
 }
