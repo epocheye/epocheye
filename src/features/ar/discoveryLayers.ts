@@ -2188,6 +2188,46 @@ export function discoveryLayerFor(slug?: string | null): DiscoveryLayer | null {
 }
 
 /**
+ * Uniformly scale a layer about the anchor origin.
+ *
+ * Cards and tap targets are attached to the ANCHOR, not to the model node, so
+ * shrinking the model for an indoor preview does not move them: a 1 m tabletop
+ * fort would still have its 20 cards spread across 48 m of the room, through the
+ * walls. Applying the SAME factor the model is rendered at keeps the layer
+ * registered to the geometry at any preview scale.
+ *
+ * `yaw` is deliberately untouched — a rotation is scale-invariant, and scaling
+ * it would silently swing every card off its wall.
+ *
+ * Identity at k = 1, so callers can apply it unconditionally.
+ */
+export function scaleDiscoveryLayer(
+  layer: DiscoveryLayer,
+  k: number,
+): DiscoveryLayer {
+  if (!Number.isFinite(k) || k <= 0 || k === 1) return layer;
+  const v = ([x, y, z]: [number, number, number]): [number, number, number] => [
+    x * k,
+    y * k,
+    z * k,
+  ];
+  return {
+    cards: layer.cards.map(c => ({
+      ...c,
+      x: c.x * k,
+      y: c.y * k,
+      z: c.z * k,
+      w: c.w * k,
+    })),
+    tapTargets: layer.tapTargets.map(tt => ({
+      ...tt,
+      min: v(tt.min),
+      max: v(tt.max),
+    })),
+  };
+}
+
+/**
  * The discovery layer flattened into prose, for surfaces that cannot place
  * cards in the world — chiefly the 3D orbit viewer a non-AR device falls back
  * to.

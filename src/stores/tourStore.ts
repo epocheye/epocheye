@@ -16,6 +16,8 @@ export interface TourRect {
   y: number;
   width: number;
   height: number;
+  /** Corner radius of the spotlit element, so the cutout can match it. */
+  radius?: number;
 }
 
 interface TourState {
@@ -51,16 +53,21 @@ export const useTourStore = create<TourState>((set, get) => ({
 
   start: () => set({running: true, stepIndex: 0, targets: {}}),
 
+  // Every step change drops all registered rects. Targets re-measure themselves
+  // (useTourTarget keys its effect on stepIndex), so the host can never latch a
+  // stale rect left behind by an earlier screen — the bug that made the
+  // spotlight land on unrelated content after a tab switch or a scroll.
   next: () => {
     const {stepIndex} = get();
     if (stepIndex >= TOUR_STEPS.length - 1) {
       get().finish();
       return;
     }
-    set({stepIndex: stepIndex + 1});
+    set({stepIndex: stepIndex + 1, targets: {}});
   },
 
-  back: () => set(s => ({stepIndex: Math.max(0, s.stepIndex - 1)})),
+  back: () =>
+    set(s => ({stepIndex: Math.max(0, s.stepIndex - 1), targets: {}})),
 
   skip: () => get().finish(),
 
@@ -69,8 +76,23 @@ export const useTourStore = create<TourState>((set, get) => ({
     void AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING.TOUR_COMPLETED, 'true');
   },
 
+  // Skip no-op writes: targets re-measure on every scroll frame, and a fresh
+  // object each time would re-render the overlay ~60x/sec for nothing.
   registerTarget: (id, rect) =>
-    set(s => ({targets: {...s.targets, [id]: rect}})),
+    set(s => {
+      const prev = s.targets[id];
+      if (
+        prev &&
+        prev.x === rect.x &&
+        prev.y === rect.y &&
+        prev.width === rect.width &&
+        prev.height === rect.height &&
+        prev.radius === rect.radius
+      ) {
+        return s;
+      }
+      return {targets: {...s.targets, [id]: rect}};
+    }),
 
   unregisterTarget: id =>
     set(s => {

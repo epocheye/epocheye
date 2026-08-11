@@ -751,8 +751,11 @@ const Home: React.FC<Props> = ({navigation}) => {
       </View>
 
       {/* Explorer HUD — gamified status: rank, streak, and XP toward the goal */}
-      <TourTarget id="home.hud">
-        <View className="mx-6 mt-3 px-4 py-3 rounded-2xl bg-[rgba(203,168,98,0.06)] border border-[rgba(203,168,98,0.20)]">
+      <TourTarget
+        id="home.hud"
+        radius={16}
+        style={{marginHorizontal: 24, marginTop: 12}}>
+        <View className="px-4 py-3 rounded-2xl bg-[rgba(203,168,98,0.06)] border border-[rgba(203,168,98,0.20)]">
           <View className="flex-row items-center justify-between mb-[10px]">
             <LevelBadge sites={hudSites} />
             <StreakFlame days={hudStreak} size={18} label={t('home.dayStreak')} />
@@ -764,7 +767,7 @@ const Home: React.FC<Props> = ({navigation}) => {
       {/* Control row: notification + search icons (right) */}
       <View className="px-6 pt-5 pb-3 flex-row items-center justify-end">
         <View className="flex-row items-center gap-x-2">
-          <TourTarget id="home.bell">
+          <TourTarget id="home.bell" radius={20}>
             <Pressable
               onPress={() => setNotifOpen(true)}
               hitSlop={10}
@@ -785,7 +788,7 @@ const Home: React.FC<Props> = ({navigation}) => {
               ) : null}
             </Pressable>
           </TourTarget>
-          <TourTarget id="home.search">
+          <TourTarget id="home.search" radius={20}>
             <Pressable
               onPress={() => setSearchOpen(prev => !prev)}
               hitSlop={10}
@@ -806,11 +809,14 @@ const Home: React.FC<Props> = ({navigation}) => {
           venue, so when the user is outside one we continuously point them to the
           nearest site with one-tap directions (never static). */}
       {!inVenue && nearestVenue ? (
-        <TourTarget id="home.nearest">
+        <TourTarget
+          id="home.nearest"
+          radius={16}
+          style={{marginHorizontal: 24, marginTop: 4, marginBottom: 8}}>
           <Pressable
             onPress={() => openVenueDirections(nearestVenue.zone)}
             style={({pressed}) => (pressed ? {opacity: 0.92} : undefined)}
-            className="mx-6 mt-1 mb-2 flex-row items-center rounded-2xl border border-white/10 bg-card px-3.5 py-3"
+            className="flex-row items-center rounded-2xl border border-white/10 bg-card px-3.5 py-3"
             accessibilityRole="button"
             accessibilityLabel={t('home.getDirectionsTo', {
               name: nearestVenue.zone.name,
@@ -828,12 +834,25 @@ const Home: React.FC<Props> = ({navigation}) => {
                 className="text-[10px] tracking-[0.18em] uppercase text-muted-foreground">
                 {t('home.nearestSite')}
               </Text>
-              <Text
-                numberOfLines={1}
-                style={{fontFamily: FONTS.uiSemiBold}}
-                className="text-sm text-foreground mt-0.5">
-                {nearestVenue.zone.name} · {formatVenueDistance(nearestVenue.distance, t)}
-              </Text>
+              {/* Name and distance as separate children: as one string the long
+                  site names ("Tipu Sultan's Summer Palace") consumed the whole
+                  line and the distance — the entire point of the row — was
+                  truncated away. The name shrinks; the distance never does. */}
+              <View className="flex-row items-baseline mt-0.5">
+                <Text
+                  numberOfLines={1}
+                  style={{fontFamily: FONTS.uiSemiBold, flexShrink: 1}}
+                  className="text-sm text-foreground">
+                  {nearestVenue.zone.name}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{fontFamily: FONTS.uiSemiBold, flexShrink: 0}}
+                  className="text-sm text-foreground">
+                  {' · '}
+                  {formatVenueDistance(nearestVenue.distance, t)}
+                </Text>
+              </View>
             </View>
             <LinearGradient
               colors={GOLD_GRADIENT}
@@ -875,8 +894,11 @@ const Home: React.FC<Props> = ({navigation}) => {
       ) : null}
 
       {/* Map — padded rounded container */}
-      <TourTarget id="home.map" style={{flex: 1}}>
-      <View className="flex-1 mx-4 mt-2 mb-2 rounded-3xl overflow-hidden bg-background">
+      <TourTarget
+        id="home.map"
+        radius={24}
+        style={{flex: 1, marginHorizontal: 16, marginTop: 8, marginBottom: 8}}>
+      <View className="flex-1 rounded-3xl overflow-hidden bg-background">
         <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}

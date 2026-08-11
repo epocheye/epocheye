@@ -40,6 +40,9 @@ function haversineMeters(
  * Returns the heritage zone the user is currently inside, or `null`.
  * If the user is inside multiple overlapping zones, the closest is returned.
  */
+/** Last emitted `[geofence]` line, so an unchanged decision is not re-logged. */
+let lastGeofenceLine = '';
+
 export function getActiveZone(
   lat: number,
   lon: number,
@@ -68,23 +71,26 @@ export function getActiveZone(
 
   // One-line field decision log (plain console.log so it surfaces in
   // `adb logcat` even on release builds during an on-site test).
+  //
+  // Deduplicated: the geofence is now re-evaluated whenever the zone list lands
+  // as well as on every GPS tick, so a single fix produced the same line six or
+  // seven times and buried the transition you actually came to read. Only a
+  // CHANGED decision is logged — which is what matters on site.
   const chosen = best ?? nearest;
-  if (chosen) {
-    console.log(
-      `[geofence] lat=${lat.toFixed(5)} lon=${lon.toFixed(5)} acc=${Math.round(
+  const line = chosen
+    ? `[geofence] lat=${lat.toFixed(5)} lon=${lon.toFixed(5)} acc=${Math.round(
         accuracyMeters,
       )}m venue=${chosen.monument_id} dist=${Math.round(
         best ? bestDist : nearestDist,
       )}m radius=${chosen.radiusMeters}m slack=${Math.round(
         slack,
-      )}m inside=${best != null}`,
-    );
-  } else {
-    console.log(
-      `[geofence] lat=${lat.toFixed(5)} lon=${lon.toFixed(5)} acc=${Math.round(
+      )}m inside=${best != null}`
+    : `[geofence] lat=${lat.toFixed(5)} lon=${lon.toFixed(5)} acc=${Math.round(
         accuracyMeters,
-      )}m no zones loaded`,
-    );
+      )}m no zones loaded`;
+  if (line !== lastGeofenceLine) {
+    lastGeofenceLine = line;
+    console.log(line);
   }
 
   return best;

@@ -40,6 +40,7 @@ import { PermissionService } from '../../shared/services/permission.service';
 import { APP_CONFIG } from '../../core/config';
 import AnimatedLogo from '../../components/ui/AnimatedLogo';
 import { TourTarget } from '../../components/tour/useTourTarget';
+import TourScrollView from '../../components/tour/TourScrollView';
 import type { TabScreenProps } from '../../core/types/navigation.types';
 import { ENABLE_ANCHOR_CAPTURE } from '@env';
 import { ROUTES } from '../../core/constants';
@@ -306,7 +307,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
         locations={[0, 0.5, 1]}
         className="flex-1"
       >
-        <KeyboardAwareScrollView
+        <TourScrollView
+          as={KeyboardAwareScrollView}
           showsVerticalScrollIndicator={false}
           bottomOffset={24}
           contentContainerStyle={{ paddingBottom: 120 }}
@@ -579,10 +581,16 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               </Text>
             </View>
           ) : (
-            <TourTarget id="account.profile">
+            // Card margins live on the TourTarget so the spotlight measures the
+            // card itself, not the full-width wrapper around it.
+            <TourTarget
+              id="account.profile"
+              radius={16}
+              style={{ marginHorizontal: 20, marginTop: 24, marginBottom: 20 }}
+            >
             <Animated.View
               entering={FadeInDown.delay(180).duration(350)}
-              className="mx-5 mt-6 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-5"
+              className="rounded-2xl border border-white/[0.08] bg-surface-1 p-5"
             >
               <Text className="text-xs uppercase tracking-[1px] text-brand-gold font-ui-semibold mb-4">
                 {t('settings.editProfile')}
@@ -964,7 +972,7 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
               </Text>
             </TouchableOpacity>
           </Animated.View>
-        </KeyboardAwareScrollView>
+        </TourScrollView>
       </LinearGradient>
     </SafeAreaView>
   );

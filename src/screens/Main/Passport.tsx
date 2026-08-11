@@ -17,6 +17,7 @@ import {COLORS, FONTS} from '../../core/constants/theme';
 import {ROUTES} from '../../core/constants/routes';
 import BadgeGrid from '../../components/ui/BadgeGrid';
 import {TourTarget} from '../../components/tour/useTourTarget';
+import TourScrollView from '../../components/tour/TourScrollView';
 import LevelUpCelebration from '../../components/ui/LevelUpCelebration';
 import XPGainToast from '../../components/ui/XPGainToast';
 import {
@@ -193,7 +194,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
         onClose={() => setLevelUp(null)}
       />
 
-      <ScrollView
+      <TourScrollView
         contentContainerStyle={{paddingBottom: 120}}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -209,13 +210,17 @@ const Passport: React.FC<Props> = ({navigation}) => {
           </View>
         </View>
 
-        {/* Rank hero card */}
-        <TourTarget id="passport.rank">
+        {/* Rank hero card. The card's own horizontal margin lives on the
+            TourTarget so the spotlight measures the card, not the full width. */}
+        <TourTarget
+          id="passport.rank"
+          radius={28}
+          style={{marginHorizontal: 20}}>
         <LinearGradient
           colors={HERO_GRADIENT}
           start={{x: 0, y: 0}}
           end={{x: 1, y: 1}}
-          style={{marginHorizontal: 20, borderRadius: 28, padding: 24}}>
+          style={{borderRadius: 28, padding: 24}}>
           <View className="flex-row items-center mb-6" style={{gap: 16}}>
             <View
               className="w-16 h-16 rounded-full items-center justify-center"
@@ -399,7 +404,7 @@ const Passport: React.FC<Props> = ({navigation}) => {
             </Text>
           </View>
         ) : null}
-      </ScrollView>
+      </TourScrollView>
     </View>
   );
 };

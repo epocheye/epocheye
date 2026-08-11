@@ -30,6 +30,7 @@ import com.google.ar.core.ResolveCloudAnchorFuture
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.VpsAvailability
+import io.github.sceneview.ar.ARDefaultCameraNode
 import io.github.sceneview.ar.camera.ARCameraStream // ADMIN-HARNESS (REMOVE AFTER KONARK)
 import io.github.sceneview.ar.node.AnchorNode
 import io.github.sceneview.environment.Environment
@@ -159,6 +160,9 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     // production scan flow never sets it, so release sessions are unchanged.
     @Volatile private var cloudAnchorsEnabled = false
     private var hostFuture: HostCloudAnchorFuture? = null
+
+    /** Temporary anchor created at the aligned pose purely so it can be hosted. */
+    private var hostTempAnchor: Anchor? = null
     private var resolveFuture: ResolveCloudAnchorFuture? = null
 
     // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -269,6 +273,25 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     }
     private var pending: Pending? = null
 
+    // How long a Front placement waits for ARCore to report a tracked plane before
+    // settling for a free-space anchor. Long enough for detection to catch up after
+    // being re-enabled; short enough that a textureless room still gets a model.
+    private val planeWaitNanos = 4_000L * 1_000_000L
+    private var planeWaitDeadlineNanos: Long = 0L
+
+    /** Last logged anchor tracking/visibility signature, so only changes print. */
+    private var lastAnchorSig: String? = null
+
+    // Alignment of the model WITHIN its anchor, in anchor-local metres. Applied to
+    // the model node, folded into the captured geospatial pose, and applied to the
+    // discovery layer so the cards travel with the walls they annotate.
+    private var modelOffsetX = 0f
+    private var modelOffsetY = 0f
+    private var modelOffsetZ = 0f
+
+    /** Cards as last requested, so alignment can re-place them unchanged. */
+    private var lastDiscoveryCardsJson: String? = null
+
     // Card-only placement state (no-GLB heritage places). The placard is deferred and
     // retried each frame like the model: if camera tracking locks within TRACK_WAIT it
     // world-anchors ~cardDistance in front (walk-around-able); otherwise it falls back to
@@ -333,6 +356,25 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     // Own the camera stream so the depth-occlusion toggle can flip
                     // it live (captured into arCameraStream below).
                     val camStream = remember(matl) { ARCameraStream(matl) }
+                    // A camera whose near clip plane is close enough to stand
+                    // inside a building.
+                    //
+                    // A reconstruction is architecture, not an object on a table:
+                    // visitors walk up to walls and through gateways, so geometry
+                    // routinely ends up centimetres from the lens. Anything nearer
+                    // than the near plane is clipped away, which reads as the fort
+                    // "disappearing" as you approach — proven on-device 2026-08-10,
+                    // where the anchor stayed TRACKING/PAUSED with nodeVisible=true
+                    // and the model attached while nothing was drawn.
+                    val arCamera = remember(eng) {
+                        ARDefaultCameraNode(eng).apply {
+                            try {
+                                near = 0.02f
+                            } catch (t: Throwable) {
+                                Log.w(TAG, "near-plane set failed", t)
+                            }
+                        }
+                    }
                     SideEffect {
                         engine = eng
                         modelLoader = ml
@@ -382,6 +424,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         // unchanged. The visible occlusion is the camera-stream flag
                         // (depthOcclusionEnabled), toggled live in the SideEffect.
                         cameraStream = camStream,
+                        cameraNode = arCamera,
                         depthMode =
                             if (depthArmed) Config.DepthMode.AUTOMATIC
                             else Config.DepthMode.DISABLED,
@@ -521,6 +564,34 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             planeReported = true
             post { onPlaneDetected?.invoke() }
         }
+        // Why did the model vanish? Log every transition of the things that can
+        // hide it: the anchor's own tracking state (PAUSED/STOPPED), whether the
+        // node still thinks it is visible, and whether the plane it hangs off has
+        // been subsumed by a larger one (which STOPS its anchors permanently).
+        run {
+            val node = currentAnchorNode
+            if (node != null) {
+                val st = try {
+                    node.anchor.trackingState.name
+                } catch (_: Throwable) {
+                    "?"
+                }
+                val vis = try {
+                    node.isVisible
+                } catch (_: Throwable) {
+                    null
+                }
+                val sig = "$st/$vis/${currentModelNode != null}"
+                if (sig != lastAnchorSig) {
+                    lastAnchorSig = sig
+                    Log.i(
+                        TAG,
+                        "anchor state -> tracking=$st nodeVisible=$vis " +
+                            "model=${currentModelNode != null}",
+                    )
+                }
+            }
+        }
         // Billboard the data placard to face the camera — Y-axis only, so it stays
         // upright (never inverted) and +Z (the image face) points at the viewer.
         // Best-effort: any mismatch is swallowed so the placard never crashes the
@@ -570,6 +641,36 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         // available.
         if (pending != null) tryPlacePending()
         if (pendingCards != null) tryPlaceCardsPending()
+    }
+
+    /**
+     * Build an AnchorNode that does NOT blink out when ARCore momentarily loses
+     * visual tracking.
+     *
+     * SceneView's AnchorNode renders only while the anchor's tracking state is in
+     * `visibleTrackingStates`, which defaults to TRACKING alone. Walking up to a
+     * reconstruction fills the camera with a close, low-texture surface — a wall —
+     * and ARCore drops the anchor to PAUSED. The node then hides and the whole
+     * fort disappears, reappearing a moment later when tracking recovers. That is
+     * the flicker seen on-device 2026-08-10 when approaching the model and
+     * stepping inside it.
+     *
+     * A world-locked heritage reconstruction must survive that: the pose is still
+     * known, ARCore has simply stopped refining it, so the right behaviour is to
+     * keep drawing at the last known pose. Visitors walk up to walls and step
+     * inside gateways — that is the whole point of the experience — and the
+     * building cannot vanish when they do.
+     *
+     * STOPPED is deliberately excluded: that means the anchor is permanently dead,
+     * where continuing to draw would be a lie about where it is.
+     */
+    private fun newAnchorNode(eng: Engine, anchor: Anchor): AnchorNode {
+        return AnchorNode(eng, anchor).apply {
+            visibleTrackingStates = setOf(
+                TrackingState.TRACKING,
+                TrackingState.PAUSED,
+            )
+        }
     }
 
     private fun hasTrackedPlane(session: Session): Boolean {
@@ -660,6 +761,13 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     /** Auto-place the model ~1.2 m in front of the camera (dev model-picker). */
     fun placeInFront() {
         pending = Pending.Front
+        // Give the hit-test something to hit. attachModel turns plane finding OFF
+        // once a model lands (to stop ARCore burning power growing planes), so
+        // WITHOUT this every re-place after the first — including each preview
+        // scale change — searched a session with plane detection switched off,
+        // found nothing, and fell back to a free-space anchor that drifts.
+        setPlaneFinding(true)
+        planeWaitDeadlineNanos = System.nanoTime() + planeWaitNanos
         tryPlacePending()
     }
 
@@ -677,6 +785,16 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
         when (p) {
             is Pending.Front -> {
+                // Prefer a real surface. Plane detection needs a second or two of
+                // parallax after it is switched back on, so hold the placement
+                // briefly rather than instantly settling for a free-space anchor
+                // that will drift. Bounded, so a textureless room still gets a
+                // model instead of nothing.
+                val session = arSession
+                val planeReady = session != null && hasTrackedPlane(session)
+                if (!planeReady && System.nanoTime() < planeWaitDeadlineNanos) {
+                    return
+                }
                 pending = null
                 doPlaceInFront(frame)
             }
@@ -701,9 +819,17 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     }
 
     /**
-     * Anchor at a fixed point ~1.2 m ahead of the camera (plane-independent —
-     * always succeeds while TRACKING) and attach the model. Powers the dev
-     * picker's "auto-place in front" so a model appears without aiming at a plane.
+     * Anchor the model and attach it, preferring a REAL SURFACE.
+     *
+     * Prefers a plane hit-test through the screen centre and falls back to a
+     * free-space point ~1.2 m ahead only when no plane is tracked yet.
+     *
+     * Why the plane matters, beyond looking right: a free-space anchor is pinned
+     * to nothing the tracker can see, so every relocalisation moves it — indoors
+     * on a plain surface the model visibly swims, tips and drifts out of frame.
+     * A plane anchor is backed by a trackable ARCore keeps re-observing, so it
+     * stays put. It also makes the model REST on the table instead of hanging in
+     * mid-air at chest height, which is what "place it on the table" means.
      */
     private fun doPlaceInFront(frame: Frame) {
         val uri = glbUri ?: return
@@ -712,11 +838,69 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             post { onARError?.invoke("AR session not ready") }
             return
         }
-        val target = frame.camera.pose.compose(Pose.makeTranslation(0f, 0f, -1.2f))
-        // Anchor at the target translation with identity rotation (model upright).
-        val placePose = Pose.makeTranslation(target.tx(), target.ty(), target.tz())
+        // Screen centre → a tracked plane, accepting only a hit inside the plane's
+        // own polygon (not its infinite extension), so the model lands on the real
+        // surface rather than on a guess beyond its edge.
+        val planeHit = try {
+            frame.hitTest(width / 2f, height / 2f).firstOrNull { r ->
+                val tr = r.trackable
+                tr is Plane && tr.trackingState == TrackingState.TRACKING &&
+                    tr.isPoseInPolygon(r.hitPose)
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "plane hit-test failed", t)
+            null
+        }
+        // Second tier: ARCore is tracking a plane, but the centre ray missed its
+        // polygon — you are aiming past the desk edge, or across it at a steep
+        // angle. Observed on-device: the status line read "Surface ✓" while every
+        // placement still logged "no plane". Anchoring to that plane's own centre
+        // is far better than free space: it is backed by a trackable ARCore keeps
+        // re-observing, so it holds still instead of drifting.
+        val nearestPlane: Plane? = if (planeHit != null) {
+            null
+        } else {
+            try {
+                val cam = frame.camera.pose
+                session.getAllTrackables(Plane::class.java)
+                    .filter { it.trackingState == TrackingState.TRACKING }
+                    .minByOrNull { p ->
+                        val c = p.centerPose
+                        val dx = c.tx() - cam.tx()
+                        val dy = c.ty() - cam.ty()
+                        val dz = c.tz() - cam.tz()
+                        dx * dx + dy * dy + dz * dz
+                    }
+            } catch (t: Throwable) {
+                Log.w(TAG, "nearest-plane scan failed", t)
+                null
+            }
+        }
+
         val anchor = try {
-            session.createAnchor(placePose)
+            when {
+                planeHit != null -> {
+                    Log.i(TAG, "placeInFront: anchored on plane (centre hit)")
+                    planeHit.createAnchor()
+                }
+                nearestPlane != null -> {
+                    Log.i(TAG, "placeInFront: anchored on NEAREST tracked plane")
+                    nearestPlane.createAnchor(nearestPlane.centerPose)
+                }
+                else -> {
+                    Log.i(
+                        TAG,
+                        "placeInFront: no tracked plane at all — free-space fallback 1.2 m ahead",
+                    )
+                    val target =
+                        frame.camera.pose.compose(Pose.makeTranslation(0f, 0f, -1.2f))
+                    // Identity rotation so the model stays upright rather than
+                    // inheriting the camera's tilt.
+                    session.createAnchor(
+                        Pose.makeTranslation(target.tx(), target.ty(), target.tz()),
+                    )
+                }
+            }
         } catch (t: Throwable) {
             Log.w(TAG, "createAnchor (front) failed", t)
             post { onARError?.invoke("anchor creation failed") }
@@ -724,7 +908,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         }
         clearCurrentAnchor()
         val anchorNode = try {
-            AnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
+            newAnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
         } catch (t: Throwable) {
             Log.e(TAG, "anchor node create failed", t)
             post { onARError?.invoke("anchor node create failed") }
@@ -782,7 +966,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
         clearCurrentAnchor()
         val anchorNode = try {
-            AnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
+            newAnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
         } catch (t: Throwable) {
             Log.e(TAG, "anchor node create failed", t)
             post { onARError?.invoke("anchor node create failed") }
@@ -877,7 +1061,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
         clearCurrentAnchor()
         val anchorNode = try {
-            AnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
+            newAnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
         } catch (t: Throwable) {
             Log.e(TAG, "card anchor node create failed", t)
             post { onARError?.invoke("anchor node create failed") }
@@ -956,6 +1140,77 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         } catch (t: Throwable) {
             Log.w(TAG, "yaw nudge failed", t)
         }
+        reapplyDiscoveryLayer()
+    }
+
+    /**
+     * Slide the model within its anchor, in the anchor's own axes (metres).
+     * X = east-ish, Y = up, Z = south-ish relative to the anchor.
+     *
+     * Alignment needs BOTH degrees of freedom: yaw alone can never bring a
+     * reconstruction onto a surviving wall, because the anchor lands wherever
+     * the admin happened to be standing. Without translation the model is
+     * simply in the wrong place and no amount of rotating fixes it.
+     */
+    fun nudgeModel(dx: Float, dy: Float, dz: Float) {
+        val node = currentModelNode ?: return
+        modelOffsetX += dx
+        modelOffsetY += dy
+        modelOffsetZ += dz
+        try {
+            node.position = Position(modelOffsetX, modelOffsetY, modelOffsetZ)
+        } catch (t: Throwable) {
+            Log.w(TAG, "model nudge failed", t)
+            return
+        }
+        Log.i(
+            TAG,
+            "nudgeModel -> offset=(%.2f, %.2f, %.2f) yaw=%.1f".format(
+                modelOffsetX, modelOffsetY, modelOffsetZ, currentYawDeg,
+            ),
+        )
+        reapplyDiscoveryLayer()
+    }
+
+    /** Drop all alignment back to the anchor's own pose. */
+    fun resetAlignment() {
+        currentYawDeg = 0f
+        modelOffsetX = 0f
+        modelOffsetY = 0f
+        modelOffsetZ = 0f
+        try {
+            currentModelNode?.let {
+                it.rotation = Rotation(0f, 0f, 0f)
+                it.position = Position(0f, 0f, 0f)
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "reset alignment failed", t)
+        }
+        reapplyDiscoveryLayer()
+    }
+
+    /**
+     * The model's pose relative to its anchor — the alignment the admin applied.
+     * This is what makes the saved geospatial pose describe the RECONSTRUCTION
+     * rather than the arbitrary spot the admin was standing on.
+     */
+    private fun modelLocalPose(): Pose {
+        val yawRad = Math.toRadians(currentYawDeg.toDouble())
+        val half = yawRad / 2.0
+        val rot = Pose.makeRotation(
+            0f,
+            kotlin.math.sin(half).toFloat(),
+            0f,
+            kotlin.math.cos(half).toFloat(),
+        )
+        return Pose.makeTranslation(modelOffsetX, modelOffsetY, modelOffsetZ)
+            .compose(rot)
+    }
+
+    /** Re-place the discovery layer so cards follow the model as it is aligned. */
+    private fun reapplyDiscoveryLayer() {
+        val json = lastDiscoveryCardsJson ?: return
+        placeDiscoveryCards(json)
     }
 
     fun clearAnchor() {
@@ -1091,10 +1346,26 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             emitGeoAnchor("capture", "ERROR_NO_ANCHOR", "place the model first")
             return
         }
-        val pose = node.anchor?.pose ?: run {
+        val anchorPose = node.anchor?.pose ?: run {
             emitGeoAnchor("capture", "ERROR_NO_POSE")
             return
         }
+        // Capture where the RECONSTRUCTION is, not where the anchor happens to be.
+        //
+        // The anchor lands wherever the admin was standing when they pressed Load.
+        // Every bit of alignment — the yaw that puts the model's walls on the real
+        // walls, and the translation that slides it onto them — lives on the MODEL
+        // node, as a transform relative to that anchor. Capturing the bare anchor
+        // pose therefore threw all of it away: the station saved the admin's
+        // standing spot with an arbitrary heading, and visitors would have seen the
+        // fort offset and rotated. Compose the two so the saved WGS84 pose is the
+        // model's own.
+        val pose = anchorPose.compose(modelLocalPose())
+        Log.i(
+            GEO_TAG,
+            "capture: folding alignment yaw=%.1f offset=(%.2f, %.2f, %.2f) into the saved pose"
+                .format(currentYawDeg, modelOffsetX, modelOffsetY, modelOffsetZ),
+        )
         val geo = try {
             earth.getGeospatialPose(pose)
         } catch (t: Throwable) {
@@ -1158,7 +1429,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         }
         clearCurrentAnchor()
         val anchorNode = try {
-            AnchorNode(eng, anchor).also { root.addChildNode(it) }
+            newAnchorNode(eng, anchor).also { root.addChildNode(it) }
         } catch (t: Throwable) {
             Log.e(GEO_TAG, "geo anchor node create failed", t)
             try { anchor.detach() } catch (_: Throwable) {}
@@ -1166,6 +1437,14 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             return
         }
         currentAnchorNode = anchorNode
+        // The saved pose already IS the aligned model pose (see captureGeospatialPose),
+        // so the model must sit on this anchor with no extra transform. Without this
+        // reset, an admin who re-verifies straight after capturing would have their
+        // alignment applied a second time on top of itself.
+        currentYawDeg = 0f
+        modelOffsetX = 0f
+        modelOffsetY = 0f
+        modelOffsetZ = 0f
         val uri = glbUri
         if (uri != null) {
             attachModel(anchorNode, uri)
@@ -1380,10 +1659,39 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             emitCloudAnchorEvent("host", "ERROR_SESSION_NOT_READY")
             return
         }
-        val anchor = currentAnchorNode?.anchor ?: run {
+        val placementAnchor = currentAnchorNode?.anchor ?: run {
             emitCloudAnchorEvent("host", "ERROR_NO_ANCHOR", message = "place the model first")
             return
         }
+        // Host the ALIGNED pose, not the placement anchor.
+        //
+        // The placement anchor is wherever the admin stood; the alignment onto the
+        // real walls is a transform of the MODEL relative to it. captureGeospatialPose
+        // folds that in, but hosting the bare anchor did not — and on resolve the
+        // visitor's model is attached with NO local transform, and the resolved cloud
+        // anchor REPLACES the geospatial one. So hosting used to make placement
+        // strictly worse: every visitor saw the fort displaced and rotated by exactly
+        // the alignment the admin had worked to apply, on a 365-day TTL.
+        //
+        // Hosting a temporary anchor built at the aligned pose makes the resolved
+        // anchor the model's own pose, which is what the zero-transform attach on the
+        // visitor side already assumes.
+        val alignedAnchor: Anchor? = try {
+            session.createAnchor(placementAnchor.pose.compose(modelLocalPose()))
+        } catch (t: Throwable) {
+            Log.w(TAG, "aligned host anchor failed; hosting placement anchor", t)
+            null
+        }
+        val anchor = alignedAnchor ?: placementAnchor
+        // Detached after the host resolves — see hostFuture's completion handler.
+        hostTempAnchor = alignedAnchor
+        Log.i(
+            TAG,
+            "hostCloudAnchor: hosting %s pose (yaw=%.1f offset=%.2f,%.2f,%.2f)".format(
+                if (alignedAnchor != null) "ALIGNED" else "raw placement",
+                currentYawDeg, modelOffsetX, modelOffsetY, modelOffsetZ,
+            ),
+        )
         // Cancel-and-replace any stale in-flight host (its terminal event can be
         // swallowed while backgrounded) so a watchdog-driven retry actually runs
         // instead of being refused forever. cancel() guarantees the old callback
@@ -1434,6 +1742,13 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         hostFuture = try {
             session.hostCloudAnchorAsync(anchor, ttlDays.coerceIn(1, 365)) { id, state ->
                 hostFuture = null
+                // The aligned anchor existed only to be hosted; the scene keeps
+                // using the placement anchor, so release it either way.
+                try {
+                    hostTempAnchor?.detach()
+                } catch (_: Throwable) {
+                }
+                hostTempAnchor = null
                 emitCloudAnchorEvent(
                     "host",
                     state.name,
@@ -1529,7 +1844,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         }
         clearCurrentAnchor()
         val anchorNode = try {
-            AnchorNode(eng, anchor).also { root.addChildNode(it) }
+            newAnchorNode(eng, anchor).also { root.addChildNode(it) }
         } catch (t: Throwable) {
             Log.e(TAG, "resolved anchor node create failed", t)
             try {
@@ -1632,6 +1947,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
      * source, and callers should resolve first and then call this.
      */
     fun placeDiscoveryCards(cardsJson: String) {
+        lastDiscoveryCardsJson = cardsJson
         val eng = engine ?: run {
             post { onARError?.invoke("engine not ready") }
             return
@@ -1654,9 +1970,18 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
         val anchor = try {
             val existing = currentAnchorNode?.anchor
-            if (existing != null && existing.trackingState == TrackingState.TRACKING) {
-                // Re-use an anchor that is already world-locked (the Cloud Anchor
-                // resolve path puts one here) rather than dropping a fresh one.
+            if (existing != null) {
+                // ALWAYS re-use the anchor the model is already on, whatever its
+                // tracking state.
+                //
+                // This used to require TRACKING. When the model's anchor was merely
+                // PAUSED — routine indoors, and for the first seconds after any
+                // placement — a second anchor was created here, the identity check
+                // below then failed, and `clearCurrentAnchor()` tore down the
+                // model's anchor node with the model on it. Showing the cards
+                // deleted the reconstruction. The layer's poses are authored in
+                // this anchor's local frame, so a different anchor is wrong even
+                // when it does not destroy anything.
                 existing
             } else {
                 val hit = try {
@@ -1681,10 +2006,13 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             return
         }
 
+        // Only ever build a NEW anchor node when there is genuinely no current one.
+        // `clearCurrentAnchor()` also removes the model, so reaching it while a
+        // reconstruction is placed is a bug, not a fallback.
         val anchorNode = currentAnchorNode?.takeIf { it.anchor === anchor } ?: run {
             clearCurrentAnchor()
             try {
-                AnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
+                newAnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
             } catch (t: Throwable) {
                 Log.e(TAG, "discovery anchor node create failed", t)
                 post { onARError?.invoke("anchor node create failed") }
@@ -1710,12 +2038,18 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 // from the bitmap's pixel count. Height follows the bitmap's aspect.
                 val widthM = obj.optDouble("w", 1.75).toFloat()
                 val heightM = widthM * bitmap.height.toFloat() / bitmap.width.toFloat()
-                val local = Position(
+                // Cards are authored in the MODEL's frame but hang off the ANCHOR,
+                // so the admin's alignment has to be applied to them by hand or the
+                // annotations slide off the walls they describe the moment the
+                // model is nudged.
+                val authored = floatArrayOf(
                     obj.optDouble("x", 0.0).toFloat(),
                     obj.optDouble("y", 1.5).toFloat(),
                     obj.optDouble("z", 0.0).toFloat(),
                 )
-                val yaw = obj.optDouble("yaw", 0.0).toFloat()
+                val aligned = modelLocalPose().transformPoint(authored)
+                val local = Position(aligned[0], aligned[1], aligned[2])
+                val yaw = obj.optDouble("yaw", 0.0).toFloat() + currentYawDeg
                 val node = ImageNode(
                     materialLoader = matl,
                     bitmap = bitmap,
@@ -1727,7 +2061,21 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 anchorNode.addChildNode(node)
                 val halfW = widthM / 2f
                 val halfH = heightM / 2f
-                discoveryCards.add(DiscoveryCard(id, node, local, yaw, halfW, halfH, json))
+                // Hit-testing happens in the MODEL's frame (see hitTestElements),
+                // so record the AUTHORED pose here, not the aligned one the node is
+                // rendered at — otherwise the alignment would be applied twice and
+                // every card tap would miss by exactly the offset.
+                discoveryCards.add(
+                    DiscoveryCard(
+                        id,
+                        node,
+                        Position(authored[0], authored[1], authored[2]),
+                        yaw - currentYawDeg,
+                        halfW,
+                        halfH,
+                        json,
+                    ),
+                )
                 placed++
             } catch (t: Throwable) {
                 Log.w(TAG, "discovery card skipped: $id", t)
@@ -1843,8 +2191,14 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         if (dlen <= 1e-6f) return
         dx /= dlen; dy /= dlen; dz /= dlen
 
-        // Into the anchor's local frame, where every authored pose lives.
-        val invPose = anchorPose.inverse()
+        // Into the MODEL's local frame, where every authored pose lives.
+        //
+        // Cards carry their own aligned pose, but the 135 tap-target boxes are
+        // axis-aligned in the model's frame — so once the admin nudges the model,
+        // testing the ray in the ANCHOR frame misses every one of them. Folding the
+        // alignment into the inverse here keeps the boxes axis-aligned (a yawed box
+        // would break the slab test outright) and makes taps land after any nudge.
+        val invPose = anchorPose.compose(modelLocalPose()).inverse()
         val lo = invPose.transformPoint(floatArrayOf(ox, oy, oz))
         val ld = invPose.rotateVector(floatArrayOf(dx, dy, dz))
 
@@ -1950,6 +2304,14 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         currentAnchorNode = null
         currentModelNode = null
         currentYawDeg = 0f
+        // Offsets MUST reset with the yaw. A re-place rebuilds the model node at
+        // (0,0,0), so leaving them set makes what is captured disagree with what is
+        // on screen: the fort snaps back to the anchor while the stale translation
+        // is still folded into the saved pose, world-locking the station somewhere
+        // the admin never saw.
+        modelOffsetX = 0f
+        modelOffsetY = 0f
+        modelOffsetZ = 0f
         pending = null
         cardsCameraLocked = false
     }
@@ -2041,7 +2403,22 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     }
                     try {
                         modelNode.rotation = Rotation(0f, currentYawDeg, 0f)
+                        // Belt and braces with the reset in clearCurrentAnchor: the
+                        // rendered model must always agree with the transform
+                        // modelLocalPose() reports, or capture saves a pose nobody saw.
+                        modelNode.position =
+                            Position(modelOffsetX, modelOffsetY, modelOffsetZ)
                     } catch (_: Throwable) {
+                    }
+                    // Never frustum-cull the reconstruction. Filament culls a
+                    // renderable by its bounding box, and standing INSIDE a
+                    // building is the degenerate case that gets that wrong —
+                    // exactly what a visitor does in a courtyard or a gateway.
+                    // Free to disable here: this model is ~5,000 vertices.
+                    try {
+                        modelNode.setCulling(false)
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "disable culling failed", t)
                     }
                     anchorNode.addChildNode(modelNode)
                     currentModelNode = modelNode

@@ -2,21 +2,37 @@
  * TourHost — driver + renderer for the first-run guided product tour.
  *
  * Mounted once at the app root (App.tsx, next to <DialogHost/>), ABOVE the
- * NavigationContainer, so it overlays every screen. For each step it
- * (1) navigates via the shared navigationRef, (2) waits for the step's target
- * element to be measured by useTourTarget, then (3) draws a dimmed cutout +
- * bouncing arrow cue around it.
+ * NavigationContainer, so it overlays every screen. For each step it navigates
+ * via the shared navigationRef and spotlights the element that screen registered
+ * through useTourTarget.
  *
- * The tooltip card (title/body + Back/Next + progress) renders IMMEDIATELY on
- * every step — centered while the target is still navigating/measuring, then
- * sliding to its anchored position once the rect resolves. The old behaviour
- * (dim-only screen with no controls for up to ~2s per step) read as a freeze
- * and left the user with no escape hatch mid-transition.
+ * Geometry notes, because all of them were previously wrong:
  *
- * A fixed "Skip tour" pill stays in the top-right on every step. The dimmed
- * backdrop absorbs touches; hardware back steps backwards (skips at step 0).
+ * - COORDINATE SPACE IS CALIBRATED, NOT ASSUMED. Targets report window coords
+ *   (measureInWindow); this overlay draws in its own local space. Those agree
+ *   only when the overlay's origin is the window origin, which is not guaranteed
+ *   under Android edge-to-edge. So the root measures itself and every rect is
+ *   translated by that origin — a no-op when the spaces already match.
+ * - THE RECT IS LIVE, NOT LATCHED. The host subscribes to the target's entry in
+ *   tourStore for the whole step. The old code polled and committed the first
+ *   acceptable rect, freezing the spotlight at its mid-transition position.
+ * - PARTIALLY-VISIBLE TARGETS STILL COUNT. A target only has to overlap the
+ *   viewport; the drawn box is clamped to it. Requiring full containment meant a
+ *   flex:1 element running to the screen edge (Home's map) could never spotlight.
+ *
+ * The tooltip card renders immediately on every step — centered while the target
+ * is still navigating/measuring, then anchored once the rect resolves. It is
+ * measured before placement so it can neither cover the spotlight nor slide off
+ * screen. "Skip tour" lives inside it: as a floating pill it collided with the
+ * header on all four tabs.
  */
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   BackHandler,
   Pressable,
@@ -24,6 +40,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Animated, {
@@ -37,6 +54,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import Svg, {Defs, Mask, Rect as SvgRect} from 'react-native-svg';
 import {ChevronDown, ChevronUp, ChevronRight, ArrowLeft} from 'lucide-react-native';
 import {useTranslation} from 'react-i18next';
 
@@ -47,7 +65,24 @@ import {navigateSafe} from '../../navigation/navigationRef';
 import {useTourStore, type TourRect} from '../../stores/tourStore';
 import {TOUR_STEPS, type TourStep} from '../../constants/appTour';
 
-const delay = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+/** Breathing room between the target's own bounds and the cutout edge. */
+const SPOT_PAD = 6;
+/** Fallback cutout radius when a target doesn't declare its own. */
+const SPOT_RADIUS = 16;
+/** Gap that leaves room for the bouncing arrow cue between spot and card. */
+const ARROW_GAP = 58;
+/** Fallback gap used when the card can't fit with the arrows shown. */
+const TIGHT_GAP = 22;
+/** Height reserved for the floating tab bar so the card never hides under it. */
+const TAB_BAR_CLEARANCE = 78;
+
+interface SpotBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  radius: number;
+}
 
 const TourHost: React.FC = () => {
   const {t} = useTranslation();
@@ -60,65 +95,41 @@ const TourHost: React.FC = () => {
   const back = useTourStore(s => s.back);
   const skip = useTourStore(s => s.skip);
 
-  const [rect, setRect] = useState<TourRect | null>(null);
+  const step: TourStep | undefined = TOUR_STEPS[stepIndex];
 
-  const navigateForStep = useCallback((step: TourStep) => {
-    switch (step.nav.kind) {
+  // Live rect for this step's target. tourStore clears `targets` on every step
+  // change, so this can never be a leftover from an earlier screen.
+  const rawRect = useTourStore(s =>
+    step?.targetId ? s.targets[step.targetId] : undefined,
+  );
+
+  const rootRef = useRef<View>(null);
+  const [origin, setOrigin] = useState({x: 0, y: 0});
+  const [cardH, setCardH] = useState(0);
+
+  const calibrate = useCallback(() => {
+    rootRef.current?.measureInWindow((x, y) => {
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        setOrigin(prev => (prev.x === x && prev.y === y ? prev : {x, y}));
+      }
+    });
+  }, []);
+
+  const navigateForStep = useCallback((s: TourStep) => {
+    switch (s.nav.kind) {
       case 'tab':
-        navigateSafe(ROUTES.MAIN.TABS, {screen: step.nav.tab});
+        navigateSafe(ROUTES.MAIN.TABS, {screen: s.nav.tab});
         break;
       case 'screen':
-        navigateSafe(step.nav.route, step.nav.params);
+        navigateSafe(s.nav.route, s.nav.params);
         break;
     }
   }, []);
 
-  const isOnScreen = useCallback(
-    (r: TourRect) =>
-      r.width > 0 &&
-      r.height > 0 &&
-      r.y >= insets.top - 12 &&
-      r.y + r.height <= SCREEN_H - 12,
-    [insets.top, SCREEN_H],
-  );
-
-  // Drive each step: navigate → wait → measure target → spotlight. The card is
-  // visible with its content and controls the whole time (never a dead frame);
-  // only the spotlight cutout waits for the rect.
   useEffect(() => {
-    if (!running) return undefined;
-    let cancelled = false;
-    setRect(null);
-    const step = TOUR_STEPS[stepIndex];
-
-    (async () => {
-      try {
-        navigateForStep(step);
-        if (!step.targetId) return;
-        await delay(step.nav.kind === 'tab' ? 300 : 450);
-        if (cancelled) return;
-
-        // Poll for the registered rect (screen needs to mount + measure);
-        // hard cap ~1.2s, after which the step stays a centered card.
-        for (let i = 0; i < 12 && !cancelled; i++) {
-          const r = useTourStore.getState().targets[step.targetId];
-          if (r && isOnScreen(r)) {
-            if (!cancelled) setRect(r);
-            return;
-          }
-          await delay(100);
-        }
-      } catch (e) {
-        // Never let a navigation/measure failure crash the app — the centered
-        // card with Next/Skip is already showing.
-        if (__DEV__) console.warn('[tour] step failed', e);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [running, stepIndex, navigateForStep, isOnScreen]);
+    if (!running || !step) return;
+    navigateForStep(step);
+  }, [running, step, navigateForStep]);
 
   // Hardware back steps backwards (skip at the first step) instead of leaving.
   useEffect(() => {
@@ -151,87 +162,197 @@ const TourHost: React.FC = () => {
     };
   }, [running, bounce]);
 
-  if (!running) return null;
+  const viewTop = insets.top;
+  const viewBottom = SCREEN_H - insets.bottom;
 
-  const step = TOUR_STEPS[stepIndex];
+  /**
+   * Translate the target's window rect into overlay space, then clamp it to the
+   * visible area. Null when the target doesn't overlap the viewport at all.
+   */
+  const spot = useMemo<SpotBox | null>(() => {
+    if (!rawRect) return null;
+    const r: TourRect = {
+      ...rawRect,
+      x: rawRect.x - origin.x,
+      y: rawRect.y - origin.y,
+    };
+    if (r.width <= 0 || r.height <= 0) return null;
+    if (r.y + r.height <= viewTop || r.y >= viewBottom) return null;
+
+    const left = Math.max(r.x - SPOT_PAD, 4);
+    const right = Math.min(r.x + r.width + SPOT_PAD, SCREEN_W - 4);
+    const top = Math.max(r.y - SPOT_PAD, viewTop + 4);
+    const bottom = Math.min(r.y + r.height + SPOT_PAD, viewBottom - 4);
+    if (right - left <= 0 || bottom - top <= 0) return null;
+
+    return {
+      x: left,
+      y: top,
+      width: right - left,
+      height: bottom - top,
+      radius: (rawRect.radius ?? SPOT_RADIUS) + SPOT_PAD,
+    };
+  }, [rawRect, origin, viewTop, viewBottom, SCREEN_W]);
+
+  /**
+   * Place the card in whichever band actually has room for its measured height,
+   * honouring the step's preferred side when it fits. Falls back to a tighter
+   * gap (dropping the arrow cue) before it will overlap the spotlight.
+   */
+  const placement = useMemo(() => {
+    const minTop = insets.top + 12;
+    const maxBottom = viewBottom - TAB_BAR_CLEARANCE;
+    const height = cardH || 200;
+
+    if (!spot) {
+      return {
+        top: Math.max(minTop, (SCREEN_H - height) / 2),
+        below: false,
+        arrows: false,
+      };
+    }
+
+    const prefersBelow =
+      step?.placement === 'bottom'
+        ? true
+        : step?.placement === 'top'
+          ? false
+          : spot.y + spot.height < SCREEN_H * 0.55;
+
+    const tryGap = (gap: number) => {
+      const roomBelow = maxBottom - (spot.y + spot.height) - gap;
+      const roomAbove = spot.y - gap - minTop;
+      const fitsBelow = roomBelow >= height;
+      const fitsAbove = roomAbove >= height;
+
+      if (prefersBelow && fitsBelow) {
+        return {top: spot.y + spot.height + gap, below: true};
+      }
+      if (!prefersBelow && fitsAbove) {
+        return {top: spot.y - gap - height, below: false};
+      }
+      if (fitsBelow) return {top: spot.y + spot.height + gap, below: true};
+      if (fitsAbove) return {top: spot.y - gap - height, below: false};
+      return null;
+    };
+
+    const withArrows = tryGap(ARROW_GAP);
+    if (withArrows) return {...withArrows, arrows: true};
+
+    const tight = tryGap(TIGHT_GAP);
+    if (tight) return {...tight, arrows: false};
+
+    // Neither side fits — take the roomier one and clamp into the viewport.
+    const roomBelow = maxBottom - (spot.y + spot.height);
+    const roomAbove = spot.y - minTop;
+    const below = roomBelow >= roomAbove;
+    return {
+      top: below
+        ? Math.max(minTop, maxBottom - height)
+        : Math.max(minTop, Math.min(spot.y - TIGHT_GAP - height, maxBottom - height)),
+      below,
+      arrows: false,
+    };
+  }, [spot, cardH, insets.top, viewBottom, SCREEN_H, step?.placement]);
+
+  const onCardLayout = useCallback((e: LayoutChangeEvent) => {
+    const h = Math.round(e.nativeEvent.layout.height);
+    setCardH(prev => (Math.abs(prev - h) < 1 ? prev : h));
+  }, []);
+
+  if (!running || !step) return null;
+
   const total = TOUR_STEPS.length;
   const isLast = stepIndex >= total - 1;
   const isFirst = stepIndex === 0;
-  const cardW = SCREEN_W - 40;
-
-  // Decide card + arrow placement relative to the spotlight rect.
-  const placeBelow =
-    !!rect &&
-    (step.placement === 'bottom' ||
-      (step.placement !== 'top' && rect.y + rect.height < SCREEN_H * 0.55));
-
-  let cardPos: {top?: number; bottom?: number};
-  if (!rect) {
-    cardPos = {top: Math.max(insets.top + 24, SCREEN_H / 2 - 120)};
-  } else if (placeBelow) {
-    cardPos = {top: Math.min(rect.y + rect.height + 26, SCREEN_H - 220)};
-  } else {
-    cardPos = {bottom: Math.min(SCREEN_H - rect.y + 26, SCREEN_H - 180)};
-  }
+  const dimColor = '#08080A';
 
   return (
-    <View style={styles.root} pointerEvents="box-none">
+    <View
+      ref={rootRef}
+      onLayout={calibrate}
+      collapsable={false}
+      style={styles.root}
+      pointerEvents="box-none">
       {/* Touch sink — blocks all underlying interaction (forced walkthrough). */}
       <Pressable style={StyleSheet.absoluteFill} onPress={() => {}} />
 
-      {/* Dimming: full cover, or a 4-panel cutout that leaves the target bright. */}
-      {rect ? (
+      {/* Scrim with a rounded hole punched out of it, so the spotlight's corners
+          match the card beneath instead of leaving dark square notches. */}
+      <Svg
+        width={SCREEN_W}
+        height={SCREEN_H}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none">
+        <Defs>
+          <Mask id="tourSpot" x={0} y={0} width={SCREEN_W} height={SCREEN_H}>
+            <SvgRect
+              x={0}
+              y={0}
+              width={SCREEN_W}
+              height={SCREEN_H}
+              fill="#FFFFFF"
+            />
+            {spot ? (
+              <SvgRect
+                x={spot.x}
+                y={spot.y}
+                width={spot.width}
+                height={spot.height}
+                rx={spot.radius}
+                ry={spot.radius}
+                fill="#000000"
+              />
+            ) : null}
+          </Mask>
+        </Defs>
+        <SvgRect
+          x={0}
+          y={0}
+          width={SCREEN_W}
+          height={SCREEN_H}
+          fill={dimColor}
+          fillOpacity={0.86}
+          mask="url(#tourSpot)"
+        />
+      </Svg>
+
+      {spot ? (
         <>
-          <View style={[styles.dim, {top: 0, left: 0, right: 0, height: rect.y - 6}]} pointerEvents="none" />
-          <View
-            style={[styles.dim, {top: rect.y - 6, left: 0, width: rect.x - 6, height: rect.height + 12}]}
-            pointerEvents="none"
-          />
-          <View
-            style={[
-              styles.dim,
-              {top: rect.y - 6, left: rect.x + rect.width + 6, right: 0, height: rect.height + 12},
-            ]}
-            pointerEvents="none"
-          />
-          <View
-            style={[styles.dim, {top: rect.y + rect.height + 6, left: 0, right: 0, bottom: 0}]}
-            pointerEvents="none"
-          />
           <View
             style={[
               styles.ring,
-              {top: rect.y - 6, left: rect.x - 6, width: rect.width + 12, height: rect.height + 12},
+              {
+                top: spot.y,
+                left: spot.x,
+                width: spot.width,
+                height: spot.height,
+                borderRadius: spot.radius,
+              },
             ]}
             pointerEvents="none"
           />
-          <BounceArrows
-            bounce={bounce}
-            direction={placeBelow ? 'up' : 'down'}
-            x={Math.min(Math.max(rect.x + rect.width / 2 - 18, 16), SCREEN_W - 52)}
-            y={placeBelow ? rect.y + rect.height + 8 : rect.y - 64}
-          />
+          {placement.arrows ? (
+            <BounceArrows
+              bounce={bounce}
+              direction={placement.below ? 'up' : 'down'}
+              x={Math.min(
+                Math.max(spot.x + spot.width / 2 - 18, 16),
+                SCREEN_W - 52,
+              )}
+              y={placement.below ? spot.y + spot.height + 8 : spot.y - 52}
+            />
+          ) : null}
         </>
-      ) : (
-        <View style={[StyleSheet.absoluteFill, styles.dim]} pointerEvents="none" />
-      )}
-
-      {/* Fixed, always-visible escape hatch. */}
-      <Pressable
-        onPress={skip}
-        accessibilityRole="button"
-        accessibilityLabel={t('tour.skip')}
-        hitSlop={8}
-        style={[styles.skipPill, {top: insets.top + 10}]}>
-        <Text style={styles.skipPillLabel}>{t('tour.skip')}</Text>
-      </Pressable>
+      ) : null}
 
       {/* Tooltip / explainer card — always mounted; slides to the anchored
           position once the target rect resolves (centered until then). */}
       <Animated.View
         entering={FadeIn.duration(220)}
         layout={LinearTransition.duration(220)}
-        style={[styles.card, {width: cardW, left: 20, ...cardPos}]}
+        onLayout={onCardLayout}
+        style={[styles.card, {width: SCREEN_W - 40, left: 20, top: placement.top}]}
         pointerEvents="auto">
         <Text style={styles.stepCount}>
           {t('tour.progress', {current: stepIndex + 1, total})}
@@ -261,6 +382,17 @@ const TourHost: React.FC = () => {
           ) : (
             <View style={styles.backBtn} />
           )}
+
+          {/* Escape hatch lives in the card: as a floating top-right pill it
+              overlapped every screen's title and Passport's share button. */}
+          <Pressable
+            onPress={skip}
+            accessibilityRole="button"
+            accessibilityLabel={t('tour.skip')}
+            hitSlop={12}
+            style={styles.skipLink}>
+            <Text style={styles.skipLabel}>{t('tour.skip')}</Text>
+          </Pressable>
 
           <Pressable
             onPress={next}
@@ -308,13 +440,8 @@ const styles = StyleSheet.create({
     zIndex: 10000,
     elevation: 10000,
   },
-  dim: {
-    position: 'absolute',
-    backgroundColor: 'rgba(8,8,10,0.86)',
-  },
   ring: {
     position: 'absolute',
-    borderRadius: moderateScale(16),
     borderWidth: 2,
     borderColor: COLORS.gold,
   },
@@ -372,24 +499,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: COLORS.gold,
   },
-  skipPill: {
-    position: 'absolute',
-    right: 16,
-    height: moderateScale(38),
-    paddingHorizontal: moderateScale(16),
-    borderRadius: moderateScale(19),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(20,20,20,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(203,168,98,0.5)',
-    zIndex: 2,
-  },
-  skipPillLabel: {
-    fontFamily: FONTS.uiSemiBold,
-    fontSize: moderateScale(13),
-    color: '#F5F0E8',
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -403,6 +512,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  // Intentionally not flex:1 — a full-width invisible touch area sitting right
+  // next to "Next" makes skipping the tour an easy mis-tap.
+  skipLink: {
+    height: moderateScale(44),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: moderateScale(10),
+  },
+  skipLabel: {
+    fontFamily: FONTS.uiSemiBold,
+    fontSize: moderateScale(13),
+    color: COLORS.textSecondary,
   },
   nextBtn: {
     flexDirection: 'row',

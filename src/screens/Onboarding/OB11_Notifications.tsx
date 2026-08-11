@@ -10,7 +10,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {BellRing, MapPin, Sparkles} from 'lucide-react-native';
 import {requestNotifications, RESULTS} from 'react-native-permissions';
 import {fcmRegisterAfterPermission} from '../../services/fcmService';
-import {BACKEND_URL} from '../../constants/onboarding';
+import {BACKEND_URL, GOLD} from '../../constants/onboarding';
 import {useOnboardingStore} from '../../stores/onboardingStore';
 import {useOnboardingComplete} from '../../context/OnboardingCallbackContext';
 import {track} from '../../services/analytics';
@@ -102,7 +102,10 @@ const OB11_Notifications: React.FC<Props> = () => {
         backgroundColor="transparent"
       />
       <AmbientGlow height={360} />
-      <OBProgressBar current={9} total={10} />
+      {/* Five interactive onboarding screens (Welcome → Region → Pull → SignUp
+          → here); the splash isn't a step. The old 9-of-10 predated the flow
+          being shortened and rendered a full bar over a stale total. */}
+      <OBProgressBar current={4} total={5} />
 
       <View
         className="flex-1 justify-between"
@@ -112,11 +115,14 @@ const OB11_Notifications: React.FC<Props> = () => {
             className="w-[120px] h-[120px] rounded-full items-center justify-center bg-[rgba(203,168,98,0.08)]"
             style={sBell}>
             <View className="w-[84px] h-[84px] rounded-full items-center justify-center bg-[rgba(203,168,98,0.12)]">
-              <BellRing size={40} color="#CBA862" />
+              <BellRing size={40} color={GOLD.primary} />
             </View>
           </Animated.View>
 
-          <Animated.View className="mt-9 items-center" style={sBody}>
+          {/* w-full matters: the benefit rows below size off this wrapper, and
+              their labels are flex-1 (zero intrinsic width). Without it the
+              wrapper shrink-wraps and the rows collapse to bare icon circles. */}
+          <Animated.View className="mt-9 w-full items-center" style={sBody}>
             <Text className="text-[11px] tracking-[0.22em] uppercase text-brand-gold font-ui-semibold">
               One last thing
             </Text>
@@ -134,7 +140,7 @@ const OB11_Notifications: React.FC<Props> = () => {
                   key={text}
                   className="flex-row items-center px-4 py-3.5 rounded-2xl bg-card border border-white/10">
                   <View className="w-10 h-10 rounded-full items-center justify-center bg-[rgba(203,168,98,0.12)]">
-                    <Icon size={18} color="#CBA862" />
+                    <Icon size={18} color={GOLD.primary} />
                   </View>
                   <Text className="ml-3 flex-1 text-[13px] leading-[19px] text-foreground/90 font-ui">
                     {text}

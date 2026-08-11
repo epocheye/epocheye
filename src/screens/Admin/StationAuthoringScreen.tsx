@@ -30,11 +30,16 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import EpocheyeDetectARView, {
   type CloudAnchorEvent,
+  type ElementTappedEvent,
   type EpocheyeDetectARHandle,
   type GeospatialAnchorEvent,
   type GeospatialStateEvent,
 } from '../../native/EpocheyeDetectARView';
 import {buildGlbUrl} from '../../config/glbDelivery';
+import {
+  discoveryLayerFor,
+  scaleDiscoveryLayer,
+} from '../../features/ar/discoveryLayers';
 import {resolveModelGlb} from '../../services/glbSource';
 import {useActiveMonument} from '../../shared/hooks/useActiveMonument';
 import {useSafeGoBack} from '../../shared/hooks/useSafeGoBack';
@@ -58,6 +63,21 @@ const MAX_YAW_ACC_DEG = 8;
 const OVERRIDE_HORIZ_ACC_M = 6;
 const OVERRIDE_YAW_ACC_DEG = 18;
 const CLOUD_ANCHOR_TTL_DAYS = 365;
+
+// Preview scales. Bangalore Fort is 47 x 48 x 13.5 m, so no single size answers
+// every question indoors: TABLETOP shows the whole plan at once but its cards are
+// 2 cm wide, WALK_IN makes the cards legible at the cost of seeing it all.
+// TRUE_SCALE is the only value a pose may be captured at.
+const TRUE_SCALE = 1;
+const WALK_IN_SCALE = 0.1;
+const TABLETOP_SCALE = 0.02;
+const PREVIEW_CYCLE = [TRUE_SCALE, WALK_IN_SCALE, TABLETOP_SCALE];
+
+function scaleLabel(k: number): string {
+  if (k === TRUE_SCALE) return 'TRUE SCALE (47 m) — tap to shrink';
+  if (k === WALK_IN_SCALE) return 'WALK-IN 1:10 (~4.8 m) — tap to shrink';
+  return 'TABLETOP 1:50 (~1 m) — tap for true scale';
+}
 
 interface CapturedPose {
   lat: number;
@@ -106,13 +126,27 @@ const StationAuthoringScreen: React.FC = () => {
   // failed", "anchor creation failed") that nothing was listening for, so every
   // placement failure looked like the button doing nothing at all.
   const [arError, setArError] = useState<string | null>(null);
+  const [planeFound, setPlaneFound] = useState(false);
+  // Coarse gets the model roughly onto the wall; fine seats it. A single step
+  // size cannot do both — 1 m is uselessly blunt at the end, 10 cm is an hour of
+  // tapping at the start.
+  const [coarse, setCoarse] = useState(true);
   // Desk preview. At true scale this reconstruction is 47 x 48 x 13.5 m, so
   // indoors you stand inside a wall and cannot judge whether the model, its
-  // cards or its orientation are right at all. Turning modelTrueScale OFF makes
-  // SceneView normalise the whole fort to `modelScale` metres across — a
-  // tabletop model — which is exactly what desk verification needs and exactly
-  // what must never be used to author a pose.
-  const [deskPreview, setDeskPreview] = useState(false);
+  // cards or its orientation are right at all.
+  //
+  // modelTrueScale stays ON in every mode and `modelScale` is used as a plain
+  // multiplier, so ONE factor governs the model, the card positions, the card
+  // widths and the tap-target boxes. (Normalising instead — modelTrueScale off —
+  // would size the model from its bounding box and leave no factor to apply to
+  // the layer.)
+  const [previewScale, setPreviewScale] = useState<number>(TRUE_SCALE);
+  const [showCards, setShowCards] = useState(false);
+  const [tapped, setTapped] = useState<{
+    title: string;
+    meta?: string;
+    body?: string;
+  } | null>(null);
   const placedOnceRef = useRef(false);
 
   const tracking =
@@ -209,6 +243,38 @@ const StationAuthoringScreen: React.FC = () => {
    * from placeInFront, setGlbUri and every frame), so JS never has to sequence
    * the prop update against the command.
    */
+  const step = coarse ? 1 : 0.1;
+  const yawStep = coarse ? 15 : 2;
+  /**
+   * Any alignment change invalidates an already-captured pose. Without this you
+   * can capture, then keep nudging, then Save — and the station is written with
+   * the pose from BEFORE the nudges, with nothing on screen saying so.
+   */
+  const invalidateCapture = useCallback(() => {
+    setCaptured(prev => {
+      if (prev) {
+        setArError('Alignment changed — capture the pose again before saving.');
+      }
+      return null;
+    });
+  }, []);
+
+  const move = useCallback(
+    (dx: number, dy: number, dz: number) => {
+      arRef.current?.nudgeModel(dx, dy, dz);
+      invalidateCapture();
+    },
+    [invalidateCapture],
+  );
+
+  const rotate = useCallback(
+    (deg: number) => {
+      arRef.current?.nudgeYaw(deg);
+      invalidateCapture();
+    },
+    [invalidateCapture],
+  );
+
   const requestPlacement = useCallback(() => {
     placedOnceRef.current = true;
     setPlaced(false);
@@ -254,15 +320,62 @@ const StationAuthoringScreen: React.FC = () => {
     }
   }, [glbUri, requestPlacement]);
 
-  // Scale is read natively at PLACEMENT time, so flipping desk preview only
-  // takes effect on the next place. Re-place from an effect rather than from the
-  // press handler, so the new prop has reached native before the command goes.
-  const deskPreviewRef = useRef(deskPreview);
+  // Scale is read natively at PLACEMENT time, so changing it only takes effect
+  // on the next place. Re-place from an effect rather than from the press
+  // handler, so the new prop has reached native before the command goes.
+  const previewScaleRef = useRef(previewScale);
   useEffect(() => {
-    if (deskPreviewRef.current === deskPreview) return;
-    deskPreviewRef.current = deskPreview;
+    if (previewScaleRef.current === previewScale) return;
+    previewScaleRef.current = previewScale;
     if (glbUri) requestPlacement();
-  }, [deskPreview, glbUri, requestPlacement]);
+  }, [previewScale, glbUri, requestPlacement]);
+
+  /**
+   * Put the authored discovery layer on the current anchor at the current
+   * preview scale. The cards hang off the ANCHOR rather than the model node, so
+   * they must be scaled by the same factor the model is rendered at or a 1 m
+   * tabletop fort keeps its cards 48 m apart, out through the walls.
+   */
+  const layer = useMemo(
+    () => discoveryLayerFor(monumentId.trim() || null),
+    [monumentId],
+  );
+
+  const placeCards = useCallback(() => {
+    if (!layer) {
+      Alert.alert(
+        'No discovery layer',
+        `No authored cards for "${monumentId.trim()}".`,
+      );
+      return;
+    }
+    const scaled = scaleDiscoveryLayer(layer, previewScale);
+    arRef.current?.setTapTargets(JSON.stringify(scaled.tapTargets));
+    arRef.current?.placeDiscoveryCards(JSON.stringify(scaled.cards));
+  }, [layer, monumentId, previewScale]);
+
+  // Re-place the layer whenever it is on and the anchor or scale changed — the
+  // native call attaches to whatever anchor is current, so a re-placed model
+  // leaves the old cards behind otherwise.
+  useEffect(() => {
+    if (!showCards || !placed) return;
+    placeCards();
+  }, [showCards, placed, previewScale, placeCards]);
+
+  const handleElementTapped = useCallback((e: ElementTappedEvent) => {
+    let payload: {title?: string; meta?: string; body?: string; label?: string} =
+      {};
+    try {
+      payload = e.payload ? JSON.parse(e.payload) : {};
+    } catch {
+      payload = {};
+    }
+    setTapped({
+      title: payload.title || payload.label || e.id,
+      meta: payload.meta,
+      body: payload.body,
+    });
+  }, []);
 
   const handleAnchorPlaced = useCallback(() => setPlaced(true), []);
 
@@ -288,9 +401,31 @@ const StationAuthoringScreen: React.FC = () => {
   }, []);
 
   const handleCloudAnchorEvent = useCallback((e: CloudAnchorEvent) => {
-    if (e.phase === 'host' && e.state === 'SUCCESS' && e.cloudAnchorId) {
+    if (e.phase !== 'host') return;
+    if (e.state === 'SUCCESS' && e.cloudAnchorId) {
       setCloudAnchorId(e.cloudAnchorId);
+      setArError(null);
+      return;
     }
+    if (e.state === 'HOSTING') {
+      setArError(`Hosting cloud anchor… (map quality ${e.quality ?? '?'})`);
+      return;
+    }
+    // Every other terminal state is a FAILURE, and it used to be dropped on the
+    // floor: the button still read "Host cloud anchor", nothing said the 365-day
+    // lock had not happened, and the station would be saved geospatial-only
+    // without anyone knowing. ERROR_NOT_AUTHORIZED here means the 365-day TTL was
+    // refused — the anchor was not stored.
+    setCloudAnchorId(null);
+    setArError(
+      `CLOUD ANCHOR FAILED: ${e.state}${e.message ? ` — ${e.message}` : ''}`,
+    );
+    Alert.alert(
+      'Cloud anchor not hosted',
+      `${e.state}${e.message ? `\n\n${e.message}` : ''}\n\n` +
+        'You can still save: the station will be geospatial-only, which is less ' +
+        'precise but correctly placed. Do not assume it was hosted.',
+    );
   }, []);
 
   const save = useCallback(async () => {
@@ -367,8 +502,13 @@ const StationAuthoringScreen: React.FC = () => {
   ]);
 
   const statusLine = useMemo(() => {
+    // Surface state first: it is the difference between a model that rests on a
+    // real plane and one pinned to empty air, which drifts and tips away.
+    const surface = planeFound
+      ? 'Surface ✓'
+      : 'NO SURFACE YET — sweep the phone slowly across a textured area';
     if (!geo) {
-      return 'Move the phone so ARCore Geospatial starts…';
+      return `${surface} · Move the phone so ARCore Geospatial starts…`;
     }
     const acc =
       geo.horizontalAccuracy != null
@@ -376,8 +516,8 @@ const StationAuthoringScreen: React.FC = () => {
             geo.orientationYawAccuracy ?? 0
           ).toFixed(1)}°`
         : '';
-    return `Earth: ${geo.earthState} · ${geo.trackingState} ${acc}`;
-  }, [geo]);
+    return `${surface} · Earth: ${geo.earthState} · ${geo.trackingState} ${acc}`;
+  }, [geo, planeFound]);
 
   if (!isAdminUser(email)) {
     return <View style={styles.root} />;
@@ -389,16 +529,20 @@ const StationAuthoringScreen: React.FC = () => {
         ref={arRef}
         style={StyleSheet.absoluteFill}
         glbUri={glbUri}
-        // Author at the model's real size. Without this SceneView normalises the
-        // GLB to `modelScale` metres across, and the pose captured below would
-        // world-lock a scaled-down toy. Desk preview deliberately turns it off —
-        // and Save is blocked while it is off, for exactly that reason.
-        modelTrueScale={!deskPreview}
-        modelScale={1}
+        // Always true-scale semantics: modelScale is a plain multiplier here, not
+        // a normalisation target. 1 = as surveyed (the only value a pose may be
+        // captured at); the preview scales shrink model AND layer by one factor.
+        modelTrueScale
+        modelScale={previewScale}
+        onElementTapped={handleElementTapped}
         geospatialEnabled
         cloudAnchorsEnabled
         onReady={handleReady}
         onError={setArError}
+        // The plane grid is deliberately hidden, so without this there is no way
+        // to tell "ARCore has found a surface" from "it never will" — which is
+        // exactly the state that made the model float in mid-air and drift.
+        onPlaneDetected={() => setPlaneFound(true)}
         onAnchorPlaced={handleAnchorPlaced}
         onGeospatialState={setGeo}
         onGeospatialAnchorEvent={handleGeoAnchorEvent}
@@ -549,21 +693,36 @@ const StationAuthoringScreen: React.FC = () => {
         ) : null}
 
         {glbUri ? (
-          <Pressable
-            onPress={() => setDeskPreview(v => !v)}
-            style={[styles.btnSecondary, deskPreview && styles.btnOverrideOn]}>
-            <Text style={styles.btnSecondaryText}>
-              {deskPreview
-                ? 'DESK PREVIEW (1 m) — tap for true scale'
-                : 'True scale (47 m) — tap for desk preview'}
-            </Text>
-          </Pressable>
+          <View style={styles.row}>
+            <Pressable
+              onPress={() =>
+                setPreviewScale(k => {
+                  const i = PREVIEW_CYCLE.indexOf(k);
+                  return PREVIEW_CYCLE[(i + 1) % PREVIEW_CYCLE.length];
+                })
+              }
+              style={[
+                styles.btnSecondary,
+                styles.flex,
+                previewScale !== TRUE_SCALE && styles.btnOverrideOn,
+              ]}>
+              <Text style={styles.btnSecondaryText}>
+                {scaleLabel(previewScale)}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setShowCards(v => !v)}
+              style={[styles.btnSecondary, showCards && styles.btnOverrideOn]}>
+              <Text style={styles.btnSecondaryText}>
+                {showCards ? 'Cards ✓' : 'Show cards'}
+              </Text>
+            </Pressable>
+          </View>
         ) : null}
-        {deskPreview ? (
+        {previewScale !== TRUE_SCALE ? (
           <Text style={styles.hint}>
-            Preview only: the fort is normalised to 1 m so you can see all of it
-            indoors. Saving is blocked — a pose captured at this scale would
-            world-lock a toy.
+            Preview only — the fort and its cards are scaled together. Saving is
+            blocked: a pose captured at this scale would world-lock a toy.
           </Text>
         ) : null}
 
@@ -575,6 +734,77 @@ const StationAuthoringScreen: React.FC = () => {
           </Text>
         ) : null}
 
+        {/* Alignment pad — the on-site job. The anchor lands where you stand, so
+            the model has to be walked onto the real wall in both rotation AND
+            translation. Every adjustment here is folded into the pose that gets
+            saved, so what you line up is what a visitor sees. */}
+        {placed ? (
+          <View style={styles.alignWrap}>
+            <Text style={styles.label}>
+              ALIGN TO THE REAL WALL{' '}
+              {coarse ? '· 1 m / 15°' : '· 10 cm / 2°'}
+            </Text>
+            <View style={styles.row}>
+              <Pressable
+                onPress={() => setCoarse(c => !c)}
+                style={[styles.btnSecondary, styles.flex]}>
+                <Text style={styles.btnSecondaryText}>
+                  {coarse ? 'COARSE — tap for fine' : 'FINE — tap for coarse'}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  arRef.current?.resetAlignment();
+                  invalidateCapture();
+                }}
+                style={styles.btnSecondary}>
+                <Text style={styles.btnSecondaryText}>Reset</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.row}>
+              <Pressable onPress={() => move(-step, 0, 0)} style={[styles.pad, styles.flex]}>
+                <Text style={styles.padText}>◀ West</Text>
+              </Pressable>
+              <Pressable onPress={() => move(step, 0, 0)} style={[styles.pad, styles.flex]}>
+                <Text style={styles.padText}>East ▶</Text>
+              </Pressable>
+            </View>
+            <View style={styles.row}>
+              <Pressable onPress={() => move(0, 0, -step)} style={[styles.pad, styles.flex]}>
+                <Text style={styles.padText}>▲ Fwd</Text>
+              </Pressable>
+              <Pressable onPress={() => move(0, 0, step)} style={[styles.pad, styles.flex]}>
+                <Text style={styles.padText}>▼ Back</Text>
+              </Pressable>
+            </View>
+            <View style={styles.row}>
+              <Pressable onPress={() => move(0, step, 0)} style={[styles.pad, styles.flex]}>
+                <Text style={styles.padText}>↑ Up</Text>
+              </Pressable>
+              <Pressable onPress={() => move(0, -step, 0)} style={[styles.pad, styles.flex]}>
+                <Text style={styles.padText}>↓ Down</Text>
+              </Pressable>
+            </View>
+            <View style={styles.row}>
+              <Pressable
+                onPress={() => rotate(-yawStep)}
+                style={[styles.pad, styles.flex]}>
+                <Text style={styles.padText}>↺ {yawStep}°</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => rotate(yawStep)}
+                style={[styles.pad, styles.flex]}>
+                <Text style={styles.padText}>{yawStep}° ↻</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.hint}>
+              Aim: the reconstruction's stone base meets the crest of the real
+              wall — 5.39 m on the Delhi Gate run, 7.39 m on the other.
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.actions}>
           <Pressable
             onPress={requestPlacement}
@@ -583,13 +813,6 @@ const StationAuthoringScreen: React.FC = () => {
             <Text style={styles.btnSecondaryText}>
               {placed ? 'Re-place' : 'Place'}
             </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => arRef.current?.nudgeYaw(15)}
-            disabled={!placed}
-            style={[styles.btnSecondary, !placed && styles.btnDisabled]}>
-            <Text style={styles.btnSecondaryText}>Nudge yaw 15°</Text>
           </Pressable>
 
           <Pressable
@@ -649,13 +872,16 @@ const StationAuthoringScreen: React.FC = () => {
 
           <Pressable
             onPress={save}
-            disabled={!captured || busy || deskPreview}
+            disabled={!captured || busy || previewScale !== TRUE_SCALE}
             style={[
               styles.btn,
-              (!captured || busy || deskPreview) && styles.btnDisabled,
+              (!captured || busy || previewScale !== TRUE_SCALE) &&
+                styles.btnDisabled,
             ]}>
             <Text style={styles.btnText}>
-              {deskPreview ? 'Save (blocked in preview)' : 'Save station'}
+              {previewScale !== TRUE_SCALE
+                ? 'Save (blocked in preview)'
+                : 'Save station'}
             </Text>
           </Pressable>
         </View>
@@ -665,6 +891,25 @@ const StationAuthoringScreen: React.FC = () => {
         </Pressable>
         </ScrollView>
       )}
+
+      {/* Tap result — proves the 135 tap-target boxes and the card quads
+          actually resolve, which nothing has ever exercised. */}
+      {tapped ? (
+        <Pressable
+          onPress={() => setTapped(null)}
+          style={[styles.tapSheet, {paddingBottom: insets.bottom + 16}]}>
+          <Text style={styles.tapTitle}>{tapped.title}</Text>
+          {tapped.meta ? (
+            <Text style={styles.tapMeta}>{tapped.meta}</Text>
+          ) : null}
+          {tapped.body ? (
+            <Text style={styles.tapBody} numberOfLines={6}>
+              {tapped.body}
+            </Text>
+          ) : null}
+          <Text style={styles.tapDismiss}>Tap to dismiss</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 };
@@ -687,6 +932,42 @@ const styles = StyleSheet.create({
   },
   hiddenStatus: {color: '#8ED0FF', fontSize: 12},
   arError: {color: '#FFB4A2', fontSize: 12},
+  alignWrap: {
+    borderWidth: 1,
+    borderColor: 'rgba(201,168,76,0.45)',
+    borderRadius: 10,
+    padding: 10,
+    gap: 6,
+    marginTop: 8,
+  },
+  pad: {
+    backgroundColor: 'rgba(201,168,76,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(201,168,76,0.45)',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  padText: {color: '#F5F0E8', fontSize: 14, fontWeight: '700'},
+  tapSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(10,10,10,0.94)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(201,168,76,0.5)',
+    padding: 16,
+    gap: 4,
+  },
+  tapTitle: {color: '#F5F0E8', fontSize: 16, fontWeight: '700'},
+  tapMeta: {color: '#C9A84C', fontSize: 11, letterSpacing: 0.6},
+  tapBody: {color: 'rgba(245,240,232,0.82)', fontSize: 13, lineHeight: 19},
+  tapDismiss: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 11,
+    marginTop: 6,
+  },
   hiddenActions: {flexDirection: 'row', gap: 8},
   title: {color: '#FFF', fontSize: 16, fontWeight: '700'},
   status: {color: '#8ED0FF', fontSize: 12, marginBottom: 6},

@@ -180,6 +180,8 @@ class EpocheyeDetectARViewManager(
             .put("placeInFront", CMD_PLACE_IN_FRONT)
             .put("clearAnchor", CMD_CLEAR_ANCHOR)
             .put("nudgeYaw", CMD_NUDGE_YAW)
+            .put("nudgeModel", CMD_NUDGE_MODEL)
+            .put("resetAlignment", CMD_RESET_ALIGNMENT)
             .put("captureFrame", CMD_CAPTURE_FRAME)
             .put("hostCloudAnchor", CMD_HOST_CLOUD_ANCHOR)
             .put("resolveCloudAnchor", CMD_RESOLVE_CLOUD_ANCHOR)
@@ -224,6 +226,13 @@ class EpocheyeDetectARViewManager(
             }
             CMD_PLACE_IN_FRONT -> view.placeInFront()
             CMD_CLEAR_ANCHOR -> view.clearAnchor()
+            CMD_NUDGE_MODEL -> {
+                val dx = args?.getDouble(0)?.toFloat() ?: return
+                val dy = args.getDouble(1).toFloat()
+                val dz = args.getDouble(2).toFloat()
+                view.nudgeModel(dx, dy, dz)
+            }
+            CMD_RESET_ALIGNMENT -> view.resetAlignment()
             CMD_NUDGE_YAW -> {
                 val deg = args?.getDouble(0)?.toFloat() ?: return
                 view.nudgeYaw(deg)
@@ -286,6 +295,13 @@ class EpocheyeDetectARViewManager(
                 val deg = args?.getDouble(0)?.toFloat() ?: return
                 view.nudgeYaw(deg)
             }
+            "nudgeModel" -> {
+                val dx = args?.getDouble(0)?.toFloat() ?: return
+                val dy = args.getDouble(1).toFloat()
+                val dz = args.getDouble(2).toFloat()
+                view.nudgeModel(dx, dy, dz)
+            }
+            "resetAlignment" -> view.resetAlignment()
             "captureFrame" -> view.captureFrame()
             "hostCloudAnchor" -> {
                 val ttlDays = args?.getDouble(0)?.toInt() ?: 365
@@ -351,6 +367,8 @@ class EpocheyeDetectARViewManager(
         private const val CMD_PLACE_FROM_DETECTION = 2
         private const val CMD_CLEAR_ANCHOR = 3
         private const val CMD_NUDGE_YAW = 4
+        private const val CMD_NUDGE_MODEL = 90
+        private const val CMD_RESET_ALIGNMENT = 91
         private const val CMD_CAPTURE_FRAME = 5
         private const val CMD_PLACE_IN_FRONT = 6
         private const val CMD_PLACE_CARDS_ONLY = 7

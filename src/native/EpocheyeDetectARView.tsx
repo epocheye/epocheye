@@ -151,6 +151,15 @@ export interface EpocheyeDetectARHandle {
   placeInFront: () => void;
   clearAnchor: () => void;
   nudgeYaw: (deg: number) => void;
+  /**
+   * Slide the placed model within its anchor, in anchor-local metres.
+   * Alignment needs translation as well as yaw: the anchor lands wherever the
+   * author was standing, so rotation alone can never bring a reconstruction
+   * onto a surviving wall. Folded into the captured geospatial pose.
+   */
+  nudgeModel: (dx: number, dy: number, dz: number) => void;
+  /** Drop yaw + offset back to the anchor's own pose. */
+  resetAlignment: () => void;
   captureFrame: () => void;
   /** DEV: host the currently placed anchor as an ARCore Cloud Anchor (TTL 1–365 days). */
   hostCloudAnchor: (ttlDays: number) => void;
@@ -274,6 +283,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         placeInFront: commands.placeInFront,
         clearAnchor: commands.clearAnchor,
         nudgeYaw: commands.nudgeYaw,
+        nudgeModel: commands.nudgeModel,
+        resetAlignment: commands.resetAlignment,
         captureFrame: commands.captureFrame,
         hostCloudAnchor: commands.hostCloudAnchor,
         resolveCloudAnchor: commands.resolveCloudAnchor,
@@ -314,6 +325,9 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         placeInFront: () => dispatch(commandIds?.placeInFront, []),
         clearAnchor: () => dispatch(commandIds?.clearAnchor, []),
         nudgeYaw: deg => dispatch(commandIds?.nudgeYaw, [deg]),
+        nudgeModel: (dx, dy, dz) =>
+          dispatch(commandIds?.nudgeModel, [dx, dy, dz]),
+        resetAlignment: () => dispatch(commandIds?.resetAlignment, []),
         captureFrame: () => dispatch(commandIds?.captureFrame, []),
         hostCloudAnchor: ttlDays =>
           dispatch(commandIds?.hostCloudAnchor, [ttlDays]),

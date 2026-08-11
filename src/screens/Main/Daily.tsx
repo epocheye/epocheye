@@ -4,7 +4,6 @@ import {
   Linking,
   Pressable,
   RefreshControl,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -29,6 +28,7 @@ import {ROUTES} from '../../core/constants/routes';
 import StreakModule from '../../components/ui/StreakModule';
 import {AmbientGlow, ImageScrim} from '../../components/ui/premium';
 import {TourTarget} from '../../components/tour/useTourTarget';
+import TourScrollView from '../../components/tour/TourScrollView';
 import {useDailyToday} from '../../shared/hooks';
 import type {DailyStreakDay} from '../../utils/api/daily';
 import type {TabScreenProps} from '../../core/types/navigation.types';
@@ -151,7 +151,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
     <View className="flex-1 bg-background">
       <StatusBar barStyle="light-content" />
       <SafeAreaView edges={['top']} className="bg-background" />
-      <ScrollView
+      <TourScrollView
         contentContainerStyle={{paddingBottom: 120}}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -177,8 +177,13 @@ const Daily: React.FC<Props> = ({navigation}) => {
         </Animated.View>
 
         {/* Streak hero — the single gold block */}
-        <TourTarget id="daily.streak">
-          <Animated.View style={sStreak} className="px-5 mb-5">
+        {/* The card's own inset lives on the TourTarget so the spotlight
+            measures the card rather than the full-width wrapper. */}
+        <TourTarget
+          id="daily.streak"
+          radius={20}
+          style={{marginHorizontal: 20, marginBottom: 20}}>
+          <Animated.View style={sStreak}>
             <StreakModule
               days={streakCount}
               week={
@@ -361,7 +366,7 @@ const Daily: React.FC<Props> = ({navigation}) => {
             })}
           </View>
         </Animated.View>
-      </ScrollView>
+      </TourScrollView>
     </View>
   );
 };

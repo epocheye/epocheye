@@ -3,7 +3,10 @@ import './global.css';
 import React, { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import {
+  SafeAreaProvider,
+  initialWindowMetrics,
+} from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AppNavigator from './src/navigation';
 import { NetworkProvider, useNetwork } from './src/context';
@@ -84,7 +87,13 @@ export default function App() {
           KeyboardAvoidingView mis-measures there (inputs hid behind the
           keyboard on every typing screen). */}
       <KeyboardProvider>
-      <SafeAreaProvider style={{ backgroundColor: '#000000' }}>
+      {/* initialMetrics avoids a first frame with insets.top === 0, which made
+          inset-positioned chrome (onboarding progress bar, tour overlay) flash
+          flush against the status bar before settling. */}
+      <SafeAreaProvider
+        initialMetrics={initialWindowMetrics}
+        style={{ backgroundColor: '#000000' }}
+      >
         <NetworkProvider>
           {/* Root boundary: convert an uncaught render/lifecycle error from a
               silent app close into a calm, recoverable screen (logs to logcat). */}

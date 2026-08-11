@@ -59,7 +59,7 @@ const OBProgressBar: React.FC<Props> = ({current, total}) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View className="px-6 pb-3" style={{paddingTop: insets.top + 14}}>
+    <View className="px-6 pb-3" style={{paddingTop: insets.top + 24}}>
       <View className="flex-row" style={{gap: SEGMENT_GAP}}>
         {Array.from({length: total}, (_, i) => (
           <Segment key={i} index={i} current={current} />
