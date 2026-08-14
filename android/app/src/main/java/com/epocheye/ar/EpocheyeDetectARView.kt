@@ -281,7 +281,14 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     // How long a Front placement waits for ARCore to report a tracked plane before
     // settling for a free-space anchor. Long enough for detection to catch up after
     // being re-enabled; short enough that a textureless room still gets a model.
-    private val planeWaitNanos = 4_000L * 1_000_000L
+    //
+    // Measured on-device 2026-08-14: at 4 s, three of four placements fell through to
+    // the free-space branch — including on a well-lit office floor — because plane
+    // detection needs PARALLAX, and the seconds right after tapping Load are exactly
+    // when the phone is held still to read the screen. A free-space anchor is the one
+    // that drifts and tips, which is what "the model floats away" has meant every time.
+    // Waiting is cheap and reversible; a drifting anchor costs a site visit.
+    private val planeWaitNanos = 12_000L * 1_000_000L
     private var planeWaitDeadlineNanos: Long = 0L
 
     /** Last logged anchor tracking/visibility signature, so only changes print. */
@@ -972,17 +979,30 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     nearestPlane.createAnchor(nearestPlane.centerPose)
                 }
                 else -> {
+                    val cam = frame.camera.pose
+                    val target = cam.compose(Pose.makeTranslation(0f, 0f, -1.2f))
+                    // Drop a SURVEYED reconstruction to the estimated ground.
+                    //
+                    // Free space carries no floor, so the anchor used to inherit the
+                    // camera's own height. For a detected object that is right — you
+                    // want it at eye level. For a true-scale building it is not: this
+                    // model's origin IS its ground course (y runs 0 → 13.52 m), so the
+                    // fort materialised with its base at the admin's chest and every
+                    // authoring session began by tapping "Down" fifteen times, at 1 m a
+                    // press, while the real wall it had to meet was underfoot.
+                    // Estimating the floor as eye-height below the camera is wrong by
+                    // how far the phone is from a standing hold — centimetres, which the
+                    // fine pad closes in a tap or two — instead of wrong by a storey.
+                    val y = if (modelTrueScale) cam.ty() - EYE_HEIGHT_M else target.ty()
                     Log.i(
                         TAG,
-                        "placeInFront: no tracked plane at all — free-space fallback 1.2 m ahead",
+                        "placeInFront: no tracked plane at all — free-space fallback " +
+                            "1.2 m ahead (trueScale=$modelTrueScale, y=%.2f vs camera %.2f)"
+                                .format(y, cam.ty()),
                     )
-                    val target =
-                        frame.camera.pose.compose(Pose.makeTranslation(0f, 0f, -1.2f))
                     // Identity rotation so the model stays upright rather than
                     // inheriting the camera's tilt.
-                    session.createAnchor(
-                        Pose.makeTranslation(target.tx(), target.ty(), target.tz()),
-                    )
+                    session.createAnchor(Pose.makeTranslation(target.tx(), y, target.tz()))
                 }
             }
         } catch (t: Throwable) {
@@ -2704,6 +2724,16 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
     companion object {
         private const val TAG = "EpocheyeDetectARView"
+
+        /**
+         * Assumed height of a hand-held phone above the ground, in metres.
+         *
+         * Only ever used to guess where the floor is when ARCore has found no plane
+         * at all, and only for true-scale models whose origin is their ground course.
+         * Being 20 cm out here is a couple of taps on the fine pad; inheriting the
+         * camera's own height instead put a 13.5 m building's base at chest level.
+         */
+        private const val EYE_HEIGHT_M = 1.5f
 
         // Dev harness: VPS-availability probe log tag. Coordinates are the
         // device's CURRENT location, passed in from JS per call.

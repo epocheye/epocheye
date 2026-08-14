@@ -5,8 +5,12 @@
  * a persisted pass/fail status, and the crash journal (including native-crash
  * "died on screen X" detection).
  *
- * Compiles to a no-op in production builds (and the target screen is only
- * registered in dev, see MainNavigation).
+ * Renders for `__DEV__` OR an admin email — it does NOT vanish in release, and
+ * `DevHealthCheckScreen` is registered unconditionally in MainNavigation. That
+ * is deliberate: this button is the only route to the on-site authoring tool, so
+ * gating it on __DEV__ would mean the admin at a monument, holding a release
+ * build, could not reach the thing they travelled there to use. Access is gated
+ * by the email allowlist instead. (This comment previously claimed the opposite.)
  */
 
 import React, {useCallback} from 'react';

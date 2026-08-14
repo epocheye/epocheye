@@ -69,10 +69,10 @@ const MAX_YAW_ACC_DEG = 12;
 // reaches it — tree cover, tall buildings, thin VPS coverage — leaves the visitor
 // staring at "move the phone slowly" forever, with no way to see the thing they
 // walked to. The geospatial pose is the COARSE lock; a hosted cloud anchor is
-// what makes it precise. So past this wider bound we offer an explicit
-// "lock on anyway", and the achieved accuracy is shown on the button.
-const OVERRIDE_HORIZ_ACC_M = 8;
-const OVERRIDE_YAW_ACC_DEG = 25;
+// what makes it precise. So once waiting has visibly failed we offer an explicit
+// escape, with the achieved accuracy shown on the button. There is deliberately
+// no upper bound on it: a bound is what turns "degraded" into "impossible", and
+// the visitor is standing in front of the monument either way.
 /** Only offer the override once it is clear waiting is not working. */
 const OVERRIDE_OFFER_AFTER_MS = 12000;
 
@@ -109,6 +109,7 @@ const SiteReconstructionScreen: React.FC<
   const arRef = useRef<EpocheyeDetectARHandle>(null);
 
   const loc = usePlacesStore(s => s.currentLocation);
+  const ensureLocationTracking = usePlacesStore(s => s.ensureLocationTracking);
   const [phase, setPhase] = useState<Phase>('loading');
   const [arError, setArError] = useState<string | null>(null);
   const [target, setTarget] = useState<ViewingStation | null>(null);
@@ -130,6 +131,21 @@ const SiteReconstructionScreen: React.FC<
     loc ? {latitude: loc.latitude, longitude: loc.longitude} : null,
     phase === 'guiding',
   );
+
+  /**
+   * Start location tracking rather than assuming somebody else did.
+   *
+   * Every other screen that needs a fix asks for one (DetectAr, GoToVenue, Home);
+   * this one only READ `currentLocation` and worked purely because Home happens to
+   * mount first at launch. Reached cold — a deep link, a process restart in the
+   * car park, Android killing the app after an AR session — `loc` stays null, so
+   * `distance` stays null and the banner says "finding a viewing station" forever
+   * with nothing on screen to explain why. It is idempotent, so calling it here
+   * costs nothing when Home already did.
+   */
+  useEffect(() => {
+    void ensureLocationTracking();
+  }, [ensureLocationTracking]);
 
   // 1. Load the site's stations.
   useEffect(() => {
@@ -172,11 +188,23 @@ const SiteReconstructionScreen: React.FC<
 
   // 2. Pick the nearest station once (frozen so guidance doesn't flip-flop).
   useEffect(() => {
-    if (target || !loc) {
+    if (target) {
       return;
     }
     const stations = pendingStationsRef.current;
     if (!stations || stations.length === 0) {
+      return;
+    }
+    if (!loc) {
+      // No fix yet. Worth waiting for — but not forever. Without a target there is
+      // no model id to resolve and no pose to place, so a location that never
+      // arrives (permission denied, a cold start indoors, a phone that has not
+      // seen sky) strands this screen even after the visitor presses the range
+      // override. Once waiting has visibly failed, take the first station: a site
+      // has one or two, and picking the wrong one is a walk, not a dead end.
+      if (waitedForLock) {
+        setTarget(stations[0]);
+      }
       return;
     }
     let best: ViewingStation | null = null;
@@ -193,7 +221,7 @@ const SiteReconstructionScreen: React.FC<
       }
     }
     setTarget(best ?? stations[0]);
-  }, [target, loc, phase]);
+  }, [target, loc, phase, waitedForLock]);
 
   // 3. Resolve the target's model GLB.
   useEffect(() => {
@@ -227,26 +255,46 @@ const SiteReconstructionScreen: React.FC<
       ? relativeBearing(bearing, heading.heading)
       : null;
   const maxR = target?.view_radius_max_m ?? 30;
-  const inRange = distance != null && distance <= maxR;
+  const gpsInRange = distance != null && distance <= maxR;
+  /**
+   * The range test is a GPS test, and GPS is the least trustworthy thing here.
+   *
+   * Bangalore Fort reported a 20 m error on the last visit, and this device logged
+   * fixes with a claimed accuracy of 163 m indoors. When the error exceeds the
+   * station's radius the visitor is standing AT the monument being told to walk to
+   * it, and because `showAr` keys off this flag the camera never even opens — so
+   * there is nothing on screen to argue with. Accuracy had an escape hatch and
+   * range did not, which is backwards: an over-tight radius is the more likely
+   * failure of the two. `lockOverride` now releases both.
+   */
+  const inRange = gpsInRange || lockOverride;
   const tracking =
     geo?.earthState === 'ENABLED' && geo?.trackingState === 'TRACKING';
   const accuracyIdeal =
     tracking &&
     (geo?.horizontalAccuracy ?? 99) <= MAX_HORIZ_ACC_M &&
     (geo?.orientationYawAccuracy ?? 99) <= MAX_YAW_ACC_DEG;
-  /** Wide enough to still be worth placing, once waiting has clearly failed. */
+  /**
+   * Offered once waiting has visibly failed, whatever the reason — a loose fix, a
+   * radius GPS says we are outside, or both. Deliberately NOT bounded by an upper
+   * accuracy limit: a bound turns "degraded" into "impossible", and the visitor is
+   * standing in front of the monument either way. The achieved accuracy is on the
+   * button, so the choice is informed rather than hidden.
+   */
   const overrideAvailable =
-    tracking &&
-    !accuracyIdeal &&
     waitedForLock &&
-    (geo?.horizontalAccuracy ?? 99) <= OVERRIDE_HORIZ_ACC_M &&
-    (geo?.orientationYawAccuracy ?? 99) <= OVERRIDE_YAW_ACC_DEG;
-  const accuracyOk = accuracyIdeal || (lockOverride && overrideAvailable);
+    // Out of range there is no camera yet — `showAr` keys off the range test — so
+    // `geo` is null and `tracking` is false. Requiring tracking here would hide the
+    // escape in precisely the case it exists for, which is the bug this replaced.
+    (!gpsInRange || (tracking && !accuracyIdeal));
+  const accuracyOk = accuracyIdeal || (lockOverride && tracking);
 
-  // Start the clock once the visitor is actually standing at the station: only
-  // then is "it isn't locking" a real answer rather than impatience.
+  // Start the clock as soon as anything is holding the lock back — being outside
+  // the radius counts. Gating this on being in range meant the one failure the
+  // visitor cannot resolve by standing still was also the one that never offered
+  // a way out.
   useEffect(() => {
-    if (phase !== 'guiding' || !inRange || accuracyIdeal) {
+    if (phase !== 'guiding' || (gpsInRange && accuracyIdeal)) {
       return;
     }
     const timer = setTimeout(
@@ -254,7 +302,7 @@ const SiteReconstructionScreen: React.FC<
       OVERRIDE_OFFER_AFTER_MS,
     );
     return () => clearTimeout(timer);
-  }, [phase, inRange, accuracyIdeal]);
+  }, [phase, gpsInRange, accuracyIdeal]);
 
   const placeLayer = useCallback(() => {
     if (!layer) {
@@ -535,9 +583,14 @@ const SiteReconstructionScreen: React.FC<
                 pressed && {opacity: 0.85},
               ]}>
               <Text style={styles.overrideText}>
-                {t('reconstruction.lockAnyway', {
-                  acc: (geo?.horizontalAccuracy ?? 0).toFixed(1),
-                })}
+                {gpsInRange
+                  ? t('reconstruction.lockAnyway', {
+                      acc: (geo?.horizontalAccuracy ?? 0).toFixed(1),
+                    })
+                  : t('reconstruction.showAnyway', {
+                      distance:
+                        distance != null ? formatDistance(distance) : '—',
+                    })}
               </Text>
             </Pressable>
           </View>

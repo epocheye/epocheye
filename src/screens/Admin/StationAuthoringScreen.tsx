@@ -52,14 +52,13 @@ import {
   type ViewingStation,
 } from '../../utils/api/ar';
 
-// Author only when localisation is this good (metres / degrees).
+// Author without ceremony when localisation is this good (metres / degrees).
 const MAX_HORIZ_ACC_M = 2.5;
 const MAX_YAW_ACC_DEG = 8;
-// Absolute floor for an explicit override. The geospatial pose is the COARSE lock —
-// a hosted cloud anchor is what makes it centimetre-precise — so a hard 2.5 m gate is
-// stricter than the pipeline actually needs, and a site that only ever reports 2.6 m
-// would otherwise be unauthorable. The achieved accuracy is stored either way
-// (captured_horiz_acc_m / captured_yaw_acc_deg), so the quality signal is never lost.
+// Still good enough to author against without a warning. The geospatial pose is the
+// COARSE lock — a hosted cloud anchor is what makes it centimetre-precise — so a hard
+// 2.5 m gate is stricter than the pipeline actually needs, and a site that only ever
+// reports 2.6 m would otherwise be unauthorable.
 const OVERRIDE_HORIZ_ACC_M = 6;
 const OVERRIDE_YAW_ACC_DEG = 18;
 const CLOUD_ANCHOR_TTL_DAYS = 365;
@@ -123,7 +122,18 @@ const StationAuthoringScreen: React.FC = () => {
     activeMonument?.slug === 'bangalore-fort' ? 'bangalore_fort_recon_v2' : '',
   );
   const [title, setTitle] = useState('');
-  const [viewRadiusMax, setViewRadiusMax] = useState('30');
+  /**
+   * 60 m, not 30.
+   *
+   * This number is compared against a GPS distance, and it decides whether the
+   * visitor's camera opens at all. Bangalore Fort measured a 20 m GPS error on
+   * the last visit, and the reconstruction is 47 m across — so a 30 m radius can
+   * put someone standing inside the footprint "out of range". The radius costs
+   * nothing when generous (it only decides how early the lock is offered; the
+   * placement itself comes from the WGS84 pose), and costs the whole visit when
+   * tight. Still editable per station.
+   */
+  const [viewRadiusMax, setViewRadiusMax] = useState('60');
   const [glbUri, setGlbUri] = useState<string | undefined>(undefined);
   const [placed, setPlaced] = useState(false);
   const [geo, setGeo] = useState<GeospatialStateEvent | null>(null);
@@ -182,11 +192,23 @@ const StationAuthoringScreen: React.FC = () => {
     tracking &&
     (geo?.horizontalAccuracy ?? 99) <= MAX_HORIZ_ACC_M &&
     (geo?.orientationYawAccuracy ?? 99) <= MAX_YAW_ACC_DEG;
-  const overrideAvailable =
-    tracking &&
-    !accuracyIdeal &&
-    (geo?.horizontalAccuracy ?? 99) <= OVERRIDE_HORIZ_ACC_M &&
-    (geo?.orientationYawAccuracy ?? 99) <= OVERRIDE_YAW_ACC_DEG;
+  /**
+   * The override is offered for ANY tracking fix, not only a nearly-good one.
+   *
+   * It used to be capped at 6 m / 18°, which reads as prudent and is in fact the
+   * worst possible failure: a site that settles at 7 m shows no button at all, and
+   * the admin — standing at the monument, one trip, no adb — has no way to author
+   * anything and no way to tell whether waiting longer would help. Being stuck is
+   * not a safer outcome than a coarse station; the coarse one is fixable later from
+   * the "Correct" row, and the hosted cloud anchor is what supplies precision
+   * regardless. The achieved numbers go into the row either way
+   * (captured_horiz_acc_m / captured_yaw_acc_deg), so nothing is hidden — and
+   * anything past the comfortable band says so, loudly, on the button itself.
+   */
+  const overrideAvailable = tracking && !accuracyIdeal;
+  const accuracyPoor =
+    (geo?.horizontalAccuracy ?? 99) > OVERRIDE_HORIZ_ACC_M ||
+    (geo?.orientationYawAccuracy ?? 99) > OVERRIDE_YAW_ACC_DEG;
   const accuracyOk = accuracyIdeal || (override && overrideAvailable);
 
   const refreshExisting = useCallback(async (slug: string) => {
@@ -927,10 +949,27 @@ const StationAuthoringScreen: React.FC = () => {
               {override
                 ? `Override ON — capturing at ±${(
                     geo?.horizontalAccuracy ?? 0
-                  ).toFixed(1)} m (recorded)`
-                : 'Capture anyway at this accuracy'}
+                  ).toFixed(1)} m / ${(geo?.orientationYawAccuracy ?? 0).toFixed(
+                    0,
+                  )}° (recorded)`
+                : accuracyPoor
+                  ? `Capture anyway — POOR fix ±${(
+                      geo?.horizontalAccuracy ?? 0
+                    ).toFixed(1)} m / ${(
+                      geo?.orientationYawAccuracy ?? 0
+                    ).toFixed(0)}°`
+                  : 'Capture anyway at this accuracy'}
             </Text>
           </Pressable>
+        ) : null}
+        {overrideAvailable && placed && accuracyPoor ? (
+          <Text style={styles.hint}>
+            Past the comfortable band. Walk a slow arc for another 30 s first — the
+            fix usually tightens a lot. If it will not, capture anyway and HOST THE
+            CLOUD ANCHOR: the anchor is what makes the placement precise, and the
+            recorded accuracy tells you later whether this station is worth
+            re-authoring.
+          </Text>
         ) : null}
 
         {captured ? (

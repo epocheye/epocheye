@@ -519,6 +519,7 @@
     "pointAround": "Point the phone around",
     "away": "{{distance}} away · {{turn}}",
     "lockAnyway": "Lock on anyway ({{acc}} m)",
+    "showAnyway": "I’m already here — show it ({{distance}} by GPS)",
     "thisPart": "This part of the fort",
     "tapToClose": "Tap anywhere to close"
   }
