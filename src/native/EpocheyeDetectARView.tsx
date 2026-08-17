@@ -92,6 +92,29 @@ export interface ElementTappedEvent {
   payload?: string;
 }
 
+/**
+ * Where the author was standing when they marked a two-point alignment feature,
+ * in the placement anchor's local frame (metres). `error` set means nothing was
+ * recorded — never treat a zeroed point as a mark.
+ */
+export interface AlignmentPointEvent {
+  index: number;
+  x: number;
+  y: number;
+  z: number;
+  error?: string;
+}
+
+/**
+ * Android thermal status. `severe` means the system is actively throttling and
+ * a shutdown is a real possibility — the view has already dropped geospatial by
+ * the time this arrives.
+ */
+export interface ThermalStatusEvent {
+  status: number;
+  severe: boolean;
+}
+
 interface NativeProps {
   style?: ViewStyle;
   glbUri?: string;
@@ -125,6 +148,8 @@ interface NativeProps {
   // Site-readiness pipeline (PERMANENT).
   onGeospatialAnchorEvent?: (event: {nativeEvent: GeospatialAnchorEvent}) => void;
   onElementTapped?: (event: {nativeEvent: ElementTappedEvent}) => void;
+  onAlignmentPoint?: (event: {nativeEvent: AlignmentPointEvent}) => void;
+  onThermalStatus?: (event: {nativeEvent: ThermalStatusEvent}) => void;
 }
 
 const NativeDetectARView = ((): HostComponent<NativeProps> | null => {
@@ -197,6 +222,23 @@ export interface EpocheyeDetectARHandle {
    * [{id, min:[x,y,z], max:[x,y,z], ...payload}] in the anchor's local frame.
    */
   setTapTargets: (targetsJson: string) => void;
+  /**
+   * Take the discovery layer down: destroys the card nodes and forgets the
+   * payload. Hiding the cards in JS alone was cosmetic — native kept the last
+   * layer and kept re-posing it, and there was no way to un-arm it short of
+   * unmounting the screen.
+   */
+  clearDiscoveryLayer: () => void;
+  /**
+   * Two-point alignment: record where the author is standing right now, in the
+   * placement anchor's frame. Result arrives on `onAlignmentPoint`.
+   */
+  markAlignmentPoint: (index: number) => void;
+  /**
+   * Two-point alignment: set the model's yaw (degrees) and anchor-local offset
+   * (metres) absolutely, replacing whatever the nudge pad accumulated.
+   */
+  applyAlignment: (yawDeg: number, dx: number, dy: number, dz: number) => void;
 }
 
 interface Props {
@@ -243,6 +285,10 @@ interface Props {
   onGeospatialAnchorEvent?: (event: GeospatialAnchorEvent) => void;
   /** A tap landed on a discovery card or a named part of the reconstruction. */
   onElementTapped?: (event: ElementTappedEvent) => void;
+  /** Result of markAlignmentPoint — two-point alignment. */
+  onAlignmentPoint?: (event: AlignmentPointEvent) => void;
+  /** Device thermal state changed; `severe` = actively throttling. */
+  onThermalStatus?: (event: ThermalStatusEvent) => void;
 }
 
 const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
@@ -269,6 +315,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       onGeospatialState, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       onGeospatialAnchorEvent, // site-readiness pipeline (PERMANENT)
       onElementTapped,
+      onAlignmentPoint, // site-readiness pipeline (PERMANENT)
+      onThermalStatus,
     },
     ref,
   ) => {
@@ -299,6 +347,9 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         placeGeospatialAnchor: commands.placeGeospatialAnchor,
         placeDiscoveryCards: commands.placeDiscoveryCards,
         setTapTargets: commands.setTapTargets,
+        clearDiscoveryLayer: commands.clearDiscoveryLayer,
+        markAlignmentPoint: commands.markAlignmentPoint,
+        applyAlignment: commands.applyAlignment,
       };
     }, []);
 
@@ -357,6 +408,12 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           dispatch(commandIds?.placeDiscoveryCards, [cardsJson]),
         setTapTargets: targetsJson =>
           dispatch(commandIds?.setTapTargets, [targetsJson]),
+        clearDiscoveryLayer: () =>
+          dispatch(commandIds?.clearDiscoveryLayer, []),
+        markAlignmentPoint: index =>
+          dispatch(commandIds?.markAlignmentPoint, [index]),
+        applyAlignment: (yawDeg, dx, dy, dz) =>
+          dispatch(commandIds?.applyAlignment, [yawDeg, dx, dy, dz]),
       }),
       [commandIds],
     );
@@ -437,6 +494,18 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           onElementTapped
             ? (e: {nativeEvent: ElementTappedEvent}) =>
                 onElementTapped(e.nativeEvent)
+            : undefined
+        }
+        onAlignmentPoint={
+          onAlignmentPoint
+            ? (e: {nativeEvent: AlignmentPointEvent}) =>
+                onAlignmentPoint(e.nativeEvent)
+            : undefined
+        }
+        onThermalStatus={
+          onThermalStatus
+            ? (e: {nativeEvent: ThermalStatusEvent}) =>
+                onThermalStatus(e.nativeEvent)
             : undefined
         }
       />

@@ -304,6 +304,20 @@ const SiteReconstructionScreen: React.FC<
     return () => clearTimeout(timer);
   }, [phase, gpsInRange, accuracyIdeal]);
 
+  /** '' from native means "the fault cleared" — see StationAuthoringScreen. */
+  const handleArError = useCallback((msg: string) => {
+    setArError(msg || null);
+  }, []);
+
+  /**
+   * Thermal throttling. Native sheds geospatial on its own; a visitor does not
+   * need a diagnostic, but whoever is debugging on site does, so this only shows
+   * behind the admin gate alongside the other native diagnostics.
+   */
+  const handleThermal = useCallback((e: {status: number; severe: boolean}) => {
+    setArError(e.severe ? `device throttling (thermal ${e.status})` : null);
+  }, []);
+
   const placeLayer = useCallback(() => {
     if (!layer) {
       return;
@@ -526,9 +540,21 @@ const SiteReconstructionScreen: React.FC<
           // so the real wall in the camera feed SHOULD hide the parts of the model
           // behind it — including the rampart core's far face. Armed at session
           // creation; ARCore checks isDepthModeSupported and degrades to no
-          // occlusion on devices without depth, so this is safe everywhere.
-          depthArmed
-          depthOcclusionEnabled
+          // occlusion on devices without depth, so arming is safe everywhere.
+          //
+          // But the occlusion itself is OFF. Proven at Bangalore Fort 2026-08-15:
+          // ARCore's depth map is only trustworthy to roughly 5 m, and a viewing
+          // station stands 20-40 m back so the whole model is far outside that.
+          // The depth values out there are meaningless, and the occlusion test then
+          // culls the reconstruction entirely — the visitor walks to the spot, locks
+          // on, and sees nothing. Left ARMED so the session-level capability is
+          // there to switch on per-station once there is evidence it helps at range.
+          // depthArmed is NOT set. Arming depthMode makes ARCore run depth-from-
+          // motion inference every frame on the GPU/DSP, and with occlusion off the
+          // result was computed and thrown away for the entire session — pure heat
+          // for zero pixels. If occlusion is ever re-enabled here it must be armed
+          // again at session creation; the two go together or not at all.
+          depthOcclusionEnabled={false}
           modelTrueScale
           modelScale={target?.model_scale && target.model_scale > 0 ? target.model_scale : 1}
           onElementTapped={handleElementTapped}
@@ -540,8 +566,10 @@ const SiteReconstructionScreen: React.FC<
           // The native view emits real diagnostics ("model load failed",
           // "anchor creation failed", "AR session not ready") that nothing was
           // listening for, so every failure here looked to the user like the
-          // screen simply doing nothing.
-          onError={setArError}
+          // screen simply doing nothing. Native emits '' when a fault clears, so
+          // a momentary glitch cannot leave a stale enum name on screen forever.
+          onError={handleArError}
+          onThermalStatus={handleThermal}
         />
       ) : (
         <View style={styles.mapPlaceholder} />

@@ -1074,6 +1074,12 @@ const DetectARNative: React.FC<{
     setErrorMessage(null);
   }, []);
   const handleError = useCallback((err: string) => {
+    // Native emits '' when a tracking fault CLEARS. That is not a failure, so it
+    // must not cancel an in-flight scan — it only takes the stale message down.
+    if (!err) {
+      setErrorMessage(null);
+      return;
+    }
     setDetecting(false);
     setErrorMessage(err);
   }, []);

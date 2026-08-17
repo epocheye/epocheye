@@ -29,12 +29,22 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import EpocheyeDetectARView, {
+  type AlignmentPointEvent,
   type CloudAnchorEvent,
   type ElementTappedEvent,
   type EpocheyeDetectARHandle,
   type GeospatialAnchorEvent,
   type GeospatialStateEvent,
 } from '../../native/EpocheyeDetectARView';
+import {
+  alignmentPairsFor,
+  type AlignmentPair,
+} from '../../features/ar/alignmentReferences';
+import {
+  solveTwoPoint,
+  type MarkedPoint,
+  type TwoPointSolution,
+} from '../../features/ar/twoPointAlign';
 import {buildGlbUrl} from '../../config/glbDelivery';
 import {
   discoveryLayerFor,
@@ -45,6 +55,7 @@ import {useActiveMonument} from '../../shared/hooks/useActiveMonument';
 import {useSafeGoBack} from '../../shared/hooks/useSafeGoBack';
 import {isAdminUser} from '../../shared/auth/isAdminUser';
 import {useUserStore} from '../../stores/userStore';
+import {recordDiagnostic} from '../../services/crashJournal';
 import {bearingBetween} from '../../shared/utils/geo.utils';
 import {
   listViewingStations,
@@ -75,15 +86,31 @@ const PREVIEW_CYCLE = [TRUE_SCALE, WALK_IN_SCALE, TABLETOP_SCALE];
 /**
  * Reconstruction GLB currently published for a site.
  *
- * `_v2` carries the z-fighting fix — the rampart core's top faces sat 1–2 mm
- * under the rampart above them, so the two solids fought for every pixel and the
- * whole wall flickered even with the camera still. It ships under a NEW id
- * because the old URL is cached both on CloudFront (immutable, one year) and in
- * the on-device GLB cache, so overwriting it would have kept serving the old
- * model to the one person who most needs the new one.
+ * `_v4` (2026-08-15) rebuilt from source after the third site visit, and every
+ * change is backed by a measurement on the file itself:
+ *   - dropped the duplicate Meshy rampart, which sat **1.7 mm** from the
+ *     measured-walls rampart. Two large surfaces that close cannot be resolved by
+ *     the depth buffer at 20-40 m — that was the flicker, and `_v2` never fixed
+ *     it (its fix addressed a different pair).
+ *   - one isotropic UV rate everywhere, 2.378 m per tile. `_v2` tiled the core at
+ *     2.50 m and the rampart at 4.20 x 5.58 m, so adjacent meshes showed the same
+ *     texture at two scales with the rampart stretched ~33% sideways.
+ *   - texture rebuilt from the site photograph and colour-grounded to the
+ *     measured fabric (L* 71.41 / a* +0.86 / b* +5.20). `_v2` shipped 26 L* too
+ *     dark at 2.2x the measured chroma, which is why it read as "a completely
+ *     different, artificial texture" on site.
+ *   - dropped 20 zero-area triangles; no orphaned buffer data.
+ * Verified by tools/verify_reconstruction_glb.py in the heritage asset repo.
+ *
+ * A NEW id each time, never an overwrite: the old URL is cached both on
+ * CloudFront (immutable, one year) and in the on-device GLB cache, so replacing
+ * the file in place would keep serving the old model to the one person who most
+ * needs the new one.
  */
+export const BANGALORE_FORT_MODEL_ID = 'bangalore_fort_recon_v4';
+
 const DEFAULT_MODEL_FOR_SLUG: Record<string, string> = {
-  'bangalore-fort': 'bangalore_fort_recon_v2',
+  'bangalore-fort': BANGALORE_FORT_MODEL_ID,
 };
 
 function scaleLabel(k: number): string {
@@ -111,15 +138,25 @@ const StationAuthoringScreen: React.FC = () => {
   const activeMonument = useActiveMonument();
   const arRef = useRef<EpocheyeDetectARHandle>(null);
 
+  // Lifecycle trace. An authoring session at a monument is minutes of standing
+  // still, and the screen has twice torn itself down mid-alignment with no crash
+  // and no JS error — so the only way to tell "the screen was popped" from "the
+  // admin gate blinked" from "React remounted us" is to say so out loud. Kept in
+  // release deliberately: this is a screen you only reach with an admin account,
+  // and the failure it chases only shows up on a real site over real minutes.
+  useEffect(() => {
+    recordDiagnostic('authoring: MOUNT');
+    return () => recordDiagnostic('authoring: UNMOUNT');
+  }, []);
+  useEffect(() => {
+    recordDiagnostic(`authoring: admin gate email=${email ? 'set' : 'MISSING'}`);
+  }, [email]);
+
   const [monumentId, setMonumentId] = useState(activeMonument?.slug ?? '');
   const [modelId, setModelId] = useState(
-    // Convenience only: saves typing the id at the site. Any value can be entered.
-    // _v2 carries the z-fighting fix: the rampart core's top faces used to sit
-    // 1-2 mm under the rampart above them, so the two solids fought for every
-    // pixel and the whole wall flickered even with the camera still. Published
-    // under a NEW id because the old URL is cached both on CloudFront
-    // (immutable, 1 year) and in the on-device GLB cache.
-    activeMonument?.slug === 'bangalore-fort' ? 'bangalore_fort_recon_v2' : '',
+    // Convenience only: saves typing the id at the site. Any value can be
+    // entered. See DEFAULT_MODEL_FOR_SLUG for what _v4 changed and why.
+    activeMonument?.slug === 'bangalore-fort' ? BANGALORE_FORT_MODEL_ID : '',
   );
   const [title, setTitle] = useState('');
   /**
@@ -155,6 +192,8 @@ const StationAuthoringScreen: React.FC = () => {
   // failed", "anchor creation failed") that nothing was listening for, so every
   // placement failure looked like the button doing nothing at all.
   const [arError, setArError] = useState<string | null>(null);
+  // Android thermal level, non-null only while the system is actively throttling.
+  const [thermal, setThermal] = useState<number | null>(null);
   const [planeFound, setPlaneFound] = useState(false);
   // Depth occlusion as ACTUALLY in force, read back from the camera stream.
   // Writing the flag was never proof it held: SceneView drives it from its own
@@ -164,10 +203,20 @@ const StationAuthoringScreen: React.FC = () => {
   // size cannot do both — 1 m is uselessly blunt at the end, 10 cm is an hour of
   // tapping at the start.
   const [coarse, setCoarse] = useState(true);
-  // ARCore Depth API occlusion. On by default: a reconstruction that ignores
-  // real geometry reads as a decal pasted on the lens. Toggleable because not
-  // every handset supports depth, and a bad depth map is worse than none.
-  const [depthOcclusion, setDepthOcclusion] = useState(true);
+  /**
+   * ARCore Depth API occlusion — now OFF by default.
+   *
+   * It was on, on the reasoning that a reconstruction ignoring real geometry reads
+   * as a decal pasted on the lens. True indoors. At Bangalore Fort on 2026-08-15 it
+   * made the reconstruction VANISH: ARCore's depth is only trustworthy to about 5 m,
+   * and a heritage reconstruction is looked at from 20-40 m, so the depth map is
+   * meaningless out there and the occlusion test culls the entire model. An
+   * invisible reconstruction is a worse failure than an unoccluded one, and this is
+   * the default the author meets while standing at the monument.
+   *
+   * Still toggleable — close-range fabric is exactly where it does help.
+   */
+  const [depthOcclusion, setDepthOcclusion] = useState(false);
   // Desk preview. At true scale this reconstruction is 47 x 48 x 13.5 m, so
   // indoors you stand inside a wall and cannot judge whether the model, its
   // cards or its orientation are right at all.
@@ -185,6 +234,21 @@ const StationAuthoringScreen: React.FC = () => {
     body?: string;
   } | null>(null);
   const placedOnceRef = useRef(false);
+
+  // ── Two-point alignment ──────────────────────────────────────────────────
+  // The nudge pad alone could not align this model: 47 m across, origin in the
+  // middle of the footprint so the author stands inside it, and no true north
+  // from the survey. Marking two identifiable features solves yaw, position and
+  // (as a measurement) scale in one step. The pad stays, for the final seating.
+  const pairs = useMemo(
+    () => alignmentPairsFor(monumentId.trim()),
+    [monumentId],
+  );
+  const [pairIndex, setPairIndex] = useState(0);
+  const pair: AlignmentPair | undefined = pairs[pairIndex];
+  const [marks, setMarks] = useState<(MarkedPoint | null)[]>([null, null]);
+  const [solution, setSolution] = useState<TwoPointSolution | null>(null);
+  const [applied, setApplied] = useState(false);
 
   const tracking =
     geo?.earthState === 'ENABLED' && geo?.trackingState === 'TRACKING';
@@ -427,6 +491,95 @@ const StationAuthoringScreen: React.FC = () => {
     placeCards();
   }, [showCards, placed, previewScale, placeCards]);
 
+  /**
+   * Native emits '' to mean "the fault cleared". Without this a single momentary
+   * ARCore glitch left its raw enum name — `BAD_STATE` — on screen for the rest of
+   * the session, next to a placed model and healthy tracking. At Bangalore Fort
+   * that read as a live fault and cost real time.
+   */
+  const handleArError = useCallback((msg: string) => {
+    setArError(msg || null);
+  }, []);
+
+  /**
+   * The phone is throttling. Native has already dropped geospatial to shed load,
+   * so the Earth readout is about to stop moving — say so, rather than letting the
+   * author stand there watching a frozen accuracy figure and drawing conclusions
+   * about the site.
+   */
+  const handleThermal = useCallback((e: {status: number; severe: boolean}) => {
+    setThermal(e.severe ? e.status : null);
+  }, []);
+
+  /**
+   * Turning the cards off has to take the layer DOWN natively, not just stop
+   * drawing them from JS. Native holds the last card payload and re-poses it on
+   * every alignment nudge, so a JS-only toggle left the author paying for a layer
+   * they could no longer see, with no way to un-arm it but killing the screen.
+   */
+  const toggleCards = useCallback(() => {
+    setShowCards(v => {
+      if (v) arRef.current?.clearDiscoveryLayer();
+      return !v;
+    });
+  }, []);
+
+  /** Marks belong to the pair they were taken against — switching pairs voids them. */
+  const selectPair = useCallback((index: number) => {
+    setPairIndex(index);
+    setMarks([null, null]);
+    setSolution(null);
+    setApplied(false);
+  }, []);
+
+  const clearMarks = useCallback(() => {
+    setMarks([null, null]);
+    setSolution(null);
+    setApplied(false);
+  }, []);
+
+  const handleAlignmentPoint = useCallback((e: AlignmentPointEvent) => {
+    if (e.error) {
+      // A refused mark must never look like a taken one — a silently zeroed
+      // point would solve to a confident, wrong transform.
+      setArError(`Mark ${e.index + 1} not recorded: ${e.error}`);
+      return;
+    }
+    setArError(null);
+    setMarks(prev => {
+      const next = [...prev];
+      next[e.index] = {x: e.x, y: e.y, z: e.z};
+      return next;
+    });
+  }, []);
+
+  // Solve as soon as both marks exist. Nothing moves until Apply is pressed —
+  // the author sees the numbers, and a bad residual is a reason to re-mark
+  // rather than something discovered after the model has already jumped.
+  useEffect(() => {
+    const [r1, r2] = marks;
+    if (!pair || !r1 || !r2) {
+      setSolution(null);
+      return;
+    }
+    setSolution(
+      solveTwoPoint({x: pair.a.x, z: pair.a.z}, {x: pair.b.x, z: pair.b.z}, r1, r2),
+    );
+  }, [marks, pair]);
+
+  const applySolution = useCallback(() => {
+    if (!solution) return;
+    arRef.current?.applyAlignment(
+      solution.yawDeg,
+      solution.offset.x,
+      solution.offset.y,
+      solution.offset.z,
+    );
+    setApplied(true);
+    // The solved pose supersedes anything captured against the old alignment.
+    invalidateCapture();
+  }, [solution, invalidateCapture]);
+
   const handleElementTapped = useCallback((e: ElementTappedEvent) => {
     let payload: {title?: string; meta?: string; body?: string; label?: string} =
       {};
@@ -615,19 +768,27 @@ const StationAuthoringScreen: React.FC = () => {
         // depthMode must be armed at session CREATION (SceneView ignores a
         // post-hoc reconfigure), so this prop is constant; the visible occlusion
         // is the camera-stream flag below, which flips live.
-        depthArmed
+        // Follows the toggle rather than being permanently on. Depth must be armed
+        // at session CREATION, so flipping this after a model is placed cannot take
+        // effect — the effective-state read-back below reports that honestly rather
+        // than pretending. Costing a full depth inference every frame for a feature
+        // that is off by default, and useless past ~5 m anyway, is not a trade worth
+        // making on the screen that overheats.
+        depthArmed={depthOcclusion}
         depthOcclusionEnabled={depthOcclusion}
         onElementTapped={handleElementTapped}
         geospatialEnabled
         cloudAnchorsEnabled
         onReady={handleReady}
-        onError={setArError}
+        onError={handleArError}
         // The plane grid is deliberately hidden, so without this there is no way
         // to tell "ARCore has found a surface" from "it never will" — which is
         // exactly the state that made the model float in mid-air and drift.
         onPlaneDetected={() => setPlaneFound(true)}
         onDepthOcclusionState={setDepthEffective}
         onAnchorPlaced={handleAnchorPlaced}
+        onAlignmentPoint={handleAlignmentPoint}
+        onThermalStatus={handleThermal}
         onGeospatialState={setGeo}
         onGeospatialAnchorEvent={handleGeoAnchorEvent}
         onCloudAnchorEvent={handleCloudAnchorEvent}
@@ -664,6 +825,14 @@ const StationAuthoringScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled">
           <Text style={styles.title}>Author viewing station</Text>
           <Text style={styles.status}>{statusLine}</Text>
+          {thermal != null ? (
+            <Text style={styles.warn}>
+              PHONE IS THROTTLING (thermal {thermal}). Geospatial has been switched
+              off to shed heat, so the Earth accuracy above has stopped updating.
+              Get the phone out of the sun for a minute; it resumes on the next
+              capture.
+            </Text>
+          ) : null}
           {arError ? <Text style={styles.arError}>AR: {arError}</Text> : null}
 
           <Pressable
@@ -795,7 +964,7 @@ const StationAuthoringScreen: React.FC = () => {
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => setShowCards(v => !v)}
+              onPress={toggleCards}
               style={[styles.btnSecondary, showCards && styles.btnOverrideOn]}>
               <Text style={styles.btnSecondaryText}>
                 {showCards ? 'Cards ✓' : 'Show cards'}
@@ -810,7 +979,7 @@ const StationAuthoringScreen: React.FC = () => {
                 depthOcclusion && styles.btnOverrideOn,
               ]}>
               <Text style={styles.btnSecondaryText}>
-                {depthOcclusion ? 'Depth ✓' : 'Depth off'}
+                {depthOcclusion ? 'Depth ✓' : 'Depth off (set before Load)'}
               </Text>
             </Pressable>
           </View>
@@ -837,10 +1006,112 @@ const StationAuthoringScreen: React.FC = () => {
           </Text>
         ) : null}
 
-        {/* Alignment pad — the on-site job. The anchor lands where you stand, so
-            the model has to be walked onto the real wall in both rotation AND
-            translation. Every adjustment here is folded into the pose that gets
-            saved, so what you line up is what a visitor sees. */}
+        {/* Two-point alignment — do this FIRST. Walking to two identifiable
+            features solves yaw, position and scale at once; the pad below is for
+            seating the result, not for finding it. */}
+        {placed && pair ? (
+          <View style={styles.twoPointWrap}>
+            <Text style={styles.label}>TWO-POINT ALIGN — START HERE</Text>
+
+            {pairs.length > 1 ? (
+              <View style={styles.row}>
+                {pairs.map((p, i) => (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => selectPair(i)}
+                    style={[
+                      styles.btnSecondary,
+                      styles.flex,
+                      i === pairIndex && styles.btnOverrideOn,
+                    ]}>
+                    <Text style={styles.btnSecondaryText} numberOfLines={1}>
+                      {p.label.split('—')[0].trim()}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+
+            <Text style={styles.hint}>
+              {pair.label} · {pair.baselineM} m apart. Walk to each end and mark
+              it by standing there — do not aim the camera at it. Accuracy comes
+              from where the phone IS, not where it points.
+            </Text>
+
+            {[pair.a, pair.b].map((ref, i) => (
+              <View key={ref.id}>
+                <Pressable
+                  onPress={() => arRef.current?.markAlignmentPoint(i)}
+                  style={[
+                    styles.btnSecondary,
+                    marks[i] != null && styles.btnMarked,
+                  ]}>
+                  <Text style={styles.btnSecondaryText}>
+                    {marks[i] != null
+                      ? `${i + 1} ✓  ${ref.label} — tap to re-mark`
+                      : `Mark ${i + 1} — ${ref.label}`}
+                  </Text>
+                </Pressable>
+                <Text style={styles.refHint}>{ref.hint}</Text>
+              </View>
+            ))}
+
+            {solution ? (
+              <View>
+                <Text style={styles.captured}>
+                  {`yaw ${solution.yawDeg.toFixed(1)}°  ·  offset ${solution.offset.x.toFixed(
+                    1,
+                  )}, ${solution.offset.y.toFixed(1)}, ${solution.offset.z.toFixed(1)} m`}
+                </Text>
+                <Text style={styles.captured}>
+                  {`walked ${solution.markedBaselineM.toFixed(1)} m vs model ${solution.modelBaselineM.toFixed(
+                    1,
+                  )} m  ·  scale ${solution.scale.toFixed(3)}  ·  residual ±${solution.residualM.toFixed(2)} m`}
+                </Text>
+                {/* The residual is the honest number here: it is how far apart the
+                    two marks and the model disagree, split between them. Under
+                    ~1 m over a 40 m run is a good fit; metres means a
+                    mis-identified feature or a real scale error. */}
+                {solution.residualM > 1.5 ? (
+                  <Text style={styles.warn}>
+                    Residual is large. Either a feature was mis-identified, or the
+                    model's inferred scale ({solution.scale.toFixed(3)}×) is wrong.
+                    Re-mark before accepting — and either way, write this number
+                    down: it is a real measurement of the last inferred dimension.
+                  </Text>
+                ) : null}
+                <View style={styles.row}>
+                  <Pressable
+                    onPress={applySolution}
+                    style={[styles.btn, styles.flex]}>
+                    <Text style={styles.btnText}>
+                      {applied ? 'Re-apply' : 'Apply alignment'}
+                    </Text>
+                  </Pressable>
+                  <Pressable onPress={clearMarks} style={styles.btnSecondary}>
+                    <Text style={styles.btnSecondaryText}>Clear</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.refHint}>
+                Both marks needed before it can solve.
+              </Text>
+            )}
+
+            {applied ? (
+              <Text style={styles.hint}>
+                Applied. Now check the vertical: the stone base must MEET the real
+                crest at {pair.crestHeightM} m on this run — use ↓/↑ on FINE below
+                if it floats or sinks. Then Host → Capture → Save.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Alignment pad — for SEATING the two-point result, not for finding it.
+            Every adjustment here is folded into the pose that gets saved, so what
+            you line up is what a visitor sees. */}
         {placed ? (
           <View style={styles.alignWrap}>
             <Text style={styles.label}>
@@ -1052,6 +1323,23 @@ const styles = StyleSheet.create({
   },
   hiddenStatus: {color: '#8ED0FF', fontSize: 12},
   arError: {color: '#FFB4A2', fontSize: 12},
+  twoPointWrap: {
+    borderWidth: 1,
+    borderColor: 'rgba(142,208,255,0.55)',
+    borderRadius: 10,
+    padding: 10,
+    gap: 6,
+    marginTop: 8,
+  },
+  btnMarked: {borderColor: '#7BE38B', backgroundColor: 'rgba(123,227,139,0.14)'},
+  refHint: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 3,
+    marginBottom: 4,
+  },
+  warn: {color: '#FFB4A2', fontSize: 11, lineHeight: 16, marginTop: 4},
   alignWrap: {
     borderWidth: 1,
     borderColor: 'rgba(201,168,76,0.45)',

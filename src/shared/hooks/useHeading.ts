@@ -24,6 +24,25 @@ interface Origin {
   altitude?: number;
 }
 
+/**
+ * Smallest heading change worth re-rendering for, in degrees.
+ *
+ * The native module emits at ~15 Hz, and every sample used to call setState — so
+ * the reconstruction screen reconciled fifteen times a second WHILE the ARCore
+ * camera was live and rendering, re-running its banner memo and re-diffing the
+ * native view's props each time. The arrow it drives is a 120 px glyph; two
+ * degrees of rotation on it is a couple of pixels, well under what anyone can
+ * see. Holding a phone by hand jitters by more than this, so in practice it cuts
+ * the re-render rate by roughly an order of magnitude while looking identical.
+ */
+const HEADING_EPSILON_DEG = 2;
+
+/** Shortest angular distance between two bearings, in degrees. */
+function headingDelta(a: number, b: number): number {
+  const d = Math.abs(((a - b + 540) % 360) - 180);
+  return d;
+}
+
 export function useHeading(
   origin: Origin | null,
   active: boolean,
@@ -42,7 +61,15 @@ export function useHeading(
     }
     native.start(o.latitude, o.longitude, o.altitude ?? 0);
     const sub = emitter.addListener(HEADING_EVENT, (s: HeadingSample) =>
-      setSample(s),
+      setSample(prev => {
+        // Drop sub-perceptual updates rather than re-rendering an AR screen at
+        // sensor rate. Keeping the previous object identity is what makes this
+        // work — returning an equal-but-new object would still re-render.
+        if (prev && headingDelta(prev.heading, s.heading) < HEADING_EPSILON_DEG) {
+          return prev;
+        }
+        return s;
+      }),
     );
     return () => {
       sub.remove();

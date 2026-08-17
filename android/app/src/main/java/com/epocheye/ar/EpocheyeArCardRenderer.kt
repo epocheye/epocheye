@@ -21,8 +21,29 @@ import org.json.JSONObject
  */
 object EpocheyeArCardRenderer {
 
-    private const val W = 1024
-    private const val PAD = 56f
+    /**
+     * Card bitmap width in pixels.
+     *
+     * 512, down from 1024. A card is a 1.75 m quad read from several metres away —
+     * 1024 px was well past what the display can resolve at that size, and the
+     * cost is quadratic: each card is an ARGB_8888 bitmap PLUS a Filament texture,
+     * so a 20-card discovery layer was carrying roughly 54 MB of texture. At 512
+     * that is about 13 MB. Twenty alpha-blended quads also defeat early-Z, so the
+     * saving is bandwidth as well as memory — both of which are heat.
+     *
+     * Every hardcoded dimension below is multiplied by [S], so the layout stays
+     * proportionally identical at any W.
+     */
+    private const val W = 512
+
+    /**
+     * Every hardcoded dimension below was authored against a 1024-px card, so they
+     * are scaled by this rather than retyped — the layout stays proportionally
+     * identical and there is one number to change if the trade-off is revisited.
+     */
+    private const val S = W / 1024f
+
+    private const val PAD = 56f * S
     private val GREEN = Color.parseColor("#4CAF50")
     private val INK = Color.parseColor("#F5F0E8")
     private val MUTED = Color.parseColor("#BDB6AC")
@@ -65,13 +86,13 @@ object EpocheyeArCardRenderer {
 
         val inner = (W - PAD * 2).toInt()
         val tp = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = INK; textSize = 68f; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            color = INK; textSize = 68f * S; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
         }
         val mp = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = accent; textSize = 30f; typeface = Typeface.SANS_SERIF
+            color = accent; textSize = 30f * S; typeface = Typeface.SANS_SERIF
         }
         val bp = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#E2DCD2"); textSize = 38f; typeface = Typeface.SANS_SERIF
+            color = Color.parseColor("#E2DCD2"); textSize = 38f * S; typeface = Typeface.SANS_SERIF
         }
         val tl = if (title.isEmpty()) null else StaticLayout.Builder
             .obtain(title, 0, title.length, tp, inner).build()
@@ -80,23 +101,23 @@ object EpocheyeArCardRenderer {
         val bl = if (body.isEmpty()) null else StaticLayout.Builder
             .obtain(body, 0, body.length, bp, inner).build()
 
-        val h = (PAD + (tl?.height ?: 0) + (if (ml != null) 18f + ml.height else 0f) +
-            (if (bl != null) 28f + bl.height else 0f) + PAD).toInt().coerceIn(220, 2200)
+        val h = (PAD + (tl?.height ?: 0) + (if (ml != null) 18f * S + ml.height else 0f) +
+            (if (bl != null) 28f * S + bl.height else 0f) + PAD).toInt().coerceIn((220 * S).toInt(), (2200 * S).toInt())
         val bmp = Bitmap.createBitmap(W, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(240, 10, 8, 12) }
-        val rect = RectF(8f, 8f, W - 8f, h - 8f)
-        c.drawRoundRect(rect, 40f, 40f, bg)
+        val rect = RectF(8f * S, 8f * S, W - 8f * S, h - 8f * S)
+        c.drawRoundRect(rect, 40f * S, 40f * S, bg)
         c.drawRoundRect(
-            rect, 40f, 40f,
+            rect, 40f * S, 40f * S,
             Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE; strokeWidth = 6f
+                style = Paint.Style.STROKE; strokeWidth = 6f * S
                 color = Color.argb(150, Color.red(accent), Color.green(accent), Color.blue(accent))
             },
         )
         // Accent spine down the left edge — the tier at a glance, before reading.
         c.drawRoundRect(
-            RectF(8f, 8f, 20f, h - 8f), 6f, 6f,
+            RectF(8f * S, 8f * S, 20f * S, h - 8f * S), 6f * S, 6f * S,
             Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent },
         )
         var y = PAD
@@ -104,12 +125,12 @@ object EpocheyeArCardRenderer {
         tl?.draw(c); c.restore()
         y += (tl?.height ?: 0).toFloat()
         if (ml != null) {
-            y += 18f
+            y += 18f * S
             c.save(); c.translate(PAD, y); ml.draw(c); c.restore()
             y += ml.height
         }
         if (bl != null) {
-            y += 28f
+            y += 28f * S
             c.save(); c.translate(PAD, y); bl.draw(c); c.restore()
         }
         return bmp
@@ -147,13 +168,13 @@ object EpocheyeArCardRenderer {
         val contentW = (W - PAD * 2).toInt()
 
         val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = INK; textSize = 64f; typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+            color = INK; textSize = 64f * S; typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
         }
         val metaPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = MUTED; textSize = 30f; typeface = Typeface.SANS_SERIF
+            color = MUTED; textSize = 30f * S; typeface = Typeface.SANS_SERIF
         }
         val bodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = INK; textSize = 38f; typeface = Typeface.SANS_SERIF
+            color = INK; textSize = 38f * S; typeface = Typeface.SANS_SERIF
         }
 
         val titleLayout = if (title.isNotBlank()) staticLayout(title, titlePaint, contentW) else null
@@ -171,10 +192,10 @@ object EpocheyeArCardRenderer {
         if (titleLayout != null) {
             y += titleLayout.height
         }
-        if (metaLayout != null) y += 18f + metaLayout.height
-        if (bodyLayout != null) y += (if (titleLayout != null) 28f else 0f) + bodyLayout.height
+        if (metaLayout != null) y += 18f * S + metaLayout.height
+        if (bodyLayout != null) y += (if (titleLayout != null) 28f * S else 0f) + bodyLayout.height
         y += PAD
-        val height = y.toInt().coerceIn(240, 2200)
+        val height = y.toInt().coerceIn((240 * S).toInt(), (2200 * S).toInt())
 
         val bmp = Bitmap.createBitmap(W, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
@@ -182,12 +203,12 @@ object EpocheyeArCardRenderer {
         // Card background + accent border.
         val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F00C0A08") }
         val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE; strokeWidth = 4f
+            style = Paint.Style.STROKE; strokeWidth = 4f * S
             color = (accent and 0x00FFFFFF) or 0x73000000.toInt() // ~45% alpha accent
         }
-        val rect = RectF(8f, 8f, (W - 8).toFloat(), (height - 8).toFloat())
-        canvas.drawRoundRect(rect, 40f, 40f, bg)
-        canvas.drawRoundRect(rect, 40f, 40f, border)
+        val rect = RectF(8f * S, 8f * S, W - 8f * S, height - 8f * S)
+        canvas.drawRoundRect(rect, 40f * S, 40f * S, bg)
+        canvas.drawRoundRect(rect, 40f * S, 40f * S, border)
 
         var cy = PAD
         if (titleLayout != null) {
@@ -199,12 +220,12 @@ object EpocheyeArCardRenderer {
         }
 
         if (metaLayout != null) {
-            cy += 18f
+            cy += 18f * S
             canvas.save(); canvas.translate(PAD, cy); metaLayout.draw(canvas); canvas.restore()
             cy += metaLayout.height
         }
         if (bodyLayout != null) {
-            if (titleLayout != null) cy += 28f
+            if (titleLayout != null) cy += 28f * S
             canvas.save(); canvas.translate(PAD, cy); bodyLayout.draw(canvas); canvas.restore()
         }
         return bmp

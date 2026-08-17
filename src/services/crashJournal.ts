@@ -232,6 +232,33 @@ export function recordNavBreadcrumb(route: string): void {
   writeBreadcrumb('fg');
 }
 
+/**
+ * Record a non-crash diagnostic note into the same journal the Dev Health
+ * screen already renders.
+ *
+ * `console.*` is stripped from release by `transform-remove-console`
+ * (babel.config.js), so a release-only fault — an AR screen that ends itself
+ * after minutes at a monument — leaves no trace in logcat at all. This is the
+ * channel that survives: it lands in AsyncStorage, shows up in the crash-log
+ * section, and can be read back off the device long after the session ended.
+ *
+ * Non-fatal by definition; never throws.
+ */
+export function recordDiagnostic(message: string): void {
+  try {
+    void appendEntry({
+      kind: 'js-nonfatal',
+      route: currentRoute,
+      message,
+      fatal: false,
+      ts: new Date().toISOString(),
+      sessionId,
+    });
+  } catch {
+    // Diagnostics must never break the app.
+  }
+}
+
 /** How the previous run ended, if it died. Cached from launch detection. */
 export function getLastRunDeath(): {
   kind: CrashKind;

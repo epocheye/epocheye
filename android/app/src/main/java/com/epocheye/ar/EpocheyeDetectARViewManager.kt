@@ -61,6 +61,26 @@ class EpocheyeDetectARViewManager(
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onARError", event)
         }
+        view.onThermalStatus = { status, severe ->
+            val event = Arguments.createMap().apply {
+                putInt("status", status)
+                putBoolean("severe", severe)
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onThermalStatus", event)
+        }
+        // Site-readiness pipeline (PERMANENT) — two-point alignment.
+        view.onAlignmentPoint = { index, x, y, z, error ->
+            val event = Arguments.createMap().apply {
+                putInt("index", index)
+                putDouble("x", x.toDouble())
+                putDouble("y", y.toDouble())
+                putDouble("z", z.toDouble())
+                if (error != null) putString("error", error)
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onAlignmentPoint", event)
+        }
         view.onFrameCaptured = { uri ->
             val event = Arguments.createMap().apply { putString("uri", uri) }
             reactContext.getJSModule(RCTEventEmitter::class.java)
@@ -195,6 +215,9 @@ class EpocheyeDetectARViewManager(
             .put("placeGeospatialAnchor", CMD_PLACE_GEO_ANCHOR)
             .put("placeDiscoveryCards", CMD_PLACE_DISCOVERY_CARDS)
             .put("setTapTargets", CMD_SET_TAP_TARGETS)
+            .put("clearDiscoveryLayer", CMD_CLEAR_DISCOVERY_LAYER)
+            .put("markAlignmentPoint", CMD_MARK_ALIGNMENT_POINT)
+            .put("applyAlignment", CMD_APPLY_ALIGNMENT)
             .build()
     }
 
@@ -228,6 +251,20 @@ class EpocheyeDetectARViewManager(
             CMD_SET_TAP_TARGETS -> {
                 val targets = args?.getString(0) ?: return
                 view.setTapTargets(targets)
+            }
+            CMD_CLEAR_DISCOVERY_LAYER -> view.clearDiscoveryLayer()
+            CMD_MARK_ALIGNMENT_POINT -> {
+                val index = args?.getDouble(0)?.toInt() ?: return
+                view.markAlignmentPoint(index)
+            }
+            CMD_APPLY_ALIGNMENT -> {
+                val yaw = args?.getDouble(0)?.toFloat() ?: return
+                view.applyAlignment(
+                    yaw,
+                    args.getDouble(1).toFloat(),
+                    args.getDouble(2).toFloat(),
+                    args.getDouble(3).toFloat(),
+                )
             }
             CMD_PLACE_IN_FRONT -> view.placeInFront()
             CMD_CLEAR_ANCHOR -> view.clearAnchor()
@@ -329,6 +366,20 @@ class EpocheyeDetectARViewManager(
                 val targets = args?.getString(0) ?: return
                 view.setTapTargets(targets)
             }
+            "clearDiscoveryLayer" -> view.clearDiscoveryLayer()
+            "markAlignmentPoint" -> {
+                val index = args?.getDouble(0)?.toInt() ?: return
+                view.markAlignmentPoint(index)
+            }
+            "applyAlignment" -> {
+                val yaw = args?.getDouble(0)?.toFloat() ?: return
+                view.applyAlignment(
+                    yaw,
+                    args.getDouble(1).toFloat(),
+                    args.getDouble(2).toFloat(),
+                    args.getDouble(3).toFloat(),
+                )
+            }
             "captureGeospatialPose" -> view.captureGeospatialPose()
             "placeGeospatialAnchor" -> {
                 val lat = args?.getDouble(0) ?: return
@@ -363,6 +414,8 @@ class EpocheyeDetectARViewManager(
             .put("onGeospatialState", MapBuilder.of("registrationName", "onGeospatialState"))
             .put("onGeospatialAnchorEvent", MapBuilder.of("registrationName", "onGeospatialAnchorEvent"))
             .put("onElementTapped", MapBuilder.of("registrationName", "onElementTapped"))
+            .put("onAlignmentPoint", MapBuilder.of("registrationName", "onAlignmentPoint"))
+            .put("onThermalStatus", MapBuilder.of("registrationName", "onThermalStatus"))
             .build()
     }
 
@@ -388,5 +441,8 @@ class EpocheyeDetectARViewManager(
         private const val CMD_PLACE_GEO_ANCHOR = 12
         private const val CMD_PLACE_DISCOVERY_CARDS = 13
         private const val CMD_SET_TAP_TARGETS = 14
+        private const val CMD_CLEAR_DISCOVERY_LAYER = 15
+        private const val CMD_MARK_ALIGNMENT_POINT = 16
+        private const val CMD_APPLY_ALIGNMENT = 17
     }
 }

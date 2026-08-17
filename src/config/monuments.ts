@@ -55,4 +55,10 @@ export const AR_SAFETY_BACKDROP_URL = `${CDN_BASE}monuments/Konarka_Temple-2.jpg
  * permitted home for a monument-slug literal in post-auth code.
  */
 export const DEV_SWEEP_MONUMENT_SLUG = 'bangalore-fort';
-export const DEV_SWEEP_MODEL_ID = 'bangalore_fort_recon';
+/**
+ * Kept in step with the id the authoring screen prefills. These drifted apart
+ * (this said `bangalore_fort_recon`, the authoring screen said `_v2`, and `_v3`
+ * existed on the CDN referenced by nothing), so the health board asserted a
+ * different model from the one anybody actually loaded.
+ */
+export const DEV_SWEEP_MODEL_ID = 'bangalore_fort_recon_v4';

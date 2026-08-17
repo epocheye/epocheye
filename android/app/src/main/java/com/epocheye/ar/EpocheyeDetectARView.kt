@@ -2,6 +2,8 @@ package com.epocheye.ar
 
 import android.content.Context
 import android.graphics.ImageFormat
+import android.os.Build
+import android.os.PowerManager
 import android.graphics.Rect
 import android.graphics.YuvImage
 import android.net.Uri
@@ -91,6 +93,16 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     var onPlaneDetected: (() -> Unit)? = null
     var onTrackingState: ((String) -> Unit)? = null
     var onAnchorPlaced: ((String) -> Unit)? = null
+
+    /**
+     * Site-readiness pipeline (PERMANENT). Two-point alignment: reports where the
+     * author is standing, in the placement anchor's own frame, so JS can solve the
+     * model transform from two marked features. (index, x, y, z, error-or-null).
+     */
+    var onAlignmentPoint: ((Int, Float, Float, Float, String?) -> Unit)? = null
+
+    /** Android thermal status (level, isSevere) — see startThermalGuard. */
+    var onThermalStatus: ((Int, Boolean) -> Unit)? = null
     var onARError: ((String) -> Unit)? = null
     var onFrameCaptured: ((String) -> Unit)? = null
     /** Dev harness: Cloud Anchor host/resolve lifecycle (phase, state, id?, quality?, message?). */
@@ -191,9 +203,26 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     // are logged immediately, the pose is throttled by tick count. Never set for
     // regular users, so their sessions stay geospatialMode DISABLED.
     @Volatile private var geospatialEnabled = false
+
+    /**
+     * Whether geospatial is currently RUNNING, as opposed to merely armed.
+     * Armed = the session was created able to do it; active = it is actually
+     * localising and burning power. See [setGeospatialActive].
+     */
+    @Volatile private var geospatialActive = true
     private var lastEarthState: String? = null
     private var lastEarthTracking: String? = null
-    private var geoTickCount = 0
+    /**
+     * Wall-clock stamp of the last geospatial pose read, not a frame counter.
+     *
+     * This used to throttle on `frames % 60`, described in the code as "~1/sec at
+     * 60fps". Switching the session to `UpdateMode.BLOCKING` halved the frame rate
+     * and silently halved this too — the readout the admin watches while deciding
+     * whether the fix has converged started updating every two seconds instead of
+     * every one, with nothing in the code saying so. A frame-count throttle is a
+     * rate that changes whenever the render rate changes; a clock is not.
+     */
+    private var lastGeoReadNanos = 0L
 
     private var currentAnchorNode: AnchorNode? = null
     private var currentModelNode: ModelNode? = null
@@ -288,8 +317,35 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     // when the phone is held still to read the screen. A free-space anchor is the one
     // that drifts and tips, which is what "the model floats away" has meant every time.
     // Waiting is cheap and reversible; a drifting anchor costs a site visit.
-    private val planeWaitNanos = 12_000L * 1_000_000L
+    //
+    // Revised 2026-08-15 down from 12 s. Twelve seconds of a blank screen after
+    // tapping Load is what "the model loads very slowly" meant at Bangalore Fort —
+    // the download is not the bottleneck (388 KB, 230 ms, edge-cached). Six seconds
+    // still covers a sweep, without reading as a hang. The real answer to drift is
+    // not a longer wait but a better fallback: see doPlaceInFront.
+    private val planeWaitNanos = 6_000L * 1_000_000L
     private var planeWaitDeadlineNanos: Long = 0L
+
+    /**
+     * Whether continuous plane detection is currently wanted.
+     *
+     * Mirrors what [setPlaneFinding] last applied, so a session rebuild re-applies
+     * it instead of silently reverting to HORIZONTAL_AND_VERTICAL — the most
+     * expensive plane mode — for the rest of the session.
+     */
+    private var planeFindingWanted = true
+
+    /**
+     * Throttle for the per-frame trackable scan.
+     *
+     * `hasTrackedPlane` allocates a fresh collection from `getAllTrackables` on
+     * every call. It was called every frame until the first plane appeared — and
+     * standing 20-40 m from a fort outdoors, that can be the entire session, at
+     * display refresh rate. Four times a second is far faster than a human can
+     * react to and costs ~1/30th as much.
+     */
+    private var lastPlaneScanNanos = 0L
+    private val planeScanIntervalNanos = 250L * 1_000_000L
 
     /** Last logged anchor tracking/visibility signature, so only changes print. */
     private var lastAnchorSig: String? = null
@@ -423,9 +479,20 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         } catch (_: Throwable) {
                         }
                         // Boost the main directional light for some shading/relief.
+                        //
+                        // And turn its SHADOWS OFF. SceneView's DefaultLightNode is
+                        // created with castShadows(true), so Filament was rendering a
+                        // full shadow-map depth pass over the whole scene every frame —
+                        // including the 47 m fort, which has frustum culling disabled
+                        // and so is in that pass even when it is behind the camera.
+                        // The reconstruction is lit by a flat ambient IBL anyway, so the
+                        // shadow map bought almost nothing visually and cost a second
+                        // full scene traversal per frame. Intensity is free by
+                        // comparison — it is a shader constant.
                         try {
                             mainLight?.let {
                                 it.lightManager.setIntensity(it.lightInstance, 120_000f)
+                                it.lightManager.setShadowCaster(it.lightInstance, false)
                             }
                         } catch (_: Throwable) {
                         }
@@ -503,6 +570,22 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         geospatialMode =
                             if (geospatialEnabled) Config.GeospatialMode.ENABLED
                             else Config.GeospatialMode.DISABLED,
+                        // updateMode MUST be set here, as a direct composable param —
+                        // NOT in the sessionConfiguration lambda below.
+                        //
+                        // This is the same trap as cloudAnchorMode and geospatialMode,
+                        // and it caught us again. SceneView defaults this parameter to
+                        // LATEST_CAMERA_IMAGE and applies it from its own
+                        // LaunchedEffect(updateMode), which runs AFTER the lambda and
+                        // wins. Setting BLOCKING in the lambda therefore did nothing.
+                        //
+                        // MEASURED on-device 2026-08-16, which is how we know: the
+                        // per-frame GEO readout is throttled to every 60th tick and it
+                        // was printing once a SECOND — i.e. 60 ticks/s, the display
+                        // refresh rate, against a 30 fps camera. Three of every four
+                        // frames were a full ARCore update plus a full Filament render
+                        // of an identical image.
+                        updateMode = Config.UpdateMode.BLOCKING,
                         sessionConfiguration = { _, config ->
                             // These two used to be hard-set to DISABLED here, which
                             // silently contradicted the geospatialMode/depthMode
@@ -519,8 +602,16 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                             config.geospatialMode =
                                 if (geospatialEnabled) Config.GeospatialMode.ENABLED
                                 else Config.GeospatialMode.DISABLED
+                            // Honour a plane-finding state that may already be OFF.
+                            // A session rebuild used to hard-reset this to the most
+                            // expensive mode, silently undoing every setPlaneFinding
+                            // (false) the placement path had done.
                             config.planeFindingMode =
-                                Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                                if (planeFindingWanted) {
+                                    Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+                                } else {
+                                    Config.PlaneFindingMode.DISABLED
+                                }
                             config.depthMode =
                                 if (depthArmed) Config.DepthMode.AUTOMATIC
                                 else Config.DepthMode.DISABLED
@@ -529,10 +620,25 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                             // diffuse IBL (env above) is the only light source.
                             config.lightEstimationMode = Config.LightEstimationMode.DISABLED
                             config.focusMode = Config.FocusMode.AUTO
-                            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                            // BLOCKING, not LATEST_CAMERA_IMAGE.
+                            //
+                            // LATEST_CAMERA_IMAGE returns immediately, so SceneView's
+                            // Choreographer loop ran a full ARCore update + a full
+                            // Filament render + onSessionTick at the DISPLAY refresh
+                            // rate — 90 or 120 Hz on a modern handset — against a
+                            // camera that only produces 30 frames a second. Three out
+                            // of every four frames redrew an identical image. That is a
+                            // straight 2-4x multiplier on the entire render and
+                            // per-frame cost, and it is the single largest contributor
+                            // to the phone shutting down after 2-3 minutes at Bangalore
+                            // Fort (2026-08-15). BLOCKING paces the loop to the camera.
+                            config.updateMode = Config.UpdateMode.BLOCKING
                         },
                         onSessionCreated = { session ->
                             arSession = session
+                            // A fresh session starts in whatever the composable param
+                            // asked for, so the suspend flag must start agreeing with it.
+                            geospatialActive = geospatialEnabled
                             Log.i(
                                 TAG,
                                 "session created cloudAnchorMode=" +
@@ -588,8 +694,19 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                             // headlock fallback floats the card within TRACK_WAIT, so a
                             // raw INSUFFICIENT_FEATURES here would read as a scary "no
                             // surface" error.
-                            if (reason != null && pendingCards == null) {
-                                post { onARError?.invoke(reason.name) }
+                            if (pendingCards == null) {
+                                if (reason != null) {
+                                    post { onARError?.invoke(reason.name) }
+                                } else {
+                                    // Recovery. Without this the raw enum name from a
+                                    // single momentary glitch sat on screen forever —
+                                    // at Bangalore Fort a stale "BAD_STATE" was showing
+                                    // while tracking was healthy and the model was
+                                    // placed, which reads as a live fault and is not.
+                                    // Empty string = "no current error"; every listener
+                                    // maps it back to null.
+                                    post { onARError?.invoke("") }
+                                }
                             }
                         },
                     ) {
@@ -624,7 +741,9 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             post { onTrackingState?.invoke(ts.name) }
         }
         // ADMIN-HARNESS (REMOVE AFTER KONARK)
-        if (geospatialEnabled) {
+        // `geospatialActive`, not just armed: once suspended for power there is no
+        // Earth to read and nothing worth reporting to JS.
+        if (geospatialEnabled && geospatialActive) {
             logGeospatial(session)
         }
         // Read the occlusion flag BACK from the camera stream, rather than trusting
@@ -651,9 +770,17 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 post { onDepthOcclusionState?.invoke(effective == true) }
             }
         }
-        if (!planeReported && hasTrackedPlane(session)) {
-            planeReported = true
-            post { onPlaneDetected?.invoke() }
+        // Throttled: see planeScanIntervalNanos. Once a plane has been reported this
+        // stops entirely, so the steady-state cost is zero.
+        if (!planeReported) {
+            val now = System.nanoTime()
+            if (now - lastPlaneScanNanos >= planeScanIntervalNanos) {
+                lastPlaneScanNanos = now
+                if (hasTrackedPlane(session)) {
+                    planeReported = true
+                    post { onPlaneDetected?.invoke() }
+                }
+            }
         }
         // Why did the model vanish? Log every transition of the things that can
         // hide it: the anchor's own tracking state (PAUSED/STOPPED), whether the
@@ -968,6 +1095,56 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             }
         }
 
+        // Third tier: no plane anywhere, but ARCore Earth has a CONVERGED fix.
+        //
+        // A free-space anchor is pinned to nothing the tracker re-observes, so it
+        // slides on every relocalisation — and with the fort extending 30 m from
+        // its anchor, a fraction of a degree there is metres at the far wall. An
+        // Earth anchor is re-solved against VPS every frame instead, so it holds.
+        //
+        // The accuracy gate is the whole point. A LOOSE Earth fix is worse than
+        // free space, not better: the anchor jumps as the estimate converges, and
+        // a jump after alignment throws away the alignment. 3 m is chosen against
+        // this site — the fixes recorded in the Bangalore Fort courtyard were
+        // +/-2.3 to +/-2.4 m, so a converged fix there passes and an unconverged
+        // one indoors (measured +/-19 to +/-25 m at the desk) does not.
+        val earthAnchorPose: Pose? = if (planeHit != null || nearestPlane != null) {
+            null
+        } else {
+            try {
+                val earth = session.earth
+                if (earth != null &&
+                    earth.earthState == Earth.EarthState.ENABLED &&
+                    earth.trackingState == TrackingState.TRACKING
+                ) {
+                    val cam = frame.camera.pose
+                    val fwd = cam.compose(Pose.makeTranslation(0f, 0f, -1.2f))
+                    // Identity rotation, ground-estimated height: the same target
+                    // the free-space tier builds, so the two tiers seat the model
+                    // identically and only the anchor backing differs.
+                    val y = if (modelTrueScale) cam.ty() - EYE_HEIGHT_M else fwd.ty()
+                    val target = Pose.makeTranslation(fwd.tx(), y, fwd.tz())
+                    val gp = earth.getGeospatialPose(target)
+                    if (gp.horizontalAccuracy <= MAX_EARTH_FALLBACK_ACC_M) {
+                        target
+                    } else {
+                        Log.i(
+                            TAG,
+                            "placeInFront: Earth fix too loose for a fallback anchor " +
+                                "(horizAcc=%.1fm > %.1fm) — using free space"
+                                    .format(gp.horizontalAccuracy, MAX_EARTH_FALLBACK_ACC_M),
+                        )
+                        null
+                    }
+                } else {
+                    null
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "Earth fallback probe failed", t)
+                null
+            }
+        }
+
         val anchor = try {
             when {
                 planeHit != null -> {
@@ -977,6 +1154,32 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 nearestPlane != null -> {
                     Log.i(TAG, "placeInFront: anchored on NEAREST tracked plane")
                     nearestPlane.createAnchor(nearestPlane.centerPose)
+                }
+                earthAnchorPose != null -> {
+                    val earth = session.earth!!
+                    val gp = earth.getGeospatialPose(earthAnchorPose)
+                    val q = gp.eastUpSouthQuaternion
+                    Log.i(
+                        TAG,
+                        "placeInFront: no plane — anchored on EARTH " +
+                            "(horizAcc=%.1fm)".format(gp.horizontalAccuracy),
+                    )
+                    post {
+                        onARError?.invoke(
+                            "placed without a surface, held by GPS + VPS. Sweep the " +
+                                "phone across textured ground and tap Re-place for a " +
+                                "steadier lock.",
+                        )
+                    }
+                    earth.createAnchor(
+                        gp.latitude,
+                        gp.longitude,
+                        gp.altitude,
+                        q[0],
+                        q[1],
+                        q[2],
+                        q[3],
+                    )
                 }
                 else -> {
                     val cam = frame.camera.pose
@@ -1000,6 +1203,18 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                             "1.2 m ahead (trueScale=$modelTrueScale, y=%.2f vs camera %.2f)"
                                 .format(y, cam.ty()),
                     )
+                    // Say so on screen. A free-space anchor is pinned to nothing the
+                    // tracker keeps re-observing, so it moves on every relocalisation —
+                    // and with a 47 m model extending 30 m from the anchor, a fraction
+                    // of a degree there is metres at the far wall. That is the "it
+                    // drifts away" reported from site, and until now the only sign it
+                    // had happened was a line in logcat nobody at a monument can read.
+                    post {
+                        onARError?.invoke(
+                            "placed WITHOUT a surface — it will drift. Sweep the phone " +
+                                "across textured ground, then tap Re-place.",
+                        )
+                    }
                     // Identity rotation so the model stays upright rather than
                     // inheriting the camera's tilt.
                     session.createAnchor(Pose.makeTranslation(target.tx(), y, target.tz()))
@@ -1019,6 +1234,11 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             return
         }
         currentAnchorNode = anchorNode
+        // The anchor exists; continuous plane growth earns nothing from here on.
+        // attachModel also does this, but only on its async SUCCESS path — so a GLB
+        // that failed to load left the most expensive ARCore mode running for the
+        // rest of the session with nothing to show for it.
+        setPlaneFinding(false)
         attachModel(anchorNode, uri)
     }
 
@@ -1312,9 +1532,47 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     }
 
     /** Re-place the discovery layer so cards follow the model as it is aligned. */
+    /**
+     * Re-pose the discovery cards after an alignment nudge.
+     *
+     * This used to call [placeDiscoveryCards], which re-renders all 20 card bitmaps
+     * and builds 20 fresh ImageNodes on EVERY nudge — while [removeAllDiscoveryCards]
+     * only DETACHED the previous ones, never destroying their Filament textures. So
+     * each tap of the alignment pad leaked 20 textures. Measured at Bangalore Fort
+     * on 2026-08-15: the pad lagged, the phone cooked, and after a few dozen taps
+     * Android killed the process for native memory — mid-authoring, losing the whole
+     * alignment. That single bug ended the site visit.
+     *
+     * Nothing about a nudge changes a card's artwork; only its pose. So re-pose the
+     * nodes that already exist: no bitmap render, no allocation, nothing to leak.
+     * `local`/`yawDeg` hold the AUTHORED pose (see the DiscoveryCard construction),
+     * so the current alignment composes onto them cleanly every time.
+     */
     private fun reapplyDiscoveryLayer() {
-        val json = lastDiscoveryCardsJson ?: return
-        placeDiscoveryCards(json)
+        if (discoveryCards.isEmpty()) return
+        val m = modelLocalPose()
+        for (c in discoveryCards) {
+            try {
+                val a = m.transformPoint(floatArrayOf(c.local.x, c.local.y, c.local.z))
+                c.node.position = Position(a[0], a[1], a[2])
+                c.node.rotation = Rotation(0f, c.yawDeg + currentYawDeg, 0f)
+            } catch (t: Throwable) {
+                Log.w(TAG, "discovery card re-pose failed: ${c.id}", t)
+            }
+        }
+    }
+
+    /**
+     * Take the discovery layer down and forget it.
+     *
+     * Hiding the cards from JS used to be cosmetic only: `lastDiscoveryCardsJson`
+     * stayed set, so the nudge path kept rebuilding a layer the author could no
+     * longer see, and there was no way to un-arm it short of killing the screen.
+     */
+    fun clearDiscoveryLayer() {
+        removeAllDiscoveryCards()
+        tapTargets.clear()
+        lastDiscoveryCardsJson = null
     }
 
     fun clearAnchor() {
@@ -1331,6 +1589,9 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
      * heavy per-frame plane detection is pure wasted CPU/heat after placement.
      */
     private fun setPlaneFinding(enabled: Boolean) {
+        // Recorded even if the session is not up yet, so the creation lambda and any
+        // later rebuild apply the same intent rather than defaulting back to ON.
+        planeFindingWanted = enabled
         val session = arSession ?: return
         try {
             val config = session.config
@@ -1423,11 +1684,134 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         // Reset transition trackers so the fresh session logs its first states.
         lastEarthState = null
         lastEarthTracking = null
-        geoTickCount = 0
+        lastGeoReadNanos = 0L
         if (composeView != null && currentAnchorNode == null) {
             Log.i(GEO_TAG, "rebuilding AR session (geospatial=$enabled)")
             rebuildAR()
         }
+    }
+
+    /**
+     * Suspend or resume ARCore Geospatial on the LIVE session, without rebuilding it.
+     *
+     * Geospatial/VPS is the most power-hungry thing this view turns on: continuous
+     * fine GPS, continuous network traffic, and on-device visual localisation running
+     * alongside the normal tracker. It was enabled for the entire life of the screen
+     * and never switched off, even once the pose it exists to produce had been banked.
+     * That is a large share of why the phone shut down after 2-3 minutes at Bangalore
+     * Fort (2026-08-15).
+     *
+     * Safe to do live: SceneView applies its `geospatialMode` parameter from a
+     * `LaunchedEffect(geospatialMode)` (verified by decompiling arsceneview 4.18.0),
+     * so it runs once per value change rather than every frame and will NOT stamp our
+     * value back — unlike the traps this view has hit before.
+     *
+     * Only meaningful when geospatial was ARMED at session creation; ARCore will not
+     * accept ENABLED on a session that was not created for it.
+     */
+    fun setGeospatialActive(active: Boolean) {
+        if (!geospatialEnabled) {
+            Log.i(GEO_TAG, "setGeospatialActive($active) ignored — never armed")
+            return
+        }
+        if (active == geospatialActive) return
+        val session = arSession ?: return
+        try {
+            val config = session.config
+            config.geospatialMode =
+                if (active) Config.GeospatialMode.ENABLED
+                else Config.GeospatialMode.DISABLED
+            session.configure(config)
+            geospatialActive = active
+            Log.i(GEO_TAG, "geospatial ${if (active) "RESUMED" else "SUSPENDED"} (power)")
+        } catch (t: Throwable) {
+            Log.w(GEO_TAG, "setGeospatialActive($active) failed", t)
+        }
+    }
+
+    /**
+     * Site-readiness pipeline (PERMANENT). Mark where the author is standing, in
+     * the placement anchor's local frame, for two-point alignment.
+     *
+     * The camera pose is used deliberately, NOT a raycast. A hit-test needs a
+     * detected plane or a depth sample, and a heritage reconstruction is aligned
+     * against masonry 20-40 m away where ARCore has neither — depth is only
+     * trustworthy to about 5 m. What ARCore IS good at over those distances is
+     * knowing where the device itself has moved, so the author walks to the
+     * feature and marks it by being there.
+     *
+     * Reported in the ANCHOR's frame because that is the frame the model node's
+     * position and rotation live in, so JS can solve a transform and apply it
+     * straight through nudgeYaw/nudgeModel.
+     */
+    fun markAlignmentPoint(index: Int) {
+        val frame = arFrame ?: run {
+            post { onAlignmentPoint?.invoke(index, 0f, 0f, 0f, "AR session not ready") }
+            return
+        }
+        val anchor = currentAnchorNode?.anchor ?: run {
+            post { onAlignmentPoint?.invoke(index, 0f, 0f, 0f, "place the model first") }
+            return
+        }
+        val camera = frame.camera
+        if (camera.trackingState != TrackingState.TRACKING) {
+            // Marking while tracking is lost would record a stale pose and quietly
+            // corrupt the alignment — the exact class of failure this feature exists
+            // to remove.
+            post {
+                onAlignmentPoint?.invoke(
+                    index, 0f, 0f, 0f,
+                    "not tracking — move the phone slowly, then mark again",
+                )
+            }
+            return
+        }
+        val local = try {
+            anchor.pose.inverse().compose(camera.pose)
+        } catch (t: Throwable) {
+            Log.w(TAG, "markAlignmentPoint transform failed", t)
+            post { onAlignmentPoint?.invoke(index, 0f, 0f, 0f, "could not read the camera pose") }
+            return
+        }
+        Log.i(
+            TAG,
+            "markAlignmentPoint[%d] anchor-local (%.2f, %.2f, %.2f)".format(
+                index, local.tx(), local.ty(), local.tz(),
+            ),
+        )
+        post { onAlignmentPoint?.invoke(index, local.tx(), local.ty(), local.tz(), null) }
+    }
+
+    /**
+     * Site-readiness pipeline (PERMANENT). Apply a solved alignment in one step:
+     * absolute yaw and an absolute anchor-local offset, replacing whatever the
+     * nudge pad had accumulated.
+     *
+     * Exists so a two-point solve lands atomically. Driving it as reset + nudgeYaw
+     * + nudgeModel from JS works, but each of those re-poses the discovery layer
+     * and emits its own frame, so a solve would visibly scatter the model through
+     * three intermediate states before settling.
+     */
+    fun applyAlignment(yawDeg: Float, dx: Float, dy: Float, dz: Float) {
+        val node = currentModelNode ?: return
+        currentYawDeg = yawDeg % 360f
+        modelOffsetX = dx
+        modelOffsetY = dy
+        modelOffsetZ = dz
+        try {
+            node.rotation = Rotation(0f, currentYawDeg, 0f)
+            node.position = Position(modelOffsetX, modelOffsetY, modelOffsetZ)
+        } catch (t: Throwable) {
+            Log.w(TAG, "applyAlignment failed", t)
+            return
+        }
+        Log.i(
+            TAG,
+            "applyAlignment yaw=%.2f offset=(%.2f, %.2f, %.2f)".format(
+                currentYawDeg, modelOffsetX, modelOffsetY, modelOffsetZ,
+            ),
+        )
+        reapplyDiscoveryLayer()
     }
 
     // Site-readiness pipeline (PERMANENT product feature). Authoring: read the
@@ -1594,9 +1978,12 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             if (earth.earthState == Earth.EarthState.ENABLED &&
                 earth.trackingState == TrackingState.TRACKING
             ) {
-                geoTickCount++
-                // ~1 log/sec at 60fps; state transitions above are unthrottled.
-                if (geoTickCount % 60 == 1) {
+                // Once every GEO_READ_INTERVAL_NANOS of WALL CLOCK, whatever the
+                // frame rate. State transitions above stay unthrottled — those are
+                // the ones you must not miss.
+                val now = System.nanoTime()
+                if (now - lastGeoReadNanos >= GEO_READ_INTERVAL_NANOS) {
+                    lastGeoReadNanos = now
                     val pose: GeospatialPose = earth.cameraGeospatialPose
                     Log.i(
                         GEO_TAG,
@@ -1633,7 +2020,24 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
      * sessionConfiguration lambda. Only used by the dev cloud-anchor path, and
      * only before anything is placed, so no world content is lost.
      */
+    /**
+     * Coalesce rebuild requests to one per frame.
+     *
+     * cloudAnchorsEnabled, depthArmed and geospatialEnabled all arrive from JS as
+     * separate prop writes at mount, and each independently asked for a rebuild —
+     * so a screen that sets all three tore down and recreated the ARCore session
+     * and the Filament engine up to THREE times in the first seconds, before the
+     * user had done anything. Posting collapses them into a single rebuild with
+     * every flag already in its final state.
+     */
+    private val rebuildRunnable = Runnable { rebuildARNow() }
+
     private fun rebuildAR() {
+        removeCallbacks(rebuildRunnable)
+        post(rebuildRunnable)
+    }
+
+    private fun rebuildARNow() {
         composeView?.let {
             try {
                 removeView(it)
@@ -1974,6 +2378,11 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             cloudAnchorId = cloudAnchorId,
             message = if (uri == null) "resolved — model attaches when glbUri arrives" else null,
         )
+        // The model now hangs off the CLOUD anchor; the geospatial anchor it was on
+        // has been cleared. Nothing left in this session needs Earth, so stop paying
+        // for it — this is the one place geospatial can be dropped with no loss at
+        // all, and it is also the steady state a visitor sits in for many minutes.
+        setGeospatialActive(false)
     }
 
     /**
@@ -2377,6 +2786,14 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             } catch (t: Throwable) {
                 Log.w(TAG, "remove discovery card failed", t)
             }
+            // Detaching a node from the scene graph does NOT free the Filament
+            // texture ImageNode built from its bitmap — only destroy() does. Twenty
+            // cards rebuilt without this is twenty leaked textures per rebuild.
+            try {
+                c.node.destroy()
+            } catch (t: Throwable) {
+                Log.w(TAG, "destroy discovery card failed", t)
+            }
         }
         discoveryCards.clear()
     }
@@ -2436,15 +2853,24 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 sceneRoot?.removeChildNode(node)
             } catch (_: Throwable) {
             }
+            // See removeAllDiscoveryCards: detach frees nothing, destroy() does.
+            try {
+                node.destroy()
+            } catch (_: Throwable) {
+            }
         }
         cardNodes.clear()
     }
 
-    /** Detach + forget all card placards (best-effort). */
+    /** Detach + destroy + forget all card placards (best-effort). */
     private fun removeCardNodes(anchorNode: AnchorNode) {
         for (node in cardNodes) {
             try {
                 anchorNode.removeChildNode(node)
+            } catch (_: Throwable) {
+            }
+            try {
+                node.destroy()
             } catch (_: Throwable) {
             }
         }
@@ -2475,18 +2901,41 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 //     showed as a black shell. setDoubleSided(true) renders both faces
                 //     AND flips normals for the back side (plus cull NONE as backstop).
                 // Per-material, each call guarded (setParameter throws on a missing param).
+                // The winding fix-ups are for the RECOMPRESSED heritage GLBs only.
+                //
+                // A surveyed reconstruction must NOT get them. Bangalore Fort's GLB is
+                // written by our own direct glTF writer — no gltfpack, no meshopt, no
+                // extensions — and its material declares `doubleSided: false`
+                // deliberately. That flag is load-bearing: the grounding core ships with
+                // its inner face omitted (…__NO-INNER-FACE) precisely so that back-face
+                // culling makes it invisible from the courtyard and solid from outside.
+                // Forcing doubleSided + CullingMode.NONE overrode that intent, so the
+                // app rendered wall interiors and the backs of faces that were meant to
+                // be absent — painting geometry over the real masonry in the camera
+                // feed, which is exactly what the model was designed to avoid, and the
+                // likeliest source of the dark patches reported on site 2026-08-15.
+                // It also roughly doubled the rasterised fragments for a closed solid.
+                val trustGlbMaterials = modelTrueScale
                 try {
                     modelInstance.materialInstances.forEach { mi ->
                         try { mi.setParameter("metallicFactor", 0.0f) } catch (_: Throwable) {}
                         try { mi.setParameter("roughnessFactor", 0.85f) } catch (_: Throwable) {}
-                        try { mi.isDoubleSided = true } catch (_: Throwable) {}
-                        try {
-                            mi.cullingMode = com.google.android.filament.Material.CullingMode.NONE
-                        } catch (_: Throwable) {}
+                        if (!trustGlbMaterials) {
+                            try { mi.isDoubleSided = true } catch (_: Throwable) {}
+                            try {
+                                mi.cullingMode =
+                                    com.google.android.filament.Material.CullingMode.NONE
+                            } catch (_: Throwable) {}
+                        }
                     }
                 } catch (t: Throwable) {
                     Log.w(TAG, "material fix-up skipped", t)
                 }
+                Log.i(
+                    TAG,
+                    "materials: winding fix-ups " +
+                        if (trustGlbMaterials) "SKIPPED (trusting the GLB)" else "applied",
+                )
                 try {
                     // scaleToUnits NORMALISES: it resizes the model so its largest
                     // bounding-box dimension equals that many metres. That is right for
@@ -2658,7 +3107,82 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         return nv21
     }
 
+    // ── Thermal guard ────────────────────────────────────────────────────────
+    /**
+     * Degrade before Android kills us.
+     *
+     * At Bangalore Fort the app ran 2-3 minutes and the system shut it down with the
+     * phone very hot. Android tells us this is coming — `PowerManager` publishes a
+     * thermal status well before the throttling gets severe — and we were not
+     * listening. Once it does, the cheapest large saving available at runtime is to
+     * drop geospatial, which is both the hottest subsystem and the one whose absence
+     * degrades gracefully (the model stays exactly where it is; only re-localisation
+     * stops).
+     *
+     * The status is also reported to JS so the screen can say what happened, rather
+     * than the accuracy readout mysteriously freezing.
+     */
+    private var powerManager: PowerManager? = null
+    private var thermalListener: PowerManager.OnThermalStatusChangedListener? = null
+
+    private fun startThermalGuard() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        if (thermalListener != null) return
+        val pm = try {
+            context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        } catch (t: Throwable) {
+            Log.w(TAG, "thermal guard unavailable", t)
+            null
+        } ?: return
+        val listener = PowerManager.OnThermalStatusChangedListener { status ->
+            // Two thresholds, deliberately different.
+            //
+            // Measured on-device 2026-08-16: this handset reaches LIGHT within about
+            // three minutes of ordinary authoring. Dropping geospatial that early
+            // would take the accuracy readout away from an admin who still needs it,
+            // so LIGHT only WARNS. MODERATE is where the system actually throttles,
+            // and that is where we shed the most expensive subsystem.
+            val warn = status >= PowerManager.THERMAL_STATUS_LIGHT
+            val severe = status >= PowerManager.THERMAL_STATUS_MODERATE
+            Log.i(TAG, "thermal status=$status warn=$warn severe=$severe")
+            post {
+                onThermalStatus?.invoke(status, warn)
+                if (severe) setGeospatialActive(false)
+            }
+        }
+        try {
+            pm.addThermalStatusListener(listener)
+            powerManager = pm
+            thermalListener = listener
+        } catch (t: Throwable) {
+            Log.w(TAG, "addThermalStatusListener failed", t)
+        }
+    }
+
+    private fun stopThermalGuard() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        val pm = powerManager
+        val l = thermalListener
+        if (pm != null && l != null) {
+            try {
+                pm.removeThermalStatusListener(l)
+            } catch (_: Throwable) {
+            }
+        }
+        powerManager = null
+        thermalListener = null
+    }
+
     fun cleanup() {
+        // Name the teardown. cleanup() is reached from BOTH onDetachedFromWindow
+        // and onDropViewInstance, and an AR screen that ends itself mid-session is
+        // indistinguishable from a crash unless the log says which one ran first.
+        Log.i(TAG, "cleanup(): attached=$isAttachedToWindow session=${arSession != null}")
+        stopThermalGuard()
+        // A queued rebuild would call setupAR() after teardown, resurrecting the
+        // session on a view that is going away.
+        removeCallbacks(rebuildRunnable)
+        removeCallbacks(measureAndLayout)
         // Cancel in-flight Cloud Anchor futures BEFORE the anchor detach below and
         // the Compose disposal (session close) — in-flight behavior across
         // pause/close is undocumented. cleanup() runs twice (onDetachedFromWindow
@@ -2690,6 +3214,21 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        // Hold the display awake for as long as the AR surface is attached.
+        //
+        // Aligning a 47 m reconstruction means standing still and LOOKING, with no
+        // touches for minutes at a time — which is precisely what the display
+        // timeout counts as idle. When it fires, ARCore pauses, the camera is
+        // released and the session comes back re-initialised; from the user's side
+        // that reads as the screen "automatically closing down" mid-alignment.
+        // Nothing else in the app sets this, so on a handset with a 30 s timeout
+        // the AR screen was unusable by design.
+        //
+        // View.keepScreenOn maps to WindowManager's FLAG_KEEP_SCREEN_ON and is
+        // scoped to this view's attachment, so it needs no permission and cannot
+        // leak past cleanup() the way an explicit WakeLock can.
+        keepScreenOn = true
+        startThermalGuard()
         if (composeView == null) setupAR()
     }
 
@@ -2719,6 +3258,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        keepScreenOn = false
         cleanup()
     }
 
@@ -2734,6 +3274,25 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
          * camera's own height instead put a 13.5 m building's base at chest level.
          */
         private const val EYE_HEIGHT_M = 1.5f
+
+        /**
+         * Worst Earth horizontal accuracy, in metres, still worth anchoring to when
+         * no plane was found. See the third tier in [doPlaceInFront] — above this,
+         * the Earth fix is still converging and its anchor JUMPS, which is worse
+         * than free space's smooth drift because a jump undoes an alignment.
+         */
+        private const val MAX_EARTH_FALLBACK_ACC_M = 3.0
+
+        /**
+         * How often the Earth pose is read and pushed to JS, in nanoseconds.
+         *
+         * 2 s, matching the rate this actually ran at on the measured build — not
+         * the 1 s its old comment claimed. Every read is a JNI call plus a JS event
+         * that re-renders the authoring screen, on the screen this project is
+         * trying to stop overheating, so it stays at the slower measured rate
+         * rather than being quietly doubled while "fixing" the throttle.
+         */
+        private const val GEO_READ_INTERVAL_NANOS = 2_000_000_000L
 
         // Dev harness: VPS-availability probe log tag. Coordinates are the
         // device's CURRENT location, passed in from JS per call.

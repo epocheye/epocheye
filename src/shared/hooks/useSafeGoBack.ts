@@ -13,12 +13,19 @@ import { useCallback, useRef } from 'react';
 import { BackHandler } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { ROUTES } from '../../core/constants';
+import { recordDiagnostic } from '../../services/crashJournal';
 import type { MainNavigationProp } from '../../core/types';
 
 export function useSafeGoBack(): () => void {
   const navigation = useNavigation<MainNavigationProp>();
 
   return useCallback(() => {
+    // Name the caller. A full-screen AR screen that closes on its own looks
+    // identical to a crash from the outside, and the difference between "somebody
+    // called back" and "the process died" decides which bug you are chasing.
+    recordDiagnostic(
+      `safeGoBack from ${new Error().stack?.split('\n')[2]?.trim() ?? '?'}`,
+    );
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {

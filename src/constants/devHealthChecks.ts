@@ -474,7 +474,7 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
     },
     requires: 'auth',
     howToTest:
-      'PASS = count >= 1 and model_id is exactly bangalore_fort_recon. count 0 means no station row (author one on site). 401 means the token expired — re-login.',
+      'PASS = count >= 1 and model_id is exactly bangalore_fort_recon_v4. count 0 means no station row (author one on site). 401 means the token expired — re-login.',
   },
   {
     id: 'bfort-glb-probe',
