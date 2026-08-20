@@ -178,6 +178,13 @@ export async function cacheGlbUrl(url: string): Promise<string> {
  */
 export async function getOrFetchGlb(url: string): Promise<string> {
   if (!url) return url;
+  // Already-local URIs are returned untouched: there is nothing to download and
+  // nothing to cache. Without this, a file:// path is handed to downloadFile(),
+  // which at best throws and at worst sits on the 60s DOWNLOAD_TIMEOUT_MS before
+  // the catch below returns the same string we already had — a minute of "the
+  // model never appeared" for no reason. Used by the on-device figure tests, which
+  // read a GLB pushed to the app's files dir instead of fetching it.
+  if (!/^https?:\/\//i.test(url)) return url;
   try {
     return await cacheGlbUrl(url);
   } catch (err) {

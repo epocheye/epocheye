@@ -115,15 +115,65 @@ export interface ThermalStatusEvent {
   severe: boolean;
 }
 
+/**
+ * PHASE 0 — rolling render cost, sampled natively and summarised ~1/s.
+ *
+ * Interpret the DELTA, not the absolute: `updateMode = BLOCKING` paces the AR
+ * loop to the ~30 fps camera (the Bangalore Fort thermal fix), so ~33 ms is the
+ * expected floor. What matters is animated vs. static in the same room.
+ */
+export interface FrameStatsEvent {
+  meanMs: number;
+  p95Ms: number;
+  fps: number;
+  /** True when the currently-placed model carries animation clips. */
+  animated: boolean;
+}
+
+/**
+ * PHASE 0 — glTF skeletal-animation clips found on the model that just loaded,
+ * read directly off the Filament animator (`FilamentInstance.getAnimator()`).
+ *
+ * This is a capability probe, not a feature. Every GLB this app has shipped is
+ * static geometry, so nothing has ever confirmed that the loader preserves a
+ * skeleton. Reading it back at load time is the only honest way to tell
+ * "the renderer cannot animate" apart from "this model has no clips".
+ *
+ * `count === 0` → the asset carries no clips, or the loader dropped them.
+ * `count > 0` but nothing visibly moves → clips exist and the animator is
+ * simply never being advanced.
+ */
+export interface ModelAnimationsEvent {
+  /** Number of animation clips on the loaded model. */
+  count: number;
+  /** Clip names, in index order. May contain '' for unnamed clips. */
+  names: string[];
+  /** Clip durations in seconds, index-aligned with `names`. */
+  durations: number[];
+}
+
 interface NativeProps {
   style?: ViewStyle;
   glbUri?: string;
   modelScale?: number;
+  /**
+   * Name of the glTF clip to play on a multi-clip model, looping. Omit to let
+   * SceneView's autoAnimate play clip index 0. Selection is by NAME because index
+   * order is an export artefact that changes silently when a clip is added.
+   */
+  animationClip?: string;
   /** Grounded card JSON to render as a world-anchored 3D panel. */
   cardData?: string;
   /** Keep the GLB's own metres instead of normalising it to `modelScale` metres
    *  across. Required for surveyed reconstructions. */
   modelTrueScale?: boolean;
+  /** Origin is on the ground: drop surface-less anchors to the estimated floor
+   *  instead of leaving them at camera height. Independent of modelTrueScale. */
+  groundAnchored?: boolean;
+  /** Root motion: slide the model forward at this speed. 0 = stay put. */
+  walkSpeedMps?: number;
+  /** Stop after this many metres. 0 = keep walking. */
+  walkDistanceM?: number;
   /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
   cloudAnchorsEnabled?: boolean;
   // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -150,6 +200,10 @@ interface NativeProps {
   onElementTapped?: (event: {nativeEvent: ElementTappedEvent}) => void;
   onAlignmentPoint?: (event: {nativeEvent: AlignmentPointEvent}) => void;
   onThermalStatus?: (event: {nativeEvent: ThermalStatusEvent}) => void;
+  /** PHASE 0 — animation clips found on the loaded model. */
+  onModelAnimations?: (event: {nativeEvent: ModelAnimationsEvent}) => void;
+  /** PHASE 0 — rolling frame-time stats (~1/s). */
+  onFrameStats?: (event: {nativeEvent: FrameStatsEvent}) => void;
 }
 
 const NativeDetectARView = ((): HostComponent<NativeProps> | null => {
@@ -245,12 +299,20 @@ interface Props {
   style?: ViewStyle;
   glbUri?: string;
   modelScale?: number;
+  /** Play this glTF clip by name, looping. Omit for autoAnimate (clip index 0). */
+  animationClip?: string;
   /** Grounded card JSON → world-anchored 3D data panel beside the model. */
   cardData?: string;
   /** Keep the GLB's own metres instead of normalising it to `modelScale` metres
    *  across. Required for surveyed reconstructions; without it a 48 m fort renders
    *  at `modelScale` metres wide. */
   modelTrueScale?: boolean;
+  /** Origin is on the ground — drop surface-less anchors to the estimated floor. */
+  groundAnchored?: boolean;
+  /** Root motion speed in m/s; must match the clip's implied pace or feet skate. */
+  walkSpeedMps?: number;
+  /** Stop the walk after this many metres (keeps it inside ARCore's drift radius). */
+  walkDistanceM?: number;
   /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
   cloudAnchorsEnabled?: boolean;
   // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -289,6 +351,10 @@ interface Props {
   onAlignmentPoint?: (event: AlignmentPointEvent) => void;
   /** Device thermal state changed; `severe` = actively throttling. */
   onThermalStatus?: (event: ThermalStatusEvent) => void;
+  /** PHASE 0 — animation clips on the loaded model (capability probe). */
+  onModelAnimations?: (event: ModelAnimationsEvent) => void;
+  /** PHASE 0 — rolling frame-time stats (~1/s). */
+  onFrameStats?: (event: FrameStatsEvent) => void;
 }
 
 const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
@@ -297,8 +363,12 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       style,
       glbUri,
       modelScale,
+      animationClip,
       cardData,
       modelTrueScale,
+      groundAnchored,
+      walkSpeedMps,
+      walkDistanceM,
       cloudAnchorsEnabled,
       depthArmed, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       depthOcclusionEnabled, // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -317,6 +387,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       onElementTapped,
       onAlignmentPoint, // site-readiness pipeline (PERMANENT)
       onThermalStatus,
+      onModelAnimations, // PHASE 0 skeletal-animation probe
+      onFrameStats, // PHASE 0 frame-time probe
     },
     ref,
   ) => {
@@ -428,8 +500,12 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         style={style}
         glbUri={glbUri}
         modelScale={modelScale}
+        animationClip={animationClip}
         cardData={cardData}
         modelTrueScale={modelTrueScale}
+        groundAnchored={groundAnchored}
+        walkSpeedMps={walkSpeedMps}
+        walkDistanceM={walkDistanceM}
         cloudAnchorsEnabled={cloudAnchorsEnabled}
         depthArmed={depthArmed} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         depthOcclusionEnabled={depthOcclusionEnabled} // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -506,6 +582,19 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           onThermalStatus
             ? (e: {nativeEvent: ThermalStatusEvent}) =>
                 onThermalStatus(e.nativeEvent)
+            : undefined
+        }
+        onModelAnimations={
+          // PHASE 0 skeletal-animation probe
+          onModelAnimations
+            ? (e: {nativeEvent: ModelAnimationsEvent}) =>
+                onModelAnimations(e.nativeEvent)
+            : undefined
+        }
+        onFrameStats={
+          // PHASE 0 frame-time probe
+          onFrameStats
+            ? (e: {nativeEvent: FrameStatsEvent}) => onFrameStats(e.nativeEvent)
             : undefined
         }
       />

@@ -69,6 +69,37 @@ class EpocheyeDetectARViewManager(
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onThermalStatus", event)
         }
+        // PHASE 0 — skeletal-animation capability probe. Emits the clip inventory
+        // read off the Filament animator right after a model loads.
+        view.onModelAnimations = { count, names, durations ->
+            val event = Arguments.createMap().apply {
+                putInt("count", count)
+                putArray(
+                    "names",
+                    Arguments.createArray().apply { names.forEach { pushString(it) } },
+                )
+                putArray(
+                    "durations",
+                    Arguments.createArray().apply {
+                        durations.forEach { pushDouble(it.toDouble()) }
+                    },
+                )
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onModelAnimations", event)
+        }
+        // PHASE 0 — rolling render cost, so the animated-vs-static delta can be
+        // read on the device instead of inferred.
+        view.onFrameStats = { meanMs, p95Ms, fps, animated ->
+            val event = Arguments.createMap().apply {
+                putDouble("meanMs", meanMs.toDouble())
+                putDouble("p95Ms", p95Ms.toDouble())
+                putDouble("fps", fps.toDouble())
+                putBoolean("animated", animated)
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onFrameStats", event)
+        }
         // Site-readiness pipeline (PERMANENT) — two-point alignment.
         view.onAlignmentPoint = { index, x, y, z, error ->
             val event = Arguments.createMap().apply {
@@ -163,6 +194,13 @@ class EpocheyeDetectARViewManager(
         view.setModelScale(scale)
     }
 
+    // PHASE 0/3 — select a glTF clip BY NAME on a multi-clip model. Null leaves
+    // SceneView's autoAnimate default (clip index 0) in charge.
+    @ReactProp(name = "animationClip")
+    fun setAnimationClip(view: EpocheyeDetectARView, name: String?) {
+        view.setAnimationClip(name)
+    }
+
     @ReactProp(name = "cardData")
     fun setCardData(view: EpocheyeDetectARView, json: String?) {
         view.setCardData(json)
@@ -186,6 +224,25 @@ class EpocheyeDetectARViewManager(
     }
 
     /** True-to-life sizing for surveyed reconstructions — see setModelTrueScale. */
+    // The model's origin sits on the ground, so a surface-less anchor is dropped to
+    // the estimated floor. Separate from modelTrueScale on purpose — see the view.
+    // Root motion: slide the placed model forward at this many metres per second,
+    // stopping after walkDistanceM. Speed must match the clip or the feet skate.
+    @ReactProp(name = "walkSpeedMps", defaultFloat = 0f)
+    fun setWalkSpeedMps(view: EpocheyeDetectARView, v: Float) {
+        view.setWalkSpeedMps(v)
+    }
+
+    @ReactProp(name = "walkDistanceM", defaultFloat = 0f)
+    fun setWalkDistanceM(view: EpocheyeDetectARView, v: Float) {
+        view.setWalkDistanceM(v)
+    }
+
+    @ReactProp(name = "groundAnchored", defaultBoolean = false)
+    fun setGroundAnchored(view: EpocheyeDetectARView, enabled: Boolean) {
+        view.setGroundAnchored(enabled)
+    }
+
     @ReactProp(name = "modelTrueScale", defaultBoolean = false)
     fun setModelTrueScale(view: EpocheyeDetectARView, enabled: Boolean) {
         view.setModelTrueScale(enabled)
@@ -416,6 +473,9 @@ class EpocheyeDetectARViewManager(
             .put("onElementTapped", MapBuilder.of("registrationName", "onElementTapped"))
             .put("onAlignmentPoint", MapBuilder.of("registrationName", "onAlignmentPoint"))
             .put("onThermalStatus", MapBuilder.of("registrationName", "onThermalStatus"))
+            // PHASE 0 skeletal-animation probe
+            .put("onModelAnimations", MapBuilder.of("registrationName", "onModelAnimations"))
+            .put("onFrameStats", MapBuilder.of("registrationName", "onFrameStats"))
             .build()
     }
 

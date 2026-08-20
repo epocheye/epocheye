@@ -38,6 +38,7 @@ import {
 import {useNavigation, useRoute} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useTranslation} from 'react-i18next';
+import Video from 'react-native-video';
 import {
   Camera as VisionCamera,
   useCameraDevice,
@@ -49,6 +50,8 @@ import EpocheyeDetectARView, {
   type CloudAnchorEvent,
   type EpocheyeDetectARHandle,
   type GeospatialStateEvent, // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  type FrameStatsEvent, // PHASE 0 frame-time probe
+  type ModelAnimationsEvent, // PHASE 0 skeletal-animation probe
   type VpsResultEvent, // ADMIN-HARNESS (REMOVE AFTER KONARK)
 } from '../../native/EpocheyeDetectARView';
 // ADMIN-HARNESS (REMOVE AFTER KONARK) — statically imported (was __DEV__ require)
@@ -99,6 +102,12 @@ const YAW_STEP_DEG = 15;
 // ~1.2 gives a human-scale statue that fills the frame. Tune this one line if the
 // test model looks too small/large. Never applied to the real recognition path.
 const DIRECT_GLB_TEST_SCALE_M = 1.2;
+/**
+ * How long the direct-GLB harness waits for ARCore to find a plane before placing
+ * anyway. Long enough for a normal sweep of a lit, textured floor; short enough
+ * that a featureless room still shows something rather than hanging forever.
+ */
+const PLANE_WAIT_MS = 12000;
 
 /** The only venue with a trained detector today. Overridable via route param. */
 const DEFAULT_DETECTOR_VENUE = 'indian-museum';
@@ -601,6 +610,51 @@ const DetectArScreen: React.FC = () => {
   const devDirectGlb = showAdminHarness
     ? (route.params as {devDirectGlb?: string} | undefined)?.devDirectGlb ?? null
     : null;
+  // Per-test scale override. The static statue probe wants ~1.2 m; a rigged human
+  // wants ~1.7 m, and Fox wants ~1.0 m. Falls back to the statue default so the
+  // existing direct-GLB check is untouched.
+  const devGlbScaleM = showAdminHarness
+    ? (route.params as {devGlbScaleM?: number} | undefined)?.devGlbScaleM ?? null
+    : null;
+  // Clip to play on a multi-clip test model. Without this the native side falls back
+  // to SceneView's autoAnimate, which plays clip index 0 — on the merged Tipu figure
+  // that is Idle_02, so the walk would be unreachable.
+  const devAnimationClip = showAdminHarness
+    ? (route.params as {devAnimationClip?: string} | undefined)?.devAnimationClip ??
+      null
+    : null;
+  // Drop a surface-less anchor to the estimated floor. NOT the same thing as true
+  // scale, though they were conflated until the figure rendered 1.7 cm tall: the
+  // Meshy rig carries a 100x unit mismatch (skeleton in cm, mesh in m, one 0.01
+  // root scale) which ONLY scaleToUnits normalisation hides. So the figure keeps
+  // normalised sizing for a correct 1.7 m, and takes the floor drop from here.
+  const devGroundAnchored = showAdminHarness
+    ? (route.params as {devGroundAnchored?: boolean} | undefined)?.devGroundAnchored ??
+      false
+    : false;
+  // Root motion for the figure. Speed is MEASURED off the clip (0.46 m/s), not
+  // picked — see advanceWalk() in EpocheyeDetectARView.kt.
+  const devWalkSpeed = showAdminHarness
+    ? (route.params as {devWalkSpeed?: number} | undefined)?.devWalkSpeed ?? 0
+    : 0;
+  const devWalkDistance = showAdminHarness
+    ? (route.params as {devWalkDistance?: number} | undefined)?.devWalkDistance ?? 0
+    : 0;
+  // Audio to play while the figure speaks. Kept as a plain URI rather than going
+  // through the audio_stops/audio_clips tables: this is a harness, and the DB path
+  // carries a persona/language matrix the figure does not have a row in yet.
+  const devAudioUri = showAdminHarness
+    ? (route.params as {devAudioUri?: string} | undefined)?.devAudioUri ?? null
+    : null;
+  // The honesty line, on screen.
+  //
+  // The figure says "I am not a recording" in his first spoken sentence, but a
+  // visitor with the phone muted — in a gallery, on a bus, or simply with the volume
+  // down — hears none of it and is shown an invented face with no warning at all.
+  // A disclosure that only exists in audio is not a disclosure.
+  const devDisclosure = showAdminHarness
+    ? (route.params as {devDisclosure?: string} | undefined)?.devDisclosure ?? null
+    : null;
   // __DEV__ Cloud Anchor harness: 'host' places the direct-GLB test model then
   // hosts its anchor as a persistent Cloud Anchor; 'resolve' resolves a saved/
   // pasted anchor ID and attaches the test model at the resolved pose. Only ever
@@ -789,6 +843,13 @@ const DetectArScreen: React.FC = () => {
         allowUngrounded={allowUngrounded}
         onClose={handleClose}
         devDirectGlb={devDirectGlb}
+        devGlbScaleM={devGlbScaleM}
+        devAnimationClip={devAnimationClip}
+        devGroundAnchored={devGroundAnchored}
+        devWalkSpeed={devWalkSpeed}
+        devWalkDistance={devWalkDistance}
+        devAudioUri={devAudioUri}
+        devDisclosure={devDisclosure}
         devCloudAnchor={devCloudAnchor}
         showAdminHarness={showAdminHarness} // ADMIN-HARNESS (REMOVE AFTER KONARK)
       />
@@ -886,6 +947,22 @@ const DetectARNative: React.FC<{
    */
   devDirectGlb?: string | null;
   /**
+   * Scale (in scaleToUnits units) for the direct-GLB test model. Null → the
+   * statue default. A rigged human needs ~1.7, Fox ~1.0.
+   */
+  devGlbScaleM?: number | null;
+  /** Play this glTF clip by name on a multi-clip test model. */
+  devAnimationClip?: string | null;
+  /** Origin on the ground — drop surface-less anchors to the estimated floor. */
+  devGroundAnchored?: boolean;
+  /** Root-motion speed (m/s) and distance (m) for the walking figure. */
+  devWalkSpeed?: number;
+  devWalkDistance?: number;
+  /** Audio to play while the figure speaks. */
+  devAudioUri?: string | null;
+  /** Honesty line shown on screen while the figure is present. */
+  devDisclosure?: string | null;
+  /**
    * __DEV__ Cloud Anchor harness mode. 'host' keeps the direct-GLB auto-place
    * and adds the host overlay; 'resolve' loads the test GLB WITHOUT placing it
    * and adds the resolve overlay. Always null/absent in release.
@@ -899,6 +976,13 @@ const DetectARNative: React.FC<{
   onClose,
   allowUngrounded = false,
   devDirectGlb = null,
+  devGlbScaleM = null,
+  devAnimationClip = null,
+  devGroundAnchored = false,
+  devWalkSpeed = 0,
+  devWalkDistance = 0,
+  devAudioUri = null,
+  devDisclosure = null,
   devCloudAnchor = null,
   showAdminHarness = false,
 }) => {
@@ -938,6 +1022,9 @@ const DetectARNative: React.FC<{
   // __DEV__ direct-GLB test: fired-once guard so the auto-place runs a single
   // time once tracking is up (the effect re-runs on every tracking/render tick).
   const directPlacedRef = useRef(false);
+  // Ref AND state deliberately: the ref keeps the placement effect from firing
+  // twice, the state exists so flipping it actually re-runs that effect.
+  const planeWaitExpiredRef = useRef(false);
 
   // __DEV__ Cloud Anchor harness: last native lifecycle event, surfaced on the
   // overlay. Cleared when the session rebuilds (onReady re-fires) so the
@@ -959,6 +1046,16 @@ const DetectARNative: React.FC<{
   // ADMIN-HARNESS (REMOVE AFTER KONARK) — on-screen readouts so the harness is
   // usable on an UNTETHERED release build (no adb); fed by native onVpsResult /
   // onGeospatialState events, rendered in the admin overlay.
+  // PHASE 0 skeletal-animation probe result (null until the model loads).
+  const [modelAnimations, setModelAnimations] =
+    useState<ModelAnimationsEvent | null>(null);
+  const [frameStats, setFrameStats] = useState<FrameStatsEvent | null>(null);
+  // True once ARCore has actually found a horizontal surface. TRACKING arrives in
+  // about a second; a usable plane takes several more of real motion, so the two
+  // are not interchangeable — placing on the former is what put the figure in
+  // mid-air.
+  const [planeReady, setPlaneReady] = useState(false);
+  const [planeWaitExpired, setPlaneWaitExpired] = useState(false);
   const [vpsResult, setVpsResult] = useState<VpsResultEvent | null>(null);
   const [geoState, setGeoState] = useState<GeospatialStateEvent | null>(null);
   const handleToggleGeospatial = useCallback((on: boolean) => {
@@ -1067,11 +1164,24 @@ const DetectARNative: React.FC<{
     setTracking(state === 'TRACKING');
   }, []);
   const handlePlaneDetected = useCallback(() => {
+    setPlaneReady(true);
     setStatus(prev => (prev === 'placed' ? prev : 'ready'));
   }, []);
   const handleAnchorPlaced = useCallback(() => {
     setStatus('placed');
     setErrorMessage(null);
+  }, []);
+  // PHASE 0 — the skeletal-animation verdict, read straight off the Filament
+  // animator at load time. Kept in state (not just logged) so the answer is
+  // legible ON THE DEVICE: this test gets run at arm's length in a room, and
+  // requiring a Metro window to read the result would make it useless on site.
+  const handleModelAnimations = useCallback((info: ModelAnimationsEvent) => {
+    setModelAnimations(info);
+    console.log(
+      `[PHASE0] MODEL ANIMATIONS count=${info.count} names=${
+        info.names.length ? info.names.join(', ') : '(none)'
+      }`,
+    );
   }, []);
   const handleError = useCallback((err: string) => {
     // Native emits '' when a tracking fault CLEARS. That is not a failure, so it
@@ -1123,15 +1233,38 @@ const DetectARNative: React.FC<{
   // the native placeInFront() to anchor it ~1.2 m ahead of the camera. Native
   // defers the actual placement until BOTH the glbUri prop and TRACKING are
   // satisfied (tryPlacePending), so the prop update and the command can race
-  // freely. Fires once (directPlacedRef). Fully inert in release: __DEV__ is
-  // false and devDirectGlb is null, so this whole effect body is dead.
+  // freely. Fires once (directPlacedRef).
+  //
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — was `!__DEV__`, which made this body
+  // dead in release and therefore untestable on a release build. The Phase 0
+  // skeletal-animation probe has to run under R8 (a debug-only dependency has
+  // caused a production failure on this codebase before), so the gate now also
+  // admits `showAdminHarness` — the same isAdminUser() allowlist that already
+  // guards devDirectGlb itself above and depthArmed/geospatialEnabled below.
+  // Still fully inert for normal users: devDirectGlb is null unless the admin
+  // health board launched this screen.
   useEffect(() => {
-    if (!__DEV__ || !devDirectGlb) return;
+    if ((!__DEV__ && !showAdminHarness) || !devDirectGlb) return;
     // Cloud Anchor RESOLVE mode must NOT auto-place — the model's pose comes
     // from the resolved anchor, not from placeInFront. (HOST mode keeps the
     // auto-place: it hosts the anchor this effect creates.)
     if (devCloudAnchor === 'resolve') return;
     if (!tracking || directPlacedRef.current) return;
+    // WAIT FOR A PLANE, not merely for TRACKING.
+    //
+    // ARCore reports TRACKING within about a second of the camera opening, but a
+    // usable horizontal plane needs several more seconds of parallax. Firing on
+    // TRACKING meant placeInFront() ran before any plane existed, fell through its
+    // whole ladder to the free-space tier, and anchored the model 1.2 m ahead at
+    // CAMERA height — which for a figure whose origin is its feet put it standing
+    // on the viewer's eye line. Logged as:
+    //   "no tracked plane at all — free-space fallback (trueScale=false, y=-0.11
+    //    vs camera 0.16)"
+    //
+    // Waiting lets the plane-hit tier win, so the figure lands on the real floor.
+    // The timeout is the escape hatch: a dark or featureless room may never yield
+    // a plane, and placing badly beats never placing at all in a dev harness.
+    if (!planeReady && !planeWaitExpiredRef.current) return;
     directPlacedRef.current = true;
     let cancelled = false;
     (async () => {
@@ -1149,7 +1282,19 @@ const DetectARNative: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [devDirectGlb, devCloudAnchor, tracking]);
+  }, [devDirectGlb, devCloudAnchor, tracking, showAdminHarness, planeReady, planeWaitExpired]);
+
+  // Escape hatch for the plane wait above: after PLANE_WAIT_MS of tracking with no
+  // plane, place anyway. Re-runs the effect by flipping state, not just the ref.
+  useEffect(() => {
+    if ((!__DEV__ && !showAdminHarness) || !devDirectGlb) return;
+    if (!tracking || planeReady || directPlacedRef.current) return;
+    const timer = setTimeout(() => {
+      planeWaitExpiredRef.current = true;
+      setPlaneWaitExpired(true);
+    }, PLANE_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [devDirectGlb, tracking, planeReady, showAdminHarness]);
 
   // __DEV__ CLOUD ANCHOR RESOLVE MODE — arm the test model WITHOUT placing it.
   //
@@ -1184,7 +1329,17 @@ const DetectARNative: React.FC<{
         ref={arRef}
         style={StyleSheet.absoluteFill}
         glbUri={glbUri ?? undefined}
-        modelScale={devDirectGlb ? DIRECT_GLB_TEST_SCALE_M : undefined}
+        modelScale={
+          devDirectGlb
+            ? devGlbScaleM ?? DIRECT_GLB_TEST_SCALE_M
+            : undefined
+        }
+        groundAnchored={devGroundAnchored || undefined}
+        walkSpeedMps={devWalkSpeed || undefined}
+        walkDistanceM={devWalkDistance || undefined}
+        animationClip={devAnimationClip ?? undefined}
+        onModelAnimations={devDirectGlb ? handleModelAnimations : undefined}
+        onFrameStats={devDirectGlb ? setFrameStats : undefined}
         cardData={
           resolved.kind === 'grounded' ? JSON.stringify(resolved.card) : undefined
         }
@@ -1203,12 +1358,80 @@ const DetectARNative: React.FC<{
         onGeospatialState={showAdminHarness ? setGeoState : undefined} // ADMIN-HARNESS (REMOVE AFTER KONARK)
       />
 
+      {/* Voice for the speaking figure.
+          Audio-only, so it is deliberately given no size and no controls — this is
+          a man talking, not a media player. `paused` waits for the AR notice so the
+          voice cannot start over a safety screen the visitor has not accepted yet.
+          `react-native-video` is already a dependency; AudioPlayer.tsx is NOT reused
+          because it ships a full scrub-bar UI meant for a listening screen. */}
+      {devAudioUri ? (
+        <Video
+          source={{uri: devAudioUri}}
+          paused={!activationDone}
+          repeat={false}
+          ignoreSilentSwitch="ignore"
+          onError={(e: unknown) => {
+            console.warn('[PHASE3] figure audio failed', e);
+            setErrorMessage('voice failed to load');
+          }}
+          onEnd={() => console.log('[PHASE3] figure audio finished')}
+          style={styles.hiddenAudio}
+        />
+      ) : null}
+
       <ARActivationOverlay
         visible={!activationDone}
         onDone={() => setActivationDone(true)}
       />
 
       <ScanGuideOverlay phase={scanPhase} ready={tracking} />
+
+      {devDisclosure && activationDone ? (
+        <View style={styles.disclosureBanner} pointerEvents="none">
+          <Text style={styles.disclosureText}>{devDisclosure}</Text>
+        </View>
+      ) : null}
+
+      {/* PHASE 0 — skeletal-animation verdict, on-screen. This test is run at
+          arm's length in a room with the phone held up; a Metro-only readout
+          would be unreadable exactly when it is needed. Shown only for the
+          direct-GLB harness, so it never appears in a real scan. */}
+      {devDirectGlb && (modelAnimations || frameStats) ? (
+        <View style={styles.animProbeBanner} pointerEvents="none">
+          {frameStats ? (
+            <Text style={styles.animProbeBody}>
+              {`${frameStats.meanMs.toFixed(1)} ms mean · ${frameStats.p95Ms.toFixed(
+                1,
+              )} ms p95 · ${frameStats.fps.toFixed(
+                1,
+              )} fps · animated=${frameStats.animated ? 'yes' : 'no'}`}
+            </Text>
+          ) : null}
+          {modelAnimations ? (
+            <>
+              <Text style={styles.animProbeTitle}>
+                {modelAnimations.count > 0
+                  ? `PHASE 0 — ${modelAnimations.count} CLIP${
+                      modelAnimations.count === 1 ? '' : 'S'
+                    } FOUND`
+                  : 'PHASE 0 — NO CLIPS ON THIS MODEL'}
+              </Text>
+              <Text style={styles.animProbeBody}>
+                {modelAnimations.count > 0
+                  ? modelAnimations.names
+                      .map(
+                        (n, i) =>
+                          `${i}: ${n || '(unnamed)'} · ${(
+                            modelAnimations.durations[i] ?? 0
+                          ).toFixed(2)}s`,
+                      )
+                      .join('\n')
+                  : 'Skeleton absent or stripped by the loader.'}
+              </Text>
+            </>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* ADMIN-HARNESS (REMOVE AFTER KONARK) — mode-less on the plain scan screen
           (VPS + occlusion toggle); 'host'/'resolve' when launched from the board. */}
@@ -1531,6 +1754,54 @@ const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: '#000000'},
   noArBackdrop: {backgroundColor: '#0A0A0A'},
   topOverlay: {position: 'absolute', top: 0, left: 0, right: 0},
+  // Audio-only: zero-size and non-interactive, never seen.
+  hiddenAudio: {width: 0, height: 0, opacity: 0},
+  // The on-screen honesty line. Deliberately NOT styled like the debug readouts:
+  // this is content the visitor is meant to read, so it sits low, stays quiet, and
+  // uses the warm-white body colour rather than the harness amber. Solid backing
+  // because it has to stay legible against a bright daylight camera feed.
+  disclosureBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 96,
+    backgroundColor: 'rgba(10,10,10,0.72)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  disclosureText: {
+    color: '#F5F0E8',
+    fontSize: 12.5,
+    lineHeight: 17,
+    textAlign: 'center',
+  },
+  // PHASE 0 skeletal-animation probe readout. Sits low so it never covers the
+  // figure being judged. Monospace so clip indices line up when read at a glance.
+  animProbeBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 132,
+    backgroundColor: 'rgba(0,0,0,0.78)',
+    borderColor: 'rgba(203,168,98,0.55)',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  animProbeTitle: {
+    color: '#E8A020',
+    fontSize: 12,
+    letterSpacing: 1.4,
+    fontWeight: '700',
+  },
+  animProbeBody: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 11,
+    marginTop: 4,
+    fontFamily: 'monospace',
+  },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',

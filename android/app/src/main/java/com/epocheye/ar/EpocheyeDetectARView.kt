@@ -103,6 +103,24 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
     /** Android thermal status (level, isSevere) — see startThermalGuard. */
     var onThermalStatus: ((Int, Boolean) -> Unit)? = null
+
+    /**
+     * PHASE 0 — glTF skeletal-animation clip inventory for the model that just
+     * loaded: (count, names, durationsSeconds).
+     *
+     * Every GLB this app ships is static geometry, so nothing has ever confirmed
+     * that the loader preserves a skeleton. Reading the inventory back off the
+     * Filament animator is what separates "this renderer cannot animate" from
+     * "this particular model has no clips" — two failures that look identical on
+     * screen and would otherwise be guessed at.
+     */
+    var onModelAnimations: ((Int, List<String>, List<Float>) -> Unit)? = null
+
+    /**
+     * PHASE 0 — rolling render cost: (meanMs, p95Ms, fps, modelIsAnimated).
+     * Emitted about once a second while a session is running.
+     */
+    var onFrameStats: ((Float, Float, Float, Boolean) -> Unit)? = null
     var onARError: ((String) -> Unit)? = null
     var onFrameCaptured: ((String) -> Unit)? = null
     /** Dev harness: Cloud Anchor host/resolve lifecycle (phase, state, id?, quality?, message?). */
@@ -726,6 +744,9 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
 
     /** Per-frame work, invoked from the composable's onSessionUpdated (main thread). */
     private fun onSessionTick(session: Session, frame: Frame) {
+        sampleFrameTime()
+        advanceWalk()
+        planeCensus(session, frame)
         if (!readyReported) {
             readyReported = true
             post { onARReady?.invoke() }
@@ -1059,11 +1080,30 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         // Screen centre → a tracked plane, accepting only a hit inside the plane's
         // own polygon (not its infinite extension), so the model lands on the real
         // surface rather than on a guess beyond its edge.
+        val camPoseForHit = frame.camera.pose
+        // Camera forward projected onto the ground plane. The model's forward is its
+        // local -Z, so a yaw of atan2(-fx, -fz) makes it face the same way the viewer
+        // is looking; adding WALK_HEADING_OFFSET_DEG turns it across the view.
+        run {
+            val z = camPoseForHit.zAxis          // camera +Z points BACKWARD
+            val fx = -z[0]
+            val fz = -z[2]
+            if (fx * fx + fz * fz > 1e-6f) {
+                placementCamYawDeg =
+                    Math.toDegrees(kotlin.math.atan2(-fx, -fz).toDouble()).toFloat()
+            }
+        }
         val planeHit = try {
             frame.hitTest(width / 2f, height / 2f).firstOrNull { r ->
                 val tr = r.trackable
                 tr is Plane && tr.trackingState == TrackingState.TRACKING &&
-                    tr.isPoseInPolygon(r.hitPose)
+                    tr.isPoseInPolygon(r.hitPose) &&
+                    // A ground-standing figure must not be seated on a table top even
+                    // when the centre ray genuinely lands on one. Same rule as the
+                    // floor search below, applied here so aiming at a desk falls
+                    // through to the floor rather than standing him on it.
+                    (!dropAnchorToFloor ||
+                        r.hitPose.ty() < camPoseForHit.ty() - MIN_FLOOR_DROP_M)
             }
         } catch (t: Throwable) {
             Log.w(TAG, "plane hit-test failed", t)
@@ -1080,15 +1120,60 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         } else {
             try {
                 val cam = frame.camera.pose
-                session.getAllTrackables(Plane::class.java)
+                val tracked = session.getAllTrackables(Plane::class.java)
                     .filter { it.trackingState == TrackingState.TRACKING }
-                    .minByOrNull { p ->
+
+                if (dropAnchorToFloor) {
+                    // A FIGURE STANDS ON THE FLOOR, AND THE NEAREST PLANE IS NOT THE
+                    // FLOOR. Indoors the first horizontal surface ARCore resolves is
+                    // almost always a desk, because that is what the phone is held over
+                    // and what has texture. Picking "nearest" put a 1.7 m man on a
+                    // 0.75 m desk — head above the viewer's — which reads on screen as
+                    // "the model is far too big" even though it measured exactly 1.700 m.
+                    //
+                    // So for ground-standing models, pick the LOWEST upward-facing plane
+                    // instead: floors sit below desks, and below the camera. The
+                    // eye-height sanity bound keeps a stray plane found through a
+                    // doorway or stairwell from dragging the figure into a basement.
+                    val floorish = tracked.filter {
+                        it.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
+                            it.centerPose.ty() < cam.ty() - MIN_FLOOR_DROP_M &&
+                            it.centerPose.ty() > cam.ty() - MAX_FLOOR_DROP_M
+                    }
+                    val floor = floorish.minByOrNull { it.centerPose.ty() }
+                    if (floor != null) {
+                        Log.i(
+                            TAG,
+                            "placeInFront: floor candidates=%d chosen y=%.2f (camera %.2f)"
+                                .format(floorish.size, floor.centerPose.ty(), cam.ty()),
+                        )
+                        floor
+                    } else {
+                        // Deliberately NULL, not "nearest". With no floor-like plane the
+                        // only candidates left are desks and counters, and falling back
+                        // to the nearest of those is exactly the bug this branch exists
+                        // to fix. Returning null drops through to the free-space tier,
+                        // which seats the figure at cam.ty() - EYE_HEIGHT_M. That anchor
+                        // drifts, and the user is told so — but a figure standing at the
+                        // right height on a shaky anchor beats one standing on a desk.
+                        Log.i(
+                            TAG,
+                            ("placeInFront: %d planes tracked but none upward-facing " +
+                                "between %.1fm and %.1fm below the camera — using the " +
+                                "estimated floor instead of a table top")
+                                .format(tracked.size, MIN_FLOOR_DROP_M, MAX_FLOOR_DROP_M),
+                        )
+                        null
+                    }
+                } else {
+                    tracked.minByOrNull { p ->
                         val c = p.centerPose
                         val dx = c.tx() - cam.tx()
                         val dy = c.ty() - cam.ty()
                         val dz = c.tz() - cam.tz()
                         dx * dx + dy * dy + dz * dz
                     }
+                }
             } catch (t: Throwable) {
                 Log.w(TAG, "nearest-plane scan failed", t)
                 null
@@ -1118,11 +1203,11 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     earth.trackingState == TrackingState.TRACKING
                 ) {
                     val cam = frame.camera.pose
-                    val fwd = cam.compose(Pose.makeTranslation(0f, 0f, -1.2f))
+                    val fwd = cam.compose(Pose.makeTranslation(0f, 0f, -placeDistanceM))
                     // Identity rotation, ground-estimated height: the same target
                     // the free-space tier builds, so the two tiers seat the model
                     // identically and only the anchor backing differs.
-                    val y = if (modelTrueScale) cam.ty() - EYE_HEIGHT_M else fwd.ty()
+                    val y = if (dropAnchorToFloor) cam.ty() - EYE_HEIGHT_M else fwd.ty()
                     val target = Pose.makeTranslation(fwd.tx(), y, fwd.tz())
                     val gp = earth.getGeospatialPose(target)
                     if (gp.horizontalAccuracy <= MAX_EARTH_FALLBACK_ACC_M) {
@@ -1183,7 +1268,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 }
                 else -> {
                     val cam = frame.camera.pose
-                    val target = cam.compose(Pose.makeTranslation(0f, 0f, -1.2f))
+                    val target = cam.compose(Pose.makeTranslation(0f, 0f, -placeDistanceM))
                     // Drop a SURVEYED reconstruction to the estimated ground.
                     //
                     // Free space carries no floor, so the anchor used to inherit the
@@ -1196,11 +1281,12 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     // Estimating the floor as eye-height below the camera is wrong by
                     // how far the phone is from a standing hold — centimetres, which the
                     // fine pad closes in a tap or two — instead of wrong by a storey.
-                    val y = if (modelTrueScale) cam.ty() - EYE_HEIGHT_M else target.ty()
+                    val y = if (dropAnchorToFloor) cam.ty() - EYE_HEIGHT_M else target.ty()
                     Log.i(
                         TAG,
                         "placeInFront: no tracked plane at all — free-space fallback " +
-                            "1.2 m ahead (trueScale=$modelTrueScale, y=%.2f vs camera %.2f)"
+                            "%.1f m ahead (trueScale=$modelTrueScale, ground=$groundAnchored, ".format(placeDistanceM) +
+                            "y=%.2f vs camera %.2f)"
                                 .format(y, cam.ty()),
                     )
                     // Say so on screen. A free-space anchor is pinned to nothing the
@@ -2877,6 +2963,335 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         cardNodes.clear()
     }
 
+    // PHASE 0 — frame-time sampling. A ring of inter-tick gaps, summarised once a
+    // second. Kept as primitives in a fixed array so the sampler itself costs
+    // nothing measurable: allocating per frame would corrupt the very number it
+    // is trying to report.
+    private val frameGapsMs = FloatArray(FRAME_SAMPLE_SIZE)
+    private var frameGapCount = 0
+    private var frameGapIndex = 0
+    private var lastFrameNanos = 0L
+    private var lastFrameReportNanos = 0L
+
+    private var lastCensusNanos = 0L
+
+    /**
+     * Report what ARCore ACTUALLY sees, once a second.
+     *
+     * "0 planes tracked" is ambiguous on its own: it cannot tell you whether ARCore
+     * found nothing, or found planes we then filtered away. Those need opposite
+     * fixes, and guessing between them has already cost several rounds. This prints
+     * the raw census — every plane, its type, its tracking state — plus the session's
+     * EFFECTIVE plane-finding mode read back from the config rather than from the
+     * flag we think we set.
+     */
+    private fun planeCensus(session: Session, frame: Frame) {
+        val now = System.nanoTime()
+        if (now - lastCensusNanos < CENSUS_INTERVAL_NANOS) return
+        lastCensusNanos = now
+        try {
+            val all = session.getAllTrackables(Plane::class.java)
+            val byState = all.groupingBy { it.trackingState.name }.eachCount()
+            val byType = all.groupingBy { it.type.name }.eachCount()
+            val mode = try {
+                session.config.planeFindingMode.name
+            } catch (t: Throwable) {
+                "?"
+            }
+            val cam = frame.camera
+            val detail = all.take(6).joinToString("; ") {
+                "%s/%s y=%.2f %.1fx%.1fm".format(
+                    it.type.name.removePrefix("HORIZONTAL_").take(8),
+                    it.trackingState.name.take(4),
+                    it.centerPose.ty(),
+                    it.extentX, it.extentZ,
+                )
+            }
+            Log.i(
+                TAG,
+                ("PLANES n=%d mode=%s wanted=%b camState=%s camY=%.2f " +
+                    "states=%s types=%s | %s")
+                    .format(
+                        all.size, mode, planeFindingWanted,
+                        cam.trackingState.name, cam.pose.ty(),
+                        byState, byType, detail,
+                    ),
+            )
+            // Where is he RIGHT NOW, relative to the viewer?
+            //
+            // A single line logged at placement time proved the feet landed on the
+            // plane and still did not match what was on screen — so something moves
+            // afterwards. Candidates: the anchor being re-solved as ARCore relocalises,
+            // the walk translating the node, or the camera pose drifting. Logging the
+            // live relationship every second is the only way to tell which, and the
+            // "feetVsCam" column is the one that matches what the eye sees: positive
+            // means he is ABOVE you, which is the reported symptom.
+            currentModelNode?.let { mn ->
+                try {
+                    val bb = mn.boundingBox
+                    val sc = mn.scale.y
+                    val wy = mn.worldPosition.y
+                    val feet = wy + (bb.center[1] - bb.halfExtent[1]) * sc
+                    val head = wy + (bb.center[1] + bb.halfExtent[1]) * sc
+                    val anchorY = currentAnchorNode?.worldPosition?.y
+                    Log.i(
+                        TAG,
+                        ("FIGURE feet=%.2f head=%.2f nodeY=%.2f anchorY=%s camY=%.2f " +
+                            "feetVsCam=%+.2f walked=%.2fm")
+                            .format(
+                                feet, head, wy,
+                                anchorY?.let { "%.2f".format(it) } ?: "-",
+                                cam.pose.ty(),
+                                feet - cam.pose.ty(),
+                                walkTravelled,
+                            ),
+                    )
+                } catch (t: Throwable) {
+                    Log.w(TAG, "figure census failed", t)
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "plane census failed", t)
+        }
+    }
+
+    /**
+     * PHASE 0 — measure how expensive the scene actually is on this device.
+     *
+     * READ THE NUMBER IN CONTEXT: updateMode is deliberately BLOCKING, which paces
+     * this loop to the ~30 fps camera rather than the 90/120 Hz display. That was
+     * the fix for a thermal shutdown at Bangalore Fort. **~33 ms/frame is the
+     * expected floor, not a regression** — the figure to watch is the DELTA
+     * between an animated model and a static one in the same room, not the
+     * absolute value.
+     *
+     * p95 rather than max: a single 200 ms GC pause says nothing, but a p95 that
+     * drifts away from the mean is real judder a user would feel.
+     */
+    private fun sampleFrameTime() {
+        val now = System.nanoTime()
+        if (lastFrameNanos != 0L) {
+            val gapMs = (now - lastFrameNanos) / 1_000_000f
+            // Drop absurd gaps (app backgrounded, session paused) — they are not
+            // render cost and would wreck the mean.
+            lastFrameDtSec = (gapMs / 1000f).coerceIn(0f, 0.1f)
+            if (gapMs in 0.5f..500f) {
+                frameGapsMs[frameGapIndex] = gapMs
+                frameGapIndex = (frameGapIndex + 1) % FRAME_SAMPLE_SIZE
+                if (frameGapCount < FRAME_SAMPLE_SIZE) frameGapCount++
+            }
+        }
+        lastFrameNanos = now
+
+        if (lastFrameReportNanos == 0L) lastFrameReportNanos = now
+        if (now - lastFrameReportNanos < FRAME_REPORT_INTERVAL_NANOS) return
+        lastFrameReportNanos = now
+        if (frameGapCount < 10) return
+
+        val sorted = frameGapsMs.copyOf(frameGapCount).also { it.sort() }
+        val mean = sorted.sum() / frameGapCount
+        val p95 = sorted[((frameGapCount * 95) / 100).coerceAtMost(frameGapCount - 1)]
+        val fps = if (mean > 0f) 1000f / mean else 0f
+        val animated = currentModelNode?.let { it.animationCount > 0 } ?: false
+        Log.i(
+            TAG,
+            "PHASE0 frame: mean=%.1fms p95=%.1fms fps=%.1f model=%s animated=%b"
+                .format(mean, p95, fps, if (currentModelNode != null) "yes" else "no", animated),
+        )
+        val cb = onFrameStats ?: return
+        post { cb.invoke(mean, p95, fps, animated) }
+    }
+
+    /**
+     * PHASE 0 — read the skeletal-animation clip inventory off a just-loaded model
+     * and report it to JS.
+     *
+     * Diagnostic ONLY. It deliberately does not start, stop, or advance anything:
+     * SceneView's ModelNode defaults `autoAnimate = true`, and ARSceneView already
+     * ticks Node.onFrame(frameTimeNanos) → ModelNode.applyAnimations every frame.
+     * Driving a second animator from onSessionTick — which supplies no delta time —
+     * would double-advance the clip and produce a fast, juddering result that looks
+     * like a rendering bug. If a clip needs selecting later, that is
+     * modelNode.playAnimation(name, speed, loop), not a hand-rolled loop.
+     *
+     * Method signatures verified against gltfio-android-1.71.5 and
+     * sceneview-4.18.0 with javap, not assumed.
+     */
+    /**
+     * Name of the glTF animation clip to play, or null to leave SceneView's
+     * `autoAnimate` default alone (which plays clip index 0 and nothing else).
+     *
+     * A multi-clip figure needs this: the merged Tipu model carries Idle_02,
+     * Talk_with_Right_Hand_Open and Thoughtful_Walk, and index 0 is whichever the
+     * exporter happened to write first — so "walk" is not reachable without naming it.
+     */
+    private var animationClip: String? = null
+
+    /**
+     * This model's origin is on the ground, so a free-space anchor must be dropped to
+     * the estimated floor rather than left at camera height.
+     *
+     * Split out from [modelTrueScale] because the two were conflated and only
+     * coincidentally travelled together. True scale answers "how big is it?"; this
+     * answers "where is its origin?" — and a figure needs the floor WITHOUT true
+     * scale, because the Meshy rig carries a 100x unit mismatch (skeleton in cm,
+     * mesh in m, one 0.01 root scale) that only `scaleToUnits` normalisation hides.
+     * Turning true scale on to get the floor drop therefore rendered a 1.7 cm man.
+     */
+    private var groundAnchored: Boolean = false
+
+    fun setGroundAnchored(enabled: Boolean) {
+        groundAnchored = enabled
+    }
+
+    /** Anchors with no surface under them should sit on the estimated floor. */
+    private val dropAnchorToFloor: Boolean
+        get() = modelTrueScale || groundAnchored
+
+    /** A person needs room to be seen whole; a placard does not. */
+    private val placeDistanceM: Float
+        get() = if (groundAnchored) PLACE_DISTANCE_FIGURE_M else PLACE_DISTANCE_OBJECT_M
+
+    // ── Root motion ─────────────────────────────────────────────────────────────
+    // Every clip in the library is an IN-PLACE cycle: the legs stride but the body
+    // never leaves the spot. To make the figure cross the floor, the node has to be
+    // translated, and the speed has to match what the clip already implies or the
+    // feet skate.
+    //
+    // 0.46 m/s is MEASURED, not chosen: in an in-place cycle the planted foot slides
+    // backward under the body at exactly the body's ground speed, so tracking the toe
+    // through its stance phase in Blender gives the answer. Left foot 0.455, right
+    // 0.464 — they agree, which is the check that the number is real.
+    /**
+     * Camera heading (degrees about Y) at the moment the figure was placed.
+     *
+     * Needed because a walking figure has to be oriented RELATIVE TO THE VIEWER, and
+     * an ARCore plane anchor's pose carries the plane's own yaw, which is arbitrary.
+     * Left at the default the figure faced the anchor's local -Z and walked that way —
+     * a direction unrelated to where anyone was standing, so he would happily walk
+     * straight through the viewer and end up behind them. On device that reads as
+     * "I can only see the soles of his feet in the air", because you are underneath him.
+     */
+    private var placementCamYawDeg: Float = 0f
+
+    private var walkSpeedMps = 0f
+    private var walkDistanceM = 0f
+    private var walkTravelled = 0f
+    private var lastFrameDtSec = 0f
+
+    fun setWalkSpeedMps(v: Float) { walkSpeedMps = if (v > 0f) v else 0f }
+    fun setWalkDistanceM(v: Float) { walkDistanceM = if (v > 0f) v else 0f }
+
+    /**
+     * Slide the placed model forward along its own facing, stopping after
+     * [walkDistanceM]. Zero distance means walk indefinitely.
+     *
+     * Bounded on purpose. This project's own notes put ARCore drift beyond roughly
+     * 8 m from an anchor, so an unbounded walk would end with the figure detached
+     * from the floor it started on — and indoors it would simply leave the room.
+     */
+    private fun advanceWalk() {
+        if (walkSpeedMps <= 0f) return
+        val node = currentModelNode ?: return
+        if (walkDistanceM > 0f && walkTravelled >= walkDistanceM) return
+        var step = walkSpeedMps * lastFrameDtSec
+        if (step <= 0f) return
+        if (walkDistanceM > 0f) step = minOf(step, walkDistanceM - walkTravelled)
+        val yaw = Math.toRadians(currentYawDeg.toDouble())
+        // glTF forward is -Z; yaw rotates about Y.
+        val fx = (-kotlin.math.sin(yaw)).toFloat()
+        val fz = (-kotlin.math.cos(yaw)).toFloat()
+        try {
+            val p = node.position
+            node.position = Position(p.x + fx * step, p.y, p.z + fz * step)
+            walkTravelled += step
+        } catch (t: Throwable) {
+            Log.w(TAG, "advanceWalk failed", t)
+        }
+    }
+
+    fun setAnimationClip(name: String?) {
+        val clean = name?.takeIf { it.isNotBlank() }
+        if (clean == animationClip) return
+        animationClip = clean
+        currentModelNode?.let { applyAnimationClip(it) }
+    }
+
+    /**
+     * Play the requested clip by NAME, looping.
+     *
+     * Selection is by name and not by index on purpose: index order is an artefact of
+     * whatever the exporter wrote first and silently changes when a clip is added, which
+     * would swap a walking figure for a standing one with no error anywhere.
+     */
+    private fun applyAnimationClip(modelNode: ModelNode) {
+        val want = animationClip ?: return
+        try {
+            val animator = modelNode.animator ?: return
+            val count = animator.animationCount
+            var index = -1
+            for (i in 0 until count) {
+                if (animator.getAnimationName(i) == want) { index = i; break }
+            }
+            if (index < 0) {
+                val have = (0 until count).joinToString(", ") { animator.getAnimationName(it) ?: "" }
+                Log.w(TAG, "animation clip '$want' not found; model has [$have]")
+                post { onARError?.invoke("animation '$want' not on this model") }
+                return
+            }
+            // Stop whatever autoAnimate started, else two clips drive the same bones.
+            for (i in 0 until count) {
+                if (i != index) try { modelNode.stopAnimation(i) } catch (_: Throwable) {}
+            }
+            modelNode.playAnimation(index, 1f, true)
+            Log.i(TAG, "PHASE0 playing clip '$want' (index $index of $count)")
+        } catch (t: Throwable) {
+            Log.w(TAG, "applyAnimationClip failed", t)
+        }
+    }
+
+    private fun reportModelAnimations(modelNode: ModelNode) {
+        val cb = onModelAnimations ?: return
+        val names = mutableListOf<String>()
+        val durations = mutableListOf<Float>()
+        var count = 0
+        try {
+            val animator = modelNode.animator
+            if (animator == null) {
+                // No animator at all: the instance carries no skeleton/clips. This is
+                // a real answer, not an error — report zero rather than staying silent.
+                Log.i(TAG, "PHASE0 animations: animator is null (no skeleton on model)")
+            } else {
+                count = animator.animationCount
+                for (i in 0 until count) {
+                    names.add(
+                        try {
+                            animator.getAnimationName(i) ?: ""
+                        } catch (t: Throwable) {
+                            ""
+                        },
+                    )
+                    durations.add(
+                        try {
+                            animator.getAnimationDuration(i)
+                        } catch (t: Throwable) {
+                            0f
+                        },
+                    )
+                }
+                Log.i(
+                    TAG,
+                    "PHASE0 animations: count=$count names=${names.joinToString(", ")} " +
+                        "durations=${durations.joinToString(", ")}",
+                )
+            }
+        } catch (t: Throwable) {
+            // Never let a diagnostic take the model down — the render is the point.
+            Log.w(TAG, "PHASE0 animation probe failed", t)
+        }
+        post { cb.invoke(count, names.toList(), durations.toList()) }
+    }
+
     private fun attachModel(anchorNode: AnchorNode, glbUri: String) {
         val loader = modelLoader ?: run {
             post { onARError?.invoke("AR not ready") }
@@ -2954,6 +3369,23 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                             scaleToUnits = modelScale,
                         )
                     }
+                    if (groundAnchored) {
+                        // Face him ACROSS the viewer's line of sight and walk him along
+                        // that facing, so he crosses the frame at a constant distance
+                        // instead of closing on the camera. Walking toward the viewer
+                        // ends with the figure on top of them; walking directly away
+                        // shows only his back. Across is the one heading that stays
+                        // legible and lets the viewer pan to follow, which is how this
+                        // is meant to be watched.
+                        currentYawDeg =
+                            (placementCamYawDeg + WALK_HEADING_OFFSET_DEG) % 360f
+                        Log.i(
+                            TAG,
+                            "figure heading %.0f deg (camera %.0f + %.0f across)".format(
+                                currentYawDeg, placementCamYawDeg, WALK_HEADING_OFFSET_DEG,
+                            ),
+                        )
+                    }
                     try {
                         modelNode.rotation = Rotation(0f, currentYawDeg, 0f)
                         // Belt and braces with the reset in clearCurrentAnchor: the
@@ -2975,6 +3407,58 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     }
                     anchorNode.addChildNode(modelNode)
                     currentModelNode = modelNode
+                    walkTravelled = 0f
+                    // What size did this ACTUALLY end up? Asked, not assumed.
+                    //
+                    // This asset has a 100x unit mismatch baked in by Meshy (skeleton in
+                    // cm under a 0.01 root scale, mesh in m), so neither the authored
+                    // numbers nor the scaleToUnits target predict what lands on screen.
+                    // Two rounds were lost to reasoning about it from the file instead of
+                    // reading it off the node.
+                    try {
+                        val sz = modelNode.size
+                        val wp = modelNode.worldPosition
+                        // WHERE ARE HIS FEET? The node's position is not the same thing.
+                        // The bounding box is offset from the origin by whatever the
+                        // asset author baked in — and this asset carries an 11.7 mm
+                        // ground nudge that sits ABOVE the 0.01 root scale, so SceneView's
+                        // corrective x100 multiplies it into ~1.17 m of vertical offset.
+                        // Log the actual world extent so the error is visible instead of
+                        // inferred.
+                        try {
+                            val bb = modelNode.boundingBox
+                            val cy = bb.center[1]
+                            val hy = bb.halfExtent[1]
+                            val sc = modelNode.scale.y
+                            Log.i(
+                                TAG,
+                                ("PHASE3 feet/head: boxCenterY=%.4f halfY=%.4f scale=%.2f " +
+                                    "-> feetWorldY=%.3f headWorldY=%.3f (anchorY=%.3f)")
+                                    .format(
+                                        cy, hy, sc,
+                                        wp.y + (cy - hy) * sc,
+                                        wp.y + (cy + hy) * sc,
+                                        wp.y,
+                                    ),
+                            )
+                        } catch (t: Throwable) {
+                            Log.w(TAG, "bbox probe failed", t)
+                        }
+                        Log.i(
+                            TAG,
+                            ("PHASE3 model size: %.3f x %.3f x %.3f m  scale=%.4f " +
+                                "trueScale=%s scaleToUnits=%.2f worldY=%.3f")
+                                .format(
+                                    sz.x, sz.y, sz.z,
+                                    modelNode.scale.x,
+                                    modelTrueScale, modelScale, wp.y,
+                                ),
+                        )
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "size probe failed", t)
+                    }
+                    reportModelAnimations(modelNode)
+                    applyAnimationClip(modelNode)
                     // Model is now world-locked via its anchor — stop continuous
                     // plane finding to cut sustained CPU load / heat. Re-enabled on
                     // clearAnchor() for a re-scan.
@@ -3265,6 +3749,12 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     companion object {
         private const val TAG = "EpocheyeDetectARView"
 
+        // PHASE 0 frame-time sampler. ~4 s of history at the BLOCKING-paced 30 fps,
+        // long enough that one bad frame cannot swing the p95 on its own.
+        private const val FRAME_SAMPLE_SIZE = 120
+        private const val FRAME_REPORT_INTERVAL_NANOS = 1_000_000_000L
+        private const val CENSUS_INTERVAL_NANOS = 1_000_000_000L
+
         /**
          * Assumed height of a hand-held phone above the ground, in metres.
          *
@@ -3274,6 +3764,43 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
          * camera's own height instead put a 13.5 m building's base at chest level.
          */
         private const val EYE_HEIGHT_M = 1.5f
+
+        /**
+         * How far below the camera a plane must sit to be treated as the FLOOR.
+         *
+         * A phone is held roughly 1.2-1.6 m up, a desk stands about 0.75 m, so the drop
+         * to a desk is ~0.5-0.85 m and the drop to the floor is ~1.2-1.6 m. 0.9 m sits
+         * between the two: it rejects the desk that ARCore finds first indoors, which is
+         * what put a correctly-sized 1.70 m figure at head height.
+         *
+         * The upper bound stops a plane glimpsed through a doorway, down a stairwell, or
+         * on the floor below from dragging the figure into the basement.
+         */
+        /**
+         * Where the figure walks, in degrees off the viewer's line of sight.
+         * 0 = straight at you (ends with him on top of the camera), 180 = directly
+         * away (you watch his back leave), 90 = across the frame at constant distance.
+         */
+        private const val WALK_HEADING_OFFSET_DEG = 90f
+
+        private const val MIN_FLOOR_DROP_M = 0.9f
+        private const val MAX_FLOOR_DROP_M = 2.5f
+
+        /**
+         * How far ahead of the camera a surface-less anchor is seated.
+         *
+         * 1.2 m suits a small object card you lean in to read. It does NOT suit a
+         * person: a phone's vertical field of view spans only about 1.4 m at that
+         * range, so a 1.70 m figure does not fit on screen at all and the viewer is
+         * left looking UP at a torso. On device that reads as "the model is enormous
+         * and standing on my head" even when it measures exactly 1.700 m at floor
+         * height — which is precisely how this was misdiagnosed twice.
+         *
+         * 3 m fits a standing adult with headroom (2 * 3 * tan(30 deg) = 3.4 m of
+         * visible height) and is still well inside ARCore's ~8 m drift radius.
+         */
+        private const val PLACE_DISTANCE_OBJECT_M = 1.2f
+        private const val PLACE_DISTANCE_FIGURE_M = 3.0f
 
         /**
          * Worst Earth horizontal accuracy, in metres, still worth anchoring to when

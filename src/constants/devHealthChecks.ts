@@ -10,8 +10,11 @@
  *              that are normally unreachable off-site, e.g. ARSafetyNotice)
  *   - manual:  cannot be deep-launched; howToTest explains the steps
  *
- * DEV-ONLY: this module is only imported by the health screen, which is
- * `require`d behind `__DEV__`, so none of this enters the release bundle.
+ * NOT dev-only, despite the name. DevHealthCheckScreen is statically imported by
+ * MainNavigation and SHIPS IN RELEASE; the entry point (DevHealthCheckButton) is
+ * gated on `__DEV__ || isAdminUser(email)`. That is deliberate — this board is the
+ * only route to the on-site authoring tool, and an admin standing at a monument
+ * holds a release build. (This comment previously claimed the opposite.)
  */
 
 import { Alert, DevSettings, Linking } from 'react-native';
@@ -37,6 +40,103 @@ import { resolveModelGlb } from '../services/glbSource';
 // probe a different model (any modelId under GLB_BASE_URL/<id>.glb).
 const DIRECT_GLB_TEST_MODEL_ID = 'seated_buddha_oval_halo';
 const DIRECT_GLB_TEST_URL = buildGlbUrl(DIRECT_GLB_TEST_MODEL_ID);
+
+// ── PHASE 0: skeletal-animation capability probe ────────────────────────────
+// Every GLB this app has ever loaded is static geometry (fort sections, wall
+// profiles, museum statues), so glTF SKELETAL ANIMATION has never once been
+// exercised. Before any character work is costed, we need to know whether the
+// loader preserves a skeleton and whether the clips actually play.
+//
+// These are Khronos reference assets — public, small, free, and known-good, so
+// a failure here indicts OUR pipeline and not the model. Verified HTTP 200 on
+// 2026-08-18. Deliberately NOT hosted on our CDN: the point is a model whose
+// correctness is not in question.
+//
+// Ladder, in order of preference:
+//   CesiumMan    438 KB — rigged human, 1 walk clip. The real shape of the test.
+//   Fox          163 KB — 3 clips (Survey/Walk/Run). Use to prove clip SELECTION,
+//                          not just "something moved".
+//   RiggedFigure  50 KB — minimal rig. If this plays and CesiumMan does not, the
+//                          fault is size/complexity, not skinning support.
+const KHRONOS_SAMPLES =
+  'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models';
+const RIGGED_GLB_TEST_URL = `${KHRONOS_SAMPLES}/CesiumMan/glTF-Binary/CesiumMan.glb`;
+const RIGGED_GLB_MULTICLIP_URL = `${KHRONOS_SAMPLES}/Fox/glTF-Binary/Fox.glb`;
+const RIGGED_GLB_MINIMAL_URL = `${KHRONOS_SAMPLES}/RiggedFigure/glTF-Binary/RiggedFigure.glb`;
+
+// ── PHASE 3: the Tipu figure itself ─────────────────────────────────────────
+// ONE file, three clips, meshopt+KTX2 compressed (8.32 MB -> 1.16 MB, -86%) via
+// `node tools/compress-glb.mjs`. The three single-clip GLBs it was merged from are
+// kept on disk as the originals but are no longer what the app loads.
+//
+// Read straight off the DEVICE, not over the network. Push it once with:
+//   adb push tipu_figure.min.glb /sdcard/Android/data/com.epocheye/files/
+// (on Git Bash prefix `MSYS_NO_PATHCONV=1`, or the /sdcard path is rewritten to a
+// Windows path and the push silently lands nowhere).
+//
+// This replaced an `adb reverse` + python http.server rig that had to be restarted
+// every time the shell or the device connection dropped, which it did constantly.
+// A file:// URI has no such failure mode: it survives reboots, needs no tunnel, and
+// works with the Wi-Fi debugger disconnected. getOrFetchGlb() returns any URI it
+// cannot download unchanged (glbCache.ts:179-187), so the file path passes straight
+// through to Filament's loader with no cache-layer change.
+//
+// This is a DEV path — the app's external files dir is not where a shipped asset
+// lives. Before the palace the figure moves to the same S3/CloudFront bucket as
+// every other GLB.
+const TIPU_FIGURE_URL =
+  'file:///sdcard/Android/data/com.epocheye/files/tipu_figure.min.glb';
+
+// MEASURED off the retimed walk clip, not chosen: in an in-place cycle the planted
+// foot slides backward at exactly the body's ground speed, so tracking the toe
+// through stance in Blender gives 0.455 m/s (left) and 0.464 (right). They agree,
+// which is what makes the number trustworthy. Feed the app anything else and the
+// feet skate. 3 m keeps the walk well inside ARCore's ~8 m drift radius.
+const TIPU_WALK_SPEED_MPS = 0.46;
+const TIPU_WALK_DISTANCE_M = 3.0;
+
+// Shown on screen for as long as the figure is visible.
+//
+// Required by the brief, and it must be VISUAL as well as spoken: the figure says he
+// is not a recording in his opening sentence, but a muted phone turns that into an
+// unlabelled invented likeness of a real, politically contested man. Wording matches
+// the register the fresco reveal already uses for its Daria Daulat Bagh credit.
+const TIPU_DISCLOSURE =
+  'A depiction — drawn from portraits painted in his lifetime, not a likeness.';
+
+// THE FIGURE'S OWN VOICE — first person, generated with Google Cloud Text-to-Speech
+// (en-IN-Neural2-B, male, rate 0.90, pitch -2.0) from the script and reasoning at
+// research/figure-tipu/voice-script.md. Measured 34.68 s.
+//
+// THESE WORDS ARE INVENTED. No recording of Tipu Sultan exists and no first-person
+// account of this building survives, so the very first sentence he speaks says as
+// much — "I am not a recording" — and TIPU_DISCLOSURE repeats it on screen for anyone
+// listening with the sound off. Do not remove either without replacing it.
+//
+// en-IN and NOT en-GB, deliberately: an English-accented Tipu would layer a second
+// misrepresentation on top of an invented voice.
+//
+// Pushed to the device beside the model, same as the GLB. Regenerate with:
+//   python scripts/tipu_voice.py --key <epocheye-app-493415 service account>.json
+// (in epocheye_backend; TTS is enabled on the MAIN GCP project epocheye-app-493415,
+// NOT on the Firebase project epocheye01 whose credential the backend .env holds).
+const TIPU_VOICE_URI =
+  'file:///sdcard/Android/data/com.epocheye/files/palace_overview_en_tipu.mp3';
+
+// KNOWN ASSET DEFECT — the figure is NOT authored at a usable real-world size.
+// Meshy's rig has a 100x unit mismatch: the skeleton is in centimetres (Hips at
+// y=88.411) under a root node scaled 0.01, while the mesh is in metres (span
+// 1.700). One root scale cannot be right for both, and the file measures 1.7 CM.
+// scaleToUnits normalisation hides this completely by forcing the largest dimension
+// to RIGGED_GLB_TEST_SCALE_M, which is why the figure looked correct until true
+// scale was switched on and rendered an ant. Until the asset is rebuilt with
+// consistent units, this path MUST stay normalised.
+
+// A human is ~1.7 m. NOTE: DetectArScreen does not set `modelTrueScale`, so the
+// native side takes the scaleToUnits branch, which NORMALISES the model to this
+// many units rather than trusting authored metres (the known "0.5 m fort trap").
+// Fine for a capability probe; a real figure must move to modelTrueScale.
+const RIGGED_GLB_TEST_SCALE_M = 1.7;
 
 export type HealthLaunch =
   | { kind: 'route'; route: string; params?: Record<string, unknown> }
@@ -286,6 +386,126 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
     requires: 'arcore',
     howToTest:
       'Bypasses recognition entirely: acknowledge the AR safety notice, let ARCore start tracking (move the phone slightly), and the sample statue should appear ~1.2 m in front of the camera in live AR. Proves the native SceneView/Filament renderer shows a GLB on this device. No animation (static model by design).',
+  },
+  {
+    id: 'ar-skeletal-anim',
+    title: 'Skeletal animation — rigged human (Phase 0)',
+    group: 'Site & AR',
+    launch: {
+      kind: 'action',
+      label: 'Render RIGGED GLB in AR',
+      run: () => {
+        navigateSafe(ROUTES.MAIN.DETECT_AR, {
+          devDirectGlb: RIGGED_GLB_TEST_URL,
+          devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
+        });
+      },
+    },
+    requires: 'arcore',
+    howToTest:
+      'PHASE 0 GATE — decides whether a walking AR character is possible at all. Same path as the static test, but the model is Khronos CesiumMan: a rigged human (1 skin, 19 joints) with one walk clip. The on-screen PHASE 0 banner reports the clip count and names read straight off the Filament animator. EXPECT count=1, shown as "(unnamed)" — verified against the GLB: CesiumMan\'s single clip genuinely carries no name, so a blank name is CORRECT and not a failure. Then watch the figure: it should walk ON ITS OWN, with no play call anywhere in our code, because SceneView ModelNode defaults autoAnimate=true and its onFrame is already ticked by the library. PASS = count=1 AND limbs moving AND the loop seam does not visibly hitch. count=0 means the loader dropped the skeleton; count=1 with a frozen model means the animator is never advanced.',
+  },
+  {
+    id: 'ar-tipu-walk',
+    title: 'Tipu figure — WALKS (merged, Phase 3)',
+    group: 'Site & AR',
+    launch: {
+      kind: 'action',
+      label: 'Walk',
+      run: () => {
+        navigateSafe(ROUTES.MAIN.DETECT_AR, {
+          devDirectGlb: TIPU_FIGURE_URL,
+          devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
+          devGroundAnchored: true,
+          devDisclosure: TIPU_DISCLOSURE,
+          devAnimationClip: 'Thoughtful_Walk',
+          devWalkSpeed: TIPU_WALK_SPEED_MPS,
+          devWalkDistance: TIPU_WALK_DISTANCE_M,
+        });
+      },
+    },
+    requires: 'arcore',
+    howToTest:
+      'THE DELIVERABLE: one 1.16 MB GLB carrying all three clips, down from 24.6 MB across three files. Expect the banner to read count=3 with Idle_02, Talk_with_Right_Hand_Open and Thoughtful_Walk. The figure must WALK, not stand: autoAnimate alone plays clip 0 (Idle_02), so seeing the walk proves selection BY NAME works. PLACEMENT: it now WAITS for a real plane before placing (up to 12 s) instead of firing the instant tracking starts — sweep the phone slowly across a lit, textured patch of floor and it should land ON the floor at roughly your own height, 1.63 m. If it still appears at eye level, check logcat for "free-space fallback": that means no plane was ever found and it fell back to an estimated floor. Also check the BACK of the figure, reconstructed from a single frontal view.',
+  },
+  {
+    id: 'ar-tipu-speak',
+    title: 'Tipu figure — SPEAKS (merged, Phase 3)',
+    group: 'Site & AR',
+    launch: {
+      kind: 'action',
+      label: 'Speak',
+      run: () => {
+        navigateSafe(ROUTES.MAIN.DETECT_AR, {
+          devDirectGlb: TIPU_FIGURE_URL,
+          devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
+          devGroundAnchored: true,
+          devDisclosure: TIPU_DISCLOSURE,
+          devAnimationClip: 'Talk_with_Right_Hand_Open',
+          devAudioUri: TIPU_VOICE_URI,
+        });
+      },
+    },
+    requires: 'arcore',
+    howToTest:
+      'HE NOW SPEAKS IN HIS OWN VOICE — 34.7 s, en-IN, first person, opening with "I am not a recording. No likeness of me was ever taken from life." The words are INVENTED (no recording of Tipu exists), which is why he says so himself and why the caption repeats it on screen. Listen for: does the voice sit right against the figure; does it start only AFTER you accept the AR notice; does the open-palm gesture loop without fighting the speech; does it finish cleanly at ~35 s. THE MOUTH DOES NOT MOVE — body clips only — so the real question is whether a still face is acceptable at arm’s length, or whether that breaks it.',
+  },
+  {
+    id: 'ar-tipu-idle',
+    title: 'Tipu figure — IDLE (merged, Phase 3)',
+    group: 'Site & AR',
+    launch: {
+      kind: 'action',
+      label: 'Idle',
+      run: () => {
+        navigateSafe(ROUTES.MAIN.DETECT_AR, {
+          devDirectGlb: TIPU_FIGURE_URL,
+          devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
+          devGroundAnchored: true,
+          devDisclosure: TIPU_DISCLOSURE,
+          devAnimationClip: 'Idle_02',
+        });
+      },
+    },
+    requires: 'arcore',
+    howToTest:
+      'What the visitor sees for longest, so it matters more than it looks. Near-motionless standing with a slight breathing shift. Check the figure does not drift, twitch, or slide off its anchor over a minute.',
+  },
+  {
+    id: 'ar-skeletal-anim-multiclip',
+    title: 'Skeletal animation — multi-clip (Fox)',
+    group: 'Site & AR',
+    launch: {
+      kind: 'action',
+      label: 'Render 3-clip GLB in AR',
+      run: () => {
+        navigateSafe(ROUTES.MAIN.DETECT_AR, {
+          devDirectGlb: RIGGED_GLB_MULTICLIP_URL,
+          devGlbScaleM: 1.0,
+        });
+      },
+    },
+    requires: 'arcore',
+    howToTest:
+      'Run ONLY after the CesiumMan test passes. Khronos Fox carries three NAMED clips — verified against the GLB: Survey, Walk, Run (1 skin, 24 joints). This is the test that matters for Phase 2, which needs to switch a figure between idle-while-speaking and walk-between-stops: CesiumMan cannot prove clip selection because its one clip is unnamed. EXPECT count=3 with exactly those three names, in that order. autoAnimate plays index 0 (Survey) only — seeing the other two NAMED in the banner is the capability being checked here.',
+  },
+  {
+    id: 'ar-skeletal-anim-minimal',
+    title: 'Skeletal animation — minimal rig (fallback)',
+    group: 'Site & AR',
+    launch: {
+      kind: 'action',
+      label: 'Render minimal rigged GLB',
+      run: () => {
+        navigateSafe(ROUTES.MAIN.DETECT_AR, {
+          devDirectGlb: RIGGED_GLB_MINIMAL_URL,
+          devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
+        });
+      },
+    },
+    requires: 'arcore',
+    howToTest:
+      'Diagnostic only — run this if CesiumMan fails. RiggedFigure is 50 KB against CesiumMan\'s 438 KB. If this animates and CesiumMan does not, the fault is model size or texture complexity on this device, NOT missing skinning support, and the Phase 0 answer is still yes.',
   },
   {
     id: 'ar-cloud-anchor-host',
