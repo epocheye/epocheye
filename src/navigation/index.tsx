@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { View, Text } from 'react-native';
+// Aliased: `AppState` is already the name of this file's local navigator-state type.
+import { AppState as RNAppState, View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import OnboardingNavigator from './OnboardingNavigator';
 import MainNavigation from './MainNavigation';
@@ -11,10 +12,12 @@ import type { LinkingOptions } from '@react-navigation/native';
 import type { MainStackParamList } from '../core/types/navigation.types';
 import AnimatedLogo from '../components/ui/AnimatedLogo';
 import UpdateRequiredScreen from '../screens/System/UpdateRequiredScreen';
+import MaintenanceScreen from '../screens/System/MaintenanceScreen';
 import { OnboardingCallbackProvider } from '../context/OnboardingCallbackContext';
 import {
-  resolveUpdateStatus,
+  resolveGates,
   type AppConfig,
+  type Maintenance,
 } from '../utils/api/appConfig';
 import { maybeShowOptionalUpdate } from '../stores/updateStore';
 import { checkForOtaUpdate, confirmBootHealthy } from '../services/otaService';
@@ -27,6 +30,11 @@ import { analytics } from '../services/analytics';
 import { recordNavBreadcrumb } from '../services/crashJournal';
 
 type AppState = 'loading' | 'onboarding' | 'login' | 'main';
+
+// How often to re-check the launch gates while the app is open. Sets the upper
+// bound on how long a non-admin keeps using the app after maintenance is
+// switched on; a foreground return re-checks immediately regardless.
+const GATE_POLL_MS = 60_000;
 
 // Deep links: epocheye://site/<slug> (and https://epocheye.com/s/... → the website
 // bounces to the scheme) open SiteDetail directly. Only resolves once the main
@@ -44,6 +52,13 @@ const AppNavigator: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('loading');
   // Hard version gate — non-null blocks the whole app with UpdateRequiredScreen.
   const [updateGate, setUpdateGate] = useState<AppConfig | null>(null);
+  // Maintenance gate — non-null blocks every non-admin with MaintenanceScreen.
+  const [maintenanceGate, setMaintenanceGate] = useState<Maintenance | null>(
+    null,
+  );
+  // Set when an admin uses the long-press door on the maintenance screen; lets
+  // LoginScreen render *through* the gate so they can sign in and be recognised.
+  const [adminLoginRequested, setAdminLoginRequested] = useState(false);
   const bootstrapSession = useSessionStore(state => state.bootstrapSession);
   const setSessionAuthenticated = useSessionStore(
     state => state.setAuthenticated,
@@ -58,25 +73,50 @@ const AppNavigator: React.FC = () => {
     void analytics.init();
   }, []);
 
-  // Version gate: resolve once on launch. FAIL-OPEN — resolveUpdateStatus only
-  // returns 'required'/'optional' on a successful fetch, so a backend outage or
-  // offline start leaves the app fully usable.
-  useEffect(() => {
-    void resolveUpdateStatus().then(status => {
-      if (status.state === 'required') {
-        // A forced STORE update wins over OTA — don't ship JS onto a build the
-        // operator has decided must go to the store.
-        setUpdateGate(status.config);
-        return;
-      }
-      if (status.state === 'optional') {
-        void maybeShowOptionalUpdate(status.config);
-      }
-      // Build is allowed to run → check for an OTA JS-bundle update (Android,
-      // fail-open; raises the "Restart now" banner when one is downloaded).
-      void checkForOtaUpdate();
-    });
+  // Resolves both launch gates (version + maintenance) from a single fetch.
+  // FAIL-OPEN throughout — resolveGates only reports a gate on a successful
+  // fetch, so a backend outage or offline start leaves the app fully usable.
+  // Runs on launch, every 60s, and whenever the app returns to the foreground,
+  // so flipping maintenance mode on reaches users already inside the app.
+  const runGateCheck = useCallback(async (isLaunch = false) => {
+    const { update, maintenance } = await resolveGates();
+
+    setMaintenanceGate(maintenance);
+    // Signing in cleared the gate → drop back out of the admin-login detour.
+    if (!maintenance) setAdminLoginRequested(false);
+
+    if (update.state === 'required') {
+      // A forced STORE update wins over OTA — don't ship JS onto a build the
+      // operator has decided must go to the store.
+      setUpdateGate(update.config);
+      return;
+    }
+    if (!isLaunch) return;
+
+    if (update.state === 'optional') {
+      void maybeShowOptionalUpdate(update.config);
+    }
+    // Build is allowed to run → check for an OTA JS-bundle update (Android,
+    // fail-open; raises the "Restart now" banner when one is downloaded).
+    void checkForOtaUpdate();
   }, []);
+
+  useEffect(() => {
+    void runGateCheck(true);
+
+    const interval = setInterval(() => {
+      void runGateCheck();
+    }, GATE_POLL_MS);
+
+    const sub = RNAppState.addEventListener('change', next => {
+      if (next === 'active') void runGateCheck();
+    });
+
+    return () => {
+      clearInterval(interval);
+      sub.remove();
+    };
+  }, [runGateCheck]);
 
   // Confirm the running bundle booted healthily (promotes a pending OTA bundle to
   // confirmed, arming native crash-rollback). Reaching a resolved, rendered state
@@ -193,6 +233,40 @@ const AppNavigator: React.FC = () => {
   // says this build is unsupported, nothing else is reachable until they update.
   if (updateGate) {
     return <UpdateRequiredScreen config={updateGate} />;
+  }
+
+  // Maintenance blocks every non-admin, and like the version gate it outranks
+  // `loading` so a blocked user never glimpses the app. A forced store update
+  // still beats it above: if the build must go to the store, that is the more
+  // useful thing to tell them.
+  //
+  // Note `checkAppState()` keeps running behind this screen — only the render is
+  // replaced — so `appState` still resolves and confirmBootHealthy() still fires.
+  // That matters: an OTA bundle whose users all land here must still be judged
+  // healthy, or it would be rolled back on the next boot.
+  if (maintenanceGate) {
+    // The admin door: render the real login screen through the gate, then
+    // re-check. An admin passes; anyone else lands straight back here.
+    if (adminLoginRequested) {
+      return (
+        <LoginScreen
+          onLoginSuccess={() => {
+            handleLoginSuccess();
+            // Leave the detour straight away so the re-check happens behind the
+            // maintenance screen rather than behind a second login screen.
+            setAdminLoginRequested(false);
+            void runGateCheck();
+          }}
+        />
+      );
+    }
+    return (
+      <MaintenanceScreen
+        info={maintenanceGate}
+        onRetry={runGateCheck}
+        onAdminSignIn={() => setAdminLoginRequested(true)}
+      />
+    );
   }
 
   if (appState === 'loading') {

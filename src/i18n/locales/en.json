@@ -432,6 +432,14 @@
     "otaReadySubtitle": "Restart to apply the latest improvements",
     "otaRestartCta": "Restart"
   },
+  "maintenance": {
+    "title": "We'll be back shortly",
+    "body": "EpochEye is down for scheduled maintenance. Your journey is safe — please check back in a little while.",
+    "etaLabel": "Expected back: {{eta}}",
+    "cta": "Try again",
+    "checking": "Checking…",
+    "adminHint": "Admin? Press and hold the logo."
+  },
   "offline": {
     "bannerTitle": "You're offline — showing saved content",
     "bannerRetryA11y": "Check connection again",
