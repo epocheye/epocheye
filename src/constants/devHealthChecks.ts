@@ -82,21 +82,61 @@ const RIGGED_GLB_MINIMAL_URL = `${KHRONOS_SAMPLES}/RiggedFigure/glTF-Binary/Rigg
 // asset vanished on every reinstall and the app then died trying to load it — and a
 // release build cannot replace a debug build without an uninstall, so the very test
 // the brief asks for was guaranteed to hit it. A CDN URL has no such failure mode.
-const TIPU_FIGURE_MODEL_ID = 'tipu_figure';
+// tipu_figure_m.glb, NOT tipu_figure.glb. The original is authored with its SKELETON
+// in centimetres (Hips at y=88.4) and its MESH in metres (1.700 tall), reconciled by a
+// 0.01 scale on the Armature node. Skinning comes out right - the inverse bind matrices
+// carry a matching factor of 100 - but the STATIC bounding box Filament measures does
+// not: mesh 1.700 x armature 0.01 = 0.017 m. SceneView's scaleToUnits then divides
+// 1.70 by 0.017 and applies a scale of exactly 100, which the device log shows as
+// "scale=100.0000" against CesiumMan's honest 1.1284. The skinned figure therefore
+// rendered 170 m tall, anchored at his feet, with a 1.7 cm culling box - which is why
+// he read as floating, absent, or "not placed" no matter how the placement code was
+// changed. The placement was never the fault.
+//
+// tipu_figure_m.glb is the same asset with the centimetre skeleton baked to metres:
+// joint translations and animation translation keys x0.01, inverse bind matrices
+// premultiplied by 0.01, armature scale set to 1. Bind hips height is unchanged at
+// 0.8724 m (proof the skinning is untouched); the static box is now a truthful 1.700 m,
+// so scaleToUnits yields 1.0000 exactly as it does for the rigged human.
+// tipu_figure_royal.glb - the metre-baked asset (see above) with the CARRIAGE corrected
+// in Blender. The Meshy clips stood him hunched: shoulders up at the ears, head jutting
+// forward of the chest, arms bowed out with the hands held away from the body. That is
+// not a king; it is a man bracing himself.
+//
+// The correction is taken from the Natyashastra's description of the stance and gait of
+// gods and kings (Ch. XIII): chest raised, neck carried long "like a peacock", shoulders
+// held down and away from the ears, chin level rather than dropped, hands quiet at the
+// sides. Applied as a CONSTANT rotation offset per bone across every keyframe, so the
+// original motion - the breathing in the idle, the weight shift in the walk - survives
+// intact; only the posture it is performed in changes. The walk additionally has its arm
+// swing and head movement damped toward their own mean: a king does not fling his arms.
+//
+// NOT taken from the treatise: the four-tala knee lift and four-tala step width, which
+// are stage conventions for portraying a king in drama and read as classical dance, not
+// as walking. Tempo was left alone on the evidence - the clip already paces 55 steps per
+// minute, slower than the 75/min of a modern ceremonial procession and consistent with
+// the treatise's "vilambita" (slow) prescription for superior characters.
+//
+// The Meshy originals are kept in the Tipu.blend file as *__meshy_original actions,
+// and tipu_figure_m.glb remains on CloudFront, so this is reversible.
+const TIPU_FIGURE_MODEL_ID = 'tipu_figure_royal';
 const TIPU_FIGURE_URL = buildGlbUrl(TIPU_FIGURE_MODEL_ID);
 
-// MEASURED off the retimed walk clip, not chosen: in an in-place cycle the planted
-// foot slides backward at exactly the body's ground speed, so tracking the toe
-// through stance in Blender gives 0.455 m/s (left) and 0.464 (right). They agree,
-// which is what makes the number trustworthy. Feed the app anything else and the
-// feet skate. 3 m keeps the walk well inside ARCore's ~8 m drift radius.
-const TIPU_WALK_SPEED_MPS = 0.46;
-// 1.2 m, not 3 m, while the floor is still an estimate. At 0.46 m/s a 3 m walk takes
-// 6.5 s and carries him clean out of frame before the height can even be judged —
-// which is exactly what happened: the on-screen readout said "walked 3.00 m" while
-// the viewer was looking at an empty table. Short enough to stay visible, long enough
-// to prove the walk is real.
-const TIPU_WALK_DISTANCE_M = 1.2;
+// WALK SPEED / DISTANCE - EVIDENCE KEPT AS PROSE, NOT AS CODE.
+//
+// No card passes a walk speed any more, so the constants would be dead code. The
+// numbers are worth keeping because they were measured, not chosen:
+//   0.46 m/s - in an in-place cycle the planted foot slides backward at exactly the
+//     body's ground speed, so tracking the toe through stance in Blender gives
+//     0.455 (left) and 0.464 (right). They agree, which is what makes it trustworthy.
+//     Feed the app anything else and the feet skate.
+//   1.2 m - the distance the WALK card used to travel. It is still too far: at 1.8 m
+//     from the camera the portrait view is only ~1.3 m wide, and the 22:55 office run
+//     logged him placed dead centre on the floor, then SCREEN feet x going
+//     0.51 -> 0.11 -> -0.18 in two seconds. He was gone before his height could be
+//     judged, which read as "never placed".
+// Phase 1 restores displacement with a heading that stays in frame; these are the
+// numbers to start from.
 
 // Shown on screen for as long as the figure is visible.
 //
@@ -451,16 +491,25 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
       kind: 'action',
       label: 'Walk',
       run: () => {
-        openTipuFigure({
+        // EXACT COPY of the Phase 0 rigged-human card, with the Tipu GLB swapped in
+        // for CesiumMan. Deliberately does NOT go through openTipuFigure: that helper
+        // adds devGroundAnchored (tap-to-place, plane-only, desk rejection) and the
+        // disclosure banner. The rigged-human path is the one that works on this
+        // device and in this room - navigate, wait for a plane, auto-place via the
+        // native placeInFront() ladder - so the only difference here is the model and
+        // the clip. Tipu carries 3 clips and autoAnimate would play index 0
+        // (Idle_02), so the walk clip is named explicitly; CesiumMan needed no name
+        // because it has exactly one.
+        navigateSafe(ROUTES.MAIN.DETECT_AR, {
+          devDirectGlb: TIPU_FIGURE_URL,
+          devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
           devAnimationClip: 'Thoughtful_Walk',
-          devWalkSpeed: TIPU_WALK_SPEED_MPS,
-          devWalkDistance: TIPU_WALK_DISTANCE_M,
         });
       },
     },
     requires: 'arcore',
     howToTest:
-      'WAIT FOR THE GRID, THEN TAP IT. Point at the floor and move the phone slowly side to side for a few seconds — ARCore needs that parallax before it will produce a plane at all, and until it does there is nothing to stand on. A white grid appears on the real floor; tap it. Placement is now PLANE-ONLY: the anchor comes from the plane you hit, so both his height and his position come from the floor instead of from the phone. Every fallback that used to guess a height — instant placement, depth points, a camera-relative offset — is gone, because each one placed him confidently on a surface that did not exist, which is what put him over your head. If you tap where there is no grid, NOTHING is placed and you are told to aim at the floor: that is correct behaviour, not a failure. He should stand where you tapped, 1.70 m against a chair or a person, and walk 1.2 m across your view. The log line "placeFigure: PLANE hit" should show a drop of roughly 1.0-1.5 m.',
+      'SAME PATH AS THE PHASE 0 RIGGED HUMAN, TIPU INSTEAD OF CESIUMMAN. No tapping: accept the AR notice, then hold the phone toward the floor and move it slowly side to side. The moment ARCore resolves a plane the figure is auto-placed on it (native placeInFront); if no plane appears within 12 s it places anyway rather than leaving the screen empty. PASS = he stands on the floor, roughly 1.70 m against a chair or a person, legs moving in place. The banner should report count=3 clips and the log "PHASE0 playing clip Thoughtful_Walk (index 2 of 3)". If he appears at eye level or in mid-air, the placement fell through to the free-space tier because no plane existed yet - the log line names which tier answered. NOTE: no depiction disclosure on this card by design; it must be restored before any of this ships.',
   },
   {
     id: 'ar-tipu-speak',

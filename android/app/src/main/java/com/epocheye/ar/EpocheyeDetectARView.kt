@@ -1108,9 +1108,22 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
      * this directly in W2. Only anchors on a TRACKING plane whose polygon
      * contains the hit pose.
      */
-    fun placeAtScreenPoint(screenX: Float, screenY: Float) {
+    fun placeAtScreenPoint(dpX: Float, dpY: Float) {
         val frame = arFrame
         if (!preflight(frame)) return
+        // React Native reports touch locations in dp; frame.hitTest wants physical
+        // pixels. Without this the ray was cast from the top-left third of the screen
+        // on a ~3x device, which is why "floor tracked, nothing under the ray" and
+        // the earlier desk / mid-air placements happened.
+        val density = resources.displayMetrics.density
+        val screenX = dpX * density
+        val screenY = dpY * density
+        Log.i(
+            TAG,
+            "tap dp=(%.0f,%.0f) px=(%.0f,%.0f) view=%dx%d density=%.2f".format(
+                dpX, dpY, screenX, screenY, width, height, density,
+            ),
+        )
         // A tapped figure goes through the plane-only routine, carrying the tap point.
         // The viewer can see the plane grid, so the tap says exactly which surface and
         // which spot on it - which beats any inference the app can make.
