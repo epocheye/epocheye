@@ -23,6 +23,7 @@ import com.google.android.filament.IndirectLight
 import com.google.ar.core.Anchor
 import com.google.ar.core.Config
 import com.google.ar.core.Coordinates2d
+import com.google.ar.core.DepthPoint
 import com.google.ar.core.Earth // ADMIN-HARNESS (REMOVE AFTER KONARK)
 import com.google.ar.core.Frame
 import com.google.ar.core.GeospatialPose // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -52,6 +53,11 @@ import io.github.sceneview.rememberModelLoader
 import org.json.JSONArray
 import java.io.ByteArrayOutputStream
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.launch
 import kotlin.math.atan2
 
 /**
@@ -120,7 +126,18 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
      * PHASE 0 — rolling render cost: (meanMs, p95Ms, fps, modelIsAnimated).
      * Emitted about once a second while a session is running.
      */
-    var onFrameStats: ((Float, Float, Float, Boolean) -> Unit)? = null
+    var onFrameStats: ((Float, Float, Float, Boolean, Int, String) -> Unit)? = null
+
+    /**
+     * Live figure geometry for the on-screen readout: (feetY, headY, camY, walkedM).
+     *
+     * On screen rather than in logcat on purpose. The placement-time numbers said the
+     * feet were on the floor while the person holding the phone was watching him float,
+     * and that contradiction cost several rounds precisely because the two observations
+     * were never in the same place at the same time. Now whoever is looking at him can
+     * read where the app thinks he is.
+     */
+    var onFigureGeometry: ((Float, Float, Float, Float) -> Unit)? = null
     var onARError: ((String) -> Unit)? = null
     var onFrameCaptured: ((String) -> Unit)? = null
     /** Dev harness: Cloud Anchor host/resolve lifecycle (phase, state, id?, quality?, message?). */
@@ -383,6 +400,18 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
      */
     private val occlusionState = mutableStateOf(false)
 
+    /**
+     * Draw ARCore's plane grid. COMPOSE STATE, not a plain field, and that distinction
+     * is the whole point.
+     *
+     * `planeRenderer = groundAnchored` looked correct and silently never worked: a plain
+     * field is read ONCE when the composable first runs, which happens before React has
+     * delivered the prop, so the grid was permanently baked to false. The same trap ate
+     * depthMode earlier in this session. Anything the composable reads and a prop can
+     * change has to be state, so the setter triggers recomposition.
+     */
+    private val planeGridState = mutableStateOf(false)
+
     // Alignment of the model WITHIN its anchor, in anchor-local metres. Applied to
     // the model node, folded into the captured geospatial pose, and applied to the
     // discovery layer so the cards travel with the walls they annotate.
@@ -523,9 +552,16 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         materialLoader = matl,
                         environment = env,
                         mainLightNode = mainLight,
-                        // Hide the dotted plane-visualization grid. Plane DETECTION
-                        // stays on (planeFindingMode below) so hit-testing works.
-                        planeRenderer = false,
+                        // SHOW the plane grid for a ground-standing figure.
+                        //
+                        // Normally hidden because a placard does not need it. For a figure
+                        // it is essential feedback: the viewer must be able to see WHICH
+                        // surface ARCore has actually found before tapping it, and whether
+                        // it is the floor or a table. Several rounds were spent arguing
+                        // about a floor neither of us could see.
+                        planeRenderer = planeGridState.value.also {
+                            Log.i(TAG, "COMPOSE planeRenderer=$it")
+                        },
                         // Cloud Anchor mode MUST be set via this direct composable
                         // param — SceneView applies its own cloudAnchorMode param
                         // authoritatively and overrides whatever the
@@ -604,7 +640,7 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         // frames were a full ARCore update plus a full Filament render
                         // of an identical image.
                         updateMode = Config.UpdateMode.BLOCKING,
-                        sessionConfiguration = { _, config ->
+                        sessionConfiguration = { session, config ->
                             // These two used to be hard-set to DISABLED here, which
                             // silently contradicted the geospatialMode/depthMode
                             // composable params set immediately above and won —
@@ -630,9 +666,56 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                                 } else {
                                     Config.PlaneFindingMode.DISABLED
                                 }
+                            // DEPTH IS HOW A STANDING USER FINDS THE FLOOR.
+                            //
+                            // Plane detection triangulates from parallax, so it needs the
+                            // viewer to WALK. A visitor stands still and points, and gets
+                            // "0 planes tracked" forever — which is why the floor ended up
+                            // being guessed as a fixed height below the phone, and why the
+                            // figure hovered whenever the phone was held above that guess.
+                            // The depth map returns real geometry from a single viewpoint,
+                            // so pointing at the floor is enough. Armed for ground-standing
+                            // models regardless of the admin harness flag.
+                            // Depth ON whenever the device supports it, unconditionally.
+                            //
+                            // It CANNOT be driven from a prop. depthMode is only honoured
+                            // when the session is created, and React props arrive after the
+                            // view mounts — so gating it on groundAnchored armed it a beat
+                            // too late and frame.hitTest() returned zero results, which is
+                            // exactly what the device reported:
+                            //     "hit-test: 0 results, kinds= -> none"
+                            // Depth is what lets a STANDING viewer find the floor by
+                            // pointing at it; plane detection cannot, because it needs the
+                            // parallax of walking. Enabling it costs some power and nothing
+                            // visual: depth OCCLUSION is a separate flag and stays off.
+                            val depthOk = try {
+                                session.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
+                            } catch (t: Throwable) {
+                                false
+                            }
                             config.depthMode =
-                                if (depthArmed) Config.DepthMode.AUTOMATIC
+                                if (depthOk) Config.DepthMode.AUTOMATIC
                                 else Config.DepthMode.DISABLED
+                            // INSTANT PLACEMENT STAYS OFF.
+                            //
+                            // It was switched on to let a stationary viewer place before any
+                            // plane existed. What it actually does is return a hit with NO
+                            // REAL PLANE, at an ASSUMED depth — the call succeeds and the
+                            // pose is a guess. That is precisely the "model standing on a
+                            // plane in mid-air" that was reported: a fabricated surface at
+                            // the viewer's own height. A wrong placement is worse than none.
+                            config.instantPlacementMode = Config.InstantPlacementMode.DISABLED
+                            // Printed from the config itself. The previous line here carried
+                            // a hard-coded "instantPlacement=LOCAL_Y_UP" left over from before
+                            // the mode was disabled, and it sent a whole diagnosis the wrong
+                            // way. Never log a literal for a value the object can report.
+                            Log.i(
+                                TAG,
+                                "session config: depthSupported=$depthOk depthMode=" +
+                                    "${config.depthMode} instantPlacement=" +
+                                    "${config.instantPlacementMode} planeFinding=" +
+                                    "${config.planeFindingMode}",
+                            )
                             // Light estimation DISABLED — on this device it produced no
                             // usable scene light (models stayed black). Our own bright
                             // diffuse IBL (env above) is the only light source.
@@ -742,10 +825,44 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         }
     }
 
+    /**
+     * Push ARCore's anchor corrections into the scene graph. WITHOUT THIS THE MODEL
+     * NEVER MOVES AFTER PLACEMENT.
+     *
+     * SceneView syncs an [AnchorNode] to its ARCore anchor inside
+     * `AnchorNode.update(session, frame)`, and the ONLY caller is `onARFrame`, which
+     * walks the TOP-LEVEL `childNodes` list the composable was given and tests each
+     * entry with `is PoseNode`. Our anchors are not in that list: they are parented
+     * under `sceneRoot`, a plain [Node], and the walk does not recurse. So `update()`
+     * was never reached and every anchored node in this view froze at the pose it was
+     * created with.
+     *
+     * Measured, not inferred — 15 s after one placement:
+     *     TRUTH arAnchorY=-1.055  nodeAnchorY=-0.988
+     * ARCore had refined the floor down by 6.7 cm as it learned the plane; the model
+     * stayed exactly where it started, hanging that far above the ground. This is the
+     * "he floats" report, and it also explains why it kept coming back: plane
+     * refinement happens on EVERY session, so the error is always reintroduced.
+     *
+     * `update()` reads `frameUpdatedAnchors` and falls back to `frame.updatedAnchors`
+     * when it is unset (it is — the setter is arsceneview-internal), so a plain call
+     * from here is enough and costs one set lookup per frame.
+     */
+    private fun syncAnchorNodes(session: Session, frame: Frame) {
+        val node = currentAnchorNode ?: return
+        try {
+            node.update(session, frame)
+        } catch (t: Throwable) {
+            Log.w(TAG, "anchor node sync failed", t)
+        }
+    }
+
     /** Per-frame work, invoked from the composable's onSessionUpdated (main thread). */
     private fun onSessionTick(session: Session, frame: Frame) {
         sampleFrameTime()
+        syncAnchorNodes(session, frame)
         advanceWalk()
+        screenProbe(frame)
         planeCensus(session, frame)
         if (!readyReported) {
             readyReported = true
@@ -904,6 +1021,16 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
      * where continuing to draw would be a lie about where it is.
      */
     private fun newAnchorNode(eng: Engine, anchor: Anchor): AnchorNode {
+        // An anchor with no model appeared mid-session from a path static reading could
+        // not identify. Cheap to log the stack on every creation (one per placement),
+        // decisive when it happens again.
+        Log.i(
+            TAG,
+            "anchor created at y=%.2f - caller:".format(
+                try { anchor.pose.ty() } catch (_: Throwable) { Float.NaN },
+            ),
+            Throwable(),
+        )
         return AnchorNode(eng, anchor).apply {
             visibleTrackingStates = setOf(
                 TrackingState.TRACKING,
@@ -984,6 +1111,15 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     fun placeAtScreenPoint(screenX: Float, screenY: Float) {
         val frame = arFrame
         if (!preflight(frame)) return
+        // A tapped figure goes through the plane-only routine, carrying the tap point.
+        // The viewer can see the plane grid, so the tap says exactly which surface and
+        // which spot on it - which beats any inference the app can make.
+        if (groundAnchored) {
+            pending = null
+            setPlaneFinding(true)
+            placeFigureOnFloor(frame!!, screenX, screenY)
+            return
+        }
         doPlace(frame!!, screenX, screenY)
     }
 
@@ -1070,7 +1206,186 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
      * stays put. It also makes the model REST on the table instead of hanging in
      * mid-air at chest height, which is what "place it on the table" means.
      */
+    /**
+     * Put a ground-standing FIGURE on a REAL floor, at the point the viewer chose.
+     *
+     * Plane hit or nothing. Every previous version of this carried a fallback - a
+     * camera-relative offset for X/Z, an assumed floor height, a depth point, an
+     * instant-placement guess - and each one produced a confident placement onto a
+     * surface that did not exist. The figure then stood in mid-air at the viewer's own
+     * height, because a pose derived from the phone follows the phone.
+     *
+     * Now: the anchor comes from `hitResult.createAnchor()` on a horizontal upward-facing
+     * plane, with `isPoseInPolygon` so it is inside the detected polygon rather than on
+     * its infinite extension. Position AND height both come from the floor. If there is
+     * no plane under the ray, nothing is placed and the viewer is told to aim at the
+     * floor - a wrong placement is worse than none.
+     *
+     * @param screenX,screenY where to test; defaults to screen centre for auto-place,
+     *        and carries the tap point when the viewer chooses a spot.
+     */
+    private fun placeFigureOnFloor(frame: Frame, screenX: Float = -1f, screenY: Float = -1f) {
+        val uri = glbUri ?: return
+        val eng = engine ?: return
+        val x = if (screenX >= 0f) screenX else width / 2f
+        val y = if (screenY >= 0f) screenY else height / 2f
+
+        // LOWEST candidate wins, not the nearest.
+        //
+        // frame.hitTest returns everything the ray crosses, ordered by DISTANCE, so
+        // firstOrNull took whatever surface was closest to the phone. Aiming down at
+        // the floor across a desk therefore stood him on the DESK: the office run
+        // logged the ray hitting a plane 0.73 m below the camera while planes at
+        // -1.05, -1.06 and -1.12 were tracked at the same moment. Standing on a desk
+        // and standing in mid-air are indistinguishable to someone looking at the
+        // floor.
+        //
+        // Taking the lowest is the rule asked for ("if multiple planes are present,
+        // detect the lowest one"), and it is safe to apply here BECAUSE every
+        // candidate still has to pass isPoseInPolygon: the ray must genuinely cross
+        // that plane's polygon, so this cannot wander onto some unrelated low plane
+        // elsewhere in the room the way a global "lowest plane" search once did.
+        //
+        // Also required to be BELOW the camera. Not a tuned threshold — a surface
+        // above the lens cannot be the ground you are standing on, and the census
+        // showed upward-facing planes as much as 0.8 m ABOVE the phone.
+        val candidates = try {
+            frame.hitTest(x, y).filter { r ->
+                val tr = r.trackable
+                tr is Plane &&
+                    tr.trackingState == TrackingState.TRACKING &&
+                    tr.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
+                    tr.isPoseInPolygon(r.hitPose) &&
+                    r.hitPose.ty() < frame.camera.pose.ty()
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "figure hit-test failed", t)
+            emptyList()
+        }
+        if (candidates.size > 1) {
+            // Show the whole choice, so a wrong pick is visible instead of deduced.
+            Log.i(
+                TAG,
+                "placeFigure: %d candidates: %s".format(
+                    candidates.size,
+                    candidates.joinToString(", ") { "y=%.2f".format(it.hitPose.ty()) },
+                ),
+            )
+        }
+        val hit = candidates.minByOrNull { it.hitPose.ty() }
+
+        // NOT A TABLE.
+        //
+        // Lowest-under-the-ray is only as good as what is under the ray. The second
+        // placement of the 16:07 run hit a 0.8 x 4.7 m plane at y=-0.37 - a run of
+        // desks - while the floor planes at -1.12 and -1.00 were momentarily PAUSED
+        // (zero extents, so the ray could not be inside their polygon) and fell out of
+        // the candidate list. He stood on the desks, 0.46 m under the phone, and the
+        // viewer reported "floats upward", which from where they stood it did.
+        //
+        // So compare the hit against the LOWEST substantial upward plane ARCore knows
+        // about in this session, tracking or paused: that is the floor, and a hit
+        // more than FLOOR_TOLERANCE_M above it is furniture. Refuse and say so.
+        // "Substantial" means a real extent has been seen, so a 0.2 m noise patch
+        // cannot masquerade as a lower floor.
+        if (hit != null) {
+            val floorY = try {
+                arSession?.getAllTrackables(Plane::class.java)
+                    ?.filter {
+                        it.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
+                            it.trackingState != TrackingState.STOPPED &&
+                            (maxPlaneExtent[it] ?: 0f) >= FLOOR_MIN_EXTENT_M
+                    }
+                    ?.minOfOrNull { it.centerPose.ty() }
+            } catch (_: Throwable) {
+                null
+            }
+            if (floorY != null && hit.hitPose.ty() > floorY + FLOOR_TOLERANCE_M) {
+                Log.i(
+                    TAG,
+                    "placeFigure: REFUSED - hit y=%.2f is %.2f m above the floor at %.2f (a table?)"
+                        .format(hit.hitPose.ty(), hit.hitPose.ty() - floorY, floorY),
+                )
+                post { onARError?.invoke("That looks like a table — tap the floor") }
+                return
+            }
+        }
+
+        if (hit == null) {
+            val n = try {
+                arSession?.getAllTrackables(Plane::class.java)
+                    ?.count { it.trackingState == TrackingState.TRACKING } ?: 0
+            } catch (t: Throwable) {
+                0
+            }
+            Log.i(TAG, "placeFigure: NO upward-facing plane under the ray ($n tracked) - placing nothing")
+            post {
+                onARError?.invoke(
+                    if (n == 0) "Point at the floor and move the phone slowly"
+                    else "Aim at the highlighted floor and tap",
+                )
+            }
+            return
+        }
+
+        val plane = hit.trackable as Plane
+        val cam = frame.camera.pose
+        val dx = hit.hitPose.tx() - cam.tx()
+        val dz = hit.hitPose.tz() - cam.tz()
+        Log.i(
+            TAG,
+            ("placeFigure: PLANE hit y=%.2f (%.1fx%.1fm) camY=%.2f drop=%.2f " +
+                "groundDist=%.2fm")
+                .format(
+                    hit.hitPose.ty(), plane.extentX, plane.extentZ, cam.ty(),
+                    cam.ty() - hit.hitPose.ty(),
+                    kotlin.math.sqrt(dx * dx + dz * dz),
+                ),
+        )
+
+        // A WORLD anchor at the hit pose, NOT hit.createAnchor().
+        //
+        // hit.createAnchor() attaches the anchor to the PLANE, and ARCore merges planes
+        // constantly while it learns a floor: the plane the figure was placed on at
+        // 16:07:28 was subsumed by its neighbour 100 ms later, its tracking state went
+        // STOPPED, the anchor went STOPPED with it, and the node hid itself -
+        //     anchor state -> tracking=STOPPED nodeVisible=false model=true
+        // The figure vanished a tenth of a second after appearing, which reads as
+        // "it does not work" and is not a placement fault at all. A session anchor at
+        // the same pose sits in the world map, survives every plane merge, and still
+        // gets ARCore's pose corrections like any other anchor.
+        val session = arSession ?: run {
+            post { onARError?.invoke("AR session not ready") }
+            return
+        }
+        val anchor = try {
+            session.createAnchor(hit.hitPose)
+        } catch (t: Throwable) {
+            Log.w(TAG, "figure anchor creation failed", t)
+            post { onARError?.invoke("anchor creation failed") }
+            return
+        }
+        clearCurrentAnchor()
+        val anchorNode = try {
+            newAnchorNode(eng, anchor).also { sceneRoot?.addChildNode(it) }
+        } catch (t: Throwable) {
+            Log.e(TAG, "anchor node create failed", t)
+            post { onARError?.invoke("anchor node create failed") }
+            return
+        }
+        currentAnchorNode = anchorNode
+        post { onARError?.invoke("") }
+        attachModel(anchorNode, uri)
+    }
+
     private fun doPlaceInFront(frame: Frame) {
+        // A ground-standing figure gets the dedicated routine above. The ladder below
+        // stays for object placards, which are a different problem: they want to sit
+        // where you point, at eye level, and they are not broken.
+        if (groundAnchored) {
+            placeFigureOnFloor(frame)
+            return
+        }
         val uri = glbUri ?: return
         val eng = engine ?: return
         val session = arSession ?: run {
@@ -1093,22 +1408,59 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     Math.toDegrees(kotlin.math.atan2(-fx, -fz).toDouble()).toFloat()
             }
         }
-        val planeHit = try {
-            frame.hitTest(width / 2f, height / 2f).firstOrNull { r ->
-                val tr = r.trackable
-                tr is Plane && tr.trackingState == TrackingState.TRACKING &&
-                    tr.isPoseInPolygon(r.hitPose) &&
-                    // A ground-standing figure must not be seated on a table top even
-                    // when the centre ray genuinely lands on one. Same rule as the
-                    // floor search below, applied here so aiming at a desk falls
-                    // through to the floor rather than standing him on it.
-                    (!dropAnchorToFloor ||
-                        r.hitPose.ty() < camPoseForHit.ty() - MIN_FLOOR_DROP_M)
-            }
+        val hits = try {
+            frame.hitTest(width / 2f, height / 2f)
         } catch (t: Throwable) {
-            Log.w(TAG, "plane hit-test failed", t)
-            null
+            Log.w(TAG, "hit-test failed", t)
+            emptyList()
         }
+
+        // Reject only what is clearly ABOVE the ground the viewer is aiming at.
+        //
+        // This used to demand a hit be MIN_FLOOR_DROP_M (0.9 m) below the camera, which
+        // was written to stop the figure standing on a desk. Applied to every rung of
+        // the ladder it does real damage: a phone held low, or a viewer aiming at floor
+        // close to their feet, produces a genuine floor hit less than 0.9 m down, and
+        // rejecting it drops through to the ASSUMED floor — the very guess that makes
+        // the figure hover. A hit the user deliberately aimed at is better evidence
+        // than any assumption, so the bar here is only "below the camera at all".
+        // The strict desk-rejecting bound still applies where it belongs: the
+        // nearest-plane search below, which picks a surface the user did NOT aim at.
+        fun lowEnough(p: Pose) =
+            !dropAnchorToFloor || p.ty() < camPoseForHit.ty() - MIN_AIMED_DROP_M
+
+        // 1. A real tracked plane is still the best answer when one exists.
+        var planeHit = hits.firstOrNull { r ->
+            val tr = r.trackable
+            tr is Plane && tr.trackingState == TrackingState.TRACKING &&
+                tr.isPoseInPolygon(r.hitPose) && lowEnough(r.hitPose)
+        }
+
+        // 2. NO PLANE? USE THE DEPTH MAP.
+        //
+        // This is the case that matters for a real visitor: standing still, pointing at
+        // the floor. Plane detection cannot serve them because it needs parallax from
+        // walking, but a DepthPoint is real measured geometry from one viewpoint. Taking
+        // it means "point at the floor" does what it says instead of falling through to
+        // an assumed floor height.
+        if (planeHit == null) {
+            planeHit = hits.firstOrNull { r ->
+                r.trackable is DepthPoint && lowEnough(r.hitPose)
+            }
+            if (planeHit != null) {
+                Log.i(TAG, "placeInFront: no plane — using DEPTH point at y=%.2f"
+                    .format(planeHit.hitPose.ty()))
+            }
+        }
+
+        Log.i(
+            TAG,
+            "hit-test: %d results, kinds=%s -> %s".format(
+                hits.size,
+                hits.take(6).joinToString(",") { it.trackable.javaClass.simpleName },
+                planeHit?.trackable?.javaClass?.simpleName ?: "none",
+            ),
+        )
         // Second tier: ARCore is tracking a plane, but the centre ray missed its
         // polygon — you are aiming past the desk edge, or across it at a steep
         // angle. Observed on-device: the status line read "Surface ✓" while every
@@ -1675,6 +2027,20 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
      * heavy per-frame plane detection is pure wasted CPU/heat after placement.
      */
     private fun setPlaneFinding(enabled: Boolean) {
+        // A FIGURE NEVER LOSES PLANE FINDING.
+        //
+        // A session was observed with `mode=DISABLED wanted=false` and an anchor node
+        // but NO model, after nothing but plane-only figure taps - so some path switched
+        // detection off while the viewer was still hunting for a floor. From that
+        // moment no plane could ever appear, no grid could ever draw, and every
+        // further tap was guaranteed to fail. Every call site on the figure path is
+        // guarded, and the caller was not identified by reading the code; so refuse
+        // here, centrally, where no future site can get round it, and print the stack
+        // of whoever asked so the next occurrence names itself.
+        if (!enabled && groundAnchored) {
+            Log.w(TAG, "setPlaneFinding(false) REFUSED for a figure - caller:", Throwable())
+            return
+        }
         // Recorded even if the session is not up yet, so the creation lambda and any
         // later rebuild apply the same intent rather than defaulting back to ON.
         planeFindingWanted = enabled
@@ -2974,6 +3340,65 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     private var lastFrameReportNanos = 0L
 
     private var lastCensusNanos = 0L
+    private var lastScreenProbeNanos = 0L
+
+    /**
+     * WHERE IS HE ON THE SCREEN? The only measurement that matches what the eye sees.
+     *
+     * Every number logged so far describes the figure in WORLD coordinates, and world
+     * coordinates have repeatedly said "he is on the floor 2.5 m away" while the person
+     * holding the phone watched him hang overhead. Projecting his feet and head through
+     * ARCore's own view and projection matrices ends that argument: it reports the pixel
+     * he actually occupies, and whether he is in front of the camera at all.
+     *
+     * screenY near 0 = top of the frame, 1 = bottom. behind=true means he is behind the
+     * viewer and should not be visible at all.
+     */
+    private fun screenProbe(frame: Frame) {
+        val node = currentModelNode ?: return
+        val now = System.nanoTime()
+        if (now - lastScreenProbeNanos < CENSUS_INTERVAL_NANOS) return
+        lastScreenProbeNanos = now
+        try {
+            val view = FloatArray(16)
+            val proj = FloatArray(16)
+            frame.camera.getViewMatrix(view, 0)
+            frame.camera.getProjectionMatrix(proj, 0, 0.05f, 100f)
+
+            val bb = node.boundingBox
+            val sc = node.scale.y
+            val wp = node.worldPosition
+            val feetY = wp.y + (bb.center[1] - bb.halfExtent[1]) * sc
+            val headY = wp.y + (bb.center[1] + bb.halfExtent[1]) * sc
+
+            fun project(x: Float, y: Float, z: Float): Triple<Float, Float, Float> {
+                val vx = view[0] * x + view[4] * y + view[8] * z + view[12]
+                val vy = view[1] * x + view[5] * y + view[9] * z + view[13]
+                val vz = view[2] * x + view[6] * y + view[10] * z + view[14]
+                val cx = proj[0] * vx + proj[4] * vy + proj[8] * vz + proj[12]
+                val cy = proj[1] * vx + proj[5] * vy + proj[9] * vz + proj[13]
+                val cw = proj[3] * vx + proj[7] * vy + proj[11] * vz + proj[15]
+                if (kotlin.math.abs(cw) < 1e-6f) return Triple(-1f, -1f, vz)
+                // NDC -> 0..1 screen, y flipped so 0 is the TOP of the frame
+                return Triple(
+                    (cx / cw + 1f) * 0.5f,
+                    1f - (cy / cw + 1f) * 0.5f,
+                    -vz,                       // metres in front of the camera
+                )
+            }
+
+            val (fx, fy, fdist) = project(wp.x, feetY, wp.z)
+            val (_, hy, _) = project(wp.x, headY, wp.z)
+            Log.i(
+                TAG,
+                ("SCREEN feet=(%.2f,%.2f) head_y=%.2f distAhead=%.2fm behind=%b " +
+                    "| 0=top 1=bottom")
+                    .format(fx, fy, hy, fdist, fdist < 0f),
+            )
+        } catch (t: Throwable) {
+            Log.w(TAG, "screen probe failed", t)
+        }
+    }
 
     /**
      * Report what ARCore ACTUALLY sees, once a second.
@@ -2985,12 +3410,23 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
      * EFFECTIVE plane-finding mode read back from the config rather than from the
      * flag we think we set.
      */
+    /**
+     * Largest extent (min of X/Z) each plane has ever reported. A PAUSED plane reports
+     * 0 x 0, so the live value says nothing about whether it was ever a real surface;
+     * this does. Keyed by the Plane object, which ARCore keeps stable for its lifetime.
+     */
+    private val maxPlaneExtent = java.util.WeakHashMap<Plane, Float>()
+
     private fun planeCensus(session: Session, frame: Frame) {
         val now = System.nanoTime()
         if (now - lastCensusNanos < CENSUS_INTERVAL_NANOS) return
         lastCensusNanos = now
         try {
             val all = session.getAllTrackables(Plane::class.java)
+            for (p in all) {
+                val e = minOf(p.extentX, p.extentZ)
+                if (e > (maxPlaneExtent[p] ?: 0f)) maxPlaneExtent[p] = e
+            }
             val byState = all.groupingBy { it.trackingState.name }.eachCount()
             val byType = all.groupingBy { it.type.name }.eachCount()
             val mode = try {
@@ -2999,7 +3435,10 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 "?"
             }
             val cam = frame.camera
-            val detail = all.take(6).joinToString("; ") {
+            // SORTED BY HEIGHT, lowest first. take(6) on the raw list showed six
+            // arbitrary planes out of eighteen, which hid exactly the thing being
+            // looked for — whether the real floor had been found at all.
+            val detail = all.sortedBy { it.centerPose.ty() }.take(6).joinToString("; ") {
                 "%s/%s y=%.2f %.1fx%.1fm".format(
                     it.type.name.removePrefix("HORIZONTAL_").take(8),
                     it.trackingState.name.take(4),
@@ -3009,11 +3448,20 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             }
             Log.i(
                 TAG,
-                ("PLANES n=%d mode=%s wanted=%b camState=%s camY=%.2f " +
+                ("PLANES n=%d mode=%s wanted=%b camState=%s why=%s camY=%.2f " +
                     "states=%s types=%s | %s")
                     .format(
                         all.size, mode, planeFindingWanted,
-                        cam.trackingState.name, cam.pose.ty(),
+                        cam.trackingState.name,
+                        // WHY tracking is poor, straight from ARCore. camY was seen
+                        // swinging 1.2 -> 2.7 m with the phone in one place, which is
+                        // divergence, not movement. Placement cannot be correct inside
+                        // a coordinate frame that is not holding still, so the reason
+                        // matters more than any further placement arithmetic:
+                        // INSUFFICIENT_FEATURES = blank walls/floor, EXCESSIVE_MOTION =
+                        // moved too fast, INSUFFICIENT_LIGHT = too dark.
+                        try { cam.trackingFailureReason.name } catch (t: Throwable) { "?" },
+                        cam.pose.ty(),
                         byState, byType, detail,
                     ),
             )
@@ -3034,6 +3482,35 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     val feet = wy + (bb.center[1] - bb.halfExtent[1]) * sc
                     val head = wy + (bb.center[1] + bb.halfExtent[1]) * sc
                     val anchorY = currentAnchorNode?.worldPosition?.y
+                    // GROUND TRUTH, straight from ARCore rather than from SceneView's
+                    // scene graph. Every number reported so far has come from the node
+                    // API and has consistently disagreed with what the viewer sees, so
+                    // compare the two side by side: the anchor's own pose is what ARCore
+                    // is actually tracking, and modelNode.worldPosition is what SceneView
+                    // believes. If these diverge, the scene graph is the liar.
+                    val arAnchorY = try {
+                        currentAnchorNode?.anchor?.pose?.ty()
+                    } catch (t: Throwable) {
+                        null
+                    }
+                    val localY = try {
+                        mn.position.y
+                    } catch (t: Throwable) {
+                        null
+                    }
+                    Log.i(
+                        TAG,
+                        "TRUTH arAnchorY=%s nodeAnchorY=%s modelLocalY=%s modelWorldY=%.3f camY=%.3f"
+                            .format(
+                                arAnchorY?.let { "%.3f".format(it) } ?: "-",
+                                anchorY?.let { "%.3f".format(it) } ?: "-",
+                                localY?.let { "%.3f".format(it) } ?: "-",
+                                wy, cam.pose.ty(),
+                            ),
+                    )
+                    onFigureGeometry?.let { cb ->
+                        post { cb.invoke(feet, head, cam.pose.ty(), walkTravelled) }
+                    }
                     Log.i(
                         TAG,
                         ("FIGURE feet=%.2f head=%.2f nodeY=%.2f anchorY=%s camY=%.2f " +
@@ -3099,7 +3576,24 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                 .format(mean, p95, fps, if (currentModelNode != null) "yes" else "no", animated),
         )
         val cb = onFrameStats ?: return
-        post { cb.invoke(mean, p95, fps, animated) }
+        // The two numbers that say whether ARCore is delivering anything at all. A run
+        // with a correct grid pipeline and zero planes looks identical, on screen, to a
+        // broken one; putting the count and ARCore's own failure reason on the banner
+        // lets the viewer tell "scanning" from "dark room" from "bug" without a laptop.
+        val planes = try {
+            arSession?.getAllTrackables(Plane::class.java)?.count {
+                it.trackingState == TrackingState.TRACKING &&
+                    it.type == Plane.Type.HORIZONTAL_UPWARD_FACING
+            } ?: 0
+        } catch (_: Throwable) {
+            0
+        }
+        val why = try {
+            arFrame?.camera?.trackingFailureReason?.name ?: "?"
+        } catch (_: Throwable) {
+            "?"
+        }
+        post { cb.invoke(mean, p95, fps, animated, planes, why) }
     }
 
     /**
@@ -3141,7 +3635,11 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     private var groundAnchored: Boolean = false
 
     fun setGroundAnchored(enabled: Boolean) {
+        Log.i(TAG, "PROP groundAnchored=$enabled (composeView=${composeView != null})")
         groundAnchored = enabled
+        // Show the grid for a figure: the viewer has to SEE which surface ARCore found
+        // before tapping it, and whether it is the floor or a table top.
+        planeGridState.value = enabled
     }
 
     /** Anchors with no surface under them should sit on the estimated floor. */
@@ -3292,19 +3790,72 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         post { cb.invoke(count, names.toList(), durations.toList()) }
     }
 
+    /**
+     * Loads models on OUR scope so a failure is catchable.
+     *
+     * SceneView's `loadModelInstanceAsync` launches on its own `StandaloneCoroutine`
+     * with no exception handler, so a throw inside it never passes through the
+     * caller's try/catch and goes straight to the default handler. A GLB that had
+     * been deleted from the device therefore KILLED THE APP the instant the figure
+     * was placed — twice in a row, until Android marked the process bad. With the
+     * asset now coming from CloudFront the same fate awaits a failed or truncated
+     * download, so the load has to be contained rather than merely attempted.
+     *
+     * Dispatchers.Default matches where the library already ran this: decoding a
+     * meshopt/KTX2 GLB is hundreds of milliseconds of CPU and must not sit on the
+     * main thread. Children are cancelled (not the scope) in cleanup(), so an
+     * in-flight load cannot resolve into a torn-down scene while the view stays
+     * reusable if it is ever re-attached.
+     */
+    private val modelScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    /**
+     * The on-disk [File] a model URI points at, or null when it is remote.
+     *
+     * `file://…` and bare `/…` paths are both in play: the dev harness used to hand
+     * over a raw sdcard path, and getOrFetchGlb() hands over a cached download.
+     * Anything with a scheme we do not own (http/https/android_asset) is the loader's
+     * problem, not ours.
+     */
+    private fun localPathOf(uri: String): File? = try {
+        when {
+            uri.startsWith("file://") -> File(Uri.parse(uri).path ?: return null)
+            uri.startsWith("/") -> File(uri)
+            else -> null
+        }
+    } catch (t: Throwable) {
+        Log.w(TAG, "could not resolve local path for $uri", t)
+        null
+    }
+
     private fun attachModel(anchorNode: AnchorNode, glbUri: String) {
         val loader = modelLoader ?: run {
             post { onARError?.invoke("AR not ready") }
             return
         }
+        // Cheap pre-flight for anything already on disk. Filament's loader reports a
+        // missing file by throwing off-thread, which is both fatal and uninformative;
+        // asking File first turns it into a message naming the actual problem.
+        localPathOf(glbUri)?.let { f ->
+            if (!f.exists() || f.length() == 0L) {
+                Log.e(TAG, "model file missing or empty: ${f.absolutePath}")
+                post { onARError?.invoke("model file missing") }
+                return
+            }
+        }
         try {
-            loader.loadModelInstanceAsync(
-                Uri.parse(glbUri).toString(),
-                { it },
-            ) { modelInstance ->
+            modelScope.launch {
+                val modelInstance = try {
+                    loader.loadModelInstance(Uri.parse(glbUri).toString())
+                } catch (t: Throwable) {
+                    // Missing, truncated, or not a GLB at all. Any of these used to
+                    // take the process down.
+                    Log.e(TAG, "model load failed: $glbUri", t)
+                    null
+                }
                 if (modelInstance == null) {
                     post { onARError?.invoke("model load failed") }
-                    return@loadModelInstanceAsync
+                    return@launch
                 }
                 // Fix-ups for the recompressed heritage GLBs:
                 //  1) They are stone sculpture but mis-authored as fully metallic
@@ -3462,7 +4013,10 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                     // Model is now world-locked via its anchor — stop continuous
                     // plane finding to cut sustained CPU load / heat. Re-enabled on
                     // clearAnchor() for a re-scan.
-                    setPlaneFinding(false)
+                    //
+                    // EXCEPT for a ground-standing figure, whose height may still be an
+                    // assumption waiting on a real floor. See reseatOnFloor().
+                    if (!groundAnchored) setPlaneFinding(false)
                     post { onAnchorPlaced?.invoke("detect_place") }
                     // Float the data placard above the model, if a card is set.
                     cardData?.let { attachCard(anchorNode, it) }
@@ -3667,6 +4221,13 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         // session on a view that is going away.
         removeCallbacks(rebuildRunnable)
         removeCallbacks(measureAndLayout)
+        // Drop any in-flight model load. cancelChildren rather than cancel: cleanup()
+        // runs twice (onDetachedFromWindow + onDropViewInstance) and cancelling the
+        // SupervisorJob itself would leave the scope permanently dead.
+        try {
+            modelScope.coroutineContext.cancelChildren()
+        } catch (_: Throwable) {
+        }
         // Cancel in-flight Cloud Anchor futures BEFORE the anchor detach below and
         // the Compose disposal (session close) — in-flight behavior across
         // pause/close is undocumented. cleanup() runs twice (onDetachedFromWindow
@@ -3755,6 +4316,12 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         private const val FRAME_REPORT_INTERVAL_NANOS = 1_000_000_000L
         private const val CENSUS_INTERVAL_NANOS = 1_000_000_000L
 
+        /** How often to check whether a better floor has appeared. */
+        private const val RESEAT_INTERVAL_NANOS = 500_000_000L
+
+        /** Ignore corrections smaller than this; below it the move is not worth the jump. */
+        private const val RESEAT_EPSILON_M = 0.04f
+
         /**
          * Assumed height of a hand-held phone above the ground, in metres.
          *
@@ -3783,6 +4350,16 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
          */
         private const val WALK_HEADING_OFFSET_DEG = 90f
 
+        /**
+         * Minimum drop below the camera for a hit the viewer AIMED at.
+         *
+         * Deliberately small. If someone points at the ground and the ray lands on it,
+         * that is the ground — arguing with them via a threshold is how a real floor hit
+         * got discarded in favour of a guessed one. 25 cm only excludes a hit at or
+         * above the phone itself, which cannot be floor.
+         */
+        private const val MIN_AIMED_DROP_M = 0.25f
+
         private const val MIN_FLOOR_DROP_M = 0.9f
         private const val MAX_FLOOR_DROP_M = 2.5f
 
@@ -3799,6 +4376,27 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
          * 3 m fits a standing adult with headroom (2 * 3 * tan(30 deg) = 3.4 m of
          * visible height) and is still well inside ARCore's ~8 m drift radius.
          */
+        /**
+         * How far in front of the viewer a standing FIGURE is placed, measured along
+         * the GROUND rather than along the camera's tilted forward axis.
+         *
+         * 2.5 m fits a 1.7 m adult inside a phone's vertical field of view with
+         * headroom (2 * 2.5 * tan(30 deg) = 2.9 m visible). Inside about 2 m a
+         * life-size person cannot fit on screen at all, which reads as "enormous"
+         * rather than "too close".
+         */
+        private const val FIGURE_DISTANCE_M = 2.5f
+
+        /**
+         * A tapped plane more than this above the session's floor is furniture.
+         * 0.35 m: comfortably above ARCore's plane-height jitter (the same floor was
+         * reported at -1.00 and -1.12 within seconds) and well below a desk (0.75 m).
+         */
+        private const val FLOOR_TOLERANCE_M = 0.35f
+
+        /** A plane must have reached this extent (both axes) to count as a floor candidate. */
+        private const val FLOOR_MIN_EXTENT_M = 0.5f
+
         private const val PLACE_DISTANCE_OBJECT_M = 1.2f
         private const val PLACE_DISTANCE_FIGURE_M = 3.0f
 

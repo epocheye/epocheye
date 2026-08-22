@@ -90,15 +90,27 @@ class EpocheyeDetectARViewManager(
         }
         // PHASE 0 — rolling render cost, so the animated-vs-static delta can be
         // read on the device instead of inferred.
-        view.onFrameStats = { meanMs, p95Ms, fps, animated ->
+        view.onFrameStats = { meanMs, p95Ms, fps, animated, planes, trackingWhy ->
             val event = Arguments.createMap().apply {
                 putDouble("meanMs", meanMs.toDouble())
                 putDouble("p95Ms", p95Ms.toDouble())
                 putDouble("fps", fps.toDouble())
                 putBoolean("animated", animated)
+                putInt("planes", planes)
+                putString("trackingWhy", trackingWhy)
             }
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onFrameStats", event)
+        }
+        view.onFigureGeometry = { feetY, headY, camY, walked ->
+            val event = Arguments.createMap().apply {
+                putDouble("feetY", feetY.toDouble())
+                putDouble("headY", headY.toDouble())
+                putDouble("camY", camY.toDouble())
+                putDouble("walked", walked.toDouble())
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onFigureGeometry", event)
         }
         // Site-readiness pipeline (PERMANENT) — two-point alignment.
         view.onAlignmentPoint = { index, x, y, z, error ->
@@ -476,6 +488,7 @@ class EpocheyeDetectARViewManager(
             // PHASE 0 skeletal-animation probe
             .put("onModelAnimations", MapBuilder.of("registrationName", "onModelAnimations"))
             .put("onFrameStats", MapBuilder.of("registrationName", "onFrameStats"))
+            .put("onFigureGeometry", MapBuilder.of("registrationName", "onFigureGeometry"))
             .build()
     }
 

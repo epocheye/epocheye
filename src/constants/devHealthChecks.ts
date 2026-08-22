@@ -28,6 +28,7 @@ import {
   DEV_SWEEP_MONUMENT_SLUG,
 } from '../config/monuments';
 import { listViewingStations } from '../utils/api/ar';
+import { AUDIO_BASE_URL } from '@env';
 import { MARQUEE_MODEL_ID, buildGlbUrl } from '../config/glbDelivery';
 import { resolveModelGlb } from '../services/glbSource';
 
@@ -69,23 +70,20 @@ const RIGGED_GLB_MINIMAL_URL = `${KHRONOS_SAMPLES}/RiggedFigure/glTF-Binary/Rigg
 // `node tools/compress-glb.mjs`. The three single-clip GLBs it was merged from are
 // kept on disk as the originals but are no longer what the app loads.
 //
-// Read straight off the DEVICE, not over the network. Push it once with:
-//   adb push tipu_figure.min.glb /sdcard/Android/data/com.epocheye/files/
-// (on Git Bash prefix `MSYS_NO_PATHCONV=1`, or the /sdcard path is rewritten to a
-// Windows path and the push silently lands nowhere).
+// Served from the same S3/CloudFront bucket as every other model, so buildGlbUrl()
+// resolves it and getOrFetchGlb() downloads + LRU-caches it on the same path
+// production uses. Uploaded WITHOUT the `.min` suffix because buildGlbUrl appends a
+// bare `.glb` to the model id:
+//   aws s3 cp tipu_figure.min.glb s3://epocheye-glb-models/tipu_figure.glb
+//     --content-type model/gltf-binary
 //
-// This replaced an `adb reverse` + python http.server rig that had to be restarted
-// every time the shell or the device connection dropped, which it did constantly.
-// A file:// URI has no such failure mode: it survives reboots, needs no tunnel, and
-// works with the Wi-Fi debugger disconnected. getOrFetchGlb() returns any URI it
-// cannot download unchanged (glbCache.ts:179-187), so the file path passes straight
-// through to Filament's loader with no cache-layer change.
-//
-// This is a DEV path — the app's external files dir is not where a shipped asset
-// lives. Before the palace the figure moves to the same S3/CloudFront bucket as
-// every other GLB.
-const TIPU_FIGURE_URL =
-  'file:///sdcard/Android/data/com.epocheye/files/tipu_figure.min.glb';
+// This replaced `file:///sdcard/Android/data/com.epocheye/files/tipu_figure.min.glb`,
+// adb-pushed by hand. Android CLEARS an app's external files dir on UNINSTALL, so the
+// asset vanished on every reinstall and the app then died trying to load it — and a
+// release build cannot replace a debug build without an uninstall, so the very test
+// the brief asks for was guaranteed to hit it. A CDN URL has no such failure mode.
+const TIPU_FIGURE_MODEL_ID = 'tipu_figure';
+const TIPU_FIGURE_URL = buildGlbUrl(TIPU_FIGURE_MODEL_ID);
 
 // MEASURED off the retimed walk clip, not chosen: in an in-place cycle the planted
 // foot slides backward at exactly the body's ground speed, so tracking the toe
@@ -93,7 +91,12 @@ const TIPU_FIGURE_URL =
 // which is what makes the number trustworthy. Feed the app anything else and the
 // feet skate. 3 m keeps the walk well inside ARCore's ~8 m drift radius.
 const TIPU_WALK_SPEED_MPS = 0.46;
-const TIPU_WALK_DISTANCE_M = 3.0;
+// 1.2 m, not 3 m, while the floor is still an estimate. At 0.46 m/s a 3 m walk takes
+// 6.5 s and carries him clean out of frame before the height can even be judged —
+// which is exactly what happened: the on-screen readout said "walked 3.00 m" while
+// the viewer was looking at an empty table. Short enough to stay visible, long enough
+// to prove the walk is real.
+const TIPU_WALK_DISTANCE_M = 1.2;
 
 // Shown on screen for as long as the figure is visible.
 //
@@ -116,12 +119,47 @@ const TIPU_DISCLOSURE =
 // en-IN and NOT en-GB, deliberately: an English-accented Tipu would layer a second
 // misrepresentation on top of an invented voice.
 //
-// Pushed to the device beside the model, same as the GLB. Regenerate with:
+// Streamed from CloudFront beside the model. react-native-video plays an https URL
+// directly, so this needs no cache layer. Regenerate with:
 //   python scripts/tipu_voice.py --key <epocheye-app-493415 service account>.json
 // (in epocheye_backend; TTS is enabled on the MAIN GCP project epocheye-app-493415,
-// NOT on the Firebase project epocheye01 whose credential the backend .env holds).
-const TIPU_VOICE_URI =
-  'file:///sdcard/Android/data/com.epocheye/files/palace_overview_en_tipu.mp3';
+// NOT on the Firebase project epocheye01 whose credential the backend .env holds),
+// then re-upload:
+//   aws s3 cp palace_overview_en_tipu.mp3
+//     s3://epocheye-glb-models/audio/tipu-summer-palace-bengaluru/
+//     --content-type audio/mpeg
+const TIPU_VOICE_URI = `${(AUDIO_BASE_URL ?? '').replace(
+  /\/+$/,
+  '',
+)}/audio/tipu-summer-palace-bengaluru/palace_overview_en_tipu.mp3`;
+
+/**
+ * Open the AR harness on the Tipu figure.
+ *
+ * Shared by all three cards because they differ ONLY in clip, audio and walk — the
+ * model, its scale and its disclosure are identical, and the disclosure in particular
+ * must never be droppable from one card by accident.
+ *
+ * buildGlbUrl returns null when GLB_BASE_URL is empty, which is now the one way this
+ * can fail; say so rather than navigating into an AR view that has nothing to load.
+ */
+function openTipuFigure(params: Record<string, unknown>): void {
+  if (!TIPU_FIGURE_URL) {
+    Alert.alert(
+      'No GLB URL',
+      'GLB_BASE_URL is empty — set it in .env and REBUILD (it is read at build time, ' +
+        'so a reload will not pick it up).',
+    );
+    return;
+  }
+  navigateSafe(ROUTES.MAIN.DETECT_AR, {
+    devDirectGlb: TIPU_FIGURE_URL,
+    devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
+    devGroundAnchored: true,
+    devDisclosure: TIPU_DISCLOSURE,
+    ...params,
+  });
+}
 
 // KNOWN ASSET DEFECT — the figure is NOT authored at a usable real-world size.
 // Meshy's rig has a 100x unit mismatch: the skeleton is in centimetres (Hips at
@@ -413,11 +451,7 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
       kind: 'action',
       label: 'Walk',
       run: () => {
-        navigateSafe(ROUTES.MAIN.DETECT_AR, {
-          devDirectGlb: TIPU_FIGURE_URL,
-          devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
-          devGroundAnchored: true,
-          devDisclosure: TIPU_DISCLOSURE,
+        openTipuFigure({
           devAnimationClip: 'Thoughtful_Walk',
           devWalkSpeed: TIPU_WALK_SPEED_MPS,
           devWalkDistance: TIPU_WALK_DISTANCE_M,
@@ -426,7 +460,7 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
     },
     requires: 'arcore',
     howToTest:
-      'THE DELIVERABLE: one 1.16 MB GLB carrying all three clips, down from 24.6 MB across three files. Expect the banner to read count=3 with Idle_02, Talk_with_Right_Hand_Open and Thoughtful_Walk. The figure must WALK, not stand: autoAnimate alone plays clip 0 (Idle_02), so seeing the walk proves selection BY NAME works. PLACEMENT: it now WAITS for a real plane before placing (up to 12 s) instead of firing the instant tracking starts — sweep the phone slowly across a lit, textured patch of floor and it should land ON the floor at roughly your own height, 1.63 m. If it still appears at eye level, check logcat for "free-space fallback": that means no plane was ever found and it fell back to an estimated floor. Also check the BACK of the figure, reconstructed from a single frontal view.',
+      'WAIT FOR THE GRID, THEN TAP IT. Point at the floor and move the phone slowly side to side for a few seconds — ARCore needs that parallax before it will produce a plane at all, and until it does there is nothing to stand on. A white grid appears on the real floor; tap it. Placement is now PLANE-ONLY: the anchor comes from the plane you hit, so both his height and his position come from the floor instead of from the phone. Every fallback that used to guess a height — instant placement, depth points, a camera-relative offset — is gone, because each one placed him confidently on a surface that did not exist, which is what put him over your head. If you tap where there is no grid, NOTHING is placed and you are told to aim at the floor: that is correct behaviour, not a failure. He should stand where you tapped, 1.70 m against a chair or a person, and walk 1.2 m across your view. The log line "placeFigure: PLANE hit" should show a drop of roughly 1.0-1.5 m.',
   },
   {
     id: 'ar-tipu-speak',
@@ -436,11 +470,7 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
       kind: 'action',
       label: 'Speak',
       run: () => {
-        navigateSafe(ROUTES.MAIN.DETECT_AR, {
-          devDirectGlb: TIPU_FIGURE_URL,
-          devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
-          devGroundAnchored: true,
-          devDisclosure: TIPU_DISCLOSURE,
+        openTipuFigure({
           devAnimationClip: 'Talk_with_Right_Hand_Open',
           devAudioUri: TIPU_VOICE_URI,
         });
@@ -458,13 +488,7 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
       kind: 'action',
       label: 'Idle',
       run: () => {
-        navigateSafe(ROUTES.MAIN.DETECT_AR, {
-          devDirectGlb: TIPU_FIGURE_URL,
-          devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
-          devGroundAnchored: true,
-          devDisclosure: TIPU_DISCLOSURE,
-          devAnimationClip: 'Idle_02',
-        });
+        openTipuFigure({ devAnimationClip: 'Idle_02' });
       },
     },
     requires: 'arcore',

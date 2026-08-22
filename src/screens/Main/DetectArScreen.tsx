@@ -50,6 +50,7 @@ import EpocheyeDetectARView, {
   type CloudAnchorEvent,
   type EpocheyeDetectARHandle,
   type GeospatialStateEvent, // ADMIN-HARNESS (REMOVE AFTER KONARK)
+  type FigureGeometryEvent,
   type FrameStatsEvent, // PHASE 0 frame-time probe
   type ModelAnimationsEvent, // PHASE 0 skeletal-animation probe
   type VpsResultEvent, // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -108,6 +109,27 @@ const DIRECT_GLB_TEST_SCALE_M = 1.2;
  * that a featureless room still shows something rather than hanging forever.
  */
 const PLANE_WAIT_MS = 12000;
+
+/**
+ * Plain-words reading of ARCore's TrackingFailureReason while no floor plane exists.
+ * Wording is deliberately about the ENVIRONMENT: every one of these is something the
+ * viewer can change and nothing the app can.
+ */
+function trackingHint(why: string): string {
+  switch (why) {
+    case 'INSUFFICIENT_LIGHT':
+      return 'TOO DARK — ARCore cannot see the floor. Turn on lights or move to daylight.';
+    case 'INSUFFICIENT_FEATURES':
+      return 'FLOOR TOO PLAIN — aim at a patterned surface or scatter a few objects on it.';
+    case 'EXCESSIVE_MOTION':
+      return 'MOVING TOO FAST — hold the phone steady, then sweep slowly.';
+    case 'BAD_STATE':
+    case 'CAMERA_UNAVAILABLE':
+      return `ARCORE ${why} — close and reopen the camera.`;
+    default:
+      return 'SCANNING FOR THE FLOOR — point down and sweep the phone slowly side to side.';
+  }
+}
 
 /** The only venue with a trained detector today. Overridable via route param. */
 const DEFAULT_DETECTOR_VENUE = 'indian-museum';
@@ -1050,6 +1072,7 @@ const DetectARNative: React.FC<{
   const [modelAnimations, setModelAnimations] =
     useState<ModelAnimationsEvent | null>(null);
   const [frameStats, setFrameStats] = useState<FrameStatsEvent | null>(null);
+  const [figure, setFigure] = useState<FigureGeometryEvent | null>(null);
   // True once ARCore has actually found a horizontal surface. TRACKING arrives in
   // about a second; a usable plane takes several more of real motion, so the two
   // are not interchangeable — placing on the former is what put the figure in
@@ -1340,6 +1363,7 @@ const DetectARNative: React.FC<{
         animationClip={devAnimationClip ?? undefined}
         onModelAnimations={devDirectGlb ? handleModelAnimations : undefined}
         onFrameStats={devDirectGlb ? setFrameStats : undefined}
+        onFigureGeometry={devDirectGlb ? setFigure : undefined}
         cardData={
           resolved.kind === 'grounded' ? JSON.stringify(resolved.card) : undefined
         }
@@ -1357,6 +1381,30 @@ const DetectARNative: React.FC<{
         onVpsResult={showAdminHarness ? setVpsResult : undefined} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         onGeospatialState={showAdminHarness ? setGeoState : undefined} // ADMIN-HARNESS (REMOVE AFTER KONARK)
       />
+
+      {/* TAP THE FLOOR TO PLACE HIM.
+          The viewer knows where the ground is; the app does not. Auto-placement has to
+          assume a floor height (EYE_HEIGHT_M below the phone) whenever ARCore has no
+          plane — and ARCore cannot get a plane from someone standing still, because
+          plane detection needs the parallax of walking. That assumption is what put the
+          figure overhead whenever the phone was held above 1.5 m.
+          A tap removes the guess entirely: it hit-tests exactly where the finger
+          landed, against depth, planes or instant placement, whichever answers first.
+          It is also the AR placement gesture people already know from every other app.
+          Auto-place still runs as a fallback so the screen is never empty. */}
+      {devDirectGlb ? (
+        <Pressable
+          style={styles.tapToPlace}
+          onPress={(e) => {
+            const {locationX, locationY} = e.nativeEvent;
+            arRef.current?.placeAtScreenPoint(locationX, locationY);
+            setStatus(prev => (prev === 'placed' ? prev : 'ready'));
+            console.log(
+              `[PHASE3] tap-to-place at ${locationX.toFixed(0)},${locationY.toFixed(0)}`,
+            );
+          }}
+        />
+      ) : null}
 
       {/* Voice for the speaking figure.
           Audio-only, so it is deliberately given no size and no controls — this is
@@ -1398,13 +1446,35 @@ const DetectARNative: React.FC<{
           direct-GLB harness, so it never appears in a real scan. */}
       {devDirectGlb && (modelAnimations || frameStats) ? (
         <View style={styles.animProbeBanner} pointerEvents="none">
+          {figure ? (
+            <Text style={styles.animProbeBody}>
+              {`feet ${figure.feetY.toFixed(2)} · head ${figure.headY.toFixed(
+                2,
+              )} · cam ${figure.camY.toFixed(2)}
+feet vs you ${(
+                figure.feetY - figure.camY
+              ).toFixed(2)} m ${
+                figure.feetY - figure.camY > 0 ? '← ABOVE YOU' : '(below, ok)'
+              } · walked ${figure.walked.toFixed(2)} m`}
+            </Text>
+          ) : null}
           {frameStats ? (
             <Text style={styles.animProbeBody}>
               {`${frameStats.meanMs.toFixed(1)} ms mean · ${frameStats.p95Ms.toFixed(
                 1,
               )} ms p95 · ${frameStats.fps.toFixed(
                 1,
-              )} fps · animated=${frameStats.animated ? 'yes' : 'no'}`}
+              )} fps · animated=${frameStats.animated ? 'yes' : 'no'}
+planes=${frameStats.planes} · why=${frameStats.trackingWhy}`}
+            </Text>
+          ) : null}
+          {/* What ARCore is doing, in words. A correct grid pipeline with zero
+              planes looks exactly like a broken one, and a whole night was lost
+              to that ambiguity. planes=0 is "still scanning"; a non-NONE reason is
+              ARCore saying the ROOM is the problem, which no code can fix. */}
+          {frameStats && frameStats.planes === 0 ? (
+            <Text style={styles.animProbeTitle}>
+              {trackingHint(frameStats.trackingWhy)}
             </Text>
           ) : null}
           {modelAnimations ? (
@@ -1776,6 +1846,10 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     textAlign: 'center',
   },
+  // Full-bleed tap target for placing the figure. Sits UNDER every control (it is
+  // rendered before them) so buttons still win, and above the camera feed so a tap
+  // anywhere on the floor lands here.
+  tapToPlace: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0},
   // PHASE 0 skeletal-animation probe readout. Sits low so it never covers the
   // figure being judged. Monospace so clip indices line up when read at a glance.
   animProbeBanner: {

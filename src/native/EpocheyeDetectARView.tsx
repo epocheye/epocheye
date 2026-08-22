@@ -128,6 +128,14 @@ export interface FrameStatsEvent {
   fps: number;
   /** True when the currently-placed model carries animation clips. */
   animated: boolean;
+  /** Upward-facing planes ARCore is currently tracking. 0 = nothing to stand on yet. */
+  planes: number;
+  /**
+   * ARCore's own TrackingFailureReason name: NONE when healthy, else
+   * INSUFFICIENT_LIGHT / INSUFFICIENT_FEATURES / EXCESSIVE_MOTION / BAD_STATE /
+   * CAMERA_UNAVAILABLE. The one field that separates "dark room" from "bug".
+   */
+  trackingWhy: string;
 }
 
 /**
@@ -143,6 +151,15 @@ export interface FrameStatsEvent {
  * `count > 0` but nothing visibly moves → clips exist and the animator is
  * simply never being advanced.
  */
+/** Live figure geometry, ~1/s. `feetY - camY` is the number that matches the eye:
+ *  negative = below you (correct), positive = floating above you. */
+export interface FigureGeometryEvent {
+  feetY: number;
+  headY: number;
+  camY: number;
+  walked: number;
+}
+
 export interface ModelAnimationsEvent {
   /** Number of animation clips on the loaded model. */
   count: number;
@@ -204,6 +221,8 @@ interface NativeProps {
   onModelAnimations?: (event: {nativeEvent: ModelAnimationsEvent}) => void;
   /** PHASE 0 — rolling frame-time stats (~1/s). */
   onFrameStats?: (event: {nativeEvent: FrameStatsEvent}) => void;
+  /** Live figure geometry vs the camera (~1/s). */
+  onFigureGeometry?: (event: {nativeEvent: FigureGeometryEvent}) => void;
 }
 
 const NativeDetectARView = ((): HostComponent<NativeProps> | null => {
@@ -355,6 +374,8 @@ interface Props {
   onModelAnimations?: (event: ModelAnimationsEvent) => void;
   /** PHASE 0 — rolling frame-time stats (~1/s). */
   onFrameStats?: (event: FrameStatsEvent) => void;
+  /** Live figure geometry vs the camera (~1/s). */
+  onFigureGeometry?: (event: FigureGeometryEvent) => void;
 }
 
 const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
@@ -389,6 +410,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       onThermalStatus,
       onModelAnimations, // PHASE 0 skeletal-animation probe
       onFrameStats, // PHASE 0 frame-time probe
+      onFigureGeometry,
     },
     ref,
   ) => {
@@ -595,6 +617,12 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           // PHASE 0 frame-time probe
           onFrameStats
             ? (e: {nativeEvent: FrameStatsEvent}) => onFrameStats(e.nativeEvent)
+            : undefined
+        }
+        onFigureGeometry={
+          onFigureGeometry
+            ? (e: {nativeEvent: FigureGeometryEvent}) =>
+                onFigureGeometry(e.nativeEvent)
             : undefined
         }
       />
