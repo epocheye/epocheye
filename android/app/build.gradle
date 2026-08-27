@@ -11,6 +11,22 @@ apply plugin: "com.google.gms.google-services"
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
+    // Opt-in: bundle the JS into the DEBUG apk so it does not need Metro.
+    //
+    //     ./gradlew :app:assembleDebug -PbundleDebugJs
+    //
+    // A normal debug build is unchanged and still hot-reloads off Metro. But a
+    // debug apk that depends on a laptop serving localhost:8081 dies the moment
+    // adb reverse is lost or the machine sleeps - which has already cost this
+    // project a site visit (project_bfort_site_visit_failure_rootcauses) and
+    // crashed on this bench with "Unable to load script". With this flag the apk
+    // is portable and keeps the debug signing key, so it installs over an
+    // existing debug build without wiping the user's login the way a release
+    // build would.
+    // `debuggableVariants` lists the variants that SKIP bundling and load from
+    // Metro. Emptying it makes the debug apk bundle its JS like a release one.
+    debuggableVariants = project.hasProperty("bundleDebugJs") ? [] : ["debug"]
+
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
     // root = file("../../")
