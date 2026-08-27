@@ -132,6 +132,12 @@ export type MainStackParamList = {
    * request are both keyed by it, so there is no sensible default.
    */
   PalaceJourney: {slug: string};
+  /**
+   * Camera-off, gyroscope-driven reconstruction. Takes no params: it is one
+   * authored experience for one site, and its viewpoints live in
+   * src/features/magicwindow/viewpoints.ts rather than in the route.
+   */
+  MagicWindow: undefined;
 };
 
 /**

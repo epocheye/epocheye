@@ -29,6 +29,7 @@ import StationAuthoringScreen from '../screens/Admin/StationAuthoringScreen';
 // Prod site-readiness experience: guide to a station + world-lock the reconstruction.
 import SiteReconstructionScreen from '../screens/Main/SiteReconstructionScreen';
 // Pre-flight: what AR does on THIS phone. Invisible on capable devices.
+import MagicWindowScreen from '../screens/Main/MagicWindowScreen';
 import ARCapabilityScreen from '../screens/Main/ARCapabilityScreen';
 // Prod guided on-site journey (figure welcome → audio guide → point-and-learn).
 // The entry CTA on SiteDetail is gated (journeyConfig.canBeginJourney).
@@ -170,6 +171,22 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         component={SiteReconstructionScreen}
         options={{ animation: 'fade', presentation: 'fullScreenModal' }}
       />
+      {/*
+        Camera-off, gyro-driven reconstruction. Wrapped in ErrorBoundary like the
+        other full-screen 3D surfaces: it drives a Filament engine from a sensor
+        callback, and a render crash must recover to the previous screen rather
+        than take the app down.
+      */}
+      <Stack.Screen
+        name={ROUTES.MAIN.MAGIC_WINDOW}
+        options={{ animation: 'fade', presentation: 'fullScreenModal' }}
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <MagicWindowScreen />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name={ROUTES.MAIN.AR_CAPABILITY}
         options={{ animation: 'fade', presentation: 'fullScreenModal' }}

@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronRight,
+  Eye,
   Footprints,
   Share2,
   Sparkles,
@@ -38,6 +39,9 @@ import { getSite } from '../../utils/api/places';
 import type { SiteDetail } from '../../utils/api/places';
 import { resolveSiteImageSource } from '../../shared/utils/localSiteImages';
 import { moderateScale } from '../../utils/scaling';
+import { isAdminUser } from '../../shared/auth/isAdminUser';
+import { isMagicWindowAvailable } from '../../native/EpocheyeMagicWindowView';
+import { MAGIC_WINDOW_SLUG } from '../../features/magicwindow/viewpoints';
 import { ROUTES } from '../../core/constants';
 import { listViewingStations } from '../../utils/api/ar';
 import { analytics } from '../../services/analytics';
@@ -288,6 +292,28 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     navigation.navigate(ROUTES.MAIN.PALACE_JOURNEY, {slug: journeySlug});
   }, [navigation, journeySlug, journeyGate.allowed, journeyGate.state]);
 
+  // MAGIC WINDOW — camera off, gyroscope drives the view.
+  //
+  // Admin-gated, and NOT geofenced. Both are deliberate:
+  //  * Not geofenced, because the whole point is that it needs no site. Every AR
+  //    route at Bangalore Fort failed on the evidence — the breach sits in a bus
+  //    yard behind a treeline, the scan has no metric scale, no ground anchor
+  //    exists — and a magic window needs none of that. Gating it to the site
+  //    would re-impose the constraint it was built to escape.
+  //  * Admin-gated, because the reconstruction still carries an unresolved
+  //    evidence dispute: this circuit is ~7% smaller than the enceinte already
+  //    live on CloudFront, so the product would otherwise show two Bangalore
+  //    Forts of different sizes. Open it up once that is settled.
+  const magicWindowSlug = siteDetail?.slug ?? site.id;
+  const showMagicWindow =
+    magicWindowSlug === MAGIC_WINDOW_SLUG &&
+    isMagicWindowAvailable &&
+    isAdminUser(profile?.email);
+  const handleMagicWindow = useCallback(() => {
+    analytics.track('magic_window_opened', {slug: magicWindowSlug});
+    navigation.navigate(ROUTES.MAIN.MAGIC_WINDOW);
+  }, [navigation, magicWindowSlug]);
+
   // Record a site view once per opened site (the auto screen_view carries no slug).
   useEffect(() => {
     analytics.track('site_viewed', {slug: site.id});
@@ -526,6 +552,28 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   : journeyGate.state === 'checking'
                     ? t('journey.gate.checking')
                     : t('journey.gate.outsideCta')}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {showMagicWindow && (
+            <TouchableOpacity
+              onPress={handleMagicWindow}
+              activeOpacity={0.9}
+              className="flex-row items-center justify-center gap-2"
+              style={{
+                height: moderateScale(53),
+                borderRadius: moderateScale(30),
+                borderWidth: 1,
+                borderColor: '#C9A84C',
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="See it as it stood, 1791">
+              <Eye color="#CBA862" size={18} />
+              <Text
+                className="text-brand-gold font-display"
+                style={{fontSize: moderateScale(20)}}>
+                See it as it stood, 1791
               </Text>
             </TouchableOpacity>
           )}

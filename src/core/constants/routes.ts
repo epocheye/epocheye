@@ -42,6 +42,8 @@ export const ROUTES = {
     STATION_AUTHORING: 'StationAuthoring',
     /** Prod: guide the visitor to a viewing station and world-lock the reconstruction. */
     SITE_RECONSTRUCTION: 'SiteReconstruction',
+    /** Camera-off, gyro-driven reconstruction (Bangalore Fort, 1791). */
+    MAGIC_WINDOW: 'MagicWindow',
     /** Pre-flight: what AR will do on this phone, and the way forward either way. */
     AR_CAPABILITY: 'ArCapability',
     /** Prod: the guided on-site journey (figure welcome → audio guide → point-and-learn). */
