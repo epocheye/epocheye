@@ -10,6 +10,23 @@
  *        - KTX2/Basis textures: ETC1S for color + linear (metallic/roughness/AO),
  *          UASTC for normal maps (ETC1S mangles normals)
  *
+ * ⚠ SKINNED CHARACTERS: PASS --no-quantize. Learned on device, 2026-08-26.
+ *
+ * gltfpack quantizes POSITION to shorts and puts the dequantization scale on the
+ * MESH NODE. For a SKINNED mesh the glTF spec says that node transform is IGNORED —
+ * the renderer builds vertices from joint matrices x inverse bind matrices, and the
+ * IBMs are still float metres. So the scale is simply never applied: the five court
+ * figures rendered ~100x oversized and floating off the floor.
+ *
+ * How to check a file BEFORE shipping it: read the POSITION accessor of the skinned
+ * primitive. It must be componentType 5126 (float) with a span in metres and a mesh
+ * node scale of [1,1,1]. If it is 5123 (ushort) spanning ~16383 with a ~0.0001 node
+ * scale, it is broken for skinning. The known-good reference tipu_figure_royal9.glb
+ * is float/unquantized — match it.
+ *
+ * Arithmetic like "16383 x 0.0001025 = 1.68, therefore correct" is NOT a check: it
+ * silently assumes the node scale is applied, which for a skinned mesh it is not.
+ *
  * The output uses only extensions Filament decodes at runtime
  * (EXT_meshopt_compression, KHR_texture_basisu, KHR_mesh_quantization) — so DO
  * NOT add a JS/three.js decoder; this file is for the native AR view.
@@ -27,6 +44,8 @@
  *   --all-scale R      scale ALL textures (overrides the two above)
  *   --simplify R       gltfpack -si: keep ratio R of triangles (e.g. 0.3)
  *   --no-uastc-normal  encode normals with ETC1S too (smaller; for placeholders)
+ *   --no-quantize      gltfpack -noq: keep float positions. REQUIRED FOR SKINNED
+ *                      FIGURES — see the warning below.
  *   --keep-temp        keep the Draco-decoded intermediate (debug)
  *
  * Low-detail placeholder recipe (see "konark low" in README):
@@ -67,6 +86,8 @@ const colorScale = arg('color-scale', '1');
 const linearScale = arg('linear-scale', '0.5');
 const simplify = arg('simplify', null);
 const uastcNormal = !flag('no-uastc-normal');
+// SKINNED FIGURES MUST PASS --no-quantize. See the note at the top of this file.
+const noQuantize = flag('no-quantize');
 
 function resolveGltfpack() {
   if (process.env.GLTFPACK_BIN && existsSync(process.env.GLTFPACK_BIN)) {
@@ -104,6 +125,7 @@ if (r.error || r.status !== 0) {
 
 // 2. gltfpack: meshopt geometry + KTX2/Basis textures.
 const gpArgs = ['-i', intermediate, '-o', output, '-cc', '-tc', '-tq', quality];
+if (noQuantize) gpArgs.push('-noq');
 if (uastcNormal) gpArgs.push('-tu', 'normal');
 if (simplify) gpArgs.push('-si', simplify);
 if (allScale) {

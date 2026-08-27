@@ -159,7 +159,29 @@ An extended token set lives in `src/design-system/tokens/` (`typography.ts`, `co
 
 **Font rule:** Several bundled families are in active use — do not delete any without checking references first. `MontserratAlternates-*` drives the brand mark (`AnimatedLogo` via `FONTS` in `theme.ts`). `InstrumentSans-*`, `InstrumentSerif-*`, and `NothingYouCouldDo-*` are used across post-auth screens (SiteDetail, Settings, Purchase, PlanList, AiGuide) via `theme.ts`. `CormorantGaramond-*` (display) and `DMSans-*` (UI) drive the onboarding v2 design system via `src/core/constants/fonts.ts`. All of these ship in `src/assets/fonts/` and are linked natively through `react-native.config.js`.
 
-**Image rule:** All monument/region images via CDN using `CDN_BASE`. No local `require()` for monument images.
+**Image rule:** There are **three** image paths, and which one applies depends on *when* the
+image renders. Getting this wrong has already caused two production failures.
+
+1. **Monument heroes (post-auth) — self-hosted on the project's own CloudFront.**
+   `monuments.hero_image_url` in the DB, served from `s3://epocheye-glb-models/monuments/` as
+   `https://d2d3syfid51acn.cloudfront.net/monuments/<slug>.jpg`. Set by migration; no code change.
+   **Never hotlink Wikimedia.** `072_udayagiri_hero_image.up.sql:8-15` records that React Native's
+   Android image loader does not reliably render hotlinked Wikimedia thumbnails — they load in a
+   browser and in `curl`, then fail in-app and fall back to the gradient. Migrations 048/049 still
+   hotlink and only escape the bug because their slugs carry bundled overrides (see 3).
+
+2. **Pre-auth onboarding teaser pack — `CDN_BASE`.** `CDN_BASE` is jsDelivr-off-GitHub
+   (`theme.ts`), and it is scoped to `src/constants/onboarding/**` and
+   `src/components/onboarding/**`, which must render before a JWT exists. It is **not** the path
+   for monument heroes: a bundled `CDN_BASE` asset that was never committed to the asset repo
+   404'd in production, which is what migration 049 exists to clean up.
+
+3. **Bundled `require()` — deliberate, and load-bearing.**
+   `src/shared/utils/localSiteImages.ts` bundles heroes for `konark-sun-temple`,
+   `victoria-memorial` and `indian-museum`. `resolveSiteImageSource()` prefers the bundled asset
+   over `hero_image_url` — instant, offline, known-good — and it is precisely what masks the
+   broken hotlinks in 048/049. Adding a slug here is a code change plus an asset; prefer path 1
+   unless the image must survive offline.
 
 **Styling approach:** NativeWind (`className` props, configured via `global.css` + `tailwind.config.js`) is the primary styling method. For dynamic or complex styles, use `StyleSheet` with theme token values.
 
@@ -253,9 +275,25 @@ Each subdirectory exports typed functions. All API calls return a discriminated 
 
 ## Image Resolution Pipeline
 
-`useResolvedSubjectImage(subject, context?)` (`src/shared/hooks/useResolvedSubjectImage.ts`) is the shared entry point for all contextual monument imagery across Home, SiteDetailScreen, OB08_DemoStory, and ResolvedSubjectImage components.
+> **Scope — read this before assuming the pipeline runs.** It almost never does. The hook
+> defaults `remote = false` and returns `EMPTY_STATE` before any network call, so it is inert
+> unless a caller opts in with `enableRemoteResolve`. Exactly **two** callers do:
+> `AncestorStorySheet.tsx` and `MonumentInfoSheet.tsx` — both Lens sheets.
+>
+> **Nothing on this path fills a monument hero.** `Home.tsx`, `SiteDetailScreen.tsx`,
+> `PreArrivalCard`, `ApproachCard` and `useActiveMonument` do not import the hook at all — they
+> read `hero_image_url` through `resolveSiteImageSource()` (path 1/3 of the image rule above).
+> `PlanList.tsx` renders `ResolvedSubjectImage` but without `enableRemoteResolve`, so it too is
+> local-only, and falls back to a **hardcoded stock landscape** when the URL is null.
+>
+> Practical consequence: a monument with `hero_image_url IS NULL` will **never** self-heal at
+> runtime. Fix it with a migration.
 
-**Resolution flow:**
+`useResolvedSubjectImage(subject, context?)` (`src/shared/hooks/useResolvedSubjectImage.ts`) is the
+opt-in resolver behind the `ResolvedSubjectImage` component, used for *contextual* subject imagery
+in the Lens sheets.
+
+**Resolution flow** (only when a caller passes `enableRemoteResolve`)**:**
 
 1. Check in-memory session cache in `src/shared/services/image-resolve.service.ts`
 2. On miss, call `GET /api/v1/images/resolve?subject=&context=` via `src/utils/api/images/Images.ts` (authenticated)

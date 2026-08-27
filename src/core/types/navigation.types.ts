@@ -125,6 +125,13 @@ export type MainStackParamList = {
   StationAuthoring: undefined;
   /** Prod: guide to a viewing station + world-lock the reconstruction. */
   SiteReconstruction: {venueSlug?: string} | undefined;
+  /**
+   * Prod: the guided on-site journey — figure welcome on the lawn, earphones +
+   * disclaimer, zone-grouped audio guide, then point-and-learn AR cards. The
+   * venue slug is REQUIRED: journey progress (journeyStore) and the audio stops
+   * request are both keyed by it, so there is no sensible default.
+   */
+  PalaceJourney: {slug: string};
 };
 
 /**

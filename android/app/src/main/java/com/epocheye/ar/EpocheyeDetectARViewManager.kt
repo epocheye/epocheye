@@ -15,9 +15,12 @@ import com.facebook.react.uimanager.events.RCTEventEmitter
  * Props:
  *   - glbUri:     model to place
  *   - modelScale: scaleToUnits for the placed model (default 0.5)
+ *   - faceViewer: keep the placed figure turned towards the visitor (default true)
  *
  * Commands (UIManager.dispatchViewManagerCommand):
  *   - 'placeAtScreenPoint' [x, y]  — hit-test that screen point, anchor the GLB
+ *   - 'placeCardsAtScreenPoint' [x, y, cardsJson] — hit-test that screen point,
+ *                                    hang world-anchored cards there
  *   - 'clearAnchor'                — remove the placed model
  *   - 'nudgeYaw' [deg]             — rotate the placed model about Y
  *   - 'captureFrame'               — emit onFrameCaptured(file:// uri)
@@ -61,6 +64,15 @@ class EpocheyeDetectARViewManager(
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onARError", event)
         }
+        // WHY tracking is degraded, as the raw ARCore enum name ("" = cleared).
+        // Kept off onARError on purpose — see the property doc on the view: that
+        // channel carries prose that screens render verbatim, so an enum sent down
+        // it becomes `INSUFFICIENT_FEATURES` on a visitor's screen.
+        view.onArTrackingFailure = { reason ->
+            val event = Arguments.createMap().apply { putString("reason", reason) }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onArTrackingFailure", event)
+        }
         view.onThermalStatus = { status, severe ->
             val event = Arguments.createMap().apply {
                 putInt("status", status)
@@ -98,6 +110,10 @@ class EpocheyeDetectARViewManager(
                 putBoolean("animated", animated)
                 putInt("planes", planes)
                 putString("trackingWhy", trackingWhy)
+                putBoolean("torch", view.torchOn)
+                putString("aim", view.aimState)
+                putDouble("aimAngleDeg", view.aimAngleDeg.toDouble())
+                putInt("luma", view.lastLuma)
             }
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onFrameStats", event)
@@ -181,6 +197,18 @@ class EpocheyeDetectARViewManager(
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onElementTapped", event)
         }
+        // A tap on a recognition placard (placeCardsOnly / placeCardsAtScreenPoint /
+        // cardData). videoUrl present = the card is a video card; JS opens the clip
+        // in its full-screen player.
+        view.onCardTap = { id, videoUrl, posterUrl ->
+            val event = Arguments.createMap().apply {
+                putString("id", id)
+                videoUrl?.let { putString("videoUrl", it) }
+                posterUrl?.let { putString("posterUrl", it) }
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onCardTap", event)
+        }
         view.onCloudAnchorEvent = { phase, state, cloudAnchorId, quality, message ->
             val event = Arguments.createMap().apply {
                 putString("phase", phase)
@@ -216,6 +244,30 @@ class EpocheyeDetectARViewManager(
     @ReactProp(name = "cardData")
     fun setCardData(view: EpocheyeDetectARView, json: String?) {
         view.setCardData(json)
+    }
+
+    // ── Visemes ───────────────────────────────────────────────────────────────
+    // The precomputed track (tools/lipsync_envelope.py output) as a JSON string,
+    // set once when the narration is chosen. Passing the whole track rather than
+    // per-frame weights keeps the bridge out of the render loop entirely.
+    @ReactProp(name = "visemeTrack")
+    fun setVisemeTrack(view: EpocheyeDetectARView, json: String?) {
+        view.setVisemeTrack(json)
+    }
+
+    // The audio player's real position, in milliseconds, sent on play/pause and
+    // then a few times a second. Native interpolates between these with the
+    // monotonic clock, so it stays with the audio when the player stalls or is
+    // paused instead of free-running away from it.
+    @ReactProp(name = "visemePositionMs", defaultInt = -1)
+    fun setVisemePositionMs(view: EpocheyeDetectARView, ms: Int) {
+        if (ms < 0) return
+        view.setVisemePositionMs(ms)
+    }
+
+    @ReactProp(name = "visemePlaying", defaultBoolean = false)
+    fun setVisemePlaying(view: EpocheyeDetectARView, playing: Boolean) {
+        view.setVisemePlaying(playing)
     }
 
     @ReactProp(name = "cloudAnchorsEnabled", defaultBoolean = false)
@@ -260,6 +312,14 @@ class EpocheyeDetectARViewManager(
         view.setModelTrueScale(enabled)
     }
 
+    // Whether the placed figure keeps turning to face the visitor. Defaults to
+    // true — the behaviour every existing screen already gets — so only a screen
+    // that sets it false (a figure that should hold its heading) sees a change.
+    @ReactProp(name = "faceViewer", defaultBoolean = true)
+    fun setFaceViewer(view: EpocheyeDetectARView, enabled: Boolean) {
+        view.setFaceViewer(enabled)
+    }
+
     // ADMIN-HARNESS (REMOVE AFTER KONARK)
     @ReactProp(name = "geospatialEnabled", defaultBoolean = false)
     fun setGeospatialEnabled(view: EpocheyeDetectARView, enabled: Boolean) {
@@ -269,8 +329,10 @@ class EpocheyeDetectARViewManager(
     override fun getCommandsMap(): Map<String, Int> {
         return MapBuilder.builder<String, Int>()
             .put("placeAtScreenPoint", CMD_PLACE_AT_SCREEN_POINT)
+            .put("walkPath", CMD_WALK_PATH)
             .put("placeFromDetection", CMD_PLACE_FROM_DETECTION)
             .put("placeCardsOnly", CMD_PLACE_CARDS_ONLY)
+            .put("placeCardsAtScreenPoint", CMD_PLACE_CARDS_AT_SCREEN_POINT)
             .put("placeInFront", CMD_PLACE_IN_FRONT)
             .put("clearAnchor", CMD_CLEAR_ANCHOR)
             .put("nudgeYaw", CMD_NUDGE_YAW)
@@ -302,6 +364,14 @@ class EpocheyeDetectARViewManager(
                 val y = args?.getDouble(1)?.toFloat() ?: return
                 view.placeAtScreenPoint(x, y)
             }
+            CMD_WALK_PATH -> {
+                view.walkPath(
+                    args?.getDouble(0)?.toFloat() ?: 4f,
+                    args?.getDouble(1)?.toFloat() ?: 0.46f,
+                    args?.getString(2),
+                    args?.getString(3),
+                )
+            }
             CMD_PLACE_FROM_DETECTION -> {
                 val nx = args?.getDouble(0)?.toFloat() ?: return
                 val ny = args?.getDouble(1)?.toFloat() ?: return
@@ -312,6 +382,12 @@ class EpocheyeDetectARViewManager(
                 val ny = args?.getDouble(1)?.toFloat() ?: return
                 val cards = args.getString(2) ?: return
                 view.placeCardsOnly(nx, ny, cards)
+            }
+            CMD_PLACE_CARDS_AT_SCREEN_POINT -> {
+                val x = args?.getDouble(0)?.toFloat() ?: return
+                val y = args?.getDouble(1)?.toFloat() ?: return
+                val cards = args.getString(2) ?: return
+                view.placeCardsAtScreenPoint(x, y, cards)
             }
             CMD_PLACE_DISCOVERY_CARDS -> {
                 val cards = args?.getString(0) ?: return
@@ -389,6 +465,14 @@ class EpocheyeDetectARViewManager(
                 val y = args?.getDouble(1)?.toFloat() ?: return
                 view.placeAtScreenPoint(x, y)
             }
+            "walkPath" -> {
+                view.walkPath(
+                    args?.getDouble(0)?.toFloat() ?: 4f,
+                    args?.getDouble(1)?.toFloat() ?: 0.46f,
+                    args?.getString(2),
+                    args?.getString(3),
+                )
+            }
             "placeFromDetection" -> {
                 val nx = args?.getDouble(0)?.toFloat() ?: return
                 val ny = args?.getDouble(1)?.toFloat() ?: return
@@ -399,6 +483,12 @@ class EpocheyeDetectARViewManager(
                 val ny = args?.getDouble(1)?.toFloat() ?: return
                 val cards = args.getString(2) ?: return
                 view.placeCardsOnly(nx, ny, cards)
+            }
+            "placeCardsAtScreenPoint" -> {
+                val x = args?.getDouble(0)?.toFloat() ?: return
+                val y = args?.getDouble(1)?.toFloat() ?: return
+                val cards = args.getString(2) ?: return
+                view.placeCardsAtScreenPoint(x, y, cards)
             }
             "placeInFront" -> view.placeInFront()
             "clearAnchor" -> view.clearAnchor()
@@ -483,7 +573,12 @@ class EpocheyeDetectARViewManager(
             .put("onGeospatialState", MapBuilder.of("registrationName", "onGeospatialState"))
             .put("onGeospatialAnchorEvent", MapBuilder.of("registrationName", "onGeospatialAnchorEvent"))
             .put("onElementTapped", MapBuilder.of("registrationName", "onElementTapped"))
+            .put("onCardTap", MapBuilder.of("registrationName", "onCardTap"))
             .put("onAlignmentPoint", MapBuilder.of("registrationName", "onAlignmentPoint"))
+            .put(
+                "onArTrackingFailure",
+                MapBuilder.of("registrationName", "onArTrackingFailure"),
+            )
             .put("onThermalStatus", MapBuilder.of("registrationName", "onThermalStatus"))
             // PHASE 0 skeletal-animation probe
             .put("onModelAnimations", MapBuilder.of("registrationName", "onModelAnimations"))
@@ -499,6 +594,7 @@ class EpocheyeDetectARViewManager(
 
     companion object {
         private const val CMD_PLACE_AT_SCREEN_POINT = 1
+        private const val CMD_WALK_PATH = 92
         private const val CMD_PLACE_FROM_DETECTION = 2
         private const val CMD_CLEAR_ANCHOR = 3
         private const val CMD_NUDGE_YAW = 4
@@ -517,5 +613,6 @@ class EpocheyeDetectARViewManager(
         private const val CMD_CLEAR_DISCOVERY_LAYER = 15
         private const val CMD_MARK_ALIGNMENT_POINT = 16
         private const val CMD_APPLY_ALIGNMENT = 17
+        private const val CMD_PLACE_CARDS_AT_SCREEN_POINT = 18
     }
 }

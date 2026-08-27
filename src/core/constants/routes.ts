@@ -44,6 +44,8 @@ export const ROUTES = {
     SITE_RECONSTRUCTION: 'SiteReconstruction',
     /** Pre-flight: what AR will do on this phone, and the way forward either way. */
     AR_CAPABILITY: 'ArCapability',
+    /** Prod: the guided on-site journey (figure welcome → audio guide → point-and-learn). */
+    PALACE_JOURNEY: 'PalaceJourney',
     /** Dev-build-only workflow health-check board (not registered in release). */
     DEV_HEALTH: 'DevHealth',
   },

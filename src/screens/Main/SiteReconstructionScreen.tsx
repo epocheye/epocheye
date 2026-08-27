@@ -45,6 +45,8 @@ import {resolveModelGlb} from '../../services/glbSource';
 import {ROUTES} from '../../core/constants';
 import {isAdminUser} from '../../shared/auth/isAdminUser';
 import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
+import ArSessionBanner from '../../components/ui/ArSessionBanner';
+import { useArSessionHealth } from '../../shared/hooks/useArSessionHealth';
 import ARCapabilityNotice from '../../components/ui/ARCapabilityNotice';
 import {
   useARCapability,
@@ -112,6 +114,8 @@ const SiteReconstructionScreen: React.FC<
   const ensureLocationTracking = usePlacesStore(s => s.ensureLocationTracking);
   const [phase, setPhase] = useState<Phase>('loading');
   const [arError, setArError] = useState<string | null>(null);
+  // Kept apart from arError so neither can erase the other (they used to share a slot).
+  const [thermalNote, setThermalNote] = useState<string | null>(null);
   const [target, setTarget] = useState<ViewingStation | null>(null);
   const [glbUri, setGlbUri] = useState<string | undefined>(undefined);
   const [geo, setGeo] = useState<GeospatialStateEvent | null>(null);
@@ -310,13 +314,28 @@ const SiteReconstructionScreen: React.FC<
   }, []);
 
   /**
-   * Thermal throttling. Native sheds geospatial on its own; a visitor does not
-   * need a diagnostic, but whoever is debugging on site does, so this only shows
-   * behind the admin gate alongside the other native diagnostics.
+   * Live AR health, in words a visitor can act on.
+   *
+   * This screen used to render NOTHING to a visitor when AR failed — `arError` was
+   * gated behind `isAdminUser()`, so a normal user watching a reconstruction fail to
+   * appear was told nothing at all. It also wrote thermal state and AR faults into
+   * the SAME `arError` slot, so a thermal-clear silently wiped a live AR fault and
+   * vice versa. Two independent facts now live in two places: the admin diagnostic
+   * line below keeps the raw string, and the hook owns what the visitor sees.
    */
-  const handleThermal = useCallback((e: {status: number; severe: boolean}) => {
-    setArError(e.severe ? `device throttling (thermal ${e.status})` : null);
-  }, []);
+  const arHealth = useArSessionHealth();
+
+  /**
+   * Thermal throttling, for the ADMIN diagnostic line only. The visitor-facing
+   * message comes from `arHealth`, which keeps thermal in its own slot.
+   */
+  const handleThermal = useCallback(
+    (e: {status: number; severe: boolean}) => {
+      arHealth.onThermalStatus(e);
+      setThermalNote(e.severe ? `device throttling (thermal ${e.status})` : null);
+    },
+    [arHealth],
+  );
 
   const placeLayer = useCallback(() => {
     if (!layer) {
@@ -570,6 +589,8 @@ const SiteReconstructionScreen: React.FC<
           // a momentary glitch cannot leave a stale enum name on screen forever.
           onError={handleArError}
           onThermalStatus={handleThermal}
+          onTrackingFailure={arHealth.onTrackingFailure}
+          onTrackingState={arHealth.onTrackingState}
         />
       ) : (
         <View style={styles.mapPlaceholder} />
@@ -587,13 +608,17 @@ const SiteReconstructionScreen: React.FC<
             <Text style={styles.banner}>{banner}</Text>
             {/* Admin-only: raw native diagnostics. A visitor gets the calm
                 banner; whoever is debugging the site gets the reason. */}
-            {arError && isAdminUser() ? (
+            {(arError || thermalNote) && isAdminUser() ? (
               <Text style={styles.arError} numberOfLines={2}>
-                AR: {arError}
+                AR: {[arError, thermalNote].filter(Boolean).join(' · ')}
               </Text>
             ) : null}
           </View>
         </View>
+
+        {/* Visitor-facing AR health. Previously this screen showed a normal user
+            nothing at all when the session failed — the diagnostic above is admin-only. */}
+        <ArSessionBanner health={arHealth} onRetry={arHealth.reset} />
 
         {/*
           Waiting has visibly failed and the accuracy is still usable. Offer the

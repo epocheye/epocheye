@@ -30,6 +30,9 @@ import StationAuthoringScreen from '../screens/Admin/StationAuthoringScreen';
 import SiteReconstructionScreen from '../screens/Main/SiteReconstructionScreen';
 // Pre-flight: what AR does on THIS phone. Invisible on capable devices.
 import ARCapabilityScreen from '../screens/Main/ARCapabilityScreen';
+// Prod guided on-site journey (figure welcome → audio guide → point-and-learn).
+// The entry CTA on SiteDetail is gated (journeyConfig.canBeginJourney).
+import PalaceJourneyScreen from '../screens/Main/PalaceJourneyScreen';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -174,6 +177,16 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         {props => (
           <ErrorBoundary onReset={() => props.navigation.goBack()}>
             <ARCapabilityScreen {...props} />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
+      <Stack.Screen
+        name={ROUTES.MAIN.PALACE_JOURNEY}
+        options={{ animation: 'fade', presentation: 'fullScreenModal' }}
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <PalaceJourneyScreen {...props} />
           </ErrorBoundary>
         )}
       </Stack.Screen>

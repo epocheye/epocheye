@@ -8,9 +8,25 @@
  * - Heritage-dark styling
  *
  * Uses react-native-video v6 under the hood.
+ *
+ * Everything below `title` is OPTIONAL and additive. Omit it all and this
+ * component behaves exactly as it always has: it mounts paused, waits for a tap
+ * on Play, and tells nobody anything.
+ *
+ * Those props exist for a caller that has to drive a CHAIN of clips — the
+ * journey's audio guide plays one stop and walks on to the next by itself — and
+ * such a caller needs two things this component used to keep to itself:
+ *
+ *  - the raw <Video> callbacks, so a completion watchdog outside can judge for
+ *    itself whether the audio is actually moving. `onEnd` alone is not enough on
+ *    Android: audio focus can be denied at un-pause or lost mid-clip, and either
+ *    one stops the sound with no event of any kind, so a chain that advances
+ *    only on `onEnd` freezes the first time it happens;
+ *  - the play/pause state, so that a visitor's deliberate pause is never
+ *    mistaken by that watchdog for a player that has died.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   PanResponder,
   Text,
@@ -18,7 +34,12 @@ import {
   View,
 } from 'react-native';
 import Video from 'react-native-video';
-import type { OnLoadData, OnProgressData, VideoRef } from 'react-native-video';
+import type {
+  OnLoadData,
+  OnProgressData,
+  OnVideoErrorData,
+  VideoRef,
+} from 'react-native-video';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -38,17 +59,83 @@ interface AudioPlayerProps {
   uri: string;
   /** Optional title shown above the player */
   title?: string;
+  /**
+   * Start playing on mount instead of waiting for a tap. Defaults to false, so
+   * a caller that does not ask for it keeps the tap-to-play player it had.
+   *
+   * Read ONCE, at mount. A caller that wants a fresh autoplay remounts this
+   * component (the audio guide keys it by stop), which is also what resets the
+   * scrub bar and the duration; re-reading the prop later would only fight the
+   * visitor's own pause.
+   */
+  autoPlay?: boolean;
+  /**
+   * Called with the flag handed to `<Video paused={...}>` — on mount, and on
+   * every change after: the autoplay, each Play/Pause tap, and the automatic
+   * pause when a clip reaches its end.
+   *
+   * A completion watchdog outside this component cannot work without it. It has
+   * to tell "no progress because the visitor paused to look at a carving" from
+   * "no progress because the player silently stopped", and those look identical
+   * from the progress callback alone.
+   */
+  onPausedChange?: (paused: boolean) => void;
+  /** Passthrough of the player's own <Video> callback, called after this
+   *  component's bookkeeping (so `duration` here is already up to date). */
+  onLoad?: (data: OnLoadData) => void;
+  /** Passthrough. Forwarded on EVERY tick, including while the visitor is
+   *  scrubbing — see handleProgress. */
+  onProgress?: (data: OnProgressData) => void;
+  /** Passthrough, called after this component resets itself to the start. */
+  onEnd?: () => void;
+  /** Passthrough. Nothing here reacts to a playback error; a caller that cares
+   *  (the guide advances rather than stranding the visitor) must handle it. */
+  onError?: (data: OnVideoErrorData) => void;
 }
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri, title }) => {
+const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  uri,
+  title,
+  autoPlay = false,
+  onPausedChange,
+  onLoad,
+  onProgress,
+  onEnd,
+  onError,
+}) => {
   const videoRef = useRef<VideoRef>(null);
-  const [paused, setPaused] = useState(true);
+  /** The clip ran to its end and the player is parked there — see handleEnd. */
+  const endedRef = useRef(false);
+  const [paused, setPaused] = useState(!autoPlay);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [rate, setRate] = useState(1);
   const [isSeeking, setIsSeeking] = useState(false);
 
   const progress = useSharedValue(0);
+
+  // The caller's callbacks live in a ref rather than in the dependency lists
+  // below. Passing an inline arrow is the normal way to hand one over, and a
+  // parent that re-renders often (the journey re-renders while its media
+  // pre-cache reports progress, file by file) would otherwise churn the identity
+  // of every <Video> prop on this player for no reason at all.
+  const callbacks = useRef({
+    onLoad,
+    onProgress,
+    onEnd,
+    onError,
+    onPausedChange,
+  });
+  useEffect(() => {
+    callbacks.current = { onLoad, onProgress, onEnd, onError, onPausedChange };
+  }, [onLoad, onProgress, onEnd, onError, onPausedChange]);
+
+  // Report the play/pause state upward, including the initial one: with
+  // autoPlay the very first thing the caller needs to know is that sound has
+  // started without anybody tapping anything.
+  useEffect(() => {
+    callbacks.current.onPausedChange?.(paused);
+  }, [paused]);
 
   const handleProgress = useCallback(
     (data: OnProgressData) => {
@@ -60,23 +147,65 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri, title }) => {
           });
         }
       }
+      // Forwarded even mid-scrub. `isSeeking` is about THIS component's scrub
+      // bar, which must not jump under the visitor's thumb; a watchdog upstream
+      // still needs every tick, because ticks are its only proof of life.
+      callbacks.current.onProgress?.(data);
     },
     [duration, isSeeking, progress],
   );
 
   const handleLoad = useCallback((data: OnLoadData) => {
     setDuration(data.duration);
+    // A fresh source is a fresh player, whatever the previous one ended as.
+    endedRef.current = false;
+    callbacks.current.onLoad?.(data);
   }, []);
 
   const handleEnd = useCallback(() => {
+    // The player is NOT back at the start just because this component's scrub
+    // bar is: ExoPlayer parks at STATE_ENDED, and setPlayWhenReady(true) does
+    // nothing from there — only a seek leaves that state. Remembered here and
+    // paid for on the next Play (see handlePlayPause) rather than seeking now:
+    // `paused` reaches native one commit later than an imperative seek, so
+    // seeking here would restart the clip for a moment before the pause landed.
+    endedRef.current = true;
     setPaused(true);
     setCurrentTime(0);
     progress.value = withTiming(0, { duration: 200 });
+    callbacks.current.onEnd?.();
   }, [progress]);
+
+  /**
+   * Play/Pause. Replaying a finished clip has to seek first.
+   *
+   * Reachable the moment a caller autoplays a chain: the journey's audio guide
+   * finishes a stop, offers "Stay on this stop", and a visitor who taps Stay and
+   * then Play was left with a Pause icon, a scrub bar frozen at 0:00 and no
+   * sound at all — no error, and (once the completion watchdog has latched) no
+   * hand-over to rescue them either.
+   */
+  const handlePlayPause = useCallback(() => {
+    if (paused && endedRef.current) {
+      endedRef.current = false;
+      videoRef.current?.seek(0);
+      setCurrentTime(0);
+      progress.value = 0;
+    }
+    setPaused(p => !p);
+  }, [paused, progress]);
+
+  const handleError = useCallback((data: OnVideoErrorData) => {
+    callbacks.current.onError?.(data);
+  }, []);
 
   const handleSeek = useCallback(
     (fraction: number) => {
       const seekTime = Math.max(0, Math.min(1, fraction)) * duration;
+      // This seek is itself what pulls the player out of STATE_ENDED, so the
+      // next Play must NOT jump back to zero and throw away the position the
+      // visitor just scrubbed to.
+      endedRef.current = false;
       videoRef.current?.seek(seekTime);
       setCurrentTime(seekTime);
       progress.value = withTiming(fraction, { duration: 100 });
@@ -133,6 +262,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri, title }) => {
         onProgress={handleProgress}
         onLoad={handleLoad}
         onEnd={handleEnd}
+        onError={handleError}
         playInBackground
         playWhenInactive
         ignoreSilentSwitch="ignore"
@@ -184,7 +314,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ uri, title }) => {
 
         {/* Play/Pause */}
         <TouchableOpacity
-          onPress={() => setPaused(p => !p)}
+          onPress={handlePlayPause}
           className="w-14 h-14 rounded-full bg-[#B8923F] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={paused ? 'Play' : 'Pause'}

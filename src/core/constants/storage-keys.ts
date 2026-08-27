@@ -57,6 +57,8 @@ export const STORAGE_KEYS = {
     SAVED_PLACES: `${STORAGE_PREFIX}/saved_places_cache`,
     USER_PROFILE: `${STORAGE_PREFIX}/user_profile_cache`,
     GEMINI_IMAGE: `${STORAGE_PREFIX}/gemini_image_cache`,
+    /** url → {path,size,lastAccessed} manifest of the on-device audio/video cache (src/services/mediaCache.ts). */
+    MEDIA_MANIFEST: `${STORAGE_PREFIX}/media_cache/manifest`,
   },
 
   /**
@@ -114,6 +116,17 @@ export const STORAGE_KEYS = {
   },
 
   /**
+   * Guided on-site journey keys (see src/stores/journeyStore.ts).
+   */
+  JOURNEY: {
+    /**
+     * Persisted journey progress, one record per venue slug. This is the
+     * zustand `persist` name, so it is also the literal AsyncStorage key.
+     */
+    PROGRESS: `${STORAGE_PREFIX}/journey_progress`,
+  },
+
+  /**
    * Dev-only harness keys — only read/written from __DEV__ code paths.
    */
   DEV: {
@@ -137,4 +150,5 @@ export type StorageKey =
   | (typeof STORAGE_KEYS.DIAGNOSTICS)[keyof typeof STORAGE_KEYS.DIAGNOSTICS]
   | (typeof STORAGE_KEYS.UPDATE)[keyof typeof STORAGE_KEYS.UPDATE]
   | (typeof STORAGE_KEYS.AR)[keyof typeof STORAGE_KEYS.AR]
+  | (typeof STORAGE_KEYS.JOURNEY)[keyof typeof STORAGE_KEYS.JOURNEY]
   | (typeof STORAGE_KEYS.DEV)[keyof typeof STORAGE_KEYS.DEV];

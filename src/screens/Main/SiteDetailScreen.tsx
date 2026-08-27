@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronRight,
+  Footprints,
   Share2,
   Sparkles,
   Shield,
@@ -40,6 +41,8 @@ import { moderateScale } from '../../utils/scaling';
 import { ROUTES } from '../../core/constants';
 import { listViewingStations } from '../../utils/api/ar';
 import { analytics } from '../../services/analytics';
+import { canBeginJourney } from './journey/journeyConfig';
+import { useJourneyGate } from './journey/useJourneyGate';
 import type {
   MainScreenProps,
   PlaceNavParam,
@@ -266,6 +269,25 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   }, [navigation, siteDetail, site]);
 
+  // Guided journey: shown only where a journey is authored AND, while
+  // JOURNEY_OPEN_TO_ALL is false, only to the admin allowlist. The email is
+  // read from the reactive profile so the CTA appears once it finishes loading.
+  const journeySlug = siteDetail?.slug ?? site.id;
+  const showJourney = canBeginJourney(journeySlug, profile?.email);
+  // GEOFENCE. A site journey is something you do AT the site, so the CTA is inert
+  // off-site — the same rule DetectArScreen states for production scanning. The
+  // hook answers 'bypass' (never 'inside') for the admin allowlist so an admin can
+  // still reach it, and the journey screen itself shows a standing banner saying so.
+  const journeyGate = useJourneyGate(showJourney ? journeySlug : null);
+  const handleBeginJourney = useCallback(() => {
+    if (!journeyGate.allowed) return;
+    analytics.track('journey_cta_tapped', {
+      slug: journeySlug,
+      gate: journeyGate.state,
+    });
+    navigation.navigate(ROUTES.MAIN.PALACE_JOURNEY, {slug: journeySlug});
+  }, [navigation, journeySlug, journeyGate.allowed, journeyGate.state]);
+
   // Record a site view once per opened site (the auto screen_view carries no slug).
   useEffect(() => {
     analytics.track('site_viewed', {slug: site.id});
@@ -469,6 +491,44 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
             </TouchableOpacity>
           </TourTarget>
+
+          {showJourney && (
+            <TouchableOpacity
+              onPress={handleBeginJourney}
+              activeOpacity={journeyGate.allowed ? 0.9 : 1}
+              disabled={!journeyGate.allowed}
+              className="flex-row items-center justify-center gap-2"
+              style={{
+                height: moderateScale(53),
+                borderRadius: moderateScale(30),
+                borderWidth: 1,
+                borderColor: '#C9A84C',
+                // Dimmed rather than hidden: a visitor reading about the palace at
+                // home should see that this exists and that it happens on site.
+                opacity: journeyGate.allowed ? 1 : 0.45,
+              }}
+              accessibilityRole="button"
+              accessibilityState={{disabled: !journeyGate.allowed}}
+              accessibilityLabel={
+                journeyGate.allowed
+                  ? t('journey.cta')
+                  : t('journey.gate.outsideCta')
+              }
+              accessibilityHint={
+                journeyGate.allowed ? t('journey.ctaHint') : undefined
+              }>
+              <Footprints color="#CBA862" size={18} />
+              <Text
+                className="text-brand-gold font-display"
+                style={{fontSize: moderateScale(20)}}>
+                {journeyGate.allowed
+                  ? t('journey.cta')
+                  : journeyGate.state === 'checking'
+                    ? t('journey.gate.checking')
+                    : t('journey.gate.outsideCta')}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {hasReconstruction && (
             <TouchableOpacity

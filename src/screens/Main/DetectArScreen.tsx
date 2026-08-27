@@ -86,11 +86,19 @@ import AiGuessCard from './components/AiGuessCard';
 import ScanGuideOverlay, {type ScanPhase} from './components/ScanGuideOverlay';
 import ARActivationOverlay from '../../components/ui/ARActivationOverlay';
 import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
+import ArSessionBanner from '../../components/ui/ArSessionBanner';
+import { useArSessionHealth } from '../../shared/hooks/useArSessionHealth';
+import {
+  parseTrackingFailure,
+  trackingHintKey,
+} from '../../features/ar/trackingHint';
+import i18next from 'i18next';
 import ShareExperienceModal from '../../components/ShareExperienceModal';
 import {ROUTES} from '../../core/constants';
 import {COLORS} from '../../core/constants/theme';
 import i18n from '../../i18n';
 import type {MainStackParamList} from '../../core/types/navigation.types';
+import {aimCoaching} from '../../features/ar/aimCoach';
 
 // Primary accent for the scan screen — the theme's sky token (was a stale amber
 // hex). Named AMBER for historical reasons; it now drives the current palette.
@@ -108,28 +116,28 @@ const DIRECT_GLB_TEST_SCALE_M = 1.2;
  * anyway. Long enough for a normal sweep of a lit, textured floor; short enough
  * that a featureless room still shows something rather than hanging forever.
  */
-const PLANE_WAIT_MS = 12000;
+// Depth is usually available within a second or two of tracking starting; this is now
+// a short warm-up, not a wait for plane fitting to succeed.
+const PLANE_WAIT_MS = 2500;
 
 /**
- * Plain-words reading of ARCore's TrackingFailureReason while no floor plane exists.
- * Wording is deliberately about the ENVIRONMENT: every one of these is something the
- * viewer can change and nothing the app can.
+ * Plain-words reading of ARCore's TrackingFailureReason for the DEV probe banner.
+ *
+ * The real mapping now lives in `src/features/ar/trackingHint.ts` and is i18n'd,
+ * because this copy was private to this file AND only rendered behind `devDirectGlb`
+ * — production never reached it while raw enum names went to visitors on another
+ * screen. This wrapper keeps the loud, upper-case dev wording (useful at arm's length
+ * on site) without being a second source of truth for the words visitors see.
  */
-function trackingHint(why: string): string {
-  switch (why) {
-    case 'INSUFFICIENT_LIGHT':
-      return 'TOO DARK — ARCore cannot see the floor. Turn on lights or move to daylight.';
-    case 'INSUFFICIENT_FEATURES':
-      return 'FLOOR TOO PLAIN — aim at a patterned surface or scatter a few objects on it.';
-    case 'EXCESSIVE_MOTION':
-      return 'MOVING TOO FAST — hold the phone steady, then sweep slowly.';
-    case 'BAD_STATE':
-    case 'CAMERA_UNAVAILABLE':
-      return `ARCORE ${why} — close and reopen the camera.`;
-    default:
-      return 'SCANNING FOR THE FLOOR — point down and sweep the phone slowly side to side.';
+function trackingHint(why: string, torch = false): string {
+  const reason = parseTrackingFailure(why);
+  const key = trackingHintKey(reason, torch);
+  if (!key) {
+    return 'SCANNING FOR THE FLOOR — point down and sweep the phone slowly side to side.';
   }
+  return i18next.t(key);
 }
+
 
 /** The only venue with a trained detector today. Overridable via route param. */
 const DEFAULT_DETECTOR_VENUE = 'indian-museum';
@@ -656,6 +664,11 @@ const DetectArScreen: React.FC = () => {
     : false;
   // Root motion for the figure. Speed is MEASURED off the clip (0.46 m/s), not
   // picked — see advanceWalk() in EpocheyeDetectARView.kt.
+  // "Follow me" beat: after placement he turns his back, walks devWalkPath metres,
+  // then stops and turns to face the visitor again.
+  const devWalkPath = showAdminHarness
+    ? (route.params as {devWalkPath?: number} | undefined)?.devWalkPath ?? 0
+    : 0;
   const devWalkSpeed = showAdminHarness
     ? (route.params as {devWalkSpeed?: number} | undefined)?.devWalkSpeed ?? 0
     : 0;
@@ -868,6 +881,7 @@ const DetectArScreen: React.FC = () => {
         devGlbScaleM={devGlbScaleM}
         devAnimationClip={devAnimationClip}
         devGroundAnchored={devGroundAnchored}
+        devWalkPath={devWalkPath}
         devWalkSpeed={devWalkSpeed}
         devWalkDistance={devWalkDistance}
         devAudioUri={devAudioUri}
@@ -978,6 +992,7 @@ const DetectARNative: React.FC<{
   /** Origin on the ground — drop surface-less anchors to the estimated floor. */
   devGroundAnchored?: boolean;
   /** Root-motion speed (m/s) and distance (m) for the walking figure. */
+  devWalkPath?: number;
   devWalkSpeed?: number;
   devWalkDistance?: number;
   /** Audio to play while the figure speaks. */
@@ -1001,6 +1016,7 @@ const DetectARNative: React.FC<{
   devGlbScaleM = null,
   devAnimationClip = null,
   devGroundAnchored = false,
+  devWalkPath = 0,
   devWalkSpeed = 0,
   devWalkDistance = 0,
   devAudioUri = null,
@@ -1072,6 +1088,9 @@ const DetectARNative: React.FC<{
   const [modelAnimations, setModelAnimations] =
     useState<ModelAnimationsEvent | null>(null);
   const [frameStats, setFrameStats] = useState<FrameStatsEvent | null>(null);
+  // Aim coaching. The verdict is computed and debounced natively; this is only the
+  // decision of what to SAY and whether the story should wait for the visitor.
+  const coaching = aimCoaching(frameStats?.aim ?? 'OK', frameStats?.aimAngleDeg ?? 0);
   const [figure, setFigure] = useState<FigureGeometryEvent | null>(null);
   // True once ARCore has actually found a horizontal surface. TRACKING arrives in
   // about a second; a usable plane takes several more of real motion, so the two
@@ -1151,12 +1170,21 @@ const DetectARNative: React.FC<{
           setGlbUri(null);
           setErrorMessage(resolution.message ?? t('lens.statueGate'));
         } else if (resolution.kind === 'error') {
+          // LOG IT, do not only paint it. This message is the only thing that says
+          // WHICH call failed and HOW ("[502] ..." or "ERR_NETWORK: ... · POST
+          // /api/v1/recognize"), and until now it existed solely as pixels on a phone
+          // in someone's hand. Reading it back required them to retype it. The
+          // journey's step 4 was blind the same way and cost three rounds to diagnose.
+          console.log(
+            `[lens] resolution=error msg=${JSON.stringify(resolution.message ?? null)}`,
+          );
           setErrorMessage(
             __DEV__ && resolution.message
               ? `Lens error — ${resolution.message}`
               : t('lens.identifyFailed'),
           );
         } else if (resolution.kind === 'ai') {
+          console.log(`[lens] resolution=ai label=${JSON.stringify(resolution.label ?? null)}`);
           // AI interpretation of an allowed statue. In a real venue (not DEV),
           // float the card(s) in the world beside the statue — no 3D model. DEV
           // "scan anything" keeps just the on-screen card.
@@ -1193,7 +1221,20 @@ const DetectARNative: React.FC<{
   const handleAnchorPlaced = useCallback(() => {
     setStatus('placed');
     setErrorMessage(null);
-  }, []);
+    console.log(`[PHASE3] anchor placed -> devWalkPath=${devWalkPath} speed=${devWalkSpeed}`);
+    // Let him settle and be seen standing before he turns and leads: walking the instant
+    // he appears reads as a glitch rather than a decision.
+    if (devWalkPath > 0) {
+      setTimeout(() => {
+        arRef.current?.walkPath(
+          devWalkPath,
+          devWalkSpeed > 0 ? devWalkSpeed : 0.46,
+          'Thoughtful_Walk',
+          'Idle_02',
+        );
+      }, 1800);
+    }
+  }, [devWalkPath, devWalkSpeed]);
   // PHASE 0 — the skeletal-animation verdict, read straight off the Filament
   // animator at load time. Kept in state (not just logged) so the answer is
   // legible ON THE DEVICE: this test gets run at arm's length in a room, and
@@ -1206,6 +1247,12 @@ const DetectARNative: React.FC<{
       }`,
     );
   }, []);
+  // Live AR health. DetectArScreen never subscribed to onThermalStatus at all, so a
+  // throttling phone — the documented Bangalore Fort shutdown — produced no message
+  // here whatsoever. Tracking failures also stop arriving on handleError as raw enum
+  // names; that channel is now app faults only.
+  const arHealth = useArSessionHealth();
+
   const handleError = useCallback((err: string) => {
     // Native emits '' when a tracking fault CLEARS. That is not a failure, so it
     // must not cancel an in-flight scan — it only takes the stale message down.
@@ -1287,7 +1334,19 @@ const DetectARNative: React.FC<{
     // Waiting lets the plane-hit tier win, so the figure lands on the real floor.
     // The timeout is the escape hatch: a dark or featureless room may never yield
     // a plane, and placing badly beats never placing at all in a dev harness.
-    if (!planeReady && !planeWaitExpiredRef.current) return;
+    // Wait only for the short depth warm-up. planeReady can no longer become true at
+  // all for a figure - plane detection is switched off natively once one is armed - so
+  // gating on it would block placement forever.
+  // GATE PROBE. A silent early return here means no GLB is ever fetched, so every tap
+  // is then rejected by preflight() with no log at all - which is exactly the "nothing
+  // happens, it just says it is looking for a floor" symptom. Print the gate state so
+  // the blocker names itself instead of being deduced.
+  console.log(
+    `[PHASE3] autoplace gate: tracking=${tracking} waitExpired=${
+      planeWaitExpiredRef.current
+    } placed=${directPlacedRef.current} planeReady=${planeReady} glb=${!!devDirectGlb}`,
+  );
+  if (!planeWaitExpiredRef.current) return;
     directPlacedRef.current = true;
     let cancelled = false;
     (async () => {
@@ -1311,7 +1370,8 @@ const DetectARNative: React.FC<{
   // plane, place anyway. Re-runs the effect by flipping state, not just the ref.
   useEffect(() => {
     if ((!__DEV__ && !showAdminHarness) || !devDirectGlb) return;
-    if (!tracking || planeReady || directPlacedRef.current) return;
+    if (!tracking || directPlacedRef.current) return;
+    console.log('[PHASE3] depth warm-up timer armed');
     const timer = setTimeout(() => {
       planeWaitExpiredRef.current = true;
       setPlaneWaitExpired(true);
@@ -1372,7 +1432,12 @@ const DetectARNative: React.FC<{
         depthOcclusionEnabled={occlusionOn} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         geospatialEnabled={geoActive} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         onReady={handleReady}
-        onTrackingState={handleTrackingState}
+        onTrackingState={state => {
+          handleTrackingState(state);
+          arHealth.onTrackingState(state);
+        }}
+        onTrackingFailure={arHealth.onTrackingFailure}
+        onThermalStatus={arHealth.onThermalStatus}
         onPlaneDetected={handlePlaneDetected}
         onAnchorPlaced={handleAnchorPlaced}
         onError={handleError}
@@ -1406,6 +1471,21 @@ const DetectARNative: React.FC<{
         />
       ) : null}
 
+      {/* AIM COACH.
+          Deliberately large, centred and sparse: this fires when the visitor is not
+          looking at the right thing, so it has to be readable without hunting for it.
+          The arrow points the SHORT way round (native sends a signed bearing), because
+          telling someone to turn the long way is worse than saying nothing. */}
+      {coaching.message ? (
+        <View pointerEvents="none" style={styles.aimCoach}>
+          <Text style={styles.aimCoachText}>
+            {coaching.arrow === 'left' ? '←  ' : ''}
+            {coaching.message}
+            {coaching.arrow === 'right' ? '  →' : ''}
+          </Text>
+        </View>
+      ) : null}
+
       {/* Voice for the speaking figure.
           Audio-only, so it is deliberately given no size and no controls — this is
           a man talking, not a media player. `paused` waits for the AR notice so the
@@ -1415,7 +1495,7 @@ const DetectARNative: React.FC<{
       {devAudioUri ? (
         <Video
           source={{uri: devAudioUri}}
-          paused={!activationDone}
+          paused={!activationDone || coaching.pauseNarration}
           repeat={false}
           ignoreSilentSwitch="ignore"
           onError={(e: unknown) => {
@@ -1433,6 +1513,16 @@ const DetectARNative: React.FC<{
       />
 
       <ScanGuideOverlay phase={scanPhase} ready={tracking} />
+
+      {/* Live AR health, in plain words. Until now this screen showed the raw ARCore
+          enum in the message bubble and had no idea the phone was throttling at all. */}
+      <ArSessionBanner
+        health={arHealth}
+        onRetry={() => {
+          arHealth.reset();
+          setErrorMessage(null);
+        }}
+      />
 
       {devDisclosure && activationDone ? (
         <View style={styles.disclosureBanner} pointerEvents="none">
@@ -1465,16 +1555,24 @@ feet vs you ${(
               )} ms p95 · ${frameStats.fps.toFixed(
                 1,
               )} fps · animated=${frameStats.animated ? 'yes' : 'no'}
-planes=${frameStats.planes} · why=${frameStats.trackingWhy}`}
+planes=${frameStats.planes} · why=${frameStats.trackingWhy}${
+                frameStats.torch ? ' · lamp ON' : ''
+              }`}
             </Text>
           ) : null}
           {/* What ARCore is doing, in words. A correct grid pipeline with zero
               planes looks exactly like a broken one, and a whole night was lost
               to that ambiguity. planes=0 is "still scanning"; a non-NONE reason is
               ARCore saying the ROOM is the problem, which no code can fix. */}
-          {frameStats && frameStats.planes === 0 ? (
+          {/* Only speak up when ARCore itself reports a problem. planes===0 used to
+              drive this, but plane detection is deliberately DISABLED for the figure
+              now - placement is depth-based - so a zero plane count is the expected
+              state and saying "scanning for the floor" about it would be a lie. */}
+          {frameStats &&
+          frameStats.trackingWhy !== 'NONE' &&
+          frameStats.trackingWhy !== '' ? (
             <Text style={styles.animProbeTitle}>
-              {trackingHint(frameStats.trackingWhy)}
+              {trackingHint(frameStats.trackingWhy, frameStats.torch)}
             </Text>
           ) : null}
           {modelAnimations ? (
@@ -1863,6 +1961,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
+  },
+  aimCoach: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '42%',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  aimCoachText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.62)',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 10,
+    overflow: 'hidden',
   },
   animProbeTitle: {
     color: '#E8A020',

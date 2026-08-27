@@ -93,6 +93,19 @@ export interface ElementTappedEvent {
 }
 
 /**
+ * A tap landed on a recognition placard hung by `placeCardsOnly`,
+ * `placeCardsAtScreenPoint` or `cardData` (the discovery layer reports on
+ * `onElementTapped` instead). `id` is the card object's own `id`, or `card_<slot>`
+ * when it had none. `videoUrl` is present when the card is a video card — open it
+ * in the full-screen player; `posterUrl` is that player's poster, if any.
+ */
+export interface CardTapEvent {
+  id: string;
+  videoUrl?: string;
+  posterUrl?: string;
+}
+
+/**
  * Where the author was standing when they marked a two-point alignment feature,
  * in the placement anchor's local frame (metres). `error` set means nothing was
  * recorded — never treat a zeroed point as a mark.
@@ -136,6 +149,21 @@ export interface FrameStatsEvent {
    * CAMERA_UNAVAILABLE. The one field that separates "dark room" from "bug".
    */
   trackingWhy: string;
+  /**
+   * True while the phone's own lamp is lit to rescue a dark room. ARCore 1.54's
+   * Config.FlashMode.TORCH; see governTorch() in EpocheyeDetectARView.kt.
+   */
+  torch: boolean;
+  /**
+   * Aim coaching verdict from the native AimMonitor: OK | OFF_TARGET | TOO_LOW |
+   * TOO_HIGH | TOO_FAST | COVERED. Hysteresis is applied natively, so this value is
+   * already debounced and safe to render directly.
+   */
+  aim: string;
+  /** Signed bearing to the figure in degrees; positive means he is to the RIGHT. */
+  aimAngleDeg: number;
+  /** Mean camera luma 0-255, -1 when not yet measured. */
+  luma: number;
 }
 
 /**
@@ -181,6 +209,21 @@ interface NativeProps {
   animationClip?: string;
   /** Grounded card JSON to render as a world-anchored 3D panel. */
   cardData?: string;
+  /**
+   * Precomputed viseme track (the JSON tools/lipsync_envelope.py writes) as a
+   * string. Sent ONCE per narration: the whole track crosses the bridge so that
+   * per-frame mouth weights never do.
+   */
+  visemeTrack?: string;
+  /** True while the narration is actually sounding. */
+  visemePlaying?: boolean;
+  /**
+   * The audio player's real position in ms. Native interpolates between these
+   * anchors with its own monotonic clock, so a few updates a second is enough —
+   * and the mouth stays with the audio when the player stalls rather than
+   * free-running past it.
+   */
+  visemePositionMs?: number;
   /** Keep the GLB's own metres instead of normalising it to `modelScale` metres
    *  across. Required for surveyed reconstructions. */
   modelTrueScale?: boolean;
@@ -191,6 +234,8 @@ interface NativeProps {
   walkSpeedMps?: number;
   /** Stop after this many metres. 0 = keep walking. */
   walkDistanceM?: number;
+  /** Keep the placed figure turned towards the visitor (native default true). */
+  faceViewer?: boolean;
   /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
   cloudAnchorsEnabled?: boolean;
   // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -205,6 +250,13 @@ interface NativeProps {
   onDepthOcclusionState?: (event: {nativeEvent: {effective: boolean}}) => void;
   onPlaneDetected?: () => void;
   onTrackingState?: (event: {nativeEvent: {state: string}}) => void;
+  /**
+   * WHY tracking is degraded, as the raw ARCore TrackingFailureReason name, or ''
+   * once it clears. Separate from onARError on purpose: that channel carries prose
+   * which screens render verbatim, so an enum sent down it reached visitors as the
+   * literal text INSUFFICIENT_FEATURES. Translate via features/ar/trackingHint.
+   */
+  onArTrackingFailure?: (event: {nativeEvent: {reason: string}}) => void;
   onAnchorPlaced?: (event: {nativeEvent: {label: string}}) => void;
   onARError?: (event: {nativeEvent: {error: string}}) => void;
   onFrameCaptured?: (event: {nativeEvent: {uri: string}}) => void;
@@ -215,6 +267,7 @@ interface NativeProps {
   // Site-readiness pipeline (PERMANENT).
   onGeospatialAnchorEvent?: (event: {nativeEvent: GeospatialAnchorEvent}) => void;
   onElementTapped?: (event: {nativeEvent: ElementTappedEvent}) => void;
+  onCardTap?: (event: {nativeEvent: CardTapEvent}) => void;
   onAlignmentPoint?: (event: {nativeEvent: AlignmentPointEvent}) => void;
   onThermalStatus?: (event: {nativeEvent: ThermalStatusEvent}) => void;
   /** PHASE 0 — animation clips found on the loaded model. */
@@ -235,15 +288,42 @@ const NativeDetectARView = ((): HostComponent<NativeProps> | null => {
 
 export interface EpocheyeDetectARHandle {
   placeAtScreenPoint: (screenX: number, screenY: number) => void;
+  /**
+   * Start the "follow me" beat: he turns his back and walks `distanceM` at `speedMps`,
+   * then stops, turns to face the viewer again and switches to `arriveClip`.
+   * Speed must match the clip's own ground speed (0.46 m/s for Thoughtful_Walk) or the
+   * feet skate.
+   */
+  walkPath: (
+    distanceM: number,
+    speedMps: number,
+    walkClip: string,
+    arriveClip: string,
+  ) => void;
   /** Place from a detector bbox base-center in IMAGE_NORMALIZED coords (0..1). */
   placeFromDetection: (imgNormX: number, imgNormY: number) => void;
   /**
    * Card-only placement (no 3D model): anchor at an IMAGE_NORMALIZED point and
    * float 1–3 card placards beside it. `cardsJson` is a JSON array of card objects.
+   * A card object carrying `video_url` (+ optional `poster_url`, `muted` default
+   * true, `id`) renders as a video playing on the card in world space; its tap
+   * arrives on `onCardTap` with the URL so JS can open the full-screen player.
    */
   placeCardsOnly: (
     imgNormX: number,
     imgNormY: number,
+    cardsJson: string,
+  ) => void;
+  /**
+   * Card placement at a TAP: same cards, same world-anchoring (depth hit-test at
+   * the point → tracked plane → ahead of the camera → headlocked, never nothing),
+   * but the point is the touch in dp exactly as `placeAtScreenPoint` takes it.
+   * Native does the dp→px and the hit-test; JS cannot map a touch to
+   * IMAGE_NORMALIZED without the camera image's crop and rotation.
+   */
+  placeCardsAtScreenPoint: (
+    screenX: number,
+    screenY: number,
     cardsJson: string,
   ) => void;
   /** Auto-place the model ~1.2 m in front of the camera (dev model-picker). */
@@ -322,6 +402,15 @@ interface Props {
   animationClip?: string;
   /** Grounded card JSON → world-anchored 3D data panel beside the model. */
   cardData?: string;
+  /**
+   * Precomputed viseme track (tools/lipsync_envelope.py output) as a JSON string.
+   * The figure's mouth is seven glTF morph targets; without a track it stays shut.
+   */
+  visemeTrack?: string;
+  /** True while the narration is sounding. False lets the mouth relax closed. */
+  visemePlaying?: boolean;
+  /** The player's real position in ms — send it a few times a second, not per frame. */
+  visemePositionMs?: number;
   /** Keep the GLB's own metres instead of normalising it to `modelScale` metres
    *  across. Required for surveyed reconstructions; without it a 48 m fort renders
    *  at `modelScale` metres wide. */
@@ -332,6 +421,11 @@ interface Props {
   walkSpeedMps?: number;
   /** Stop the walk after this many metres (keeps it inside ARCore's drift radius). */
   walkDistanceM?: number;
+  /**
+   * Keep the placed figure turned towards the visitor. Omit (native default true)
+   * for the existing behaviour; false lets a figure hold its own heading.
+   */
+  faceViewer?: boolean;
   /** DEV harness only — enables ARCore Cloud Anchor mode on the session. */
   cloudAnchorsEnabled?: boolean;
   // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -350,6 +444,8 @@ interface Props {
   onPlaneDetected?: () => void;
   /** ARCore camera tracking state, e.g. 'TRACKING' | 'PAUSED' | 'STOPPED'. */
   onTrackingState?: (state: string) => void;
+  /** Raw ARCore TrackingFailureReason, or '' when it clears. Never render it raw. */
+  onTrackingFailure?: (reason: string) => void;
   onAnchorPlaced?: (label: string) => void;
   onError?: (error: string) => void;
   /** file:// uri of the captured ARCore camera frame. */
@@ -366,6 +462,8 @@ interface Props {
   onGeospatialAnchorEvent?: (event: GeospatialAnchorEvent) => void;
   /** A tap landed on a discovery card or a named part of the reconstruction. */
   onElementTapped?: (event: ElementTappedEvent) => void;
+  /** A tap landed on a recognition placard (video cards carry their URL). */
+  onCardTap?: (event: CardTapEvent) => void;
   /** Result of markAlignmentPoint — two-point alignment. */
   onAlignmentPoint?: (event: AlignmentPointEvent) => void;
   /** Device thermal state changed; `severe` = actively throttling. */
@@ -386,10 +484,14 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       modelScale,
       animationClip,
       cardData,
+      visemeTrack,
+      visemePlaying,
+      visemePositionMs,
       modelTrueScale,
       groundAnchored,
       walkSpeedMps,
       walkDistanceM,
+      faceViewer,
       cloudAnchorsEnabled,
       depthArmed, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       depthOcclusionEnabled, // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -398,6 +500,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       onDepthOcclusionState,
       onPlaneDetected,
       onTrackingState,
+      onTrackingFailure,
       onAnchorPlaced,
       onError,
       onFrameCaptured,
@@ -406,6 +509,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       onGeospatialState, // ADMIN-HARNESS (REMOVE AFTER KONARK)
       onGeospatialAnchorEvent, // site-readiness pipeline (PERMANENT)
       onElementTapped,
+      onCardTap,
       onAlignmentPoint, // site-readiness pipeline (PERMANENT)
       onThermalStatus,
       onModelAnimations, // PHASE 0 skeletal-animation probe
@@ -426,8 +530,10 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       if (!commands) return null;
       return {
         placeAtScreenPoint: commands.placeAtScreenPoint,
+        walkPath: commands.walkPath,
         placeFromDetection: commands.placeFromDetection,
         placeCardsOnly: commands.placeCardsOnly,
+        placeCardsAtScreenPoint: commands.placeCardsAtScreenPoint,
         placeInFront: commands.placeInFront,
         clearAnchor: commands.clearAnchor,
         nudgeYaw: commands.nudgeYaw,
@@ -469,10 +575,23 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
       () => ({
         placeAtScreenPoint: (screenX, screenY) =>
           dispatch(commandIds?.placeAtScreenPoint, [screenX, screenY]),
+        walkPath: (distanceM, speedMps, walkClip, arriveClip) =>
+          dispatch(commandIds?.walkPath, [
+            distanceM,
+            speedMps,
+            walkClip,
+            arriveClip,
+          ]),
         placeFromDetection: (imgNormX, imgNormY) =>
           dispatch(commandIds?.placeFromDetection, [imgNormX, imgNormY]),
         placeCardsOnly: (imgNormX, imgNormY, cardsJson) =>
           dispatch(commandIds?.placeCardsOnly, [imgNormX, imgNormY, cardsJson]),
+        placeCardsAtScreenPoint: (screenX, screenY, cardsJson) =>
+          dispatch(commandIds?.placeCardsAtScreenPoint, [
+            screenX,
+            screenY,
+            cardsJson,
+          ]),
         placeInFront: () => dispatch(commandIds?.placeInFront, []),
         clearAnchor: () => dispatch(commandIds?.clearAnchor, []),
         nudgeYaw: deg => dispatch(commandIds?.nudgeYaw, [deg]),
@@ -524,10 +643,14 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         modelScale={modelScale}
         animationClip={animationClip}
         cardData={cardData}
+        visemeTrack={visemeTrack}
+        visemePlaying={visemePlaying}
+        visemePositionMs={visemePositionMs}
         modelTrueScale={modelTrueScale}
         groundAnchored={groundAnchored}
         walkSpeedMps={walkSpeedMps}
         walkDistanceM={walkDistanceM}
+        faceViewer={faceViewer}
         cloudAnchorsEnabled={cloudAnchorsEnabled}
         depthArmed={depthArmed} // ADMIN-HARNESS (REMOVE AFTER KONARK)
         depthOcclusionEnabled={depthOcclusionEnabled} // ADMIN-HARNESS (REMOVE AFTER KONARK)
@@ -543,6 +666,12 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           onTrackingState
             ? (e: {nativeEvent: {state: string}}) =>
                 onTrackingState(e.nativeEvent.state)
+            : undefined
+        }
+        onArTrackingFailure={
+          onTrackingFailure
+            ? (e: {nativeEvent: {reason: string}}) =>
+                onTrackingFailure(e.nativeEvent.reason)
             : undefined
         }
         onAnchorPlaced={
@@ -592,6 +721,11 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           onElementTapped
             ? (e: {nativeEvent: ElementTappedEvent}) =>
                 onElementTapped(e.nativeEvent)
+            : undefined
+        }
+        onCardTap={
+          onCardTap
+            ? (e: {nativeEvent: CardTapEvent}) => onCardTap(e.nativeEvent)
             : undefined
         }
         onAlignmentPoint={

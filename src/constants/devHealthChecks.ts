@@ -119,8 +119,144 @@ const RIGGED_GLB_MINIMAL_URL = `${KHRONOS_SAMPLES}/RiggedFigure/glTF-Binary/Rigg
 //
 // The Meshy originals are kept in the Tipu.blend file as *__meshy_original actions,
 // and tipu_figure_m.glb remains on CloudFront, so this is reversible.
-const TIPU_FIGURE_MODEL_ID = 'tipu_figure_royal';
+// v2 adds two anatomy fixes found by eye and then confirmed by measurement:
+//   FEET - the walk tracked a single line and actually CROSSED the midline: the left hip
+//   sits at x=+6.8cm but the left foot averaged x=-4.0, so each leg swung ~10cm past
+//   centre. Opening both hips widens the base to a mean 8.8cm (range 5.3-11.9) with no
+//   crossed frame anywhere in the cycle, which is a normal walking base of support. The
+//   ankles are counter-rotated by the same angle so the soles stay flat.
+//   HANDS - the forearms splayed, putting each wrist 6-7cm OUTBOARD of its own elbow.
+//   They now sit ~1cm inboard, so the hands fall along the thighs the way a person's do.
+// The standing and speaking clips keep their original, wider stances - only the walk had
+// the crossing problem, and narrowing the others would have been damage, not repair.
+// v3, rebuilt from the untouched Meshy source rather than layering a fourth correction
+// on top of three. Two faults were still visible on device and both are now measured:
+//   STANCE - v2 stopped the feet CROSSING (-6.0cm, each leg swinging ~10cm past centre)
+//   and set them 8.8cm apart, a true human base of support. It still read as one line,
+//   because a floor-length robe hides the legs and only the feet show. Widened to 13.7cm
+//   mean (10.4-17.1 through the cycle): wider than a real walk, deliberately, so two legs
+//   are legible at AR distance. Ankles counter-rotated by the same angle, soles stay flat.
+//   ARM SWING - the damping that calmed the Meshy arm-flinging went too far and read as
+//   stiff: 21.3cm of swing cut to 12.7cm, a 40% loss. Now 18.5-19.0cm, about 87% of the
+//   original, with the damping factor at 0.90 instead of 0.62. The posture correction is
+//   unaffected; what came back is the motion, not the hunch.
+// Idle and Talk keep their own wider stances - only the walk ever had the crossing fault.
+// v4 rebuilds Idle_02 from the Meshy source because my own earlier passes had damaged it
+// (an unsigned shoulder correction drove the two shoulders 18 cm apart before I caught it).
+// Everything is driven to a MEASURED target rather than dialled in by eye:
+//   KNEES     43 / 39 deg of flex -> 7 deg. The Meshy idle was a half-crouch, which is why
+//             he read as short and sunken. Straightening pushes the feet down in FK, so the
+//             hips are lifted numerically until the toes sit back at their original height.
+//   STANCE    62 cm between the feet -> 16 cm. The source splayed him; straight knees made
+//             that obvious.
+//   ARMS      Driven by CLEARANCE AGAINST THE COSTUME, not against the ribs. The robe is
+//             wide, so arms tucked to the body put the hands INSIDE the cloth (-9 cm on the
+//             left). This is why Meshy splayed them 29-36 deg in the first place. Both hands
+//             now rest ~1-2 cm outside the silhouette.
+//   SWING     Rotating the arms out cost swing amplitude (19 -> 12.6 cm); restored to 17.6.
+// The walk keeps its own knee flexion - walking bends knees, and only the idle was crouched.
+// v5 squares him up and gives him a mouth.
+//   TWIST     The idle carried a 14.2 deg shear between the hip line and the shoulder line
+//             (hips yawed -23.0, shoulders -9.5), left over from my own earlier passes. Fixed
+//             bottom-up: rotate Hips to bring the hip line square, spread the untwist across
+//             Spine02/Spine01/Spine, then align the face with the neck. Now 0.1 deg.
+//   LEAN      An over-correction from the "chest up, neck long" pass had him leaning BACK:
+//             pelvis->chest -7.1 deg, gaze pitched -21.2 deg, head 8.2 cm behind the hips.
+//             Now +1.2 / -0.1 / 0.6 cm.
+//   VISEMES   Seven glTF morph targets - AA, E, I, O, U, MBP, FV - authored as shape keys on
+//             char1 and exported as targets on its single primitive. The rig has NO facial
+//             bones (Head/headfront only), so morph targets are the only route.
+//             Built from measurement, not eyeballing: the mouth was located by sampling the
+//             diffuse texture per vertex, whose painted dark band puts the seam at z=1.395 m
+//             with a 54 mm width - a plausible adult mouth. AA rotates the jaw about a
+//             measured condyle at (0, 0.005, 1.448) so the chin drops AND swings back the way
+//             a real mandible does, rather than translating down.
+//             HONEST LIMIT: the mouth interior is PAINTED texture, not modelled geometry -
+//             there is no cavity behind the lips (~11 mm of crease, no through-hole). Opening
+//             the jaw therefore stretches a closed skin sheet instead of revealing darkness.
+//             At AR distance the moustache moves with the upper lip and reads as the primary
+//             cue, which is why O and E are legible; a wide-open mouth inspected up close is
+//             not. Cutting a real aperture is mesh surgery on unstructured Meshy topology and
+//             is deliberately deferred until the device shows whether it is needed.
+// v6 finishes what v5 started. v5 squared up Idle_02 and I stopped there, which was
+// wrong: Talk_with_Right_Hand_Open is the clip that plays for the WHOLE 35-second
+// welcome, and it carried a hip yaw of +16.2..20.3 deg with the shoulders following at
+// +10.9..18.7 - his entire body stood turned while he spoke to the visitor. Measured
+// off the exported file by forward kinematics, now -1.6..2.4 / -3.0..4.8. The walk's
+// mean was taken out the same way (its remaining -6.6..6.4 swing is the gait itself,
+// which must survive). Only the MEAN is removed, as a constant per-bone offset across
+// every keyframe, so the motion is untouched.
+//
+// TWO BLENDER TRAPS, both of which produced silently wrong results:
+//   1. The depsgraph stopped refreshing `pose.bones[].head` mid-session. Reads kept
+//      succeeding and kept returning a STALE pose, so measurements looked plausible and
+//      were not. Fix: measure the EXPORTED glTF by FK (scratch fk_probe.mjs) and treat
+//      Blender as write-only. Never trust a pose read that has not been proven to move.
+//   2. Actions are SLOTTED in Blender 4.4+. An action bound to the armature WITHOUT a
+//      valid `action_slot` is skipped by the glTF exporter - silently, no warning. That
+//      dropped a whole clip from one export. Clear `animation_data.action = None` before
+//      exporting so the exporter iterates every action on its own terms.
+// v7 is v6's geometry with a CORRUPT FILE fixed. v5 and v6 crashed the app on every
+// journey start - a native SIGSEGV inside libgltfio-jni.so at model LOAD, before any of
+// our own logging ran:
+//     F libc: Fatal signal 11 (SIGSEGV), code 2 (SEGV_ACCERR)
+//     #00 pc 000000000019f82c  libgltfio-jni.so
+//
+// The bug was in the cm->m bake script, not in Blender and not in Filament. Blender
+// exports morph targets as SPARSE accessors (only the vertices that actually move), and
+// a sparse accessor references THREE bufferViews: its own, plus sparse.indices and
+// sparse.values. The script's garbage collector walked mesh attributes, indices, morph
+// targets, inverse bind matrices and animation samplers - but never `accessor.sparse`.
+// So the 14 sparse bufferViews (7 targets x 2) were dropped from the repack AND their
+// indices were left pointing at pre-GC slots. gltfio then read vertex indices out of a
+// buffer that now held something else entirely and dereferenced them:
+//     ACCESSOR_SPARSE_INDEX_OOB  48865 >= 26076
+// royal4 never hit this because it had no morph targets, so it had no sparse accessors.
+//
+// TWO PROCESS LESSONS, both cheap and both skipped:
+//   1. RUN A GLTF VALIDATOR on any programmatically-rewritten GLB.
+//      `npx @gltf-transform/cli validate <file>` named the exact accessor in seconds.
+//      Our own validate_glb.mjs passed it happily - it checks geometry, not structure.
+//   2. Absence of a log line locates a crash ONLY if you check which logs are missing.
+//      The first diagnosis blamed probeMorphTargets because its line never printed; the
+//      PHASE3/PHASE0 lines that run EARLIER were missing too, which is what actually
+//      placed the fault at load time.
+const TIPU_FIGURE_MODEL_ID = 'tipu_figure_royal9';
 const TIPU_FIGURE_URL = buildGlbUrl(TIPU_FIGURE_MODEL_ID);
+
+// COURT FIGURES (Purnaiah, guard, rocketman, Hyder Ali, cavalryman) - built
+// 2026-08-26, delivered to CloudFront under figures/<venue>/. These are NOT the
+// journey host; nothing in the app loads them yet, and these cards exist so they
+// can be proved on a device before any of that is wired.
+//
+// Each ships THREE clips as three separate GLBs (rigged / walk / idle), because
+// Meshy emits one animation per file. The idle is authored in Blender, not bought:
+// the free rig gives walk + run only, and meshy_animate takes an integer action id
+// with no catalogue, so finding an idle means paying to guess (action 1 turned out
+// to be "Walking Woman").
+//
+// CLIP NAMES DIFFER FROM TIPU'S. Tipu carries Idle_02 / Thoughtful_Walk /
+// Talk_with_Right_Hand_Open. These carry exactly one clip each, named 'idle' in the
+// idle file and 'walking_man' in the walk file. Naming the clip explicitly is still
+// right - autoAnimate would play index 0, which happens to be correct here only
+// because there IS just one.
+const COURT_FIGURE_SCALE_M = 1.7;
+const COURT_FIGURES: ReadonlyArray<{
+  key: string;
+  name: string;
+  clip: string;
+  tier: string;
+}> = [
+  {key: 'purnaiah', name: 'Purnaiah', clip: 'idle', tier: 'CC0 Hickey portrait, from life'},
+  {key: 'guard', name: 'Palace guard', clip: 'idle', tier: 'generic - costume CONFIRMED, Feb 1792'},
+  {key: 'rocketman', name: 'Mysore rocketman', clip: 'idle', tier: 'generic - costume CONFIRMED'},
+  {key: 'hyderali', name: 'Hyder Ali', clip: 'idle', tier: 'DISPUTED likeness - see dossier'},
+  {key: 'cavalryman', name: 'Mysore cavalryman', clip: 'idle', tier: 'INFERRED - 82px source'},
+];
+
+function courtFigureUrl(key: string): string | null {
+  return buildGlbUrl(`figures/tipu-summer-palace-bengaluru/${key}_idle`);
+}
 
 // WALK SPEED / DISTANCE - EVIDENCE KEPT AS PROSE, NOT AS CODE.
 //
@@ -267,7 +403,40 @@ async function launchWithMarqueeGlb(
   });
 }
 
+const COURT_FIGURE_CHECKS: HealthCheckItem[] = COURT_FIGURES.map(fig => ({
+  id: `ar-court-${fig.key}`,
+  title: `Court figure - ${fig.name} (idle)`,
+  group: 'Site & AR',
+  launch: {
+    kind: 'action',
+    label: 'Place',
+    run: () => {
+      const url = courtFigureUrl(fig.key);
+      if (!url) {
+        Alert.alert(
+          'No GLB URL',
+          'GLB_BASE_URL is empty - set it in .env to place a court figure.',
+        );
+        return;
+      }
+      // Same ground-anchored path as the Tipu walk card: auto-placed on a real
+      // floor plane, no tapping. groundAnchored matters - without it placement
+      // can accept a vertical wall or a plane above the camera.
+      navigateSafe(ROUTES.MAIN.DETECT_AR, {
+        devDirectGlb: url,
+        devGlbScaleM: COURT_FIGURE_SCALE_M,
+        devAnimationClip: fig.clip,
+        devGroundAnchored: true,
+      });
+    },
+  },
+  requires: 'arcore',
+  howToTest:
+    `${fig.name} - ${fig.tier}. Accept the AR notice, then hold the phone toward the floor and move it slowly side to side until ARCore resolves a plane; the figure auto-places on it. PASS = he stands on the floor at roughly 1.7 m against a chair or a person, arms DOWN at his sides, with a slow 4-second breathing loop - not frozen and not in a T-pose. The banner should report count=1 and the log should name clip "${fig.clip}". A T-pose means the clip did not play; a figure that never appears means the GLB did not load, which for these is the first real test of meshopt + KTX2 decoding in Filament on this device. NOTE: no depiction disclosure on this card by design - it must be restored before any of this ships, and Hyder Ali in particular must never be presented as a documented likeness.`,
+}));
+
 export const HEALTH_CHECKS: HealthCheckItem[] = [
+  ...COURT_FIGURE_CHECKS,
   // ── Entry ────────────────────────────────────────────────────────────────
   {
     id: 'onboarding-auth',
@@ -504,12 +673,54 @@ export const HEALTH_CHECKS: HealthCheckItem[] = [
           devDirectGlb: TIPU_FIGURE_URL,
           devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
           devAnimationClip: 'Thoughtful_Walk',
+          // GROUND-ONLY. Without this the rigged-human path runs doPlaceInFront, whose
+          // first tier tests `Plane && TRACKING && isPoseInPolygon` with NO Plane.Type
+          // filter at all - so a VERTICAL wall passes it - and whose height guard
+          // `lowEnough` is `!dropAnchorToFloor || ...`, which with groundAnchored=false
+          // is unconditionally true, admitting planes ABOVE the camera too. That is why
+          // he anchored to walls and slanted surfaces. groundAnchored routes placement
+          // to placeFigureOnFloor instead, which was built for exactly this and is
+          // already proven on device: HORIZONTAL_UPWARD_FACING only, inside the plane's
+          // own polygon, below the camera, LOWEST candidate wins (so a desk loses to the
+          // floor under it), a table-height hit is refused outright, and the anchor is a
+          // world anchor that survives plane merges. It still AUTO-PLACES - placeInFront
+          // reaches it through doPlaceInFront - so there is no tapping, exactly as with
+          // the rigged human. If no real floor is found NOTHING is placed, which is the
+          // point: a figure on a wall is worse than a figure not yet shown.
+          devGroundAnchored: true,
         });
       },
     },
     requires: 'arcore',
     howToTest:
       'SAME PATH AS THE PHASE 0 RIGGED HUMAN, TIPU INSTEAD OF CESIUMMAN. No tapping: accept the AR notice, then hold the phone toward the floor and move it slowly side to side. The moment ARCore resolves a plane the figure is auto-placed on it (native placeInFront); if no plane appears within 12 s it places anyway rather than leaving the screen empty. PASS = he stands on the floor, roughly 1.70 m against a chair or a person, legs moving in place. The banner should report count=3 clips and the log "PHASE0 playing clip Thoughtful_Walk (index 2 of 3)". If he appears at eye level or in mid-air, the placement fell through to the free-space tier because no plane existed yet - the log line names which tier answered. NOTE: no depiction disclosure on this card by design; it must be restored before any of this ships.',
+  },
+  {
+    id: 'ar-tipu-walk-path',
+    title: 'Tipu figure — WALKS THE PATH (locomotion)',
+    group: 'Site & AR',
+    launch: {
+      kind: 'action',
+      label: 'Walk the path',
+      run: () => {
+        navigateSafe(ROUTES.MAIN.DETECT_AR, {
+          devDirectGlb: TIPU_FIGURE_URL,
+          devGlbScaleM: RIGGED_GLB_TEST_SCALE_M,
+          devAnimationClip: 'Idle_02',
+          devGroundAnchored: true,
+          // 1.5 m, not 4. The 180 degree turn-around is itself an ARC of radius 0.9 m,
+          // which adds ~2.8 m of walking and displaces him 1.8 m sideways - so 4 m of
+          // straight line meant ~6.5 m of travel in total, and in an office that walks
+          // him through the wall into the next room. This keeps the whole beat inside a
+          // single room while still being real locomotion rather than an in-place cycle.
+          devWalkPath: 1.5,
+          devWalkSpeed: 0.46,
+        });
+      },
+    },
+    requires: 'arcore',
+    howToTest:
+      'REAL LOCOMOTION, not the in-place cycle. He appears facing you, stands for ~1.8 s, then turns his back and walks 4 m away at 0.46 m/s before stopping and turning to face you again. WATCH THE FEET: 0.46 m/s is measured off the clip itself (planted toe tracked through stance in Blender, 0.455 left / 0.464 right), so the planted foot should stay put on the floor. If it slides, the speed and the clip disagree and the number is wrong. WATCH THE COACHING: as he nears the edge of frame an arrow should appear BEFORE he leaves it, and past 6 m you should get "Follow him" instead — that one does not pause narration, because he may be talking as he leads. Log lines: "walkPath: 4.0 m at 0.46 m/s" then "walkPath: arrived after 4.00 m - turning back".',
   },
   {
     id: 'ar-tipu-speak',

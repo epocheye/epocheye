@@ -44,7 +44,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Svg, {Circle} from 'react-native-svg';
-import {ArrowRight, Eye, Footprints, ShieldCheck, Users} from 'lucide-react-native';
+import {
+  ArrowRight,
+  Eye,
+  Footprints,
+  RefreshCw,
+  ShieldCheck,
+  Users,
+} from 'lucide-react-native';
 import {useTranslation} from 'react-i18next';
 
 import {COLORS, FONTS, GOLD_GRADIENT} from '../../core/constants/theme';
@@ -72,10 +79,18 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 /** The three policy points, in the order the warning presents them. */
+// The first three are the Play families-policy points. The fourth is not a policy
+// requirement — it is an honesty one. This screen is the last thing shown before the
+// camera opens on EVERY AR surface, and until now the app implied AR simply works.
+// It frequently does not: a dark room, a plain wall, a fast pan or a warm phone all
+// lose tracking, and the visitor was left with an empty feed and no explanation.
+// Saying so once here means the live banner that follows is a promise kept, not a
+// surprise.
 const POINTS = [
   {key: 'supervise', Icon: Users},
   {key: 'surroundings', Icon: Eye},
   {key: 'movement', Icon: Footprints},
+  {key: 'reliability', Icon: RefreshCw},
 ] as const;
 
 /**
