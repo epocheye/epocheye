@@ -60,6 +60,8 @@ import { useVoiceInput } from '../../shared/hooks';
 import { useSafeGoBack } from '../../shared/hooks/useSafeGoBack';
 import { AppAlert } from '../../shared/ui/appAlert';
 import MarkdownText from '../../components/ui/MarkdownText';
+import OfflineInline from '../../components/ui/OfflineInline';
+import { useNetwork } from '../../context/NetworkContext';
 import { AnimatedWaveform, AiThinkingIndicator } from './components/AiThinking';
 import { analytics } from '../../services/analytics';
 
@@ -79,6 +81,9 @@ const FLAME = '#CBA862';
 const AiGuideScreen: React.FC<Props> = ({ route }) => {
   const { t } = useTranslation();
   const { slug, siteName, heroImageUrl } = route.params;
+  // The guide streams from the backend, so it cannot answer at all offline. The
+  // header (and its back button) stays mounted either way.
+  const { isOffline } = useNetwork();
 
   const [siteDetail, setSiteDetail] = useState<SiteDetail | null>(null);
   const [messages, setMessages] = useState<ChatBubble[]>([]);
@@ -298,6 +303,12 @@ const AiGuideScreen: React.FC<Props> = ({ route }) => {
     !streamingText &&
     faqSuggestions.length > 0;
 
+  // Offline with nothing said yet (just the welcome bubble) → replace the body
+  // with the notice. Mid-conversation, keep the transcript on screen — it's
+  // still worth reading — and let the disabled input plus the chrome banner
+  // explain why nothing new can be sent.
+  const offlineEmpty = isOffline && messages.length <= 1;
+
   const hasText = input.trim().length > 0;
   const statusText = voice.isListening
     ? t('guide.statusListening')
@@ -356,27 +367,31 @@ const AiGuideScreen: React.FC<Props> = ({ route }) => {
       <View style={styles.divider} />
 
       <KeyboardAvoidingView behavior="padding" style={styles.flexFill}>
-        <FlatList
-          ref={listRef}
-          data={messages}
-          keyExtractor={item => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          ListFooterComponent={
-            <FooterArea
-              streamingText={streamingText}
-              isStreaming={isStreaming}
-              error={error}
-              onRetry={handleRetry}
-            />
-          }
-          onContentSizeChange={() =>
-            listRef.current?.scrollToEnd({ animated: true })
-          }
-        />
+        {offlineEmpty ? (
+          <OfflineInline message={t('offline.guideMessage')} />
+        ) : (
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={item => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            ListFooterComponent={
+              <FooterArea
+                streamingText={streamingText}
+                isStreaming={isStreaming}
+                error={error}
+                onRetry={handleRetry}
+              />
+            }
+            onContentSizeChange={() =>
+              listRef.current?.scrollToEnd({ animated: true })
+            }
+          />
+        )}
 
         {/* TRY ASKING chips (Figma 240:40-50) */}
-        {showSuggestions ? (
+        {showSuggestions && !isOffline ? (
           <View style={styles.suggestionsBlock}>
             <Text style={styles.tryAsking}>{t('guide.tryAsking')}</Text>
             <View style={styles.chipsGrid}>
@@ -408,7 +423,7 @@ const AiGuideScreen: React.FC<Props> = ({ route }) => {
               })}
               placeholderTextColor="#898888"
               style={styles.textInput}
-              editable={!isStreaming}
+              editable={!isStreaming && !isOffline}
               multiline
               returnKeyType="send"
               onSubmitEditing={handleSendPress}
@@ -416,7 +431,7 @@ const AiGuideScreen: React.FC<Props> = ({ route }) => {
             />
             <Pressable
               onPress={handlePrimaryPress}
-              disabled={isStreaming}
+              disabled={isStreaming || isOffline}
               accessibilityRole="button"
               accessibilityLabel={
                 voice.isListening
@@ -428,7 +443,7 @@ const AiGuideScreen: React.FC<Props> = ({ route }) => {
               style={[
                 styles.primaryButton,
                 voice.isListening && styles.primaryButtonActive,
-                isStreaming && styles.primaryButtonDisabled,
+                (isStreaming || isOffline) && styles.primaryButtonDisabled,
               ]}>
               {voice.isListening ? (
                 <Square size={16} color="#FFFFFF" fill="#FFFFFF" />

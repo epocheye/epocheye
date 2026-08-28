@@ -12,6 +12,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft,
   Check,
@@ -32,6 +33,8 @@ import {
 } from '../../utils/api/explorer-pass';
 import { useExplorerPass, useExplorerPassPurchase } from '../../shared/hooks';
 import { usePlacesStore } from '../../stores/placesStore';
+import OfflineInline from '../../components/ui/OfflineInline';
+import { useNetwork } from '../../context/NetworkContext';
 import { getSites } from '../../utils/api/places';
 import type { SiteDetail } from '../../utils/api/places';
 import { formatPlaceType } from '../../shared/utils/formatters';
@@ -176,9 +179,13 @@ const PlaceSelectCard: React.FC<PlaceSelectCardProps> = React.memo(
 PlaceSelectCard.displayName = 'PlaceSelectCard';
 
 const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
+  const { t } = useTranslation();
   const preSelectedPlaceId = route.params?.preSelectedPlaceId;
 
   const currentLocation = usePlacesStore(s => s.currentLocation);
+  // Checkout needs a live connection (quote + Razorpay + backend confirm). The
+  // rest of the screen stays browsable; only the purchase itself is blocked.
+  const { isOffline } = useNetwork();
   const [sites, setSites] = useState<SiteDetail[]>([]);
   const [sitesLoading, setSitesLoading] = useState(true);
   const [siteSearch, setSiteSearch] = useState('');
@@ -310,6 +317,9 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handlePurchase = useCallback(async () => {
     if (selectedCount === 0) return;
+    // The button is already disabled offline; this covers connectivity dropping
+    // between render and press, so we never open Razorpay with no network.
+    if (isOffline) return;
     const placeIds = Array.from(selectedPlaceIds);
     const pass = await purchase(placeIds, {
       durationHours: isBundle ? durationHours : undefined,
@@ -323,6 +333,7 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
     appliedCoupon,
     durationHours,
     isBundle,
+    isOffline,
     navigation,
     purchase,
     refreshPasses,
@@ -594,8 +605,8 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
               <View className="flex-row gap-2">
                 <TextInput
                   value={couponInput}
-                  onChangeText={t => {
-                    setCouponInput(t.toUpperCase());
+                  onChangeText={text => {
+                    setCouponInput(text.toUpperCase());
                     if (couponResult) setCouponResult(null);
                   }}
                   placeholder="Enter code"
@@ -635,11 +646,14 @@ const PurchaseScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Purchase button */}
           <Animated.View entering={FadeInDown.delay(250).duration(350)}>
+            {isOffline ? (
+              <OfflineInline compact message={t('offline.purchaseMessage')} />
+            ) : null}
             <TouchableOpacity
               onPress={handlePurchase}
-              disabled={purchasing || selectedCount === 0 || !quote}
+              disabled={purchasing || selectedCount === 0 || !quote || isOffline}
               className={`py-4 rounded-2xl items-center justify-center flex-row gap-2 ${
-                selectedCount === 0 || !quote ? 'opacity-45' : ''
+                selectedCount === 0 || !quote || isOffline ? 'opacity-45' : ''
               }`}
               style={{ backgroundColor: '#B8923F' }}
               accessibilityRole="button"

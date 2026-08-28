@@ -9,9 +9,9 @@ import {
 } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AppNavigator from './src/navigation';
-import { NetworkProvider, useNetwork } from './src/context';
-import NoInternetScreen from './src/screens/NoInternetScreen';
+import { NetworkProvider } from './src/context';
 import DialogHost from './src/components/ui/DialogHost';
+import OfflineBanner from './src/components/ui/OfflineBanner';
 import TourHost from './src/components/tour/TourHost';
 import TourErrorBoundary from './src/components/tour/TourErrorBoundary';
 import ErrorBoundary from './src/components/ui/ErrorBoundary';
@@ -39,23 +39,6 @@ try {
 // Crash/stability journal: global JS error + rejection handlers and the
 // native-crash breadcrumb. Module scope so it's live before first render.
 initCrashJournal();
-
-/**
- * Main app content that handles network state
- */
-const AppContent: React.FC = () => {
-  const { isConnected, isInternetReachable } = useNetwork();
-
-  // Show offline screen when there's no internet
-  // isInternetReachable can be null initially, so we check for explicit false
-  const isOffline = isConnected === false || isInternetReachable === false;
-
-  if (isOffline) {
-    return <NoInternetScreen />;
-  }
-
-  return <AppNavigator />;
-};
 
 export default function App() {
   const authenticated = useSessionStore(s => s.authenticated);
@@ -98,8 +81,18 @@ export default function App() {
           {/* Root boundary: convert an uncaught render/lifecycle error from a
               silent app close into a calm, recoverable screen (logs to logcat). */}
           <ErrorBoundary resetLabel="Try again">
-            <AppContent />
+            {/* The navigator stays mounted regardless of connectivity. Swapping it
+                for an offline screen unmounts every screen — losing cached content,
+                the nav stack, in-flight forms and any open camera session. Offline
+                is a condition screens degrade under (useNetwork().isOffline), not
+                an app state. */}
+            <AppNavigator />
           </ErrorBoundary>
+          {/* Chrome-level offline strip. Inside NetworkProvider (it reads the
+              context) and before DialogHost so a transient toast layers above it.
+              Mounted here rather than in MainNavigation so it also covers the
+              onboarding and login navigator states. */}
+          <OfflineBanner />
         </NetworkProvider>
         {/* Global heritage-styled dialog + toast host — overlays every screen. */}
         <DialogHost />

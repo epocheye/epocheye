@@ -6,6 +6,13 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!--
+      The restoration before/after is SHARED, never written to the photo library:
+      the composite lives in the app cache and goes straight to the share sheet
+      via react-native-share (which supplies its own FileProvider). That is why
+      there are no storage permissions here — nothing of ours leaves the sandbox
+      except through a share the user initiates.
+    -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />

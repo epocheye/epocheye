@@ -77,13 +77,15 @@ import {streamMuseumNarration} from '../../services/museumModeService';
 import {fetchObjectCard, type ObjectCard} from '../../services/detectorResolver';
 import {useVenueGate} from '../../shared/hooks/useVenueGate';
 import {useARSafetyGate} from '../../shared/hooks/useARSafetyGate';
-import {useMuseumPrefsStore} from '../../stores/museumPrefsStore';
+import {useNarrationLang} from '../../stores/museumPrefsStore';
 import {usePlacesStore} from '../../stores/placesStore';
 import {analytics} from '../../services/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import GroundedObjectCard from './components/GroundedObjectCard';
 import AiGuessCard from './components/AiGuessCard';
 import ScanGuideOverlay, {type ScanPhase} from './components/ScanGuideOverlay';
+import OfflineInline from '../../components/ui/OfflineInline';
+import {useNetwork} from '../../context/NetworkContext';
 import ARActivationOverlay from '../../components/ui/ARActivationOverlay';
 import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
 import ArSessionBanner from '../../components/ui/ArSessionBanner';
@@ -393,7 +395,7 @@ function buildGroundedArCards(card: ObjectCard): string {
 function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
   const [resolved, setResolved] = useState<ResolvedState>({kind: 'idle'});
   // Narration content language (en/hi/bn) — passed to the museum-mode stream.
-  const narrationLang = useMuseumPrefsStore(s => s.narrationLang);
+  const narrationLang = useNarrationLang();
   // Free scans left at this venue after the latest serve (null when ungated/dev).
   const [remaining, setRemaining] = useState<number | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
@@ -1025,6 +1027,9 @@ const DetectARNative: React.FC<{
   showAdminHarness = false,
 }) => {
   const {t} = useTranslation();
+  // Recognition needs the backend, so scanning is blocked offline — but the
+  // camera stays mounted (see OfflineScanOverlay).
+  const {isOffline} = useNetwork();
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const arRef = useRef<EpocheyeDetectARHandle>(null);
@@ -1514,6 +1519,7 @@ const DetectARNative: React.FC<{
 
       <ScanGuideOverlay phase={scanPhase} ready={tracking} />
 
+      {isOffline ? <OfflineScanOverlay /> : null}
       {/* Live AR health, in plain words. Until now this screen showed the raw ARCore
           enum in the message bubble and had no idea the phone was throttling at all. */}
       <ArSessionBanner
@@ -1714,8 +1720,11 @@ planes=${frameStats.planes} · why=${frameStats.trackingWhy}${
           {!devCloudAnchor && (
             <Pressable
               onPress={handleDetect}
-              disabled={detecting}
-              style={[styles.detectButton, detecting && styles.detectButtonBusy]}>
+              disabled={detecting || isOffline}
+              style={[
+                styles.detectButton,
+                (detecting || isOffline) && styles.detectButtonBusy,
+              ]}>
               {detecting ? (
                 <ActivityIndicator color="#1A0F00" />
               ) : (
@@ -1753,6 +1762,8 @@ const DetectAR2D: React.FC<{
   allowUngrounded?: boolean;
 }> = ({venueSlug, onClose, allowUngrounded = false}) => {
   const {t} = useTranslation();
+  // Same as the native path: block scanning, keep the camera session alive.
+  const {isOffline} = useNetwork();
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const cameraRef = useRef<VisionCamera | null>(null);
@@ -1846,6 +1857,8 @@ const DetectAR2D: React.FC<{
 
       <ScanGuideOverlay phase={scanPhase} />
 
+      {isOffline ? <OfflineScanOverlay /> : null}
+
       <SafeAreaView style={styles.topOverlay} edges={['top']} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">
           <Pressable onPress={onClose} hitSlop={12} style={styles.iconButton}>
@@ -1896,8 +1909,11 @@ const DetectAR2D: React.FC<{
 
         <Pressable
           onPress={handleDetect}
-          disabled={busy}
-          style={[styles.detectButton, busy && styles.detectButtonBusy]}>
+          disabled={busy || isOffline}
+          style={[
+            styles.detectButton,
+            (busy || isOffline) && styles.detectButtonBusy,
+          ]}>
           {busy ? (
             <ActivityIndicator color="#1A0F00" />
           ) : (
@@ -1918,7 +1934,32 @@ const DetectAR2D: React.FC<{
   );
 };
 
+/**
+ * Offline cue for the scan screen. Recognition posts a frame to the backend, so
+ * it cannot run without a connection — but the camera session stays MOUNTED and
+ * active behind this overlay. Tearing a vision-camera session down on a
+ * connectivity blip is exactly the unmount-on-offline behaviour the app moved
+ * away from, and it is the class of bug that produced the MapView crash.
+ *
+ * box-none so the close button and the (disabled) scan button underneath stay
+ * reachable — going offline must never trap the user in the camera.
+ */
+const OfflineScanOverlay: React.FC = () => {
+  const {t} = useTranslation();
+  return (
+    <View style={styles.offlineScanOverlay} pointerEvents="box-none">
+      <OfflineInline message={t('offline.scanMessage')} />
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
+  offlineScanOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10,10,12,0.72)',
+  },
   root: {flex: 1, backgroundColor: '#000000'},
   noArBackdrop: {backgroundColor: '#0A0A0A'},
   topOverlay: {position: 'absolute', top: 0, left: 0, right: 0},

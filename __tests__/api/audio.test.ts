@@ -23,7 +23,18 @@ function stop(
   order: number,
   zone: string | null | undefined,
 ): AudioStop {
-  return { stop_key: key, title: key, sort_order: order, zone };
+  return {
+    stop_key: key,
+    title: key,
+    sort_order: order,
+    // The wire cannot send null here — model.go declares Zone as *string with
+    // `,omitempty`, so a NULL column is omitted rather than serialised as null,
+    // and AudioStop.zone is typed `?: string` to say so. groupStopsByZone is
+    // nonetheless defensive about null, and that defence is worth a test, so
+    // this ONE field is constructed past the type rather than the type being
+    // widened to a shape the server can never produce.
+    zone: zone as string | undefined,
+  };
 }
 
 describe('listAudioStops', () => {

@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Eye,
   Footprints,
+  Headphones,
   Share2,
   Sparkles,
   Shield,
@@ -44,6 +45,14 @@ import { isMagicWindowAvailable } from '../../native/EpocheyeMagicWindowView';
 import { MAGIC_WINDOW_SLUG } from '../../features/magicwindow/viewpoints';
 import { ROUTES } from '../../core/constants';
 import { listViewingStations } from '../../utils/api/ar';
+import { getAudioStops } from '../../utils/api/audio';
+import { shouldShowAudioCta } from '../../shared/utils/audioGuide';
+import {
+  useMuseumPrefsStore,
+  useNarrationLang,
+} from '../../stores/museumPrefsStore';
+import { useVenueGate } from '../../shared/hooks/useVenueGate';
+import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 import { analytics } from '../../services/analytics';
 import { canBeginJourney } from './journey/journeyConfig';
 import { useJourneyGate } from './journey/useJourneyGate';
@@ -313,6 +322,51 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     analytics.track('magic_window_opened', {slug: magicWindowSlug});
     navigation.navigate(ROUTES.MAIN.MAGIC_WINDOW);
   }, [navigation, magicWindowSlug]);
+
+  // Audio guide: probe for stops the same way hasReconstruction probes for
+  // viewing stations. The CTA is on-site only (the guide is meant to be walked),
+  // with an admin bypass so the screen is reachable for testing from anywhere.
+  const audioLang = useNarrationLang();
+  const audioPersona = useMuseumPrefsStore(s => s.narrationPersona);
+  const {inVenue, venueSlug: activeVenueSlug} = useVenueGate();
+  const isAdminClaim = useIsAdmin();
+  const [hasAudioGuide, setHasAudioGuide] = useState(false);
+  useEffect(() => {
+    const slug = siteDetail?.slug ?? site.id;
+    if (!slug) {
+      return;
+    }
+    let cancelled = false;
+    void getAudioStops(slug, audioLang, audioPersona).then(res => {
+      if (!cancelled && res.success) {
+        setHasAudioGuide((res.data.stops ?? []).length > 0);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [siteDetail?.slug, site.id, audioLang, audioPersona]);
+
+  // ADMIN-HARNESS (REMOVE AFTER KONARK) — accept EITHER admin signal: the
+  // is_admin JWT claim or the ADMIN_EMAILS allowlist. They are separate
+  // mechanisms and only one may apply to a given test account. Neither is a
+  // security boundary — /api/v1/audio/stops is plain user-auth and returns the
+  // same data to everyone — so this only decides who sees the button.
+  const audioAdminBypass = isAdminClaim || isAdminUser(profile?.email);
+  const showAudioCta = shouldShowAudioCta({
+    hasStops: hasAudioGuide,
+    atThisVenue:
+      inVenue && !!activeVenueSlug &&
+      activeVenueSlug === (siteDetail?.slug ?? site.id),
+    adminBypass: audioAdminBypass,
+  });
+  const handleAudioGuide = useCallback(() => {
+    const slug = siteDetail?.slug ?? site.id;
+    navigation.navigate(ROUTES.MAIN.AUDIO_GUIDE, {
+      venueSlug: slug,
+      siteName: siteDetail?.name ?? site.name,
+    });
+  }, [navigation, siteDetail, site]);
 
   // Record a site view once per opened site (the auto screen_view carries no slug).
   useEffect(() => {
@@ -595,6 +649,28 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 className="text-brand-gold font-display"
                 style={{fontSize: moderateScale(20)}}>
                 See the reconstruction
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {showAudioCta && (
+            <TouchableOpacity
+              onPress={handleAudioGuide}
+              activeOpacity={0.9}
+              className="flex-row items-center justify-center gap-2"
+              style={{
+                height: moderateScale(53),
+                borderRadius: moderateScale(30),
+                borderWidth: 1,
+                borderColor: '#C9A84C',
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('audioGuide.listenCta')}>
+              <Headphones color="#C9A84C" size={18} />
+              <Text
+                className="text-brand-gold font-display"
+                style={{fontSize: moderateScale(20)}}>
+                {t('audioGuide.listenCta')}
               </Text>
             </TouchableOpacity>
           )}

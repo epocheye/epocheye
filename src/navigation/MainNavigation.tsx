@@ -12,6 +12,8 @@ import AiGuideScreen from '../screens/Main/AiGuideScreen';
 import DetectArScreen from '../screens/Main/DetectArScreen';
 import GoToVenueScreen from '../screens/Main/GoToVenueScreen';
 import SuggestSiteScreen from '../screens/Main/SuggestSiteScreen';
+import AudioGuideScreen from '../screens/Main/AudioGuideScreen';
+import RestorationScreen from '../screens/Main/RestorationScreen';
 import VenueActivationBanner from '../components/VenueActivationBanner';
 import DailyNudgeBanner from '../components/DailyNudgeBanner';
 import UpdateAvailableBanner from '../components/UpdateAvailableBanner';
@@ -151,6 +153,26 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         {props => (
           <ErrorBoundary onReset={() => props.navigation.goBack()}>
             <SuggestSiteScreen />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
+      <Stack.Screen
+        name={ROUTES.MAIN.AUDIO_GUIDE}
+        options={{ animation: 'slide_from_right' }}
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <AudioGuideScreen {...props} />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
+      <Stack.Screen
+        name={ROUTES.MAIN.RESTORATION}
+        options={{ animation: 'fade', presentation: 'fullScreenModal' }}
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <RestorationScreen {...props} />
           </ErrorBoundary>
         )}
       </Stack.Screen>
