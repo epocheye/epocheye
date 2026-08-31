@@ -15,6 +15,15 @@ declare module '@env' {
    * audio can move to its own origin without touching models.
    */
   export const AUDIO_BASE_URL: string;
+  /**
+   * CDN base for object-card media (video, stills): same bucket/distribution as
+   * GLB_BASE_URL today, `media/` prefix. Built as {MEDIA_BASE_URL}/{key}; an
+   * absolute media_url bypasses it. Declared separately from AUDIO_BASE_URL for
+   * the same reason that one is separate from GLB_BASE_URL — video is the
+   * heaviest thing this app serves and is the most likely to want its own
+   * origin.
+   */
+  export const MEDIA_BASE_URL: string;
   /** "true"/"1" to surface the admin-only Capture Anchor entry in Settings. Off by default (never shown in production builds). */
   export const ENABLE_ANCHOR_CAPTURE: string;
 }

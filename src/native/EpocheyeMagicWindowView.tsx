@@ -75,12 +75,19 @@ export interface MagicWindowWalk {
   right: number;
 }
 
-/** A figure standing in the fort, in the authored plan frame. */
+/** A figure standing in the scene, in that scene's authored plan frame. */
 export interface MagicWindowFigure {
   uri: string;
   east: number;
   north: number;
-  /** Compass bearing the figure FACES. */
+  /**
+   * Floor level the figure stands on, metres. Optional and 0 by default, which
+   * is the fort's only floor. The palace is two-storey in the same frame - its
+   * ground colonnade is 0.0 and the darbar hall floor is 2.60 - so a figure
+   * upstairs must say so or it stands through the floor.
+   */
+  up?: number;
+  /** Bearing the figure FACES, in the same convention as the viewpoint's. */
   heading: number;
 }
 
@@ -122,6 +129,37 @@ export interface MagicWindowRigProbeEvent {
   advancing: boolean;
 }
 
+/**
+ * ORIENTATION TELEMETRY, debug builds only.
+ *
+ * Emitted ~4x/second plus a burst on recenter. It exists because the palace
+ * scene pointed at the ground from every viewpoint and every explanation was a
+ * guess: `fwd` is the vector actually handed to the Filament camera, and `pos`
+ * must NOT change while the device only rotates.
+ *
+ * Held upright and level, `fwdY` should be near 0. Near -1 means the camera is
+ * looking at the nadir and the basis conversion is at fault.
+ */
+/** Live compass heading of the view, degrees, 0 = +Y of the model frame. */
+export interface MagicWindowHeadingEvent {
+  headingDeg: number;
+}
+
+export interface MagicWindowCameraDebugEvent {
+  fwdX: number;
+  fwdY: number;
+  fwdZ: number;
+  posX: number;
+  posY: number;
+  posZ: number;
+  displayRotation: number;
+  remapBranch: string;
+  movedOnRotate: boolean;
+  /** World-space vertical span of the loaded model. */
+  modelMinY: number;
+  modelMaxY: number;
+}
+
 interface NativeProps {
   style?: ViewStyle;
   glbUri?: string;
@@ -133,11 +171,27 @@ interface NativeProps {
   timelineState?: number;
   assaultStep?: number;
   fogEnabled?: boolean;
+  /**
+   * Per-scene fog, metres: [start, halfExtinction]. Omitted keeps the native
+   * default, which is Bangalore Fort's 150/1100 — inert in a 140 m interior.
+   */
+  fog?: readonly [number, number];
   onModelLoaded?: (event: {nativeEvent: MagicWindowModelLoadedEvent}) => void;
   onLoadError?: (event: {nativeEvent: MagicWindowLoadErrorEvent}) => void;
   onFigureTapped?: (event: {nativeEvent: MagicWindowFigureTappedEvent}) => void;
   onDriftSample?: (event: {nativeEvent: MagicWindowDriftEvent}) => void;
   onRigProbe?: (event: {nativeEvent: MagicWindowRigProbeEvent}) => void;
+  /**
+   * Linear RGB sky for a scene whose GLB carries no dome. Omit it and the
+   * model supplies its own sky (Bangalore Fort does).
+   */
+  skyColor?: [number, number, number];
+  /** Per-scene exposure multiplier. Omit (or 1) to leave lighting alone. */
+  lightScale?: number;
+  onHeading?: (event: {nativeEvent: MagicWindowHeadingEvent}) => void;
+  onCameraDebug?: (event: {
+    nativeEvent: MagicWindowCameraDebugEvent;
+  }) => void;
 }
 
 const NativeMagicWindowView = ((): HostComponent<NativeProps> | null => {
@@ -185,6 +239,10 @@ const EpocheyeMagicWindowView = forwardRef<
     onFigureTapped,
     onDriftSample,
     onRigProbe,
+    onCameraDebug,
+    skyColor,
+    lightScale,
+    onHeading,
   },
   ref,
 ) => {
@@ -234,6 +292,10 @@ const EpocheyeMagicWindowView = forwardRef<
       onFigureTapped={onFigureTapped}
       onDriftSample={onDriftSample}
       onRigProbe={onRigProbe}
+      onCameraDebug={onCameraDebug}
+      skyColor={skyColor}
+      lightScale={lightScale}
+      onHeading={onHeading}
     />
   );
 });

@@ -37,7 +37,12 @@ import { useArSessionHealth } from '../../../shared/hooks/useArSessionHealth';
 import { prepareImageForGemini } from '../../../services/geminiVisionService';
 import { recognize } from '../../../services/recognizeService';
 import { fetchObjectCard } from '../../../services/detectorResolver';
-import { JOURNEY_TEST_VIDEO_URL, getOrFetchMedia } from '../../../services/mediaCache';
+import {
+  JOURNEY_TEST_VIDEO_URL,
+  buildMediaUrl,
+  getOrFetchMedia,
+} from '../../../services/mediaCache';
+import { listObjectMedia } from '../../../utils/api/objects';
 import { analytics } from '../../../services/analytics';
 import { ROUTES } from '../../../core/constants';
 import type { MainStackParamList } from '../../../core/types/navigation.types';
@@ -317,18 +322,57 @@ const PointLearnStep: React.FC<Props> = ({
           return;
         }
 
-        // DEV-ONLY HOOK: exercise the video-card path on anything called a
-        // pillar until real card video exists. Served from the media cache when
-        // the lawn pre-cache saved it, else streamed by the native player.
-        // JOURNEY_TEST_VIDEO_URL is null outside a dev build, so this whole block
-        // is dead in release and flipping JOURNEY_OPEN_TO_ALL cannot ship an
-        // ffmpeg test pattern onto a heritage pillar.
+        // REAL CARD MEDIA. object_media (migration 090) is the row the video
+        // card was always waiting for; until it existed the only thing feeding
+        // the native VideoNode path was a colour-bar test pattern matched on the
+        // word "pillar".
+        //
+        // Keyed on class_id, so it only fires for a result with a catalogued
+        // object behind it — an AI-interpretation card has nothing to attach
+        // media to. Failure is silent: a card with no video is the normal case,
+        // not an error worth interrupting a visitor for.
         let videoUri: string | null = null;
-        if (JOURNEY_TEST_VIDEO_URL && titleMentionsPillar(title)) {
+        let mediaTitle = '';
+        let disclosure = '';
+        if (result.class_id) {
+          const res = await listObjectMedia(slug, result.class_id);
+          if (controller.signal.aborted) return;
+          if (res.success) {
+            const clip = res.data.media.find(m => m.media_type === 'video');
+            const url = buildMediaUrl(clip?.media_url);
+            if (clip && url) {
+              videoUri = await getOrFetchMedia(url);
+              if (controller.signal.aborted) return;
+              mediaTitle = clip.title ?? '';
+              // A GENERATED ASSET NEVER PLAYS WITHOUT ITS DISCLOSURE. The
+              // database refuses to store one without it; this is the other half
+              // of that promise. If the text is somehow absent the video simply
+              // does not play — an unlabelled generated image of a Tipu sword is
+              // the one thing this whole feature must not produce.
+              if (clip.is_generated) {
+                disclosure = clip.disclosure ?? '';
+                if (!disclosure) videoUri = null;
+              }
+            }
+          }
+        }
+
+        // DEV-ONLY FALLBACK, and only until real media is seeded: exercise the
+        // video-card path on anything called a pillar. JOURNEY_TEST_VIDEO_URL is
+        // null outside a dev build, so this is dead in release and flipping
+        // JOURNEY_OPEN_TO_ALL cannot ship a test pattern onto a heritage pillar.
+        if (!videoUri && JOURNEY_TEST_VIDEO_URL && titleMentionsPillar(title)) {
           videoUri = await getOrFetchMedia(JOURNEY_TEST_VIDEO_URL);
           if (controller.signal.aborted) return;
         }
-        cards = withDevVideoCard(cards, title, videoUri, t('journey.explore.watch'));
+        cards = withDevVideoCard(
+          cards,
+          mediaTitle || title,
+          videoUri,
+          t('journey.explore.watch'),
+          undefined,
+          disclosure,
+        );
 
         pendingCardsRef.current = { json: JSON.stringify(cards), title };
         setMessage(null);

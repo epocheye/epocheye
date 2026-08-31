@@ -23,7 +23,7 @@ import {
   unlink,
 } from '@dr.pogodin/react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AUDIO_BASE_URL } from '@env';
+import { AUDIO_BASE_URL, MEDIA_BASE_URL } from '@env';
 import { STORAGE_KEYS } from '../core/constants/storage-keys';
 import { cacheGlbUrl, getCachedGlbUri, getOrFetchGlb } from './glbCache';
 
@@ -62,6 +62,20 @@ export function joinMediaUrl(
  */
 export function buildAudioUrl(keyOrUrl: string | null | undefined): string | null {
   return joinMediaUrl(AUDIO_BASE_URL, keyOrUrl);
+}
+
+/**
+ * Resolve an object-media reference (`object_media.media_url` / `poster_url`,
+ * migration 090) against MEDIA_BASE_URL. Same contract as buildAudioUrl and the
+ * same joiner: the backend serves a relative CDN key, the client decides the
+ * origin, and an absolute URL passes through untouched.
+ *
+ * Deliberately built on `joinMediaUrl` and NOT on the other `buildAudioUrl` in
+ * config/glbDelivery.ts — that one takes a non-nullable string, and every
+ * caller here is reading an optional column off a card.
+ */
+export function buildMediaUrl(keyOrUrl: string | null | undefined): string | null {
+  return joinMediaUrl(MEDIA_BASE_URL, keyOrUrl);
 }
 
 /**

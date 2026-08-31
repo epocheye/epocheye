@@ -173,8 +173,16 @@ export function withDevVideoCard(
   videoUrl: string | null,
   watchLabel: string,
   posterUrl?: string | null,
+  disclosure?: string,
 ): ArCard[] {
-  if (!videoUrl || !titleMentionsPillar(title)) return cards;
+  // THE PILLAR TEST NO LONGER GATES REAL MEDIA. It was the dev hook's way of
+  // limiting a colour-bar test pattern to one harmless subject. Media that came
+  // from object_media was authored against this exact object, so gating it on
+  // the word "pillar" would hide every real clip. The dev pattern still passes
+  // through the same check, because JOURNEY_TEST_VIDEO_URL is the only thing
+  // that reaches here without a disclosure or a title of its own.
+  if (!videoUrl) return cards;
+  if (!disclosure && !titleMentionsPillar(title)) return cards;
   const videoCard: ArCard = {
     id: JOURNEY_VIDEO_CARD_ID,
     continuation: true,
@@ -182,6 +190,11 @@ export function withDevVideoCard(
     narrative: title,
     video_url: videoUrl,
     ...(posterUrl ? { poster_url: posterUrl } : {}),
+    // Carried on the card itself so the renderer cannot draw the video without
+    // it. A generated asset that reached here has a non-empty disclosure by
+    // construction: the DB refuses to store one without (migration 090) and
+    // PointLearnStep drops the video if it is somehow missing.
+    ...(disclosure ? { disclosure } : {}),
   };
   return [...capCards(cards, MAX_AR_CARDS - 1), videoCard];
 }

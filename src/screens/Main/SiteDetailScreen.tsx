@@ -42,7 +42,10 @@ import { resolveSiteImageSource } from '../../shared/utils/localSiteImages';
 import { moderateScale } from '../../utils/scaling';
 import { isAdminUser } from '../../shared/auth/isAdminUser';
 import { isMagicWindowAvailable } from '../../native/EpocheyeMagicWindowView';
-import { MAGIC_WINDOW_SLUG } from '../../features/magicwindow/viewpoints';
+import {
+  getMagicWindowScene,
+  hasMagicWindow,
+} from '../../features/magicwindow/scenes';
 import { ROUTES } from '../../core/constants';
 import { listViewingStations } from '../../utils/api/ar';
 import { getAudioStops } from '../../utils/api/audio';
@@ -313,14 +316,24 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   //    evidence dispute: this circuit is ~7% smaller than the enceinte already
   //    live on CloudFront, so the product would otherwise show two Bangalore
   //    Forts of different sizes. Open it up once that is settled.
+  //
+  // TWO SITES NOW. Tipu Sultan's Summer Palace joins Bangalore Fort, and the
+  // scene is chosen by slug rather than by having a second screen — see
+  // features/magicwindow/scenes.ts. The palace stays admin-gated for its first
+  // release for its own reason, not the fort's: its facade length is still
+  // DISPUTED between three derivations (satellite 33.5 m, OSM 35.1 m,
+  // photographs 29-33 m, deliberately not averaged) and the painted decoration
+  // is a reconstruction of the idiom rather than a record of any room. Open it
+  // up when a tape measurement lands.
   const magicWindowSlug = siteDetail?.slug ?? site.id;
+  const magicWindowScene = getMagicWindowScene(magicWindowSlug);
   const showMagicWindow =
-    magicWindowSlug === MAGIC_WINDOW_SLUG &&
+    hasMagicWindow(magicWindowSlug) &&
     isMagicWindowAvailable &&
     isAdminUser(profile?.email);
   const handleMagicWindow = useCallback(() => {
     analytics.track('magic_window_opened', {slug: magicWindowSlug});
-    navigation.navigate(ROUTES.MAIN.MAGIC_WINDOW);
+    navigation.navigate(ROUTES.MAIN.MAGIC_WINDOW, {slug: magicWindowSlug});
   }, [navigation, magicWindowSlug]);
 
   // Audio guide: probe for stops the same way hasReconstruction probes for
@@ -622,12 +635,12 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 borderColor: '#C9A84C',
               }}
               accessibilityRole="button"
-              accessibilityLabel="See it as it stood, 1791">
+              accessibilityLabel={magicWindowScene.ctaLabel}>
               <Eye color="#CBA862" size={18} />
               <Text
                 className="text-brand-gold font-display"
                 style={{fontSize: moderateScale(20)}}>
-                See it as it stood, 1791
+                {magicWindowScene.ctaLabel}
               </Text>
             </TouchableOpacity>
           )}

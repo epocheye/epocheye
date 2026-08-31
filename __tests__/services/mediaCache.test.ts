@@ -43,6 +43,8 @@ jest.mock('../../src/services/glbCache', () => ({
 }));
 
 import {
+  buildAudioUrl,
+  buildMediaUrl,
   cacheMediaUrl,
   clearMediaCache,
   extensionFor,
@@ -51,6 +53,7 @@ import {
   joinMediaUrl,
   prefetchMedia,
 } from '../../src/services/mediaCache';
+import { AUDIO_BASE_URL, MEDIA_BASE_URL } from '@env';
 
 const AUDIO = 'https://cdn.example.com/audio/tipu/palace_overview_en_casual.mp3';
 const VIDEO = 'https://cdn.example.com/test/journey_test_pattern.mp4?v=2';
@@ -97,6 +100,45 @@ describe('joinMediaUrl', () => {
     expect(joinMediaUrl('https://cdn.example.com', null)).toBeNull();
     expect(joinMediaUrl(undefined, 'audio/x.mp3')).toBeNull();
     expect(joinMediaUrl('   ', 'audio/x.mp3')).toBeNull();
+  });
+});
+
+/**
+ * buildMediaUrl resolves object_media.media_url (migration 090) the same way
+ * buildAudioUrl resolves audio_clips.audio_url — a relative CDN key against a
+ * configured base, an absolute URL untouched.
+ *
+ * `@env` is the static test mock and defines NEITHER base, which is the useful
+ * case rather than a gap: it proves an absolute media_url still resolves with no
+ * CDN configured, and that a relative key correctly yields null instead of a
+ * half-formed "/media/x.mp4" that would 404 at play time.
+ */
+describe('buildMediaUrl', () => {
+  it('matches joinMediaUrl(MEDIA_BASE_URL, key)', () => {
+    expect(buildMediaUrl('media/tipu/hilt.mp4')).toBe(
+      joinMediaUrl(MEDIA_BASE_URL, 'media/tipu/hilt.mp4'),
+    );
+  });
+
+  it('resolves an absolute media url with no CDN base configured', () => {
+    expect(buildMediaUrl('https://other.example/hilt.mp4')).toBe(
+      'https://other.example/hilt.mp4',
+    );
+  });
+
+  it('returns null for an empty or absent media_url', () => {
+    expect(buildMediaUrl('')).toBeNull();
+    expect(buildMediaUrl(null)).toBeNull();
+    expect(buildMediaUrl(undefined)).toBeNull();
+  });
+
+  it('is a separate origin from audio, not an alias of it', () => {
+    // The two bases are declared separately so video — the heaviest thing this
+    // app serves — can move origin without touching audio. If someone collapses
+    // them into one constant this test still passes when they happen to be
+    // equal, so it asserts the wiring, not the value.
+    expect(buildMediaUrl('k.mp4')).toBe(joinMediaUrl(MEDIA_BASE_URL, 'k.mp4'));
+    expect(buildAudioUrl('k.mp3')).toBe(joinMediaUrl(AUDIO_BASE_URL, 'k.mp3'));
   });
 });
 

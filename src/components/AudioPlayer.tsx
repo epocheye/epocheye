@@ -94,6 +94,22 @@ interface AudioPlayerProps {
    * from the progress callback alone.
    */
   onPausedChange?: (paused: boolean) => void;
+  /**
+   * Hold playback without touching the visitor's own play/pause choice.
+   *
+   * Separate from the internal `paused` state on purpose. The magic window
+   * plays a viewpoint's narration continuously, and when the visitor taps a
+   * figure that figure speaks over it; the clip has to duck and then carry on
+   * from where it was. Unmounting would lose the position - `the_lost_colour`
+   * runs 105 s - and there is no imperative handle on this component to stop
+   * it with. Raising this leaves `paused` alone, so when it drops the clip
+   * resumes exactly as the visitor left it, with the button still showing what
+   * they chose.
+   *
+   * Reported through `onPausedChange` as well, because a watchdog watching for
+   * a stall must not read a deliberate duck as a dead player.
+   */
+  suspended?: boolean;
   /** Passthrough of the player's own <Video> callback, called after this
    *  component's bookkeeping (so `duration` here is already up to date). */
   onLoad?: (data: OnLoadData) => void;
@@ -113,6 +129,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   autoPlay = false,
   sourceKey,
   onPausedChange,
+  suspended = false,
   onLoad,
   onProgress,
   onEnd,
@@ -155,8 +172,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   // autoPlay the very first thing the caller needs to know is that sound has
   // started without anybody tapping anything.
   useEffect(() => {
-    callbacks.current.onPausedChange?.(paused);
-  }, [paused]);
+    callbacks.current.onPausedChange?.(paused || suspended);
+  }, [paused, suspended]);
 
   // Reset transient state whenever the source changes. This component is
   // designed to be kept mounted across sources (one player instance), so
@@ -326,7 +343,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       <Video
         ref={videoRef}
         source={{ uri }}
-        paused={paused}
+        paused={paused || suspended}
         rate={rate}
         onProgress={handleProgress}
         onLoad={handleLoad}

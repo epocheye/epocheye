@@ -205,7 +205,7 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
       >
         {props => (
           <ErrorBoundary onReset={() => props.navigation.goBack()}>
-            <MagicWindowScreen />
+            <MagicWindowScreen {...props} />
           </ErrorBoundary>
         )}
       </Stack.Screen>

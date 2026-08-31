@@ -53,6 +53,7 @@ import type { AudioStop, AudioStopsResponse } from '../../../utils/api/audio';
 import useAudioCompletion, {
   type AudioCompletionReason,
 } from './useAudioCompletion';
+import { viewpointForStop } from '../../../features/magicwindow/tour';
 import {
   GhostButton,
   JOURNEY_GOLD,
@@ -84,6 +85,13 @@ interface Props {
   /** Stop to resume at (journeyStore.lastStopKey); null starts from the first. */
   initialStopKey: string | null;
   onStopChange: (stopKey: string) => void;
+  /**
+   * Open the magic window at the viewpoint that stands where this stop is
+   * heard. A CALLBACK rather than a useNavigation() call inside the step,
+   * because every other step here takes props in and hands callbacks out — the
+   * parent owns the machine and owns the navigator. Omitted = no link shown.
+   */
+  onOpenReconstruction?: (viewpointId: string) => void;
   onContinue: () => void;
 }
 
@@ -159,6 +167,7 @@ const AudioGuideStep: React.FC<Props> = ({
   onRetry,
   initialStopKey,
   onStopChange,
+  onOpenReconstruction,
   onContinue,
 }) => {
   const { t } = useTranslation();
@@ -187,6 +196,12 @@ const AudioGuideStep: React.FC<Props> = ({
   }, [ordered, initialStopKey]);
 
   const current = ordered[Math.min(index, Math.max(0, ordered.length - 1))];
+
+  // The magic-window viewpoint that stands where this stop is heard, if any.
+  const mwViewpointId = viewpointForStop(
+    stops?.monument_id,
+    current?.stop.stop_key,
+  );
   const next = ordered[index + 1];
   const isLast = ordered.length > 0 && index >= ordered.length - 1;
 
@@ -538,6 +553,23 @@ const AudioGuideStep: React.FC<Props> = ({
             <Text style={journeyStyles.eyebrow}>{t('journey.guide.transcript')}</Text>
             <Text style={journeyStyles.body}>{clip.transcript}</Text>
           </View>
+        ) : null}
+
+        {/* THE ROOM THIS STOP IS ABOUT, RECONSTRUCTED. The magic window has a
+            viewpoint standing exactly where each stop is heard, and until now
+            the two shipped as unconnected screens. Passing the viewpoint means
+            the visitor lands looking at the right thing instead of at a list of
+            eight place names.
+
+            No extra gate: entry to the journey is already admin-only
+            (canBeginJourney -> isAdminUser), the same gate SiteDetail puts on
+            the magic window. viewpointForStop returns undefined for any venue
+            without a magic window, so this simply does not render elsewhere. */}
+        {mwViewpointId && onOpenReconstruction ? (
+          <GhostButton
+            label={t('journey.guide.seeReconstruction')}
+            onPress={() => onOpenReconstruction(mwViewpointId)}
+          />
         ) : null}
 
         {next && next.zone !== current.zone ? (

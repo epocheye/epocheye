@@ -62,6 +62,31 @@ class EpocheyeMagicWindowViewManager(
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onModelLoaded", event)
         }
+        view.onCameraDebug = {
+            fx, fy, fz, px, py, pz, rot, branch, moved, minY, maxY ->
+            val event = Arguments.createMap().apply {
+                putDouble("fwdX", fx.toDouble())
+                putDouble("fwdY", fy.toDouble())
+                putDouble("fwdZ", fz.toDouble())
+                putDouble("posX", px.toDouble())
+                putDouble("posY", py.toDouble())
+                putDouble("posZ", pz.toDouble())
+                putInt("displayRotation", rot)
+                putString("remapBranch", branch)
+                putBoolean("movedOnRotate", moved)
+                putDouble("modelMinY", minY.toDouble())
+                putDouble("modelMaxY", maxY.toDouble())
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onCameraDebug", event)
+        }
+        view.onHeading = { deg ->
+            val event = Arguments.createMap().apply {
+                putDouble("headingDeg", deg.toDouble())
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onHeading", event)
+        }
         view.onFigureTapped = { distancePx ->
             val event = Arguments.createMap().apply {
                 putDouble("distancePx", distancePx.toDouble())
@@ -124,7 +149,9 @@ class EpocheyeMagicWindowViewManager(
     }
 
     /**
-     * A figure standing in the fort: {uri, east, north, heading}.
+     * A figure standing in the scene: {uri, east, north, up, heading}.
+     * `up` is the floor level in metres and defaults to 0, which is the fort's
+     * only floor; the palace needs it because its darbar hall is at 2.60 m.
      *
      * Atomic, like `viewpoint`, and for the same reason - a half-applied figure
      * could momentarily put one person at another's position.
@@ -132,13 +159,13 @@ class EpocheyeMagicWindowViewManager(
     @ReactProp(name = "figure")
     fun setFigure(view: EpocheyeMagicWindowView, fig: ReadableMap?) {
         if (fig == null) {
-            view.setFigure(null, 0f, 0f, 0f)
+            view.setFigure(null, 0f, 0f, 0f, 0f)
             return
         }
         fun f(k: String) = if (fig.hasKey(k)) fig.getDouble(k).toFloat() else 0f
         view.setFigure(
             if (fig.hasKey("uri")) fig.getString("uri") else null,
-            f("east"), f("north"), f("heading"),
+            f("east"), f("north"), f("up"), f("heading"),
         )
     }
 
@@ -183,6 +210,38 @@ class EpocheyeMagicWindowViewManager(
         view.setFogEnabled(enabled)
     }
 
+    /**
+     * Linear RGB sky for scenes whose GLB carries no dome. Omit it and the model
+     * supplies its own sky, which is what Bangalore Fort does.
+     */
+    @ReactProp(name = "skyColor")
+    fun setSkyColor(view: EpocheyeMagicWindowView, c: ReadableArray?) {
+        view.setSkyColor(
+            if (c == null || c.size() < 3) null
+            else floatArrayOf(
+                c.getDouble(0).toFloat(),
+                c.getDouble(1).toFloat(),
+                c.getDouble(2).toFloat(),
+            ),
+        )
+    }
+
+    /** Per-scene exposure. 1.0 leaves the fort's lighting untouched. */
+    @ReactProp(name = "lightScale", defaultFloat = 1.0f)
+    fun setLightScale(view: EpocheyeMagicWindowView, v: Float) {
+        view.setLightScale(v)
+    }
+
+    /**
+     * Per-scene fog, metres: [start, halfExtinction]. A 140 m interior and a
+     * 3 km fort cannot share one distance — see EpocheyeMagicWindowView.setFog.
+     */
+    @ReactProp(name = "fog")
+    fun setFog(view: EpocheyeMagicWindowView, fog: ReadableArray?) {
+        if (fog == null || fog.size() < 2) return
+        view.setFog(fog.getDouble(0).toFloat(), fog.getDouble(1).toFloat())
+    }
+
     @ReactProp(name = "viewpoint")
     fun setViewpoint(view: EpocheyeMagicWindowView, vp: ReadableMap?) {
         if (vp == null) return
@@ -222,6 +281,8 @@ class EpocheyeMagicWindowViewManager(
             .put("onFigureTapped", MapBuilder.of("registrationName", "onFigureTapped"))
             .put("onDriftSample", MapBuilder.of("registrationName", "onDriftSample"))
             .put("onRigProbe", MapBuilder.of("registrationName", "onRigProbe"))
+            .put("onCameraDebug", MapBuilder.of("registrationName", "onCameraDebug"))
+            .put("onHeading", MapBuilder.of("registrationName", "onHeading"))
             .build()
     }
 }

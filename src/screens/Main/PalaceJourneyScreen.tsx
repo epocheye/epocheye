@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 
 import ARSafetyNotice from '../../components/ui/ARSafetyNotice';
 import ARCapabilityNotice from '../../components/ui/ARCapabilityNotice';
+import { ROUTES } from '../../core/constants/routes';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 import { useSafeBackHandler, useSafeGoBack } from '../../shared/hooks/useSafeGoBack';
 import {
@@ -42,6 +43,10 @@ import {
   type PrefetchSummary,
 } from '../../services/mediaCache';
 import { listAudioStops, type AudioStopsResponse } from '../../utils/api/audio';
+import {
+  useMuseumPrefsStore,
+  useNarrationLang,
+} from '../../stores/museumPrefsStore';
 import {
   JOURNEY_STEPS,
   currentStepId,
@@ -71,8 +76,12 @@ import {
 type Props = MainScreenProps<'PalaceJourney'>;
 
 /** Kannada is out of scope for the slice; the guide is served in English. */
-const GUIDE_LANG = 'en';
-const GUIDE_PERSONA = 'casual';
+// MERGE CASUALTY, fixed. `main` and ota/ar-safety-v21 both rewrote
+// museumPrefsStore; v3 survived with narrationLangOverride + narrationPersona,
+// and SiteDetailScreen and AudioGuideScreen both carry those through to
+// /api/v1/audio/stops. This screen kept a hard-coded pair, so a Hindi or Bengali
+// visitor on the palace journey was served English 'casual' clips whatever they
+// had chosen in Settings. Read the store like the other two callers do.
 
 /**
  * zustand's persist hydrates from AsyncStorage asynchronously. Until it has,
@@ -93,9 +102,13 @@ function useJourneyHydrated(): boolean {
 type CameraState = 'unknown' | 'granted' | 'denied';
 type ResumeOffer = 'pending' | 'shown' | 'decided';
 
-const PalaceJourneyScreen: React.FC<Props> = ({ route }) => {
+const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
   const { t } = useTranslation();
   const slug = route.params.slug;
+  // The visitor's own narration settings, resolved exactly as
+  // SiteDetailScreen and AudioGuideScreen resolve them.
+  const guideLang = useNarrationLang();
+  const guidePersona = useMuseumPrefsStore(st => st.narrationPersona);
   const host = useMemo(() => journeyHostFor(slug), [slug]);
 
   // ---- Progress (persisted per venue) ----
@@ -184,7 +197,7 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route }) => {
   const [stops, setStops] = useState<AudioStopsResponse | null>(null);
   const loadStops = useCallback(async () => {
     setStopsStatus('loading');
-    const res = await listAudioStops(slug, { lang: GUIDE_LANG, persona: GUIDE_PERSONA });
+    const res = await listAudioStops(slug, { lang: guideLang, persona: guidePersona });
     if (res.success) {
       setStops(res.data);
       setStopsStatus('ready');
@@ -193,7 +206,7 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route }) => {
       setStops(null);
       setStopsStatus('error');
     }
-  }, [slug]);
+  }, [slug, guideLang, guidePersona]);
   useEffect(() => {
     if (acknowledged) void loadStops();
   }, [acknowledged, loadStops]);
@@ -239,6 +252,22 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route }) => {
     },
     [slug, completeStep],
   );
+  /**
+   * Hand off to the magic window at the viewpoint standing where the current
+   * stop is heard. The two screens have been siblings with no link between them
+   * since both were written; the visitor heard about the darbar hall and then
+   * had to find it again in a list of eight place names.
+   *
+   * No extra gate: entry to this screen is already admin-only through
+   * canBeginJourney, the same gate SiteDetail puts on the magic window.
+   */
+  const openReconstruction = useCallback(
+    (viewpointId: string) => {
+      navigation.navigate(ROUTES.MAIN.MAGIC_WINDOW, { slug, viewpointId });
+    },
+    [navigation, slug],
+  );
+
   const finishJourney = useCallback(() => {
     advanceFrom('explore');
     setDone(true);
@@ -468,6 +497,7 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route }) => {
           onRetry={() => void loadStops()}
           initialStopKey={progress.lastStopKey}
           onStopChange={handleStopChange}
+          onOpenReconstruction={openReconstruction}
           onContinue={() => advanceFrom('guide')}
         />
       );

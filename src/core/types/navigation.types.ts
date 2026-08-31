@@ -152,11 +152,17 @@ export type MainStackParamList = {
    */
   PalaceJourney: {slug: string};
   /**
-   * Camera-off, gyroscope-driven reconstruction. Takes no params: it is one
-   * authored experience for one site, and its viewpoints live in
-   * src/features/magicwindow/viewpoints.ts rather than in the route.
+   * Magic window — camera-off, gyroscope-driven reconstruction.
+   *
+   * `slug` picks the scene; omitted = Bangalore Fort.
+   *
+   * `viewpointId` opens straight at one viewpoint and skips the guided tour,
+   * for a caller that already knows where the visitor is — today that is the
+   * journey's audio guide, whose stop maps 1:1 onto a viewpoint. Unknown ids
+   * are ignored rather than throwing, so a stop with no viewpoint just opens
+   * the tour.
    */
-  MagicWindow: undefined;
+  MagicWindow: {slug?: string; viewpointId?: string} | undefined;
 };
 
 /**

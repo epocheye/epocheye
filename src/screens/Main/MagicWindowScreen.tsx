@@ -18,6 +18,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
+  Image,
   PanResponder,
   Pressable,
   ScrollView,
@@ -46,15 +47,16 @@ import EpocheyeMagicWindowView, {
   type MagicWindowFigureTappedEvent,
   type MagicWindowDriftEvent,
   type MagicWindowRigProbeEvent,
+  type MagicWindowCameraDebugEvent,
+  type MagicWindowHeadingEvent,
 } from '../../native/EpocheyeMagicWindowView';
+import {toNativeViewpoint} from '../../features/magicwindow/viewpoints';
 import {
-  MAGIC_WINDOW_LEGEND,
-  MAGIC_WINDOW_MODEL_ID,
-  MAGIC_WINDOW_VIEWPOINTS,
-  toNativeViewpoint,
-} from '../../features/magicwindow/viewpoints';
+  getMagicWindowScene,
+  type MagicWindowScene,
+} from '../../features/magicwindow/scenes';
 import {
-  MAGIC_WINDOW_PEOPLE,
+  peopleFor,
   RIG_TEST_MODEL_ID,
   RIG_TEST_PLACEMENT,
   type MagicWindowPerson,
@@ -69,6 +71,22 @@ import {
   speak,
   stopSpeaking,
 } from '../../native/EpocheyeSpeech';
+import AudioPlayer from '../../components/AudioPlayer';
+import {listAudioStops} from '../../utils/api/audio/Audio';
+import type {AudioStopsResponse} from '../../utils/api/audio/types';
+import {
+  buildAudioUrl,
+  getOrFetchMedia,
+  prefetchMedia,
+} from '../../services/mediaCache';
+import {
+  useMuseumPrefsStore,
+  useNarrationLang,
+} from '../../stores/museumPrefsStore';
+import {tourFor, type TourStop} from '../../features/magicwindow/tour';
+import {roomPhotoFor} from '../../features/magicwindow/roomPhotos';
+import PalacePlanIndicator from '../../features/magicwindow/PalacePlanIndicator';
+import {TEXTURE_CREDITS} from '../../features/magicwindow/palace';
 import {ASSAULT} from '../../features/magicwindow/assault';
 import {FORT_STATES} from '../../features/magicwindow/timeline';
 import {resolveModelGlb} from '../../services/glbSource';
@@ -90,20 +108,28 @@ import {COLORS, FONTS, RADIUS, SPACING} from '../../core/constants/theme';
  * the largest dimension to a target of a metre or two. That must never ship
  * silently, because a 0.5 m fort still looks like a fort.
  */
-const EXPECTED_SCENE_SPAN_M = 3000;
 const SCALE_TOLERANCE = 0.25;
-
-/** The circuit itself: 443.5 m east-west by 576.5 m north-south (2b x 2a). */
-const CIRCUIT_EW_M = 443.5;
-const CIRCUIT_NS_M = 576.5;
 
 /** Radius of the walk pad, in points. */
 const STICK_R = 46;
 const ZERO_WALK = {forward: 0, right: 0} as const;
 
-const MagicWindowScreen: React.FC = () => {
+interface MagicWindowScreenProps {
+  route?: {params?: {slug?: string; viewpointId?: string}};
+}
+
+const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
   const safeGoBack = useSafeBackHandler();
   const viewRef = useRef<EpocheyeMagicWindowHandle>(null);
+
+  // ONE screen, several sites. Everything site-specific — the model, the
+  // viewpoints, the legend, and which of the fort-only affordances exist at all
+  // — comes from the scene registry. See features/magicwindow/scenes.ts for why
+  // this is a registry rather than a second copy of this file.
+  const scene: MagicWindowScene = useMemo(
+    () => getMagicWindowScene(route?.params?.slug),
+    [route?.params?.slug],
+  );
 
   const [glbUri, setGlbUri] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
@@ -111,13 +137,43 @@ const MagicWindowScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [scaleWarning, setScaleWarning] = useState<string | null>(null);
 
-  const viewpoint = MAGIC_WINDOW_VIEWPOINTS[index];
+  // ---- THE GUIDED TOUR ----------------------------------------------------
+  //
+  // The rail of viewpoint names was the visitor interface and it should never
+  // have been: choosing the right chip needs you to already know which room you
+  // are in. The tour leads instead. It cannot SENSE where the visitor is - see
+  // features/magicwindow/tour.ts for the three sensing routes and why each one
+  // fails indoors - so it says where to walk and the visitor confirms.
+  const tour = useMemo(() => tourFor(scene.slug), [scene.slug]);
+  const [tourIndex, setTourIndex] = useState(0);
+  /** The visitor has said "I'm here" for the CURRENT tour stop. */
+  const [arrived, setArrived] = useState(false);
+  /** Stops walked past without confirming, so progress can say so honestly. */
+  const [skipped, setSkipped] = useState<string[]>([]);
+  // A caller that already knows where the visitor is (the journey's audio guide,
+  // whose stop maps 1:1 onto a viewpoint) opens straight at it and skips the
+  // tour. An unknown id is ignored rather than throwing.
+  const routeViewpointId = route?.params?.viewpointId;
+  const [tourActive, setTourActive] = useState(
+    () => tour.length > 0 && !routeViewpointId,
+  );
+  useEffect(() => {
+    if (!routeViewpointId) return;
+    const i = scene.viewpoints.findIndex(v => v.id === routeViewpointId);
+    if (i >= 0) setIndex(i);
+  }, [routeViewpointId, scene.viewpoints]);
+
+  const tourStop: TourStop | undefined = tourActive
+    ? tour[tourIndex]
+    : undefined;
+
+  const viewpoint = scene.viewpoints[index];
 
   // SITE MODE. When the visitor is actually standing at Bangalore Fort, their
   // real position drives the camera. Off-site it is inert, and the on-screen pad
   // does the walking instead — see useSiteWalk for why that boundary exists.
   const [siteMode, setSiteMode] = useState(false);
-  const site = useSiteWalk(siteMode);
+  const site = useSiteWalk(siteMode && scene.hasSiteWalk);
 
   const nativeViewpoint = useMemo(() => {
     const base = toNativeViewpoint(viewpoint);
@@ -138,7 +194,7 @@ const MagicWindowScreen: React.FC = () => {
       try {
         // Reuse the existing resolver: CloudFront → on-device LRU cache →
         // bundled fallback. No bespoke fetching here.
-        const uri = await resolveModelGlb(MAGIC_WINDOW_MODEL_ID);
+        const uri = await resolveModelGlb(scene.modelId);
         if (cancelled) return;
         if (!uri) {
           setError('The reconstruction is not available on this device yet.');
@@ -152,11 +208,46 @@ const MagicWindowScreen: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [scene.modelId]);
 
   // PHASE 4 blocking test. Admin-only, and reported rather than assumed: a rig
   // can load with animations present and never tick, which looks exactly like a
   // static mesh.
+  // ORIENTATION HUD. Debug + admin only, and it exists for one reason: the
+  // palace scene pointed at the ground from every viewpoint and every
+  // explanation offered for it was a hypothesis. `fwd` is the vector actually
+  // handed to the Filament camera; `pos` must not move while the device only
+  // rotates. Held upright and level, fwdY near 0 means the basis is right and
+  // fwdY near -1 means the camera is aimed at the nadir.
+  const [camDebug, setCamDebug] = useState<MagicWindowCameraDebugEvent | null>(
+    null,
+  );
+  const onCameraDebug = useCallback(
+    ({nativeEvent}: {nativeEvent: MagicWindowCameraDebugEvent}) => {
+      setCamDebug(nativeEvent);
+    },
+    [],
+  );
+
+  // WHERE AM I. The palace is five identical bays of colonnade, so from inside
+  // it one stop looks much like another; the rail names them only while you are
+  // reading it and the caption scrolls away. Heading comes from the native view,
+  // derived from the same forward vector that aims the camera.
+  const [headingDeg, setHeadingDeg] = useState<number | null>(null);
+  const [planOpen, setPlanOpen] = useState(false);
+  const onHeading = useCallback(
+    ({nativeEvent}: {nativeEvent: MagicWindowHeadingEvent}) => {
+      setHeadingDeg(nativeEvent.headingDeg);
+    },
+    [],
+  );
+
+  // IMAGE CREDITS. A licence obligation, not a nicety: the palace's painted
+  // wall ships as a photograph of the real surface under CC BY 2.0, which
+  // requires attribution. Shown on demand rather than permanently so it does
+  // not compete with the view, but always reachable from the legend.
+  const [creditsOpen, setCreditsOpen] = useState(false);
+
   const [rigTest, setRigTest] = useState(false);
   const [rigResult, setRigResult] = useState<string | null>(null);
   const onRigProbe = useCallback(
@@ -173,7 +264,24 @@ const MagicWindowScreen: React.FC = () => {
   // Deliberately non-blocking and failure-tolerant: if the person cannot be
   // fetched the fort still opens. A missing model must never cost you the site.
   const [figure, setFigure] = useState<MagicWindowFigure | null>(null);
-  const person: MagicWindowPerson | undefined = MAGIC_WINDOW_PEOPLE[0];
+  // Whose figure this is depends on the SITE, not on a fixed index. It was
+  // MAGIC_WINDOW_PEOPLE[0] — the fort's Tipu — which would have put him in the
+  // palace's darbar hall the moment the palace grew a figure.
+  // peopleFor(...)[0] was hardcoded, so a site could only ever have one
+  // figure however many were authored (the fort has two). Pick the first who
+  // can actually be seen from where the visitor is standing, and fall back to
+  // the first authored so a scene never silently loses its figure.
+  const people = useMemo(
+    () => (scene.hasFigure ? peopleFor(scene.slug) : []),
+    [scene.hasFigure, scene.slug],
+  );
+  const person: MagicWindowPerson | undefined = useMemo(
+    () =>
+      people.find(
+        pp => !pp.visibleFrom || pp.visibleFrom.includes(viewpoint.id),
+      ) ?? people[0],
+    [people, viewpoint.id],
+  );
   useEffect(() => {
     if (!person) return;
     let cancelled = false;
@@ -190,6 +298,7 @@ const MagicWindowScreen: React.FC = () => {
                 uri,
                 east: person.position[0],
                 north: person.position[1],
+                up: person.floorM ?? 0,
                 heading: person.headingDeg,
               },
         );
@@ -251,14 +360,14 @@ const MagicWindowScreen: React.FC = () => {
         // Standing in the right place is part of the account.
         const vpId = ASSAULT[next - 1].viewpoint;
         if (vpId) {
-          const i = MAGIC_WINDOW_VIEWPOINTS.findIndex(x => x.id === vpId);
+          const i = scene.viewpoints.findIndex(x => x.id === vpId);
           if (i >= 0) setIndex(i);
         }
         setStateId(3); // the fort as it stood, with the siege marked on it
       }
       return next;
     });
-  }, []);
+  }, [scene.viewpoints]);
 
   const [lineIndex, setLineIndex] = useState<number | null>(null);
   const [everSpoke, setEverSpoke] = useState(false);
@@ -283,6 +392,80 @@ const MagicWindowScreen: React.FC = () => {
       stopSpeaking();
     };
   }, []);
+
+  // ---- VIEWPOINT NARRATION -------------------------------------------------
+  //
+  // Eight stops were written, recorded and applied for this site and none of
+  // them could be heard here: they play in AudioGuideScreen, so standing in the
+  // darbar hall gave silence. Each viewpoint now names an `audio_stops.stop_key`
+  // (emitted from the build, see STOP_KEY in build_palace_magicwindow.py) and
+  // arriving at it plays that clip.
+  //
+  // Deliberately the EXISTING audio path and not a second one: the same
+  // `listAudioStops` the guide and the journey call, the same lang/persona
+  // resolution, the same mediaCache, and the same <AudioPlayer/>. A scene whose
+  // viewpoints carry no stopKey (the fort) fetches nothing at all.
+  const narrationLang = useNarrationLang();
+  const narrationPersona = useMuseumPrefsStore(st => st.narrationPersona);
+  const [stops, setStops] = useState<AudioStopsResponse | null>(null);
+  const hasNarration = useMemo(
+    () => scene.viewpoints.some(v => v.stopKey),
+    [scene.viewpoints],
+  );
+  useEffect(() => {
+    if (!hasNarration) return;
+    let cancelled = false;
+    void listAudioStops(scene.slug, {
+      lang: narrationLang,
+      persona: narrationPersona,
+    }).then(res => {
+      if (cancelled) return;
+      // Silence on failure. Narration is an addition to this screen, not its
+      // deliverable, and an error banner over a reconstruction is worse than
+      // no sound.
+      setStops(res.success ? res.data : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasNarration, scene.slug, narrationLang, narrationPersona]);
+
+  const stopForView = useMemo(() => {
+    if (!viewpoint.stopKey || !stops) return undefined;
+    return stops.stops.find(st => st.stop_key === viewpoint.stopKey);
+  }, [stops, viewpoint.stopKey]);
+
+  // Warm the whole site's audio once, so moving along the rail does not stall
+  // on a download each time. Never throws; failures just mean a stream.
+  useEffect(() => {
+    if (!stops) return;
+    const urls = stops.stops.map(st => buildAudioUrl(st.clip?.audio_url));
+    const controller = new AbortController();
+    void prefetchMedia(urls, {signal: controller.signal});
+    return () => controller.abort();
+  }, [stops]);
+
+  // Prefer the cached copy, fall back to the CDN so the first visit still plays.
+  const [clipUri, setClipUri] = useState<string | null>(null);
+  useEffect(() => {
+    const url = buildAudioUrl(stopForView?.clip?.audio_url);
+    if (!url) {
+      setClipUri(null);
+      return;
+    }
+    let cancelled = false;
+    void getOrFetchMedia(url)
+      .then(u => {
+        if (!cancelled) setClipUri(u);
+      })
+      .catch(() => {
+        if (!cancelled) setClipUri(url);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [stopForView]);
+
   const advance = useCallback(() => {
     if (!person) return;
     setEverSpoke(true);
@@ -307,7 +490,7 @@ const MagicWindowScreen: React.FC = () => {
       setReady(true);
       const {sizeEastM, sizeNorthM, sizeUpM} = nativeEvent;
       const span = Math.max(sizeEastM, sizeNorthM, sizeUpM);
-      const ratio = span / EXPECTED_SCENE_SPAN_M;
+      const ratio = span / scene.sceneSpanM;
       if (ratio < 1 - SCALE_TOLERANCE || ratio > 1 + SCALE_TOLERANCE) {
         // Say it out loud rather than rendering a convincing miniature. Report
         // the implied size of the CIRCUIT, since that is the number a reader can
@@ -315,14 +498,15 @@ const MagicWindowScreen: React.FC = () => {
         setScaleWarning(
           `Scale check failed: the reconstruction is at ${(ratio * 100).toFixed(0)}% ` +
             `of true scale — the circuit would measure ` +
-            `${(CIRCUIT_EW_M * ratio).toFixed(1)} × ${(CIRCUIT_NS_M * ratio).toFixed(1)} m ` +
-            `instead of ${CIRCUIT_EW_M} × ${CIRCUIT_NS_M} m.`,
+            `${(scene.extentEwM * ratio).toFixed(1)} × ` +
+            `${(scene.extentNsM * ratio).toFixed(1)} m instead of ` +
+            `${scene.extentEwM} × ${scene.extentNsM} m.`,
         );
       } else {
         setScaleWarning(null);
       }
     },
-    [],
+    [scene.sceneSpanM, scene.extentEwM, scene.extentNsM],
   );
 
   const onLoadError = useCallback(
@@ -337,6 +521,44 @@ const MagicWindowScreen: React.FC = () => {
     // A new pin drops a new drift anchor, so the old measurement no longer
     // describes anything. Clear it rather than show a stale number.
     setDrift(null);
+  }, []);
+
+  /** The visitor says they have arrived. The only "positioning" this has. */
+  const confirmArrived = useCallback(() => {
+    if (!tourStop) return;
+    const i = scene.viewpoints.findIndex(v => v.id === tourStop.viewpointId);
+    if (i >= 0) selectViewpoint(i);
+    setArrived(true);
+  }, [tourStop, scene.viewpoints, selectViewpoint]);
+
+  /** Next stop. `confirmed` false means they moved on without arriving. */
+  const nextTourStop = useCallback(
+    (confirmed: boolean) => {
+      const from = tour[tourIndex];
+      if (!confirmed && from) {
+        setSkipped(prev =>
+          prev.includes(from.viewpointId) ? prev : [...prev, from.viewpointId],
+        );
+      }
+      setTourIndex(i => Math.min(i + 1, tour.length - 1));
+      // A stop that shares its position with the one before it is already where
+      // the visitor is standing, so do not make them confirm it twice - open it
+      // and let the prompt say "stay where you are, look up".
+      const next = tour[Math.min(tourIndex + 1, tour.length - 1)];
+      if (next?.sameSpot) {
+        const i = scene.viewpoints.findIndex(v => v.id === next.viewpointId);
+        if (i >= 0) selectViewpoint(i);
+        setArrived(true);
+      } else {
+        setArrived(false);
+      }
+    },
+    [tour, tourIndex, scene.viewpoints, selectViewpoint],
+  );
+
+  /** Leave the tour for the rail. A deliberate act, never the default. */
+  const openRail = useCallback(() => {
+    setTourActive(false);
   }, []);
 
   const recenter = useCallback(() => {
@@ -410,16 +632,21 @@ const MagicWindowScreen: React.FC = () => {
         onDriftSample={onDriftSample}
         figure={figure}
         fogEnabled
+        fog={scene.fog}
         onModelLoaded={onModelLoaded}
         onLoadError={onLoadError}
         onFigureTapped={onFigureTapped}
         onRigProbe={onRigProbe}
+        onCameraDebug={__DEV__ ? onCameraDebug : undefined}
+        skyColor={scene.skyColor}
+        onHeading={onHeading}
+        lightScale={scene.lightScale}
       />
 
       {!ready && !error ? (
         <View style={styles.loading} pointerEvents="none">
           <ActivityIndicator color={COLORS.amber} />
-          <Text style={styles.loadingText}>Rebuilding the circuit…</Text>
+          <Text style={styles.loadingText}>{scene.loadingLabel}</Text>
         </View>
       ) : null}
 
@@ -431,8 +658,8 @@ const MagicWindowScreen: React.FC = () => {
       />
       <SafeAreaView style={styles.topBar} edges={['top']}>
         <View style={styles.titleBlock}>
-          <Text style={styles.title}>Bangalore Fort</Text>
-          <Text style={styles.subtitle}>as it stood, 1791</Text>
+          <Text style={styles.title}>{scene.title}</Text>
+          <Text style={styles.subtitle}>{scene.subtitle}</Text>
         </View>
         <Pressable
           onPress={safeGoBack}
@@ -455,15 +682,97 @@ const MagicWindowScreen: React.FC = () => {
         </View>
       ) : null}
 
-      {figure && person && !everSpoke && ready ? (
+      {/* THE PROMPT MUST NOT POINT AT SOMEONE YOU CANNOT SEE. It is suppressed
+          at any stop the person authored themselves out of — for the palace,
+          every stop on the ground floor, because Purnaiah is a storey up. And
+          the palace cannot be walked, so it does not ask you to. */}
+      {figure &&
+      person &&
+      !everSpoke &&
+      ready &&
+      (!person.visibleFrom || person.visibleFrom.includes(viewpoint.id)) ? (
         <View style={styles.pointHint} pointerEvents="none">
           <Text style={styles.pointHintText}>
-            Someone is here. Walk up and tap him.
+            {scene.hasSiteWalk
+              ? 'Someone is here. Walk up and tap him.'
+              : 'Someone is here. Point at him and tap.'}
           </Text>
         </View>
       ) : null}
 
-      {isAdminUser() ? (
+      {scene.hasPlanIndicator ? (
+        <PalacePlanIndicator
+          position={viewpoint.position}
+          headingDeg={headingDeg}
+          title={viewpoint.title}
+          expanded={planOpen}
+          onToggle={() => setPlanOpen(v => !v)}
+        />
+      ) : (
+        // Every other scene at least gets its stop named, permanently.
+        <View style={styles.stopNameOnly} pointerEvents="none">
+          <Text style={styles.stopNameText} numberOfLines={1}>
+            {viewpoint.title}
+          </Text>
+        </View>
+      )}
+
+      {__DEV__ && isAdminUser() && camDebug ? (
+        <View style={styles.camHud} pointerEvents="none">
+          <Text style={styles.camHudHead}>ORIENTATION</Text>
+          <Text
+            style={[
+              styles.camHudLine,
+              Math.abs(camDebug.fwdY) > 0.5 && styles.camHudBad,
+            ]}>
+            {`fwd  ${camDebug.fwdX.toFixed(2)}  ${camDebug.fwdY.toFixed(
+              2,
+            )}  ${camDebug.fwdZ.toFixed(2)}`}
+          </Text>
+          <Text style={styles.camHudLine}>
+            {`pos  ${camDebug.posX.toFixed(1)}  ${camDebug.posY.toFixed(
+              1,
+            )}  ${camDebug.posZ.toFixed(1)}`}
+          </Text>
+          <Text
+            style={[
+              styles.camHudLine,
+              camDebug.movedOnRotate && styles.camHudBad,
+            ]}>
+            {`moved on rotate: ${camDebug.movedOnRotate ? 'YES' : 'no'}`}
+          </Text>
+          <Text style={styles.camHudLine}>
+            {`rot ${camDebug.displayRotation}  ${camDebug.remapBranch}`}
+          </Text>
+          <Text
+            style={[
+              styles.camHudLine,
+              (camDebug.posY < camDebug.modelMinY ||
+                camDebug.posY > camDebug.modelMaxY) &&
+                styles.camHudBad,
+            ]}>
+            {`model Y ${camDebug.modelMinY.toFixed(
+              1,
+            )} .. ${camDebug.modelMaxY.toFixed(1)}  (eye ${camDebug.posY.toFixed(
+              1,
+            )})`}
+          </Text>
+          <Text style={styles.camHudBig}>
+            {`${(
+              (Math.asin(Math.max(-1, Math.min(1, camDebug.fwdY))) * 180) /
+              Math.PI
+            ).toFixed(0)}° elevation`}
+          </Text>
+          <Text style={styles.camHudNote}>
+            0° = level · −90° = straight down · +90° = straight up
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Fort-only, and now stated as such. RIG_TEST_PLACEMENT is (40, -300) in
+          the FORT's frame — 300 m outside a 22 m building — so gating it on
+          hasFigure stopped working the moment the palace got one. */}
+      {scene.hasSiteWalk && isAdminUser() ? (
         <Pressable
           style={styles.rigTest}
           onPress={() => {
@@ -544,7 +853,7 @@ const MagicWindowScreen: React.FC = () => {
       ) : null}
 
       {/* Walk pad. Bottom-left, thumb-reachable, clear of the viewpoint rail. */}
-      {ready && !error ? (
+      {ready && !error && scene.hasSiteWalk ? (
         <View style={styles.stickPad} {...panResponder.panHandlers}>
           <View style={styles.stickRing} />
           <View
@@ -563,26 +872,88 @@ const MagicWindowScreen: React.FC = () => {
         pointerEvents="none"
       />
       <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
+        {/* WHERE YOU ARE. Always visible, never behind a tap. The room name and
+            the direction are the two things a visitor needs to match what is on
+            screen to what is in front of them, and the old UI made them expand
+            a plan to get either. `facing` is emitted from the build off the TRUE
+            bearing - headingDeg is frame-relative and would say "north" here. */}
+        <View style={styles.whereRow}>
+          <Text style={styles.whereTitle} numberOfLines={1}>
+            {viewpoint.title}
+          </Text>
+          {tour.length > 0 ? (
+            <Text style={styles.whereProgress}>
+              {tourActive
+                ? `${tourIndex + 1} of ${tour.length}`
+                : 'Jumped to'}
+              {skipped.length > 0 ? ` · ${skipped.length} skipped` : ''}
+            </Text>
+          ) : null}
+        </View>
+        {viewpoint.facing ? (
+          <Text style={styles.whereFacing}>
+            You are standing in {tourStop?.place ?? viewpoint.title}, looking{' '}
+            {viewpoint.facing}.
+          </Text>
+        ) : null}
+
         <Text style={styles.caption}>{viewpoint.caption}</Text>
 
+        {/* The stop that belongs at this position. ONE player instance, kept
+            mounted across viewpoints: AudioPlayer swaps source on a sourceKey
+            change without remounting, which is exactly the viewpoint-change
+            case. `suspended` ducks it while the figure is speaking, rather than
+            unmounting, so a 105 s clip resumes where it was. */}
+        {clipUri && stopForView && (!tourActive || arrived) ? (
+          <AudioPlayer
+            uri={clipUri}
+            sourceKey={stopForView.stop_key}
+            title={stopForView.title}
+            autoPlay
+            suspended={speaking}
+          />
+        ) : null}
+
         <View style={styles.legendRow}>
-          {MAGIC_WINDOW_LEGEND.map(item => (
+          {scene.legend.map(item => (
             <View key={item.key} style={styles.legendItem}>
               <View
                 style={[
                   styles.legendSwatch,
                   item.key === 'ghost' && styles.legendSwatchGhost,
                   item.key === 'open' && styles.legendSwatchOpen,
+                  item.key === 'colour' && styles.legendSwatchGhost,
+                  item.key === 'unknown' && styles.legendSwatchOpen,
                 ]}
               />
               <Text style={styles.legendLabel}>{item.label}</Text>
             </View>
           ))}
         </View>
+        {scene.hasPlanIndicator && TEXTURE_CREDITS.length > 0 ? (
+          <Pressable onPress={() => setCreditsOpen(v => !v)} hitSlop={8}>
+            <Text style={styles.creditsLink}>
+              {creditsOpen ? 'Image credits ×' : 'Image credits'}
+            </Text>
+          </Pressable>
+        ) : null}
+        {creditsOpen
+          ? TEXTURE_CREDITS.map(c => (
+              <Text key={c.source} style={styles.creditsText}>
+                {`${c.used_for} — photograph by ${c.author}, ${c.licence}`}
+              </Text>
+            ))
+          : null}
+
         <Text style={styles.legendDetail}>
-          {MAGIC_WINDOW_LEGEND[1].detail} {MAGIC_WINDOW_LEGEND[2].detail}
+          {scene.legend
+            .slice(1)
+            .map(l => l.detail)
+            .join(' ')}
         </Text>
 
+        {scene.hasAssault ? (
+        <>
         <Pressable style={styles.assaultBar} onPress={advanceAssault}>
           <Text style={styles.assaultCue}>
             {step === 0
@@ -601,7 +972,11 @@ const MagicWindowScreen: React.FC = () => {
             ) : null}
           </View>
         ) : null}
+        </>
+        ) : null}
 
+        {scene.hasTimeline ? (
+        <>
         <View style={styles.timelineRow}>
           {FORT_STATES.map(f => {
             const on = f.id === stateId;
@@ -622,19 +997,77 @@ const MagicWindowScreen: React.FC = () => {
           {'  ·  '}
           {fortState.note}
         </Text>
+        </>
+        ) : null}
 
+        {/* THE GUIDE. Where to walk, then the visitor confirms. It never says
+            it knows where they are, because nothing on this phone does. */}
+        {tourStop ? (
+          <View style={styles.guide}>
+            <Text style={styles.guidePlace}>{tourStop.place}</Text>
+            <Text style={styles.guideWalk}>{tourStop.walkTo}</Text>
+            <View style={styles.guideRow}>
+              {!arrived ? (
+                <Pressable
+                  onPress={confirmArrived}
+                  style={styles.guidePrimary}
+                  accessibilityLabel={`I am at ${tourStop.place}`}>
+                  <Text style={styles.guidePrimaryText}>I'm here</Text>
+                </Pressable>
+              ) : tourIndex < tour.length - 1 ? (
+                <Pressable
+                  onPress={() => nextTourStop(true)}
+                  style={styles.guidePrimary}>
+                  <Text style={styles.guidePrimaryText}>Next stop</Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={openRail} style={styles.guidePrimary}>
+                  <Text style={styles.guidePrimaryText}>That's the tour</Text>
+                </Pressable>
+              )}
+              {!arrived && tourIndex < tour.length - 1 ? (
+                <Pressable
+                  onPress={() => nextTourStop(false)}
+                  hitSlop={8}
+                  style={styles.guideGhost}>
+                  <Text style={styles.guideGhostText}>Skip</Text>
+                </Pressable>
+              ) : null}
+              <Pressable onPress={openRail} hitSlop={8} style={styles.guideGhost}>
+                <Text style={styles.guideGhostText}>Jump to a room</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
+        {/* The rail is a FALLBACK now, reached deliberately. A list of place
+            names cannot be matched to a room you are standing in, so it is not
+            the way in - but it is the way back if the tour is in the wrong
+            place, and it is the only way to revisit a room out of order. */}
         <View style={styles.railRow}>
+          {tourStop ? null : (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.rail}>
-            {MAGIC_WINDOW_VIEWPOINTS.map((vp, i) => {
+            {scene.viewpoints.map((vp, i) => {
               const active = i === index;
+              // A photograph where one honestly exists — a visitor matches a
+              // picture to the room in front of them and cannot match a phrase.
+              // Two viewpoints have none on purpose; see roomPhotos.ts.
+              const photo = roomPhotoFor(scene.slug, vp.id);
               return (
                 <Pressable
                   key={vp.id}
                   onPress={() => selectViewpoint(i)}
-                  style={[styles.chip, active && styles.chipActive]}>
+                  style={[
+                    styles.chip,
+                    !!photo && styles.chipWithPhoto,
+                    active && styles.chipActive,
+                  ]}>
+                  {photo ? (
+                    <Image source={photo} style={styles.chipPhoto} />
+                  ) : null}
                   <Text
                     style={[styles.chipText, active && styles.chipTextActive]}>
                     {vp.title}
@@ -643,23 +1076,31 @@ const MagicWindowScreen: React.FC = () => {
               );
             })}
           </ScrollView>
-          <Pressable
-            onPress={() => {
-              setArWalk(v => !v);
-              setDrift(null);
-            }}
-            hitSlop={10}
-            style={[styles.recenterButton, arWalk && styles.siteButtonOn]}
-            accessibilityLabel="Walk through the fort for real">
-            <Compass size={18} color={arWalk ? COLORS.bg : COLORS.amber} />
-          </Pressable>
-          <Pressable
-            onPress={() => setSiteMode(v => !v)}
-            hitSlop={10}
-            style={[styles.recenterButton, siteMode && styles.siteButtonOn]}
-            accessibilityLabel="Walk with your own steps">
-            <Footprints size={18} color={siteMode ? COLORS.bg : COLORS.amber} />
-          </Pressable>
+          )}
+          {scene.hasSiteWalk ? (
+            <>
+              <Pressable
+                onPress={() => {
+                  setArWalk(v => !v);
+                  setDrift(null);
+                }}
+                hitSlop={10}
+                style={[styles.recenterButton, arWalk && styles.siteButtonOn]}
+                accessibilityLabel="Walk through the fort for real">
+                <Compass size={18} color={arWalk ? COLORS.bg : COLORS.amber} />
+              </Pressable>
+              <Pressable
+                onPress={() => setSiteMode(v => !v)}
+                hitSlop={10}
+                style={[styles.recenterButton, siteMode && styles.siteButtonOn]}
+                accessibilityLabel="Walk with your own steps">
+                <Footprints
+                  size={18}
+                  color={siteMode ? COLORS.bg : COLORS.amber}
+                />
+              </Pressable>
+            </>
+          ) : null}
           <Pressable
             onPress={recenter}
             hitSlop={10}
@@ -670,7 +1111,9 @@ const MagicWindowScreen: React.FC = () => {
         </View>
 
         <Text style={styles.rule}>
-          {arWalk
+          {!scene.hasSiteWalk
+            ? 'Turn the phone to look around. Tap a place below to move there. No camera, no tracking — nothing here can drift.'
+            : arWalk
             ? 'Walk. Your real steps move you through the fort at true scale — the camera is running for tracking but never shown.'
             : !siteMode
             ? 'Turn the phone to look. Use the pad to walk. Your own steps do not move you — most of this fort is under live roads now.'
@@ -786,6 +1229,78 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     backgroundColor: 'rgba(10,10,12,0.66)',
     overflow: 'hidden',
+  },
+
+  creditsLink: {
+    color: COLORS.amberLight,
+    fontFamily: FONTS.ui,
+    fontSize: 11,
+    textDecorationLine: 'underline',
+    marginTop: 2,
+  },
+  creditsText: {
+    color: COLORS.textMuted,
+    fontFamily: FONTS.ui,
+    fontSize: 10,
+    marginTop: 2,
+  },
+
+  stopNameOnly: {
+    position: 'absolute',
+    right: SPACING.lg,
+    top: 96,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: RADIUS.sm,
+    backgroundColor: 'rgba(10,10,12,0.72)',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  stopNameText: {
+    color: COLORS.amberLight,
+    fontFamily: FONTS.uiSemiBold,
+    fontSize: 12,
+    letterSpacing: 0.3,
+  },
+
+  camHud: {
+    position: 'absolute',
+    left: SPACING.lg,
+    top: 150,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+    borderRadius: RADIUS.sm,
+    backgroundColor: 'rgba(10,10,12,0.86)',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  camHudHead: {
+    color: COLORS.textTertiary,
+    fontFamily: FONTS.uiSemiBold,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    marginBottom: 3,
+  },
+  camHudLine: {
+    color: COLORS.textSecondary,
+    fontFamily: FONTS.ui,
+    fontSize: 12,
+  },
+  camHudBad: {
+    color: '#E8705A',
+    fontFamily: FONTS.uiSemiBold,
+  },
+  camHudBig: {
+    color: COLORS.amberLight,
+    fontFamily: FONTS.uiSemiBold,
+    fontSize: 18,
+    marginTop: 4,
+  },
+  camHudNote: {
+    color: COLORS.textMuted,
+    fontFamily: FONTS.ui,
+    fontSize: 10,
+    marginTop: 3,
   },
 
   rigTest: {
@@ -1030,6 +1545,82 @@ const styles = StyleSheet.create({
   },
   eraLabel: {color: COLORS.amberLight, fontFamily: FONTS.uiSemiBold},
 
+  whereRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
+  },
+  whereTitle: {
+    flex: 1,
+    color: COLORS.textPrimary,
+    fontFamily: FONTS.semiBold,
+    fontSize: 17,
+  },
+  whereProgress: {
+    color: COLORS.textTertiary,
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+  },
+  whereFacing: {
+    color: COLORS.textSecondary,
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  guide: {
+    marginTop: SPACING.sm,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    backgroundColor: 'rgba(20,20,22,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(212,134,10,0.35)',
+    gap: 6,
+  },
+  guidePlace: {
+    color: COLORS.amberLight,
+    fontFamily: FONTS.semiBold,
+    fontSize: 15,
+  },
+  guideWalk: {
+    color: COLORS.textPrimary,
+    fontFamily: FONTS.regular,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  guideRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    marginTop: 4,
+    flexWrap: 'wrap',
+  },
+  guidePrimary: {
+    paddingVertical: 10,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.amber,
+  },
+  guidePrimaryText: {
+    color: '#141414',
+    fontFamily: FONTS.semiBold,
+    fontSize: 14,
+  },
+  guideGhost: {paddingVertical: 10},
+  guideGhostText: {
+    color: COLORS.textTertiary,
+    fontFamily: FONTS.regular,
+    fontSize: 13,
+  },
+  chipWithPhoto: {
+    paddingTop: 0,
+    paddingHorizontal: 0,
+    paddingBottom: 6,
+    overflow: 'hidden',
+    alignItems: 'center',
+    width: 96,
+  },
+  chipPhoto: {width: 96, height: 72, marginBottom: 4},
   railRow: {flexDirection: 'row', alignItems: 'center', gap: SPACING.sm},
   rail: {gap: SPACING.xs, paddingRight: SPACING.sm},
   chip: {

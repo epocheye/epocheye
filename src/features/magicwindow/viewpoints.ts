@@ -45,6 +45,25 @@ export interface MagicWindowViewpoint {
   farM: number;
   /** The on-screen caption. What this viewpoint is FOR, and what it withholds. */
   caption: string;
+  /**
+   * Spelled-out 16-point compass direction the view faces, e.g.
+   * 'west-north-west'. Emitted from the build off the TRUE bearing in the
+   * research JSON, NOT derived from `headingDeg` — that one is frame-relative
+   * (0 = the building's +Y, itself true bearing 286.8 at the palace), so
+   * computing a compass name from it in the app would tell a visitor at P5 they
+   * were facing north.
+   */
+  facing?: string;
+  /**
+   * `audio_stops.stop_key` for the narration that belongs at this position,
+   * if any. Emitted from the build (see STOP_KEY in
+   * build_palace_magicwindow.py) so it cannot drift from the viewpoint list.
+   *
+   * Optional on purpose. A viewpoint with no stop stays SILENT rather than
+   * borrowing a neighbour's clip - the fort has no stops at all today, and a
+   * wrong clip is worse than none.
+   */
+  stopKey?: string;
 }
 
 /**

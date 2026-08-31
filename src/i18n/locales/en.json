@@ -604,6 +604,7 @@
       "stopOf": "Stop {{n}} of {{total}}",
       "walkTo": "Walk to: {{zone}}",
       "nowIn": "You're in: {{zone}}",
+      "seeReconstruction": "See this room as it was",
       "play": "Play",
       "pause": "Pause",
       "next": "Next stop",

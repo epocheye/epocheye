@@ -15,6 +15,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import com.facebook.react.uimanager.ThemedReactContext
 import com.google.android.filament.IndirectLight
@@ -44,8 +45,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import com.google.android.filament.Skybox
+import com.epocheye.BuildConfig
 import java.io.File
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -127,9 +131,25 @@ class EpocheyeMagicWindowView(
         /** Do not let the visitor walk off the modelled ground disc (r = 1400 m). */
         private const val WALK_LIMIT_M = 1200.0
 
-        /** Fog start / half-extinction distance, from magicwindow_viewpoints.json. */
+        /**
+         * DEFAULT fog start / half-extinction distance — Bangalore Fort's, from
+         * magicwindow_viewpoints.json, and sized to its 3 km scene.
+         *
+         * They are only defaults now. Hard-coding them made fog INERT in the
+         * palace: that scene spans 140 m and its lawn ends 72 m from the darbar
+         * hall, so a fog that starts at 150 m never engaged and the ground met a
+         * flat skybox along a hard line — "the distant green area is a plain
+         * block". A scene sets its own through [setFog].
+         */
         private const val FOG_START_M = 150.0f
         private const val FOG_END_M = 1100.0f
+
+        /**
+         * Strength of the sky-above/ground-below term in the IBL. See the
+         * irradiance() call for the whole argument. 0f restores the old flat
+         * ambient exactly.
+         */
+        private const val IBL_UP_GRADIENT = 0.45f
     }
 
     // ---- props (set by EpocheyeMagicWindowViewManager) ----------------------
@@ -151,6 +171,42 @@ class EpocheyeMagicWindowView(
     private var nearM = 2.0f
     private var farM = 4000.0f
     private var fogEnabled = true
+
+    /** Fog start / half-extinction, metres. Defaults are the fort's 3 km ones. */
+    private var fogStartM = FOG_START_M
+    private var fogEndM = FOG_END_M
+
+    /**
+     * Sky colour supplied by the SCENE rather than by the model, linear RGB.
+     *
+     * The palace ships without a sky dome in its GLB. A 200 m dome around a 31 m
+     * building made the model's bounding box 400 x 200 x 400 m, and on device
+     * that hid the building completely - proven by bisecting three diagnostic
+     * GLBs while Blender rendered the interior correctly from the device's own
+     * reported camera. With the dome gone the bounding box is the building, and
+     * the sky comes from here instead.
+     *
+     * null = the scene carries its own dome (Bangalore Fort). Nothing changes
+     * for it.
+     */
+    private var skyColor: FloatArray? = null
+
+    /**
+     * Per-scene exposure. 1.0 keeps Bangalore Fort exactly as it is.
+     *
+     * The fort's lighting was tuned for a 600 m open circuit under sky: 60,000
+     * lux of IBL and a 90,000 lux key. Pointed at a 31 m shaded interior that is
+     * roughly two stops hot - measured on device, the palace's stone floor
+     * rendered near-white where Blender renders it mid-grey, which washed out
+     * both the tiling materials and the baked occlusion that had just been put
+     * in to fix exactly that flatness.
+     *
+     * A scene that is an INTERIOR says so here rather than the model being
+     * darkened to compensate, which would have made it wrong everywhere else.
+     */
+    private var lightScale = 1.0f
+    private val lightScaleState = mutableStateOf(1.0f)
+    private val skyColorState = mutableStateOf<FloatArray?>(null)
 
     // ---- PHASE 5: the timeline -------------------------------------------
     //
@@ -232,6 +288,45 @@ class EpocheyeMagicWindowView(
      */
     var onRigProbe: ((Int, Int, Boolean) -> Unit)? = null
 
+    /**
+     * ORIENTATION TELEMETRY. Debug builds only.
+     *
+     * The palace scene came back pointing at the ground from every viewpoint and
+     * every explanation offered for it was a hypothesis. This reports what the
+     * transform ACTUALLY produces, so the fault is named by a number rather than
+     * argued about: the remap branch that ran, the forward vector in both the
+     * sensor's ENU frame and the camera's glTF frame, and the camera position -
+     * which must not move when the device only rotates.
+     *
+     * (fwdX, fwdY, fwdZ, posX, posY, posZ, displayRotation, remapBranch, movedOnRotate)
+     */
+    var onCameraDebug: (
+        (Float, Float, Float, Float, Float, Float, Int, String, Boolean,
+         Float, Float) -> Unit
+    )? = null
+
+    /**
+     * Live compass heading of the view, degrees, 0 = +Y of the model frame.
+     *
+     * Production, unlike [onCameraDebug]: the position indicator's facing wedge
+     * is driven from it. Throttled to ~10 Hz and carrying one float, so it costs
+     * far less than the diagnostic it is promoted from.
+     */
+    var onHeading: ((Float) -> Unit)? = null
+
+    private var lastHeadingNanos = 0L
+    private var lastDebugNanos = 0L
+    private var debugPosX = Float.NaN
+    private var debugPosY = Float.NaN
+    private var debugPosZ = Float.NaN
+    private var debugMovedOnRotate = false
+    private var forceDebugBurst = false
+    // The model's world-space vertical span, captured at load. This is the
+    // half of "camera above the building" that was never measured, and the
+    // device suppresses this app's logcat, so it travels in the HUD event.
+    private var modelMinY = Float.NaN
+    private var modelMaxY = Float.NaN
+
     // ---- engine / scene refs -----------------------------------------------
 
     @Volatile private var modelLoader: ModelLoader? = null
@@ -250,11 +345,16 @@ class EpocheyeMagicWindowView(
     private var figureUri: String? = null
     private var figEast = 0f
     private var figNorth = 0f
+    // FLOOR LEVEL THE FIGURE STANDS ON. It was hardcoded to 0, which is right
+    // for the fort (one ground plane) and wrong for the palace, which is a
+    // two-storey building: its ground colonnade is z = 0.0 but the darbar hall
+    // floor is z = 2.60 m. Without this a figure placed upstairs stands 2.6 m
+    // through the floor, in the colonnade below.
+    private var figUp = 0f
     private var figHeadingDeg = 0f
     private var figureNode: ModelNode? = null
     private var loadedFigureUri: String? = null
     private var loadingFigure = false
-    private var rigAnimTime = -1.0
     private var rigProbeReported = false
     private var composeView: ComposeView? = null
     private var loadedUri: String? = null
@@ -343,15 +443,69 @@ class EpocheyeMagicWindowView(
                     // reveal the modelled relief without inventing a mood. This is
                     // a document, not a sunset - the same reason the Blender renders
                     // use a neutral world and the Standard view transform.
-                    val env = remember(eng) {
+                    val sky = skyColorState.value
+                    val lscale = lightScaleState.value
+                    val env = remember(eng, sky, lscale) {
                         try {
+                            // A SKY-ABOVE, GROUND-BELOW GRADIENT, and this is
+                            // the fix for "the texture is missing, only the
+                            // gilding reads".
+                            //
+                            // This was irradiance(1, [1,1,1]) - ONE band, which
+                            // is a constant ambient with no directional
+                            // variation at all. With shadows off and the main
+                            // light's direction never set, every non-metallic
+                            // surface then resolved to albedo x vertex-AO x one
+                            // constant. A flat ceiling has one normal, so it
+                            // rendered as one colour whatever texture it
+                            // carried - which is exactly what the device
+                            // reported for the darbar hall's 31 x 22 m soffit.
+                            // ARCH_CUSPED_GILT was legible because at metallic
+                            // 0.65 it is the only material with a
+                            // view-dependent specular response.
+                            //
+                            // Two bands make irradiance a linear function of the
+                            // normal, which Filament evaluates as
+                            //     E(n) = sh[0] + sh[1]*n.y + sh[2]*n.z + sh[3]*n.x
+                            // (all constants pre-folded into the coefficients).
+                            // Only the n.y term is set, so up-facing surfaces get
+                            // 1 + GRADIENT and down-facing ones 1 - GRADIENT,
+                            // with walls unchanged at 1. Neutral on all three
+                            // channels: this is still a document, not a sunset -
+                            // the change is that "up" and "down" stop being lit
+                            // identically, not that the scene gains a mood.
+                            //
+                            // Set IBL_UP_GRADIENT to 0f to get exactly the old
+                            // look back; that is also the fallback if the
+                            // coefficient order ever turns out to differ.
+                            val g = IBL_UP_GRADIENT
                             val ibl = IndirectLight.Builder()
-                                .irradiance(1, floatArrayOf(1.0f, 1.0f, 1.0f))
-                                .intensity(60_000f)
+                                .irradiance(
+                                    2,
+                                    floatArrayOf(
+                                        1.0f, 1.0f, 1.0f,   // L00  ambient
+                                        g, g, g,            // L1-1 * n.y
+                                        0f, 0f, 0f,         // L10  * n.z
+                                        0f, 0f, 0f,         // L11  * n.x
+                                    ),
+                                )
+                                .intensity(60_000f * lscale)
                                 .build(eng)
-                            Environment(indirectLight = ibl)
+                            // A scene that ships WITHOUT a sky dome in its GLB
+                            // gets its sky here instead. See [skyColor] for why
+                            // the palace does and the fort does not.
+                            val sb = sky?.let {
+                                Skybox.Builder()
+                                    .color(it[0], it[1], it[2], 1.0f)
+                                    .build(eng)
+                            }
+                            if (sb != null) {
+                                Log.i(TAG, "skybox: app-side %.3f %.3f %.3f"
+                                    .format(sky[0], sky[1], sky[2]))
+                            }
+                            Environment(indirectLight = ibl, skybox = sb)
                         } catch (t: Throwable) {
-                            Log.w(TAG, "IBL build failed", t)
+                            Log.w(TAG, "environment build failed", t)
                             Environment()
                         }
                     }
@@ -369,7 +523,8 @@ class EpocheyeMagicWindowView(
                         applyFog(fView)
                         try {
                             mainLight?.let {
-                                it.lightManager.setIntensity(it.lightInstance, 90_000f)
+                                it.lightManager.setIntensity(
+                                    it.lightInstance, 90_000f * lightScale)
                                 // Shadows OFF. A shadow map stretched over a 3 km
                                 // scene buys nothing legible and costs a second full
                                 // scene traversal per frame; rendering this model in
@@ -559,6 +714,38 @@ class EpocheyeMagicWindowView(
                         "circuit within it 443.5 E x 576.5 N)")
                         .format(size.x, size.y, abs(size.z)),
                 )
+                // WHERE THE MODEL ACTUALLY SITS. The camera position has been
+                // logged and verified from the start; the model's was assumed.
+                // "Level camera, building below it" is a POSITION relationship,
+                // so the model's world transform is the half that was never
+                // measured.
+                try {
+                    val wp0 = node.worldPosition
+                    val c0 = node.center
+                    modelMinY = wp0.y + c0.y - size.y / 2f
+                    modelMaxY = wp0.y + c0.y + size.y / 2f
+                } catch (t: Throwable) {
+                    Log.w(TAG, "model span probe failed", t)
+                }
+                try {
+                    val wp = node.worldPosition
+                    val ws = node.worldScale
+                    val c = node.center
+                    Log.i(
+                        TAG,
+                        ("model node: worldPos=(%.2f %.2f %.2f) worldScale=" +
+                            "(%.3f %.3f %.3f) center=(%.2f %.2f %.2f) " +
+                            "size=(%.1f %.1f %.1f) -> world Y span %.2f .. %.2f")
+                            .format(
+                                wp.x, wp.y, wp.z, ws.x, ws.y, ws.z,
+                                c.x, c.y, c.z, size.x, size.y, size.z,
+                                wp.y + c.y - size.y / 2f,
+                                wp.y + c.y + size.y / 2f,
+                            ),
+                    )
+                } catch (t: Throwable) {
+                    Log.w(TAG, "model node probe failed", t)
+                }
                 post { onModelLoaded?.invoke(size.x, size.y, abs(size.z)) }
             } catch (t: Throwable) {
                 Log.e(TAG, "model attach failed", t)
@@ -576,8 +763,30 @@ class EpocheyeMagicWindowView(
      *
      * The FOV is applied as a focal length rather than as a projection matrix so
      * that SceneView keeps recomputing the aspect ratio as the surface resizes.
-     * Filament assumes a 36 mm sensor, so a horizontal FOV theta is
-     * f = (36 / 2) / tan(theta / 2).
+     *
+     * WHAT THE AUTHORED NUMBER ACTUALLY DELIVERS, because the line below does
+     * NOT produce the horizontal angle it looks like it produces.
+     *
+     * This computes f = (36 / 2) / tan(theta / 2), i.e. theta as a HORIZONTAL
+     * angle across a 36 mm sensor width. Filament does not read it back that
+     * way: it derives the VERTICAL angle from a 24 mm sensor HEIGHT. That is
+     * not inferred - sceneview-4.18.0 names the constant itself, in
+     * io/github/sceneview/CameraFramingKt: FILAMENT_SENSOR_HEIGHT_MM = 24.0,
+     * beside verticalFovDegreesForFocalLength().
+     *
+     * So an authored 62 deg arrives as f = 29.96 mm, and therefore
+     *     vertical   2 * atan(12 / 29.96)          = 43.7 deg
+     *     horizontal 2 * atan(tan(21.8) * aspect)  = 20.9 deg at 1080x2340
+     * - about three times narrower horizontally than the authored figure reads.
+     *
+     * LEFT AS IT IS, DELIBERATELY. Every shipped composition in both scenes was
+     * reviewed and approved through this projection, so "correcting" it would
+     * re-frame all of them at once. The number is recorded here so nobody
+     * re-derives a frustum from `fovDeg` and gets it wrong: anything that needs
+     * the real frustum - placing a figure, deciding what a viewpoint can see -
+     * must use the delivered angles above, not the authored one. Placing
+     * Purnaiah against the authored 62 deg is exactly how he ended up 28 deg
+     * off a 10.5 deg half-angle, i.e. off screen. See PALACE_PEOPLE.
      */
     private fun applyCamera() {
         val cam = cameraNode ?: return
@@ -587,6 +796,27 @@ class EpocheyeMagicWindowView(
                 (camEast + offE).toFloat(), camUp, (-(camNorth + offN)).toFloat())
             cam.near = nearM
             cam.far = farM
+            // A viewpoint change MOVES the camera legitimately. Clear the
+            // drift baseline here or the movedOnRotate flag latches on the very
+            // next sensor frame and reports a fault that did not happen - which
+            // is exactly what it did on its first run.
+            debugPosX = Float.NaN
+            debugMovedOnRotate = false
+            // DIAGNOSTIC: the palace came back showing its own roof from above,
+            // and every explanation for that was a guess. Report what the camera
+            // was actually set to.
+            Log.i(
+                TAG,
+                ("camera: authored E=%.2f N=%.2f U=%.2f (+off %.2f/%.2f) -> " +
+                    "glTF (%.2f, %.2f, %.2f)  hdg=%.1f pitch=%.1f fov=%.1f " +
+                    "near=%.2f far=%.1f")
+                    .format(
+                        camEast, camNorth, camUp, offE, offN,
+                        cam.worldPosition.x, cam.worldPosition.y,
+                        cam.worldPosition.z,
+                        headingDeg, pitchDeg, fovDeg, nearM, farM,
+                    ),
+            )
             val half = Math.toRadians((fovDeg / 2.0f).toDouble())
             cam.focalLength = (SENSOR_WIDTH_MM / 2.0) / tan(half)
         } catch (t: Throwable) {
@@ -616,12 +846,12 @@ class EpocheyeMagicWindowView(
         try {
             fView.fogOptions = FilamentView.FogOptions().apply {
                 enabled = fogEnabled
-                distance = FOG_START_M
+                distance = fogStartM
                 // Filament attenuates as 1 - exp(-density * pathLength), so the
                 // density that leaves half the scene showing at the stated end is
                 // ln(2) / (end - start). Same expression the Blender render script
                 // used for its volume scatter, so the two agree by construction.
-                density = (0.693f / (FOG_END_M - FOG_START_M))
+                density = (0.693f / max(1f, fogEndM - fogStartM))
                 height = 0f
                 heightFalloff = 0f
                 maximumOpacity = 1f
@@ -669,7 +899,7 @@ class EpocheyeMagicWindowView(
                     // points at, and the feet are often below the frame anyway.
                     val p = cam.worldToScreenPoint(
                         io.github.sceneview.collision.Vector3(
-                            figEast, 1.4f, -figNorth))
+                            figEast, figUp + 1.4f, -figNorth))
                     // worldToScreenPoint returns z < 0 for points behind the
                     // camera, which would otherwise project to a phantom hit.
                     if (p.z < 0f) return false
@@ -844,6 +1074,7 @@ class EpocheyeMagicWindowView(
             return
         }
         pendingRecenter = true
+        forceDebugBurst = true
     }
 
     private fun displayRotation(): Int = try {
@@ -857,23 +1088,26 @@ class EpocheyeMagicWindowView(
      * Re-express the rotation matrix so the device axes read as they do in the
      * natural portrait orientation, whatever the screen is currently rotated to.
      */
+    /** Which branch [remapForDisplay] took, for the telemetry. */
+    private var remapBranch = "?"
+
     private fun remapForDisplay(r: FloatArray): FloatArray = when (displayRotation()) {
         Surface.ROTATION_90 -> if (
             SensorManager.remapCoordinateSystem(
                 r, SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X, remapMatrix,
-            )
+            ).also { remapBranch = "ROT90 AXIS_Y,AXIS_MINUS_X" }
         ) remapMatrix else r
         Surface.ROTATION_180 -> if (
             SensorManager.remapCoordinateSystem(
                 r, SensorManager.AXIS_MINUS_X, SensorManager.AXIS_MINUS_Y, remapMatrix,
-            )
+            ).also { remapBranch = "ROT180 AXIS_MINUS_X,AXIS_MINUS_Y" }
         ) remapMatrix else r
         Surface.ROTATION_270 -> if (
             SensorManager.remapCoordinateSystem(
                 r, SensorManager.AXIS_MINUS_Y, SensorManager.AXIS_X, remapMatrix,
-            )
+            ).also { remapBranch = "ROT270 AXIS_MINUS_Y,AXIS_X" }
         ) remapMatrix else r
-        else -> r
+        else -> r.also { remapBranch = "ROT0 none (pass-through)" }
     }
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -1025,6 +1259,66 @@ class EpocheyeMagicWindowView(
                 Float4(0f, 0f, 0f, 1f),
             )
             cam.worldQuaternion = quaternion(m)
+
+            // The heading the visitor is actually facing, for the plan
+            // indicator. Derived from the SAME forward vector the camera uses,
+            // so the wedge can never disagree with the view.
+            val nowH = event.timestamp
+            if (nowH - lastHeadingNanos > 100_000_000L) {
+                lastHeadingNanos = nowH
+                val hdg = ((Math.toDegrees(atan2(fe.toDouble(), fn.toDouble()))
+                    .toFloat()) % 360f + 360f) % 360f
+                post { onHeading?.invoke(hdg) }
+            }
+
+            if (BuildConfig.DEBUG) {
+                // POSITION MUST NOT MOVE ON ROTATION. Checked every frame, not
+                // sampled: a camera at eye height that drifts while the device
+                // only turns is a different and more serious fault than a pitch
+                // error, and this is the number that tells them apart.
+                val p = cam.worldPosition
+                if (!debugPosX.isNaN() && (walkFwd == 0f && walkRight == 0f)) {
+                    if (abs(p.x - debugPosX) > 1e-3f ||
+                        abs(p.y - debugPosY) > 1e-3f ||
+                        abs(p.z - debugPosZ) > 1e-3f
+                    ) {
+                        debugMovedOnRotate = true
+                    }
+                }
+                debugPosX = p.x
+                debugPosY = p.y
+                debugPosZ = p.z
+
+                val now = event.timestamp
+                if (forceDebugBurst || now - lastDebugNanos > 250_000_000L) {
+                    lastDebugNanos = now
+                    forceDebugBurst = false
+                    Log.i(
+                        TAG,
+                        ("ORIENT %s rot=%d | raw=[%.3f %.3f %.3f] | " +
+                            "ENU fwd=(%.3f %.3f %.3f) | glTF fwd=(%.3f %.3f %.3f) " +
+                            "up=(%.3f %.3f %.3f) | pos=(%.2f %.2f %.2f) " +
+                            "movedOnRotate=%b | yawOff=%.1f pitch=%.1f")
+                            .format(
+                                remapBranch, displayRotation(),
+                                values.getOrElse(0) { 0f },
+                                values.getOrElse(1) { 0f },
+                                values.getOrElse(2) { 0f },
+                                fe, fn, fUp,
+                                fx, fy, fz, ux, uy, uz,
+                                p.x, p.y, p.z,
+                                debugMovedOnRotate, yawOffsetDeg, pitchDeg,
+                            ),
+                    )
+                    post {
+                        onCameraDebug?.invoke(
+                            fx, fy, fz, p.x, p.y, p.z,
+                            displayRotation(), remapBranch, debugMovedOnRotate,
+                            modelMinY, modelMaxY,
+                        )
+                    }
+                }
+            }
         } catch (t: Throwable) {
             Log.w(TAG, "orientation update failed", t)
         }
@@ -1071,7 +1365,21 @@ class EpocheyeMagicWindowView(
         offE = 0.0
         offN = 0.0
         lastWalkNanos = 0L
-        pendingRecenter = true
+        // NO RECENTER HERE. THIS LINE ERASED EVERY AUTHORED HEADING.
+        //
+        // recenter() solves yawOffsetDeg = headingDeg - sensorHeading, i.e. it
+        // maps the authored heading onto WHEREVER THE PHONE IS POINTING at that
+        // instant. Doing that on every viewpoint change made every stop face the
+        // same real-world direction relative to the device, so the 90 degrees
+        // between "Centre bay" (frame azimuth 0) and "Down the arcade" (270)
+        // vanished and the two looked identical on device - all that was left
+        // between them was 7.5 m of translation inside a repetitive colonnade.
+        //
+        // Recentring is a USER action. It still happens once on the first sensor
+        // sample (pendingRecenter starts true) so the scene does not open facing
+        // an arbitrary compass direction, and again whenever the crosshair is
+        // tapped. Between stops the offset is KEPT, so moving from one viewpoint
+        // to the next now swings the view by the angle the research authored.
         applyCamera()
     }
 
@@ -1083,12 +1391,29 @@ class EpocheyeMagicWindowView(
     }
 
     /**
-     * Place a figure in the fort. Position is the authored plan frame
-     * (east, north) in metres; heading is the compass bearing the figure FACES.
+     * Place a figure in the scene. Position is the authored plan frame
+     * (east, north, up) in metres - for the palace that frame is the building's
+     * own, +X along the facade and +Y into the building, and `up` is the FLOOR
+     * the figure stands on. Heading is the bearing the figure FACES, in the same
+     * convention as the viewpoint's.
      */
-    fun setFigure(uri: String?, east: Float, north: Float, heading: Float) {
+    /**
+     * Per-scene fog. A 140 m interior and a 3 km fort cannot share one distance:
+     * the fort's 150 m start leaves the palace with no fog at all, which is why
+     * its lawn ended in a hard line against the sky.
+     */
+    fun setFog(startM: Float, endM: Float) {
+        fogStartM = if (startM > 0f) startM else FOG_START_M
+        fogEndM = if (endM > startM) endM else fogStartM + 1f
+        filamentView?.let { applyFog(it) }
+    }
+
+    fun setFigure(
+        uri: String?, east: Float, north: Float, up: Float, heading: Float,
+    ) {
         figEast = east
         figNorth = north
+        figUp = up
         figHeadingDeg = heading
         if (uri != figureUri) {
             figureUri = uri
@@ -1102,7 +1427,7 @@ class EpocheyeMagicWindowView(
         val n = figureNode ?: return
         try {
             // (east, north, up) -> glTF, same conversion as the camera. Trap 3.
-            n.worldPosition = Float3(figEast, 0f, -figNorth)
+            n.worldPosition = Float3(figEast, figUp, -figNorth)
             // A heading is clockwise from north; a rotation about glTF +Y is
             // counter-clockwise, so it negates - same relation the camera uses.
             n.worldRotation = Float3(0f, -figHeadingDeg, 0f)
@@ -1157,27 +1482,64 @@ class EpocheyeMagicWindowView(
                 // the animator has MOVED. Presence of an animation proves
                 // nothing; a rig that loads and never ticks renders exactly like
                 // a static mesh, which is the failure this test exists to catch.
+                //
+                // THE PREVIOUS VERSION OF THIS TEST COULD NOT CATCH IT. It
+                // reported `advancing = nAnim > 0 && getAnimationDuration(0) >
+                // 0f` - which asks only whether a clip EXISTS and is longer than
+                // zero. A completely frozen rig satisfies both and reported
+                // advancing=true. Its own comment promised "the advance half is
+                // sampled in the frame hook"; there is no frame hook here, and
+                // the field it wrote for one was never read.
+                //
+                // So sample the thing that actually changes. Filament's Animator
+                // applies a clip by writing TransformManager transforms on the
+                // animated joint entities, so re-reading those after a delay is
+                // a direct observation of advancement, with no dependence on the
+                // library's own bookkeeping.
                 val nAnim = try { n.animationCount } catch (_: Throwable) { 0 }
                 val nSkin = try { n.skinCount } catch (_: Throwable) { 0 }
                 rigProbeReported = false
-                rigAnimTime = -1.0
                 Log.i(TAG, "RIG PROBE: animations=%d skins=%d (advance TBC)"
                     .format(nAnim, nSkin))
-                postDelayed({
-                    val moved = try {
-                        val t0 = n.animator?.let { an ->
-                            if (nAnim > 0) an.getAnimationDuration(0) else 0f
-                        } ?: 0f
-                        // A non-zero duration plus a live animator is the load
-                        // half; the advance half is sampled in the frame hook.
-                        nAnim > 0 && t0 > 0f
-                    } catch (_: Throwable) {
-                        false
+
+                // EVERY joint, not one. Only 5 of this figure's 24 joints carry
+                // any motion - the other 19 are two-key tracks holding the bind
+                // pose - so a single sampled joint would very likely report a
+                // healthy rig as frozen.
+                val tm = loader.engine.transformManager
+                fun sampleJoints(): FloatArray? = try {
+                    val buf = ArrayList<Float>()
+                    val m = FloatArray(16)
+                    for (s in 0 until nSkin) {
+                        for (e in inst.getJointsAt(s)) {
+                            val ti = tm.getInstance(e)
+                            if (ti != 0) {
+                                tm.getTransform(ti, m)
+                                for (v in m) buf.add(v)
+                            }
+                        }
                     }
+                    if (buf.isEmpty()) null else buf.toFloatArray()
+                } catch (t: Throwable) {
+                    Log.w(TAG, "joint sample failed", t)
+                    null
+                }
+
+                val before = sampleJoints()
+                postDelayed({
+                    val after = sampleJoints()
+                    val moved = before != null && after != null &&
+                        before.size == after.size &&
+                        before.indices.any { abs(before[it] - after[it]) > 1e-5f }
                     if (!rigProbeReported) {
                         rigProbeReported = true
-                        Log.i(TAG, "RIG PROBE RESULT: animations=%d skins=%d advancing=%s"
-                            .format(nAnim, nSkin, moved))
+                        Log.i(
+                            TAG,
+                            ("RIG PROBE RESULT: animations=%d skins=%d " +
+                                "joints=%d advancing=%s")
+                                .format(nAnim, nSkin,
+                                    (before?.size ?: 0) / 16, moved),
+                        )
                         post { onRigProbe?.invoke(nAnim, nSkin, moved) }
                     }
                 }, 1200L)
@@ -1236,6 +1598,22 @@ class EpocheyeMagicWindowView(
         } catch (t: Throwable) {
             Log.w(TAG, "timeline switch failed", t)
         }
+    }
+
+    fun setSkyColor(rgb: FloatArray?) {
+        val cur = skyColorState.value
+        val same = (cur == null && rgb == null) ||
+            (cur != null && rgb != null && cur.contentEquals(rgb))
+        if (same) return
+        skyColorState.value = rgb
+        skyColor = rgb
+    }
+
+    fun setLightScale(v: Float) {
+        val k = if (v <= 0f) 1.0f else v
+        if (k == lightScale) return
+        lightScale = k
+        lightScaleState.value = k
     }
 
     fun setFogEnabled(enabled: Boolean) {
