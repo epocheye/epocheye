@@ -262,7 +262,7 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
   {
     id: 'P0',
     title: 'Front lawn',
-    position: [0.000, -14.000, 0.900],
+    position: [0.000, -14.000, 1.600],
     headingDeg: 0.00,
     pitchDeg: 0.00,
     fovDeg: 62.0,
