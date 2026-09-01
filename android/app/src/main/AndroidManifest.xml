@@ -25,6 +25,25 @@
          API 33; both surfaces degrade to silence if the user declines. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!--
+      LOCK-SCREEN TRANSPORT FOR THE NARRATION.
+
+      NOT for background audio, which already works without any of this: a
+      105 s clip was measured playing to completion with the screen locked and
+      no service of any kind, because <Video playInBackground/> keeps ExoPlayer
+      alive on its own. What was missing was only the CONTROL - a visitor
+      walking a building with the phone in a pocket had no way to pause without
+      unlocking, finding the app and finding the button.
+
+      MEDIA_PLAYBACK is the narrow type, and it is the honest one: the only
+      foreground service this app runs is react-native-video's, it only starts
+      while a clip is actually playing, and it stops with the clip. Declaring
+      the generic FOREGROUND_SERVICE alongside it is required - the typed
+      permission is additional to it, not a replacement.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -84,6 +103,33 @@
             <data android:scheme="epocheye" />
         </intent-filter>
       </activity>
+
+      <!--
+        react-native-video's own MediaSessionService, declared HERE because the
+        library ships an empty manifest and leaves the decision to the app -
+        which is right, since it is the app that has to answer for a foreground
+        service in review.
+
+        It is started only by <Video showNotificationControls/>, and only two
+        screens set that: the audio guide and the magic window, the two
+        long-form narration surfaces. Everything else that plays audio
+        (museum-mode narration, the journey step, a figure speaking) leaves it
+        off, so a two-second line never puts a media notification on the lock
+        screen.
+
+        exported="false" because nothing outside the app should bind it; the
+        intent-filter is what media3 routes hardware media buttons and
+        notification actions through, so it stays even though our own binding
+        is direct.
+      -->
+      <service
+        android:name="com.brentvatne.exoplayer.VideoPlaybackService"
+        android:exported="false"
+        android:foregroundServiceType="mediaPlayback">
+        <intent-filter>
+          <action android:name="androidx.media3.session.MediaSessionService" />
+        </intent-filter>
+      </service>
 
     </application>
 </manifest>

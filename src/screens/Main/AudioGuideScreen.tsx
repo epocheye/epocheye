@@ -307,6 +307,12 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
         title={selected.title}
         autoPlay
         suspended={held}
+        // The guide is meant to be listened to while walking, often with the
+        // phone away. Without this the only way to pause is to unlock, find
+        // the app and find the button — which is the same failure the big
+        // play control on this screen exists to fix, one layer out.
+        showNotificationControls
+        notificationSubtitle={siteName}
         onPausedChange={setPlayerPaused}
         onLoad={d => setDurationMs(Math.round((d.duration ?? 0) * 1000))}
         onProgress={d => setElapsedMs(Math.round((d.currentTime ?? 0) * 1000))}

@@ -685,6 +685,13 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
         title={stopForView.title}
         autoPlay
         suspended={speaking || audioHeld}
+        // `the_lost_colour` runs 105 s and this is a screen a visitor holds up
+        // and then lowers. The lock-screen transport is how they pause it
+        // without coming back in. Ducking a figure's speech over it raises
+        // `suspended`, which the notification reflects as paused - correct: it
+        // is paused, briefly, and the visitor can see why on screen.
+        showNotificationControls
+        notificationSubtitle={scene.title}
         onPausedChange={setAudioPaused}
       />
     ) : null;

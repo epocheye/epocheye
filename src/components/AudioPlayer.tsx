@@ -121,6 +121,30 @@ interface AudioPlayerProps {
   /** Passthrough. Nothing here reacts to a playback error; a caller that cares
    *  (the guide advances rather than stranding the visitor) must handle it. */
   onError?: (data: OnVideoErrorData) => void;
+  /**
+   * Put a transport on the lock screen and in the notification shade.
+   *
+   * OFF by default, and the default is the point. Background audio does not
+   * need this - a 105 s clip was measured playing to completion with the
+   * screen locked and no service at all, because `playInBackground` keeps
+   * ExoPlayer alive on its own. What this adds is the CONTROL, for a visitor
+   * walking a building with the phone in a pocket who wants to pause without
+   * unlocking it.
+   *
+   * That is worth a foreground service for a 105 s narration and absurd for a
+   * two-second line, so it is the caller who decides. Only the two long-form
+   * narration surfaces turn it on: the audio guide and the magic window. It
+   * requires FOREGROUND_SERVICE_MEDIA_PLAYBACK and a declaration of
+   * com.brentvatne.exoplayer.VideoPlaybackService in AndroidManifest.xml,
+   * both of which the app supplies because the library ships neither.
+   */
+  showNotificationControls?: boolean;
+  /**
+   * Second line on the lock screen, under `title` - the place the clip belongs
+   * to. Unused on screen; a notification with a stop name and nothing else does
+   * not say which app or which building it came from.
+   */
+  notificationSubtitle?: string;
 }
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({
@@ -134,6 +158,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   onProgress,
   onEnd,
   onError,
+  showNotificationControls = false,
+  notificationSubtitle,
 }) => {
   const trackKey = sourceKey ?? uri;
   const { t } = useTranslation();
@@ -342,7 +368,16 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       {/* Hidden video — audio only */}
       <Video
         ref={videoRef}
-        source={{ uri }}
+        // METADATA IS WHAT MAKES THE NOTIFICATION READABLE. media3 draws the
+        // lock-screen card from the MediaItem, not from anything on this
+        // component, so a player with notification controls and no metadata
+        // shows a blank card with two buttons on it.
+        source={{
+          uri,
+          metadata: showNotificationControls
+            ? {title, subtitle: notificationSubtitle, artist: notificationSubtitle}
+            : undefined,
+        }}
         paused={paused || suspended}
         rate={rate}
         onProgress={handleProgress}
@@ -351,6 +386,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         onError={handleError}
         playInBackground
         playWhenInactive
+        showNotificationControls={showNotificationControls}
         ignoreSilentSwitch="ignore"
         style={{ height: 0, width: 0 }}
       />
