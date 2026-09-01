@@ -132,7 +132,6 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
   );
 
   const [glbUri, setGlbUri] = useState<string | null>(null);
-  const [index, setIndex] = useState(0);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scaleWarning, setScaleWarning] = useState<string | null>(null);
@@ -157,6 +156,24 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
   const [tourActive, setTourActive] = useState(
     () => tour.length > 0 && !routeViewpointId,
   );
+
+  // THE VIEW OPENS WHERE THE TOUR OPENS. This was `useState(0)`, which is P2
+  // "Down the arcade" - an interior - while the tour's first stop is P0, the
+  // front lawn. The screen therefore opened inside the building and captioned it
+  // "You are standing in The front lawn", because the facing line reads
+  // `tourStop.place` while the camera reads `viewpoint`. They only agreed once
+  // the visitor tapped "I'm here", which set the index from the tour stop.
+  //
+  // Deriving the initial index from the same tour stop makes them agree from the
+  // first frame, and it is the right way round: the tour is the visitor
+  // interface, so the tour decides where the view starts. A scene with no tour
+  // (the fort) still opens at its own first viewpoint.
+  const [index, setIndex] = useState(() => {
+    const first = tour.length > 0 && !routeViewpointId ? tour[0] : undefined;
+    if (!first) return 0;
+    const i = scene.viewpoints.findIndex(v => v.id === first.viewpointId);
+    return i >= 0 ? i : 0;
+  });
   useEffect(() => {
     if (!routeViewpointId) return;
     const i = scene.viewpoints.findIndex(v => v.id === routeViewpointId);
@@ -282,6 +299,21 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
       ) ?? people[0],
     [people, viewpoint.id],
   );
+  /**
+   * The figure can actually be SEEN from where the visitor is standing.
+   *
+   * ONE predicate, two consumers. It used to be written inline in the point
+   * hint and simply omitted from the person tab, so at a viewpoint the figure
+   * is not visible from - every palace stop except P5, since Purnaiah is
+   * `visibleFrom: ['P5']` - the hint correctly stayed away while the tab still
+   * announced him by name. `person` falls back to `people[0]` so that a scene
+   * never silently loses its figure, which is what put a name on screen for
+   * someone standing a storey above the visitor.
+   */
+  const personVisible =
+    !!person &&
+    (!person.visibleFrom || person.visibleFrom.includes(viewpoint.id));
+
   useEffect(() => {
     if (!person) return;
     let cancelled = false;
@@ -686,11 +718,7 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
           at any stop the person authored themselves out of — for the palace,
           every stop on the ground floor, because Purnaiah is a storey up. And
           the palace cannot be walked, so it does not ask you to. */}
-      {figure &&
-      person &&
-      !everSpoke &&
-      ready &&
-      (!person.visibleFrom || person.visibleFrom.includes(viewpoint.id)) ? (
+      {figure && person && personVisible && !everSpoke && ready ? (
         <View style={styles.pointHint} pointerEvents="none">
           <Text style={styles.pointHintText}>
             {scene.hasSiteWalk
@@ -790,7 +818,7 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
 
       {/* The figure's voice. Every line carries its tier and source in the
           record; what the visitor sees is the sentence, not the apparatus. */}
-      {figure && person ? (
+      {figure && person && personVisible ? (
         <Pressable style={styles.personTab} onPress={advance}>
           <Text style={styles.personName}>{person.name}</Text>
           <Text style={styles.personRole}>{person.role}</Text>
