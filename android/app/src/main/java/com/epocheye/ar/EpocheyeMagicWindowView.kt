@@ -697,6 +697,28 @@ class EpocheyeMagicWindowView(
                 // NOT scaleToUnits - see trap 1 in the class doc.
                 val node = ModelNode(modelInstance = instance)
                 root.addChildNode(node)
+                // PIN THE MODEL TO THE PLAN ORIGIN. This is the fix for "the
+                // palace came back showing its own roof from above" - the
+                // symptom the camera diagnostic below was added to chase, and
+                // which was never explained.
+                //
+                // The viewpoints are authored in the GLB's OWN coordinates
+                // (P5 "up 4.2" means 4.2 m above the palace's ground floor), so
+                // the model has to sit at the origin for the camera's authored
+                // heights to mean anything. It was not: the node reported
+                // worldPos=(-0.45, -2.61, 14.00) with worldScale 1, which put
+                // the building 2.61 m BELOW where the viewpoints assume and
+                // therefore put every interior camera that much too high. At P5
+                // that is glTF Y 6.81 against a roof deck at 6.19-6.37 - the
+                // camera stands on top of the roof, which is exactly what the
+                // device rendered: sky above, lawn below, no building.
+                //
+                // Nothing in this file positioned it and the GLB carries no node
+                // transform (all 758 nodes are identity), so the offset comes
+                // from SceneView. Stating the transform we require, rather than
+                // inheriting whatever the library leaves, costs one call.
+                node.worldPosition = Float3(0f, 0f, 0f)
+                node.worldRotation = Float3(0f, 0f, 0f)
                 currentModelNode = node
                 loadedUri = uri
                 applyTimeline()
