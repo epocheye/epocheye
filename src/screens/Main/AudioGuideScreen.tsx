@@ -55,6 +55,7 @@ import AudioPlayer from '../../components/AudioPlayer';
 import { buildAudioUrl } from '../../config/glbDelivery';
 import {
   formatClipDuration,
+  formatZoneLabel,
   groupStopsByZone,
   hasRestoration,
   isPlayable,
@@ -176,7 +177,7 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
         {groups.map(group => (
           <View key={group.zone ?? '__ungrouped__'} style={styles.group}>
             {group.zone ? (
-              <Text style={styles.zoneHeader}>{group.zone.toUpperCase()}</Text>
+              <Text style={styles.zoneHeader}>{formatZoneLabel(group.zone)}</Text>
             ) : null}
             {group.stops.map(stop => {
               const playable = isPlayable(stop);
@@ -418,7 +419,9 @@ const styles = StyleSheet.create({
   zoneHeader: {
     fontFamily: FONTS.uiSemiBold,
     fontSize: FONT_SIZES.caption,
-    letterSpacing: 1.6,
+    // 1.6 was tracking for an ALL-CAPS slug. The header is sentence case now,
+    // where that much letter-spacing reads as a label rather than a place.
+    letterSpacing: 0.6,
     color: COLORS.textTertiary,
     marginBottom: SPACING.sm,
   },

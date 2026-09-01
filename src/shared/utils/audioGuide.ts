@@ -24,6 +24,27 @@ export interface AudioZoneGroup {
 }
 
 /**
+ * Turns a zone slug into something a visitor can read.
+ *
+ * `audio_stops.zone` is a database slug — the palace holds `exterior_lawn`,
+ * `ground_colonnade`, `upper_floor` and `end_block` — and the screen used to
+ * render `zone.toUpperCase()`, which put EXTERIOR_LAWN and GROUND_COLONNADE on
+ * screen in front of visitors.
+ *
+ * Deliberately a GENERIC transform rather than a lookup table: a per-site label
+ * map would put monument content back into the app, which the post-auth
+ * boundary in CLAUDE.md exists to prevent, and it would silently fall back to
+ * the raw slug for every site added later. Underscores become spaces and the
+ * first letter is capitalised; anything unexpected still reads as words rather
+ * than as a key.
+ */
+export function formatZoneLabel(zone: string): string {
+  const words = zone.trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!words) return '';
+  return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
+}
+
+/**
  * Formats a clip duration as m:ss. Negative, NaN and missing values collapse to
  * "0:00" rather than rendering "NaN:aN" — duration_ms is NOT NULL server-side,
  * but a stale cached payload should not be able to break the row.

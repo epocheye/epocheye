@@ -5,6 +5,7 @@
  */
 import {
   formatClipDuration,
+  formatZoneLabel,
   groupStopsByZone,
   hasRestoration,
   isPlayable,
@@ -56,6 +57,31 @@ describe('formatClipDuration', () => {
     expect(formatClipDuration(undefined)).toBe('0:00');
     expect(formatClipDuration(null)).toBe('0:00');
     expect(formatClipDuration(Number.NaN)).toBe('0:00');
+  });
+});
+
+describe('formatZoneLabel', () => {
+  // The bug: the screen rendered zone.toUpperCase(), so visitors saw the raw
+  // database slugs EXTERIOR_LAWN and GROUND_COLONNADE.
+  it('turns the palace zone slugs into readable places', () => {
+    expect(formatZoneLabel('exterior_lawn')).toBe('Exterior lawn');
+    expect(formatZoneLabel('ground_colonnade')).toBe('Ground colonnade');
+    expect(formatZoneLabel('upper_floor')).toBe('Upper floor');
+    expect(formatZoneLabel('end_block')).toBe('End block');
+  });
+
+  it('never leaves an underscore or a shouting slug on screen', () => {
+    for (const z of ['exterior_lawn', 'ground_colonnade', 'END_BLOCK', 'a__b']) {
+      const out = formatZoneLabel(z);
+      expect(out).not.toContain('_');
+      expect(out).not.toBe(out.toUpperCase());
+    }
+  });
+
+  it('handles hyphens, stray whitespace and empty input', () => {
+    expect(formatZoneLabel('upper-floor')).toBe('Upper floor');
+    expect(formatZoneLabel('  ground__colonnade  ')).toBe('Ground colonnade');
+    expect(formatZoneLabel('   ')).toBe('');
   });
 });
 
