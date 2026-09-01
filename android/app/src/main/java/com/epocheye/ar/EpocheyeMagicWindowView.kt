@@ -1496,9 +1496,6 @@ class EpocheyeMagicWindowView(
                 figureNode = n
                 loadedFigureUri = uri
                 poseFigure()
-                val sz = n.size
-                Log.i(TAG, "figure loaded: %.2f x %.2f x %.2f m at (%.1f E, %.1f N)"
-                    .format(sz.x, sz.y, abs(sz.z), figEast, figNorth))
 
                 // BLOCKING TEST. Count the rig, then check a second later that
                 // the animator has MOVED. Presence of an animation proves
@@ -1529,6 +1526,62 @@ class EpocheyeMagicWindowView(
                 // pose - so a single sampled joint would very likely report a
                 // healthy rig as frozen.
                 val tm = loader.engine.transformManager
+
+                // HOW TALL IS HE, ACTUALLY. This used to read `n.size` and print
+                // "figure loaded: 0.02 x 0.02 x 0.00 m", which cost a night.
+                //
+                // That number is not wrong so much as it is the wrong number.
+                // ModelNode.size is the renderable's STATIC bounding box - the
+                // POSITION accessors put through the node hierarchy with NO
+                // skinning applied. These figures come out of Blender with an
+                // Armature node scaled 0.01 and inverse bind matrices carrying a
+                // matching 100, so the bind box really is 1.7 cm tall and the
+                // skinned figure really is 1.68 m. Both are true; only the second
+                // is on screen. Printing the first as "m" invites the reader to
+                // conclude the asset is degenerate, which it is not.
+                //
+                // So measure something that is genuinely observable at runtime:
+                // where the joints are in WORLD space. That catches the fault
+                // this loader could actually cause - a stray scale on the node,
+                // scaleToUnits sneaking back in - because those move the joints
+                // too. It CANNOT catch a broken inverse-bind premultiplication:
+                // that explodes the skin while leaving the skeleton perfect, and
+                // no Filament Java binding exposes skinned bounds
+                // (FilamentInstance has no recomputeBoundingBoxes). That check
+                // belongs offline, in heritage_assets/.../tools/verify_figure.py,
+                // which skins the mesh itself. Do not re-derive it from here.
+                val bind = n.size
+                var jl = Float.MAX_VALUE
+                var jh = -Float.MAX_VALUE
+                try {
+                    val m = FloatArray(16)
+                    for (s in 0 until nSkin) {
+                        for (e in inst.getJointsAt(s)) {
+                            val ti = tm.getInstance(e)
+                            if (ti != 0) {
+                                tm.getWorldTransform(ti, m)
+                                // Column-major: translation is elements 12..14.
+                                if (m[13] < jl) jl = m[13]
+                                if (m[13] > jh) jh = m[13]
+                            }
+                        }
+                    }
+                } catch (t: Throwable) {
+                    Log.w(TAG, "joint span probe failed", t)
+                }
+                val skeletonM = if (jh > jl) jh - jl else Float.NaN
+                Log.i(
+                    TAG,
+                    ("figure loaded: skeleton spans %.3f m of world height " +
+                        "(expect ~1.6 for these rigs) at (%.1f E, %.1f N, " +
+                        "%.2f up); bind-pose box %.4f x %.4f x %.4f m is the " +
+                        "UNSKINNED extent and is NOT the rendered size")
+                        .format(
+                            skeletonM, figEast, figNorth, figUp,
+                            bind.x, bind.y, abs(bind.z),
+                        ),
+                )
+
                 fun sampleJoints(): FloatArray? = try {
                     val buf = ArrayList<Float>()
                     val m = FloatArray(16)
