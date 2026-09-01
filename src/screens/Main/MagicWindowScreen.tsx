@@ -18,20 +18,22 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
-  Image,
   PanResponder,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import {
   Compass,
   Crosshair,
   Footprints,
+  Info,
+  Pause,
+  Play,
   Volume2,
   VolumeX,
   X,
@@ -84,15 +86,14 @@ import {
   useNarrationLang,
 } from '../../stores/museumPrefsStore';
 import {tourFor, type TourStop} from '../../features/magicwindow/tour';
-import {roomPhotoFor} from '../../features/magicwindow/roomPhotos';
-import PalacePlanIndicator from '../../features/magicwindow/PalacePlanIndicator';
-import {TEXTURE_CREDITS} from '../../features/magicwindow/palace';
+import MagicWindowSheet from '../../features/magicwindow/MagicWindowSheet';
 import {ASSAULT} from '../../features/magicwindow/assault';
 import {FORT_STATES} from '../../features/magicwindow/timeline';
 import {resolveModelGlb} from '../../services/glbSource';
 import {isAdminUser} from '../../shared/auth/isAdminUser';
 import {useSafeBackHandler} from '../../shared/hooks/useSafeGoBack';
 import {COLORS, FONTS, RADIUS, SPACING} from '../../core/constants/theme';
+import {STORAGE_KEYS} from '../../core/constants/storage-keys';
 
 /**
  * The true-scale span of the whole scene, in metres.
@@ -251,7 +252,6 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
   // reading it and the caption scrolls away. Heading comes from the native view,
   // derived from the same forward vector that aims the camera.
   const [headingDeg, setHeadingDeg] = useState<number | null>(null);
-  const [planOpen, setPlanOpen] = useState(false);
   const onHeading = useCallback(
     ({nativeEvent}: {nativeEvent: MagicWindowHeadingEvent}) => {
       setHeadingDeg(nativeEvent.headingDeg);
@@ -263,7 +263,24 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
   // wall ships as a photograph of the real surface under CC BY 2.0, which
   // requires attribution. Shown on demand rather than permanently so it does
   // not compete with the view, but always reachable from the legend.
-  const [creditsOpen, setCreditsOpen] = useState(false);
+
+  /**
+   * The detail sheet. Everything that is not the reconstruction lives behind
+   * this one control - see MagicWindowSheet for what moved and why.
+   */
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  /**
+   * The visitor's own pause, held separately from the figure's ducking.
+   *
+   * It rides `suspended` rather than the player's internal `paused` because
+   * there is no imperative handle on <AudioPlayer/> and the transport now lives
+   * inside the sheet. `suspended` holds playback WITHOUT losing the position,
+   * which is the whole point for a 105 s clip.
+   */
+  const [audioHeld, setAudioHeld] = useState(false);
+  /** What the player reports it is actually doing, for the glyph. */
+  const [audioPaused, setAudioPaused] = useState(true);
 
   const [rigTest, setRigTest] = useState(false);
   const [rigResult, setRigResult] = useState<string | null>(null);
@@ -632,6 +649,77 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
     [],
   );
 
+  // ---- WHAT THE SUBTRACTED LAYOUT NEEDS ----------------------------------
+
+  /**
+   * The single line over the reconstruction.
+   *
+   * Before the visitor confirms, it is the tour's walk-to - where to go. After,
+   * it is where they are. One line, two tenses, replacing the four elements
+   * that used to say it between them: the stop title, "1 of 8", the facing
+   * sentence and the caption.
+   *
+   * `facing` is emitted from the build off the TRUE bearing; headingDeg is
+   * frame-relative and would say "north" here.
+   */
+  const whereLine = useMemo(() => {
+    if (tourStop && !arrived) return tourStop.walkTo;
+    const place = tourStop?.place ?? viewpoint.title;
+    return viewpoint.facing
+      ? `You are in ${place}, looking ${viewpoint.facing}.`
+      : `You are in ${place}.`;
+  }, [tourStop, arrived, viewpoint.title, viewpoint.facing]);
+
+  /**
+   * ONE player instance, and it lives in the sheet.
+   *
+   * It is created here rather than inside MagicWindowSheet so the glyph on the
+   * reconstruction and the transport in the sheet drive the same component. The
+   * sheet is never unmounted, so a 105 s clip survives the sheet being closed.
+   */
+  const playerNode =
+    clipUri && stopForView && (!tourActive || arrived) ? (
+      <AudioPlayer
+        uri={clipUri}
+        sourceKey={stopForView.stop_key}
+        title={stopForView.title}
+        autoPlay
+        suspended={speaking || audioHeld}
+        onPausedChange={setAudioPaused}
+      />
+    ) : null;
+
+  /** Sound is actually coming out: not paused, not ducked, not held. */
+  const audioSounding = !!playerNode && !audioPaused && !speaking && !audioHeld;
+
+  /**
+   * The one-time hint that replaced the permanent instruction line.
+   *
+   * Starts false so a returning visitor never sees a flash of it while the
+   * flag loads; the effect raises it only when the flag is genuinely absent.
+   */
+  const [showHint, setShowHint] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void AsyncStorage.getItem(STORAGE_KEYS.MAGIC_WINDOW.HINT_SEEN)
+      .then(seen => {
+        if (!cancelled && seen !== 'true') setShowHint(true);
+      })
+      .catch(() => {
+        // A storage failure must not cost the visitor the reconstruction.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const dismissHint = useCallback(() => {
+    setShowHint(false);
+    void AsyncStorage.setItem(
+      STORAGE_KEYS.MAGIC_WINDOW.HINT_SEEN,
+      'true',
+    ).catch(() => {});
+  }, []);
+
   if (!isMagicWindowAvailable) {
     return (
       <View style={styles.fallback}>
@@ -682,17 +770,13 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
         </View>
       ) : null}
 
-      {/* Top: title, close. */}
-      <LinearGradient
-        colors={['rgba(10,10,12,0.85)', 'transparent']}
-        style={styles.topGradient}
-        pointerEvents="none"
-      />
-      <SafeAreaView style={styles.topBar} edges={['top']}>
-        <View style={styles.titleBlock}>
-          <Text style={styles.title}>{scene.title}</Text>
-          <Text style={styles.subtitle}>{scene.subtitle}</Text>
-        </View>
+      {/* THE WAY OUT, and nothing else up here.
+          The title and subtitle went: "Tipu Sultan's Summer Palace / as it was
+          painted" is answered by the reconstruction itself and by the screen the
+          visitor tapped to get here. The gradient went with them - it existed to
+          make that text legible, and unlit it was just a bruise across the top
+          of the building. */}
+      <SafeAreaView style={styles.topBar} edges={['top']} pointerEvents="box-none">
         <Pressable
           onPress={safeGoBack}
           hitSlop={12}
@@ -727,23 +811,6 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
           </Text>
         </View>
       ) : null}
-
-      {scene.hasPlanIndicator ? (
-        <PalacePlanIndicator
-          position={viewpoint.position}
-          headingDeg={headingDeg}
-          title={viewpoint.title}
-          expanded={planOpen}
-          onToggle={() => setPlanOpen(v => !v)}
-        />
-      ) : (
-        // Every other scene at least gets its stop named, permanently.
-        <View style={styles.stopNameOnly} pointerEvents="none">
-          <Text style={styles.stopNameText} numberOfLines={1}>
-            {viewpoint.title}
-          </Text>
-        </View>
-      )}
 
       {__DEV__ && isAdminUser() && camDebug ? (
         <View style={styles.camHud} pointerEvents="none">
@@ -893,267 +960,264 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
         </View>
       ) : null}
 
-      {/* Bottom: caption, legend, viewpoint rail, recentre. */}
+      {/* -- THE ONLY THINGS OVER THE RECONSTRUCTION ----------------------
+          Where you are, how far through you are, the tour's action, the
+          controls, and one line of honesty. Everything else moved into the
+          sheet behind the info control. */}
       <LinearGradient
-        colors={['transparent', 'rgba(10,10,12,0.92)']}
+        colors={['transparent', 'rgba(10,10,12,0.86)']}
         style={styles.bottomGradient}
         pointerEvents="none"
       />
-      <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
-        {/* WHERE YOU ARE. Always visible, never behind a tap. The room name and
-            the direction are the two things a visitor needs to match what is on
-            screen to what is in front of them, and the old UI made them expand
-            a plan to get either. `facing` is emitted from the build off the TRUE
-            bearing - headingDeg is frame-relative and would say "north" here. */}
-        <View style={styles.whereRow}>
-          <Text style={styles.whereTitle} numberOfLines={1}>
-            {viewpoint.title}
-          </Text>
-          {tour.length > 0 ? (
-            <Text style={styles.whereProgress}>
-              {tourActive
-                ? `${tourIndex + 1} of ${tour.length}`
-                : 'Jumped to'}
-              {skipped.length > 0 ? ` · ${skipped.length} skipped` : ''}
-            </Text>
-          ) : null}
-        </View>
-        {viewpoint.facing ? (
-          <Text style={styles.whereFacing}>
-            You are standing in {tourStop?.place ?? viewpoint.title}, looking{' '}
-            {viewpoint.facing}.
-          </Text>
-        ) : null}
+      <SafeAreaView
+        style={styles.bottomBar}
+        edges={['bottom']}
+        pointerEvents="box-none">
+        {/* ONE LINE, DOING DOUBLE DUTY. Before the visitor confirms it is the
+            walk-to: where to go. After, it is where they are. The same question
+            in a different tense, which is why it can be one line rather than
+            the four it used to take (title, progress, facing, caption). */}
+        {/* Three lines, not two: the tour's walk-to instructions run long
+            ("Stand out on the lawn in front of the palace, far enough back to
+            see the whole front at once. Face the building.") and clipping one
+            mid-word is worse than the line it replaced. */}
+        <Text style={styles.where} numberOfLines={3}>
+          {whereLine}
+        </Text>
 
-        <Text style={styles.caption}>{viewpoint.caption}</Text>
-
-        {/* The stop that belongs at this position. ONE player instance, kept
-            mounted across viewpoints: AudioPlayer swaps source on a sourceKey
-            change without remounting, which is exactly the viewpoint-change
-            case. `suspended` ducks it while the figure is speaking, rather than
-            unmounting, so a 105 s clip resumes where it was. */}
-        {clipUri && stopForView && (!tourActive || arrived) ? (
-          <AudioPlayer
-            uri={clipUri}
-            sourceKey={stopForView.stop_key}
-            title={stopForView.title}
-            autoPlay
-            suspended={speaking}
-          />
-        ) : null}
-
-        <View style={styles.legendRow}>
-          {scene.legend.map(item => (
-            <View key={item.key} style={styles.legendItem}>
+        {/* PROGRESS AS A RULE, NOT AS WORDS. "1 of 8" is a number the visitor
+            has to read and convert; a filled tick is a glance. Skipped stops
+            stay visible as hollow ticks, because progress that quietly forgets
+            what you walked past is not honest about the visit. */}
+        {tour.length > 0 ? (
+          <View
+            style={styles.progress}
+            accessibilityLabel={`Stop ${tourIndex + 1} of ${tour.length}`}>
+            {tour.map((st, i) => (
               <View
+                key={st.viewpointId}
                 style={[
-                  styles.legendSwatch,
-                  item.key === 'ghost' && styles.legendSwatchGhost,
-                  item.key === 'open' && styles.legendSwatchOpen,
-                  item.key === 'colour' && styles.legendSwatchGhost,
-                  item.key === 'unknown' && styles.legendSwatchOpen,
+                  styles.tick,
+                  tourActive && i === tourIndex && styles.tickOn,
+                  skipped.includes(st.viewpointId) && styles.tickSkipped,
                 ]}
               />
-              <Text style={styles.legendLabel}>{item.label}</Text>
-            </View>
-          ))}
-        </View>
-        {scene.hasPlanIndicator && TEXTURE_CREDITS.length > 0 ? (
-          <Pressable onPress={() => setCreditsOpen(v => !v)} hitSlop={8}>
-            <Text style={styles.creditsLink}>
-              {creditsOpen ? 'Image credits ×' : 'Image credits'}
-            </Text>
-          </Pressable>
-        ) : null}
-        {creditsOpen
-          ? TEXTURE_CREDITS.map(c => (
-              <Text key={c.source} style={styles.creditsText}>
-                {`${c.used_for} — photograph by ${c.author}, ${c.licence}`}
-              </Text>
-            ))
-          : null}
-
-        <Text style={styles.legendDetail}>
-          {scene.legend
-            .slice(1)
-            .map(l => l.detail)
-            .join(' ')}
-        </Text>
-
-        {scene.hasAssault ? (
-        <>
-        <Pressable style={styles.assaultBar} onPress={advanceAssault}>
-          <Text style={styles.assaultCue}>
-            {step === 0
-              ? 'Play the storm of 21 March 1791'
-              : `${step} of ${ASSAULT.length} · ${assault?.when ?? ''}`}
-          </Text>
-        </Pressable>
-        {assault ? (
-          <View style={styles.assaultCard}>
-            <Text style={styles.assaultTitle}>{assault.title}</Text>
-            <Text style={styles.assaultText}>{assault.text}</Text>
-            {!assault.drawn ? (
-              <Text style={styles.assaultNote}>
-                Nothing is added to the model at this step.
-              </Text>
-            ) : null}
+            ))}
           </View>
         ) : null}
-        </>
-        ) : null}
 
-        {scene.hasTimeline ? (
-        <>
-        <View style={styles.timelineRow}>
-          {FORT_STATES.map(f => {
-            const on = f.id === stateId;
-            return (
-              <Pressable
-                key={f.id}
-                onPress={() => setStateId(f.id)}
-                style={[styles.era, on && styles.eraOn]}>
-                <Text style={[styles.eraYear, on && styles.eraYearOn]}>
-                  {f.years}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <Text style={styles.eraNote}>
-          <Text style={styles.eraLabel}>{fortState.label}</Text>
-          {'  ·  '}
-          {fortState.note}
-        </Text>
-        </>
-        ) : null}
-
-        {/* THE GUIDE. Where to walk, then the visitor confirms. It never says
-            it knows where they are, because nothing on this phone does. */}
-        {tourStop ? (
-          <View style={styles.guide}>
-            <Text style={styles.guidePlace}>{tourStop.place}</Text>
-            <Text style={styles.guideWalk}>{tourStop.walkTo}</Text>
-            <View style={styles.guideRow}>
+        <View style={styles.actionRow}>
+          {/* THE TOUR'S OWN ACTION. `Skip` stays beside it: a visitor who
+              cannot reach a stop - a closed room, a locked stair - needs a way
+              past that keeps them in the tour, and jumping from the sheet drops
+              them out of it entirely. */}
+          {tourStop ? (
+            <View style={styles.tourActions}>
               {!arrived ? (
                 <Pressable
                   onPress={confirmArrived}
-                  style={styles.guidePrimary}
+                  style={styles.primary}
                   accessibilityLabel={`I am at ${tourStop.place}`}>
-                  <Text style={styles.guidePrimaryText}>I'm here</Text>
+                  <Text style={styles.primaryText}>I&apos;m here</Text>
                 </Pressable>
               ) : tourIndex < tour.length - 1 ? (
                 <Pressable
                   onPress={() => nextTourStop(true)}
-                  style={styles.guidePrimary}>
-                  <Text style={styles.guidePrimaryText}>Next stop</Text>
+                  style={styles.primary}>
+                  <Text style={styles.primaryText}>Next stop</Text>
                 </Pressable>
               ) : (
-                <Pressable onPress={openRail} style={styles.guidePrimary}>
-                  <Text style={styles.guidePrimaryText}>That's the tour</Text>
+                <Pressable onPress={openRail} style={styles.primary}>
+                  <Text style={styles.primaryText}>That&apos;s the tour</Text>
                 </Pressable>
               )}
               {!arrived && tourIndex < tour.length - 1 ? (
                 <Pressable
                   onPress={() => nextTourStop(false)}
-                  hitSlop={8}
-                  style={styles.guideGhost}>
-                  <Text style={styles.guideGhostText}>Skip</Text>
+                  hitSlop={10}
+                  style={styles.ghost}>
+                  <Text style={styles.ghostText}>Skip</Text>
                 </Pressable>
               ) : null}
-              <Pressable onPress={openRail} hitSlop={8} style={styles.guideGhost}>
-                <Text style={styles.guideGhostText}>Jump to a room</Text>
-              </Pressable>
             </View>
+          ) : (
+            <View style={styles.tourActions} />
+          )}
+
+          <View style={styles.controls}>
+            {/* PLAY/PAUSE ONLY. Scrub, speed and the transcript are in the
+                sheet; this is the one audio control a visitor needs without
+                looking at the screen. It rides `suspended`, the same hold the
+                figure's speech uses, so the clip resumes at its position
+                rather than restarting a 105 s narration. */}
+            {playerNode ? (
+              <Pressable
+                onPress={() => setAudioHeld(v => !v)}
+                hitSlop={10}
+                style={styles.control}
+                accessibilityLabel={
+                  audioSounding ? 'Pause narration' : 'Play narration'
+                }>
+                {audioSounding ? (
+                  <Pause size={18} color={COLORS.amber} />
+                ) : (
+                  <Play size={18} color={COLORS.amber} />
+                )}
+              </Pressable>
+            ) : null}
+
+            {scene.hasSiteWalk ? (
+              <>
+                <Pressable
+                  onPress={() => {
+                    setArWalk(v => !v);
+                    setDrift(null);
+                  }}
+                  hitSlop={10}
+                  style={[styles.control, arWalk && styles.controlOn]}
+                  accessibilityLabel="Walk through the fort for real">
+                  <Compass size={18} color={arWalk ? COLORS.bg : COLORS.amber} />
+                </Pressable>
+                <Pressable
+                  onPress={() => setSiteMode(v => !v)}
+                  hitSlop={10}
+                  style={[styles.control, siteMode && styles.controlOn]}
+                  accessibilityLabel="Walk with your own steps">
+                  <Footprints
+                    size={18}
+                    color={siteMode ? COLORS.bg : COLORS.amber}
+                  />
+                </Pressable>
+              </>
+            ) : null}
+
+            <Pressable
+              onPress={recenter}
+              hitSlop={10}
+              style={styles.control}
+              accessibilityLabel="Recentre the view">
+              <Crosshair size={18} color={COLORS.amber} />
+            </Pressable>
+
+            {/* THE ONE CONTROL THAT OPENS EVERYTHING ELSE. */}
+            <Pressable
+              onPress={() => setSheetOpen(true)}
+              hitSlop={10}
+              style={[styles.control, styles.controlPrimary]}
+              accessibilityLabel="Plan, legend, places and transcript">
+              <Info size={18} color={COLORS.bg} />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* THE WALK'S STATE, and only while a walk is switched on.
+            The instruction line this replaced was two different things wearing
+            one style: "turn the phone to look around", which is a first-run
+            hint and is now shown once, and this - whether the visitor's own
+            steps are actually moving them, and how good the fix is. State is
+            not instruction. Dropping it would leave the fort's site mode with
+            no feedback at all, so it stays, gated on the mode being on. */}
+        {scene.hasSiteWalk && (arWalk || siteMode) ? (
+          <Text style={styles.status}>
+            {arWalk
+              ? 'Your real steps are moving you at true scale.'
+              : site.active
+                ? `Your own steps are moving you. Fix ±${Math.round(
+                    site.accuracyM ?? 0,
+                  )} m.`
+                : site.offSite
+                  ? `You are not at the fort. Your steps only move you within ${SITE_WALK_RADIUS_M} m of the Delhi Gate.`
+                  : site.error
+                    ? `Location unavailable — ${site.error}. Using the pad instead.`
+                    : 'Looking for a good enough fix…'}
+          </Text>
+        ) : null}
+
+        {/* SMALL, PERMANENT, AND NOT NEGOTIABLE. The one claim the screen must
+            never stop making about itself. */}
+        <Text style={styles.disclaimer}>A reconstruction, not a photograph.</Text>
+      </SafeAreaView>
+
+      {/* THE SHEET. Always mounted - the single AudioPlayer lives inside it and
+          unmounting would restart the clip every time it closed. */}
+      <MagicWindowSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        scene={scene}
+        viewpoint={viewpoint}
+        index={index}
+        onSelectViewpoint={i => {
+          selectViewpoint(i);
+          setTourActive(false);
+          setSheetOpen(false);
+        }}
+        headingDeg={headingDeg}
+        transcript={stopForView?.clip?.transcript}
+        player={playerNode}>
+        {scene.hasAssault ? (
+          <View style={styles.sheetBlock}>
+            <Pressable style={styles.assaultBar} onPress={advanceAssault}>
+              <Text style={styles.assaultCue}>
+                {step === 0
+                  ? 'Play the storm of 21 March 1791'
+                  : `${step} of ${ASSAULT.length} · ${assault?.when ?? ''}`}
+              </Text>
+            </Pressable>
+            {assault ? (
+              <View style={styles.assaultCard}>
+                <Text style={styles.assaultTitle}>{assault.title}</Text>
+                <Text style={styles.assaultText}>{assault.text}</Text>
+                {!assault.drawn ? (
+                  <Text style={styles.assaultNote}>
+                    Nothing is added to the model at this step.
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
           </View>
         ) : null}
 
-        {/* The rail is a FALLBACK now, reached deliberately. A list of place
-            names cannot be matched to a room you are standing in, so it is not
-            the way in - but it is the way back if the tour is in the wrong
-            place, and it is the only way to revisit a room out of order. */}
-        <View style={styles.railRow}>
-          {tourStop ? null : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.rail}>
-            {scene.viewpoints.map((vp, i) => {
-              const active = i === index;
-              // A photograph where one honestly exists — a visitor matches a
-              // picture to the room in front of them and cannot match a phrase.
-              // Two viewpoints have none on purpose; see roomPhotos.ts.
-              const photo = roomPhotoFor(scene.slug, vp.id);
-              return (
-                <Pressable
-                  key={vp.id}
-                  onPress={() => selectViewpoint(i)}
-                  style={[
-                    styles.chip,
-                    !!photo && styles.chipWithPhoto,
-                    active && styles.chipActive,
-                  ]}>
-                  {photo ? (
-                    <Image source={photo} style={styles.chipPhoto} />
-                  ) : null}
-                  <Text
-                    style={[styles.chipText, active && styles.chipTextActive]}>
-                    {vp.title}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          )}
-          {scene.hasSiteWalk ? (
-            <>
-              <Pressable
-                onPress={() => {
-                  setArWalk(v => !v);
-                  setDrift(null);
-                }}
-                hitSlop={10}
-                style={[styles.recenterButton, arWalk && styles.siteButtonOn]}
-                accessibilityLabel="Walk through the fort for real">
-                <Compass size={18} color={arWalk ? COLORS.bg : COLORS.amber} />
-              </Pressable>
-              <Pressable
-                onPress={() => setSiteMode(v => !v)}
-                hitSlop={10}
-                style={[styles.recenterButton, siteMode && styles.siteButtonOn]}
-                accessibilityLabel="Walk with your own steps">
-                <Footprints
-                  size={18}
-                  color={siteMode ? COLORS.bg : COLORS.amber}
-                />
-              </Pressable>
-            </>
-          ) : null}
-          <Pressable
-            onPress={recenter}
-            hitSlop={10}
-            style={styles.recenterButton}
-            accessibilityLabel="Recentre the view">
-            <Crosshair size={18} color={COLORS.bg} />
-          </Pressable>
-        </View>
+        {scene.hasTimeline ? (
+          <View style={styles.sheetBlock}>
+            <View style={styles.timelineRow}>
+              {FORT_STATES.map(f => {
+                const on = f.id === stateId;
+                return (
+                  <Pressable
+                    key={f.id}
+                    onPress={() => setStateId(f.id)}
+                    style={[styles.era, on && styles.eraOn]}>
+                    <Text style={[styles.eraYear, on && styles.eraYearOn]}>
+                      {f.years}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.eraNote}>
+              <Text style={styles.eraLabel}>{fortState.label}</Text>
+              {'  ·  '}
+              {fortState.note}
+            </Text>
+          </View>
+        ) : null}
+      </MagicWindowSheet>
 
-        <Text style={styles.rule}>
-          {!scene.hasSiteWalk
-            ? 'Turn the phone to look around. Tap a place below to move there. No camera, no tracking — nothing here can drift.'
-            : arWalk
-            ? 'Walk. Your real steps move you through the fort at true scale — the camera is running for tracking but never shown.'
-            : !siteMode
-            ? 'Turn the phone to look. Use the pad to walk. Your own steps do not move you — most of this fort is under live roads now.'
-            : site.active
-              ? `Your own steps are moving you. Fix ±${Math.round(site.accuracyM ?? 0)} m.`
-              : site.offSite
-                ? `You are not at the fort. Your steps only move you within ${SITE_WALK_RADIUS_M} m of the Delhi Gate.`
-                : site.error
-                  ? `Location unavailable — ${site.error}. Using the pad instead.`
-                  : 'Looking for a good enough fix…'}
-        </Text>
-      </SafeAreaView>
+      {/* THE HINT, ONCE. This replaces a permanent instruction line that sat
+          under every reconstruction telling the visitor to turn the phone.
+          Discoverability is a first-run problem, not a standing one. */}
+      {showHint && ready && !error ? (
+        <Pressable style={styles.hintScrim} onPress={dismissHint}>
+          <View style={styles.hintCard}>
+            <Text style={styles.hintText}>
+              {scene.hasSiteWalk
+                ? 'Turn the phone to look around. Use the pad to walk.'
+                : 'Turn the phone to look around.'}
+            </Text>
+            <Text style={styles.hintDismiss}>Tap to start</Text>
+          </View>
+        </Pressable>
+      ) : null}
     </View>
   );
 };
@@ -1173,7 +1237,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  topGradient: {position: 'absolute', top: 0, left: 0, right: 0, height: 140},
   topBar: {
     position: 'absolute',
     top: 0,
@@ -1181,22 +1244,12 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    // flex-end, not space-between: the title block that used to sit on the
+    // left is gone, and space-between with a single child pushes the close
+    // button to the WRONG side of the screen.
+    justifyContent: 'flex-end',
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.sm,
-  },
-  titleBlock: {flex: 1},
-  title: {
-    color: COLORS.textPrimary,
-    fontFamily: FONTS.displayBold,
-    fontSize: 20,
-    letterSpacing: 0.2,
-  },
-  subtitle: {
-    color: COLORS.amber,
-    fontFamily: FONTS.ui,
-    fontSize: 12,
-    marginTop: 2,
   },
   iconButton: {
     width: 36,
@@ -1259,37 +1312,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  creditsLink: {
-    color: COLORS.amberLight,
-    fontFamily: FONTS.ui,
-    fontSize: 11,
-    textDecorationLine: 'underline',
-    marginTop: 2,
-  },
-  creditsText: {
-    color: COLORS.textMuted,
-    fontFamily: FONTS.ui,
-    fontSize: 10,
-    marginTop: 2,
-  },
 
-  stopNameOnly: {
-    position: 'absolute',
-    right: SPACING.lg,
-    top: 96,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 6,
-    borderRadius: RADIUS.sm,
-    backgroundColor: 'rgba(10,10,12,0.72)',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  stopNameText: {
-    color: COLORS.amberLight,
-    fontFamily: FONTS.uiSemiBold,
-    fontSize: 12,
-    letterSpacing: 0.3,
-  },
 
   camHud: {
     position: 'absolute',
@@ -1479,39 +1502,107 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.sm,
     gap: SPACING.sm,
   },
-  caption: {
-    color: COLORS.textSecondary,
+
+  // ---- the subtracted layout -------------------------------------------
+  where: {
+    color: COLORS.textPrimary,
+    fontFamily: FONTS.ui,
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  progress: {flexDirection: 'row', gap: 4, marginTop: 2},
+  tick: {
+    flex: 1,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  tickOn: {backgroundColor: COLORS.amber, height: 3},
+  tickSkipped: {backgroundColor: 'rgba(255,255,255,0.08)'},
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
+  },
+  tourActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    flexShrink: 1,
+  },
+  primary: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.amber,
+  },
+  primaryText: {
+    color: COLORS.bg,
+    fontFamily: FONTS.uiSemiBold,
+    fontSize: 14,
+  },
+  ghost: {paddingHorizontal: SPACING.sm, paddingVertical: SPACING.sm},
+  ghostText: {
+    color: COLORS.textTertiary,
+    fontFamily: FONTS.ui,
+    fontSize: 13,
+  },
+  controls: {flexDirection: 'row', alignItems: 'center', gap: SPACING.sm},
+  control: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10,10,12,0.72)',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  controlOn: {backgroundColor: COLORS.amber, borderColor: COLORS.amber},
+  controlPrimary: {backgroundColor: COLORS.amber, borderColor: COLORS.amber},
+  status: {
+    color: COLORS.amberLight,
     fontFamily: FONTS.ui,
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 17,
   },
-
-  legendRow: {flexDirection: 'row', gap: SPACING.md, alignItems: 'center'},
-  legendItem: {flexDirection: 'row', alignItems: 'center', gap: 6},
-  legendSwatch: {
-    width: 12,
-    height: 12,
-    borderRadius: 2,
-    backgroundColor: 'rgba(198,186,168,1)',
-  },
-  legendSwatchGhost: {backgroundColor: 'rgba(198,186,168,0.40)'},
-  legendSwatchOpen: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: 'rgba(198,186,168,0.9)',
-  },
-  legendLabel: {
-    color: COLORS.textTertiary,
+  disclaimer: {
+    color: COLORS.textMuted,
     fontFamily: FONTS.ui,
     fontSize: 11,
   },
-  legendDetail: {
-    color: COLORS.textMuted,
-    fontFamily: FONTS.ui,
-    fontSize: 10,
-    lineHeight: 15,
+  sheetBlock: {marginBottom: SPACING.lg},
+
+  hintScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10,10,12,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.xl,
   },
+  hintCard: {
+    padding: SPACING.lg,
+    borderRadius: RADIUS.md,
+    backgroundColor: 'rgba(10,10,12,0.92)',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  hintText: {
+    color: COLORS.textPrimary,
+    fontFamily: FONTS.ui,
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 23,
+  },
+  hintDismiss: {
+    color: COLORS.amber,
+    fontFamily: FONTS.uiSemiBold,
+    fontSize: 13,
+  },
+
 
   assaultBar: {
     paddingVertical: 8,
@@ -1573,121 +1664,8 @@ const styles = StyleSheet.create({
   },
   eraLabel: {color: COLORS.amberLight, fontFamily: FONTS.uiSemiBold},
 
-  whereRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: SPACING.sm,
-  },
-  whereTitle: {
-    flex: 1,
-    color: COLORS.textPrimary,
-    fontFamily: FONTS.semiBold,
-    fontSize: 17,
-  },
-  whereProgress: {
-    color: COLORS.textTertiary,
-    fontFamily: FONTS.regular,
-    fontSize: 12,
-  },
-  whereFacing: {
-    color: COLORS.textSecondary,
-    fontFamily: FONTS.regular,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  guide: {
-    marginTop: SPACING.sm,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    backgroundColor: 'rgba(20,20,22,0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(212,134,10,0.35)',
-    gap: 6,
-  },
-  guidePlace: {
-    color: COLORS.amberLight,
-    fontFamily: FONTS.semiBold,
-    fontSize: 15,
-  },
-  guideWalk: {
-    color: COLORS.textPrimary,
-    fontFamily: FONTS.regular,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  guideRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    marginTop: 4,
-    flexWrap: 'wrap',
-  },
-  guidePrimary: {
-    paddingVertical: 10,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.amber,
-  },
-  guidePrimaryText: {
-    color: '#141414',
-    fontFamily: FONTS.semiBold,
-    fontSize: 14,
-  },
-  guideGhost: {paddingVertical: 10},
-  guideGhostText: {
-    color: COLORS.textTertiary,
-    fontFamily: FONTS.regular,
-    fontSize: 13,
-  },
-  chipWithPhoto: {
-    paddingTop: 0,
-    paddingHorizontal: 0,
-    paddingBottom: 6,
-    overflow: 'hidden',
-    alignItems: 'center',
-    width: 96,
-  },
-  chipPhoto: {width: 96, height: 72, marginBottom: 4},
-  railRow: {flexDirection: 'row', alignItems: 'center', gap: SPACING.sm},
-  rail: {gap: SPACING.xs, paddingRight: SPACING.sm},
-  chip: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 8,
-    borderRadius: RADIUS.pill,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  chipActive: {
-    backgroundColor: COLORS.amberSubtle,
-    borderColor: COLORS.borderFocus,
-  },
-  chipText: {
-    color: COLORS.textSecondary,
-    fontFamily: FONTS.ui,
-    fontSize: 12,
-  },
-  chipTextActive: {color: COLORS.amberLight, fontFamily: FONTS.uiSemiBold},
 
-  siteButtonOn: {
-    backgroundColor: COLORS.amberLight,
-  },
-  recenterButton: {
-    width: 38,
-    height: 38,
-    borderRadius: RADIUS.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.amber,
-  },
 
-  rule: {
-    color: COLORS.textMuted,
-    fontFamily: FONTS.ui,
-    fontSize: 10,
-    textAlign: 'center',
-  },
 
   fallback: {flex: 1, backgroundColor: COLORS.bg},
   fallbackInner: {

@@ -32,6 +32,22 @@ const W = 116;
 const H = 92;
 const PAD = 7;
 
+/**
+ * How much ground in FRONT of the facade the plan includes, in metres.
+ *
+ * PALACE_PLAN describes the building and stops at the facade (y_min = 0), but
+ * the visit does not: the tour opens on the front lawn at y = -14, and drawing
+ * only the footprint put the visitor's dot off-canvas at the one stop where
+ * they most need to know where they are standing. The lawn is part of the
+ * visit, so it is part of the plan.
+ *
+ * A CONSTANT, not the current position. Deriving the extent from wherever the
+ * camera happens to be would rescale the drawing on every move, and a plan
+ * whose scale changes underneath you is not a plan. 16 m clears the -14 m stop
+ * with a margin so the dot never sits on the edge.
+ */
+const FORECOURT_M = 16.0;
+
 export interface PalacePlanIndicatorProps {
   /** Camera position in the building frame: [x, y, z] metres. */
   position: readonly [number, number, number] | number[];
@@ -41,6 +57,12 @@ export interface PalacePlanIndicatorProps {
   title: string;
   expanded: boolean;
   onToggle: () => void;
+  /**
+   * Lay out in normal flow instead of pinning to the top-right of the screen.
+   * The plan now lives inside the detail sheet, where an absolutely-positioned
+   * card would float over the sheet's own content.
+   */
+  inline?: boolean;
 }
 
 const PalacePlanIndicator: React.FC<PalacePlanIndicatorProps> = ({
@@ -49,6 +71,7 @@ const PalacePlanIndicator: React.FC<PalacePlanIndicatorProps> = ({
   title,
   expanded,
   onToggle,
+  inline = false,
 }) => {
   const p = PALACE_PLAN;
   const scale = expanded ? 2.1 : 1;
@@ -64,15 +87,19 @@ const PalacePlanIndicator: React.FC<PalacePlanIndicatorProps> = ({
    * — the way you would hold a paper plan walking in.
    */
   const t = useMemo(() => {
+    // The DRAWN extent, which is the building plus its forecourt. The footprint
+    // rectangle below is still drawn from PALACE_PLAN's own numbers, so the
+    // building cannot drift from the model; only the paper around it grew.
+    const yMin = p.y_min - FORECOURT_M;
     const spanX = p.x_max - p.x_min;
-    const spanY = p.y_max - p.y_min;
+    const spanY = p.y_max - yMin;
     const k = Math.min((w - 2 * PAD) / spanX, (h - 2 * PAD) / spanY);
     const ox = (w - spanX * k) / 2;
     const oy = (h - spanY * k) / 2;
     return {
       k,
       X: (mx: number) => ox + (mx - p.x_min) * k,
-      Y: (my: number) => oy + (my - p.y_min) * k,
+      Y: (my: number) => oy + (my - yMin) * k,
     };
   }, [p, w, h]);
 
@@ -94,7 +121,7 @@ const PalacePlanIndicator: React.FC<PalacePlanIndicatorProps> = ({
   return (
     <Pressable
       onPress={onToggle}
-      style={styles.wrap}
+      style={inline ? styles.wrapInline : styles.wrap}
       accessibilityRole="button"
       accessibilityLabel={`You are at ${title}. Tap for a larger plan.`}>
       <Svg width={w} height={h}>
@@ -171,6 +198,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10,10,12,0.72)',
     borderWidth: 1,
     borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  wrapInline: {
+    alignSelf: 'center',
+    padding: SPACING.sm,
     alignItems: 'center',
   },
   title: {

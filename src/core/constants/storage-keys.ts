@@ -116,6 +116,20 @@ export const STORAGE_KEYS = {
   },
 
   /**
+   * Magic-window (camera-off reconstruction) keys.
+   */
+  MAGIC_WINDOW: {
+    /**
+     * The one-time "turn the phone to look around" hint has been shown.
+     *
+     * It replaces a permanent instruction line that sat under every
+     * reconstruction. Discoverability is a first-run problem, not a
+     * standing one, so it is shown once and then never again.
+     */
+    HINT_SEEN: `${STORAGE_PREFIX}/magic_window_hint_seen`,
+  },
+
+  /**
    * Guided on-site journey keys (see src/stores/journeyStore.ts).
    */
   JOURNEY: {
@@ -150,5 +164,6 @@ export type StorageKey =
   | (typeof STORAGE_KEYS.DIAGNOSTICS)[keyof typeof STORAGE_KEYS.DIAGNOSTICS]
   | (typeof STORAGE_KEYS.UPDATE)[keyof typeof STORAGE_KEYS.UPDATE]
   | (typeof STORAGE_KEYS.AR)[keyof typeof STORAGE_KEYS.AR]
+  | (typeof STORAGE_KEYS.MAGIC_WINDOW)[keyof typeof STORAGE_KEYS.MAGIC_WINDOW]
   | (typeof STORAGE_KEYS.JOURNEY)[keyof typeof STORAGE_KEYS.JOURNEY]
   | (typeof STORAGE_KEYS.DEV)[keyof typeof STORAGE_KEYS.DEV];
