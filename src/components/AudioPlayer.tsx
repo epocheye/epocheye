@@ -216,17 +216,64 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   // dead scrub bar. Observed on device. In that case keep the duration and just
   // rewind the native player, which a same-URL swap won't do on its own — and
   // that seek is also what lifts STATE_ENDED, so `endedRef` clears with it.
-  const prevUriRef = useRef(uri);
+  /**
+   * WHICH SOURCE HAS ACTUALLY LOADED, and which one we have already reported an
+   * end for. Both exist to filter a real, observed lie from the native player.
+   *
+   * On a source swap ExoPlayer is still parked in STATE_ENDED from the previous
+   * clip, and preparing the next one emits a SECOND ended event. Measured on
+   * device, in this order:
+   *
+   *   LOAD palace_overview dur=55.56 | END palace_overview |
+   *   END into_the_shade | LOAD into_the_shade dur=51.816 | LOAD the_pillars
+   *
+   * The third event is the previous clip's ending arriving late, wearing the
+   * new clip's name - the new source has not even loaded yet. A caller that
+   * advances on `onEnd` therefore skipped a stop for every stop it played, and
+   * walked the whole guide in about a minute.
+   *
+   * So `onEnd` is forwarded only when the CURRENT source has loaded and has not
+   * already reported an end. That is a statement about the source, not a
+   * debounce: a real second ending of the same clip cannot happen without a
+   * seek or a reload, and both clear these.
+   */
+  const loadedKeyRef = useRef<string | null>(null);
+  const endedKeyRef = useRef<string | null>(null);
+
+  /**
+   * The source this effect last ran FOR, key and url together.
+   *
+   * Together, and not two refs, because the effect has to be idempotent. It
+   * depends on a reanimated shared value whose identity is stable in the app
+   * and not necessarily under a test renderer, so it can run more than once
+   * for one source — and a second run that read a half-updated pair would
+   * decide the url was unchanged and mark the NEW source as already loaded,
+   * which is exactly the report the guard below exists to suppress.
+   */
+  const lastRunRef = useRef<{ key: string; uri: string } | null>(null);
   useEffect(() => {
+    const prev = lastRunRef.current;
+    // Nothing about the source changed: a repeat run of this effect must not
+    // rewind a clip the visitor is listening to.
+    if (prev && prev.key === trackKey && prev.uri === uri) return;
+    lastRunRef.current = { key: trackKey, uri };
+
     setCurrentTime(0);
     setIsSeeking(false);
     progress.value = 0;
     setPaused(!autoPlay);
     endedRef.current = false;
-    if (prevUriRef.current !== uri) {
-      prevUriRef.current = uri;
+    // The two key refs are deliberately NOT cleared here. They hold a source
+    // KEY, so a new source invalidates them by simply not matching. Same-key
+    // replays clear them where they happen: a seek out of the end, and Play
+    // on a finished clip.
+    if (!prev || prev.uri !== uri) {
       setDuration(0);
     } else {
+      // Same file, different stop: the media never reloads, so `onLoad` will
+      // NOT fire again. Mark it loaded here or the end-guard above would
+      // swallow this stop's genuine ending.
+      loadedKeyRef.current = trackKey;
       videoRef.current?.seek(0);
     }
     // Keyed on trackKey, not uri — see the sourceKey prop.
@@ -250,12 +297,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     [duration, isSeeking, progress],
   );
 
-  const handleLoad = useCallback((data: OnLoadData) => {
-    setDuration(data.duration);
-    // A fresh source is a fresh player, whatever the previous one ended as.
-    endedRef.current = false;
-    callbacks.current.onLoad?.(data);
-  }, []);
+  const handleLoad = useCallback(
+    (data: OnLoadData) => {
+      setDuration(data.duration);
+      // A fresh source is a fresh player, whatever the previous one ended as.
+      endedRef.current = false;
+      loadedKeyRef.current = trackKey;
+      endedKeyRef.current = null;
+      callbacks.current.onLoad?.(data);
+    },
+    [trackKey],
+  );
 
   const handleEnd = useCallback(() => {
     // The player is NOT back at the start just because this component's scrub
@@ -264,12 +316,22 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     // paid for on the next Play (see handlePlayPause) rather than seeking now:
     // `paused` reaches native one commit later than an imperative seek, so
     // seeking here would restart the clip for a moment before the pause landed.
+    // IGNORE IT ENTIRELY, not just the report upward. An ending that belongs
+    // to the previous clip must not touch this one's transport either: the
+    // first version of this guard let the stale event still run setPaused(true)
+    // and it silently paused the stop that had just started, which on device
+    // looked like the guide loading a stop and then refusing to play it.
+    if (loadedKeyRef.current !== trackKey || endedKeyRef.current === trackKey) {
+      return;
+    }
+    endedKeyRef.current = trackKey;
+
     endedRef.current = true;
     setPaused(true);
     setCurrentTime(0);
     progress.value = withTiming(0, { duration: 200 });
     callbacks.current.onEnd?.();
-  }, [progress]);
+  }, [progress, trackKey]);
 
   const handleSeek = useCallback(
     (fraction: number) => {
@@ -278,6 +340,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       // next Play must NOT jump back to zero and throw away the position the
       // visitor just scrubbed to.
       endedRef.current = false;
+      // Scrubbing back out of the end means this clip can legitimately end
+      // again, so the once-per-source guard has to be released with it.
+      endedKeyRef.current = null;
       videoRef.current?.seek(seekTime);
       setCurrentTime(seekTime);
       progress.value = withTiming(fraction, { duration: 100 });
@@ -297,6 +362,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const handlePlayPause = useCallback(() => {
     if (paused && endedRef.current) {
       endedRef.current = false;
+      // Replaying a finished clip: it can end again, and the caller should hear
+      // about it, so release the once-per-source guard along with STATE_ENDED.
+      endedKeyRef.current = null;
       videoRef.current?.seek(0);
       setCurrentTime(0);
       progress.value = 0;
