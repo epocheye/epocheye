@@ -470,7 +470,15 @@
     "fallbackNotice": "Playing in English — this guide has not been recorded in your language yet.",
     "ungroupedZone": "The guide",
     "listenCta": "Listen — audio guide",
-    "loadError": "Couldn't load the audio guide. Pull to try again."
+    "loadError": "Couldn't load the audio guide. Pull to try again.",
+    "allStops": "All stops",
+    "closeStops": "Close stops and settings",
+    "previousStop": "Previous stop",
+    "nextStop": "Next stop",
+    "movingOn": "Moving on to {{title}}",
+    "stayHere": "Stay here",
+    "autoAdvance": "Play the next stop automatically",
+    "autoAdvanceHint": "When a clip ends, the guide waits a few seconds and then moves on. You can always stay where you are."
   },
   "restoration": {
     "title": "Restoration",

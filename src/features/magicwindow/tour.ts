@@ -149,3 +149,27 @@ export function viewpointForStop(
   if (scene.slug !== slug) return undefined;
   return scene.viewpoints.find(v => v.stopKey === stopKey)?.id;
 }
+
+/**
+ * Where to stand to hear an `audio_stops.stop_key`, in plain language.
+ *
+ * The audio guide asks the visitor to walk somewhere and listen, and the stop
+ * row it used to render said only a title and a duration — "The small room,
+ * 1:48" — which is a filename, not a direction. This prose already exists, was
+ * already written for exactly this purpose, and reaches the audio guide for
+ * free: stop_key -> viewpoint -> tour stop, a chain that is 1:1 for the palace
+ * (eight stops, eight viewpoints, eight tour entries).
+ *
+ * UNDEFINED IS THE HONEST ANSWER FOR EVERYWHERE ELSE. `tourFor` returns [] for
+ * the fort and for every venue without a magic window, and nothing is going to
+ * be invented to fill the gap: a confident-sounding "walk to the far end" that
+ * nobody authored is worse than no line. The caller falls back to the zone.
+ */
+export function walkToForStop(
+  slug: string | null | undefined,
+  stopKey: string | null | undefined,
+): string | undefined {
+  const viewpointId = viewpointForStop(slug, stopKey);
+  if (!viewpointId || !slug) return undefined;
+  return tourFor(slug).find(t => t.viewpointId === viewpointId)?.walkTo;
+}

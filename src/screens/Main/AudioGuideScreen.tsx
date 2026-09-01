@@ -1,24 +1,41 @@
 /**
- * AudioGuideScreen — the venue's pre-generated narration, stop by stop.
+ * AudioGuideScreen — the stop you are standing at, and how to hear it.
  *
- * Fetches GET /api/v1/audio/stops for the active venue, lists the stops grouped
- * by zone, and plays the selected one through a SINGLE AudioPlayer instance that
- * is never unmounted between stops — tapping a new stop swaps the source on the
- * live player rather than remounting it, so the chosen playback speed carries
- * over and playback survives moving around the screen.
+ * WHAT THIS REPLACED, AND WHY. The first version was a catalogue: title,
+ * subtitle, three persona chips, four zone headings, eight stop rows each with
+ * a duration — twenty-five text elements and twelve controls, with NOTHING
+ * PLAYING. Choosing a stop then mounted the player BELOW all eight rows, so the
+ * act of picking something to listen to pushed the play button toward the fold.
+ * The screen's resting state was an index of things the visitor was not
+ * hearing.
  *
- * The transcript below the player is the non-audio and accessibility path: every
- * clip's full text is available without listening.
+ * The guide is used walking around a building, often with the phone held low or
+ * not looked at. So the current stop IS the screen: where you are, what to
+ * listen for, one large play control, and how much is left. The other seven
+ * stops, the transcript, the persona, the speed and the restored view are all
+ * one tap away in the sheet. Nothing was deleted — see components/ui/DetailSheet.
+ *
+ * WHERE TO STAND COSTS NOTHING. `walkToForStop` joins an audio stop to the
+ * guided tour's authored walk-to prose through the magic window's viewpoints
+ * (stop_key -> viewpoint -> tour stop). It is 1:1 for the palace and absent
+ * everywhere else, and absent is left absent: an invented direction is worse
+ * than none on a screen whose whole job is telling someone where to go.
+ *
+ * ONE PLAYER, INSIDE THE SHEET. Same arrangement as the magic window. The sheet
+ * is never unmounted, so the full transport (scrub, speed, skip 15 s) lives
+ * there while the screen keeps only play/pause — the one control a visitor
+ * needs without looking. `suspended` is what the big button drives, because
+ * there is no imperative handle on <AudioPlayer/> and `suspended` holds
+ * playback WITHOUT losing the position.
  *
  * Language and persona both come from museumPrefsStore, shared with museum-mode
  * narration — one narration preference, not a second parallel one.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -28,8 +45,11 @@ import {
   ChevronLeft,
   Headphones,
   Info,
+  List,
+  Pause,
   Play,
-  Sparkles,
+  SkipBack,
+  SkipForward,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -42,7 +62,7 @@ import {
 } from '../../core/constants/theme';
 import type { MainScreenProps } from '../../core/types/navigation.types';
 import { ROUTES } from '../../core/constants';
-import { getAudioStops, AUDIO_PERSONAS } from '../../utils/api/audio';
+import { getAudioStops } from '../../utils/api/audio';
 import type { AudioStop, AudioStopsResponse } from '../../utils/api/audio';
 import {
   useMuseumPrefsStore,
@@ -51,18 +71,29 @@ import {
 import { useSafeGoBack } from '../../shared/hooks/useSafeGoBack';
 import { useNetwork } from '../../context/NetworkContext';
 import OfflineInline from '../../components/ui/OfflineInline';
+import AudioGuideSheet from '../../features/audioguide/AudioGuideSheet';
 import AudioPlayer from '../../components/AudioPlayer';
 import { buildAudioUrl } from '../../config/glbDelivery';
+import { walkToForStop } from '../../features/magicwindow/tour';
 import {
   formatClipDuration,
   formatZoneLabel,
   groupStopsByZone,
-  hasRestoration,
   isPlayable,
-  PERSONA_LABEL_KEY,
 } from '../../shared/utils/audioGuide';
 
 type Props = MainScreenProps<'AudioGuide'>;
+
+/**
+ * How long the guide waits before playing the next stop.
+ *
+ * Long enough to notice that it is about to happen and say no — the whole
+ * reason the gap exists — and short enough that a visitor walking between two
+ * stops is not left standing in silence wondering whether it broke. The offer
+ * is cancellable for the entire window; anything the visitor touches cancels
+ * it, not just the "stay here" target.
+ */
+const AUTO_ADVANCE_GAP_MS = 6000;
 
 const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
   const { t } = useTranslation();
@@ -74,6 +105,8 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
   const lang = useNarrationLang();
   const persona = useMuseumPrefsStore(s => s.narrationPersona);
   const setPersona = useMuseumPrefsStore(s => s.setNarrationPersona);
+  const autoAdvance = useMuseumPrefsStore(s => s.autoAdvance);
+  const setAutoAdvance = useMuseumPrefsStore(s => s.setAutoAdvance);
 
   const [data, setData] = useState<AudioStopsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,6 +115,25 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
   // language change) replaces every stop object, and holding the key lets the
   // selection survive it when the same stop exists in the new payload.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  /** Everything that is not the current stop. */
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  /**
+   * The visitor's own pause, ridden on `suspended` rather than the player's
+   * internal `paused`, because the transport lives in the sheet and there is no
+   * imperative handle to reach it with. `suspended` holds playback without
+   * losing the position, which matters for clips of 105 s.
+   */
+  const [held, setHeld] = useState(false);
+  /** What the player reports it is actually doing, for the glyph. */
+  const [playerPaused, setPlayerPaused] = useState(true);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [durationMs, setDurationMs] = useState(0);
+
+  /** The stop the guide is about to move on to, during the gap. */
+  const [pendingNext, setPendingNext] = useState<AudioStop | null>(null);
+  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,9 +157,36 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
   const stops = useMemo(() => data?.stops ?? [], [data]);
   const groups = useMemo(() => groupStopsByZone(stops), [stops]);
 
+  /**
+   * The walking order. `stops` is already ordered by (sort_order, stop_key)
+   * server-side, so this is the sequence previous/next step through — NOT the
+   * grouped list, which would make the order depend on how zones happen to be
+   * bucketed. Unrecorded stops are dropped: skipping over a row that cannot
+   * play is what a guide does, and stepping onto one would strand the visitor
+   * on a stop with no way forward but another tap.
+   */
+  const sequence = useMemo(() => stops.filter(isPlayable), [stops]);
+
   const selected: AudioStop | null = useMemo(
     () => stops.find(s => s.stop_key === selectedKey) ?? null,
     [stops, selectedKey],
+  );
+
+  /**
+   * Arrive ON a stop, not on a list. The entry point is a button that says
+   * "Listen", so the first playable stop is selected as soon as the payload
+   * lands and `autoPlay` starts it. Only when nothing is selected: a refetch
+   * after a persona change must not throw the visitor back to stop one.
+   */
+  useEffect(() => {
+    if (!selectedKey && sequence.length > 0) {
+      setSelectedKey(sequence[0].stop_key);
+    }
+  }, [selectedKey, sequence]);
+
+  const position = useMemo(
+    () => sequence.findIndex(s => s.stop_key === selectedKey),
+    [sequence, selectedKey],
   );
 
   // Resolve the CDN key (or absolute URL) the backend returned into something
@@ -127,12 +206,118 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
     [selected],
   );
 
-  const handleSelect = useCallback((stop: AudioStop) => {
-    if (!isPlayable(stop)) return;
-    setSelectedKey(stop.stop_key);
+  /** Where to stand. Palace-only, and absent is left absent — see the header. */
+  const walkTo = useMemo(
+    () => walkToForStop(venueSlug, selected?.stop_key),
+    [venueSlug, selected],
+  );
+
+  const cancelAdvance = useCallback(() => {
+    if (advanceTimer.current) {
+      clearTimeout(advanceTimer.current);
+      advanceTimer.current = null;
+    }
+    setPendingNext(null);
   }, []);
 
-  const renderBody = () => {
+  // Never leave a timer running into an unmounted screen: it would call
+  // setState on a dead component and, worse, keep a stale stop pinned.
+  useEffect(() => cancelAdvance, [cancelAdvance]);
+
+  /**
+   * Move to a stop. Every path in — a tap in the sheet, previous, next, the
+   * auto-advance firing — comes through here, so the pending offer is always
+   * cancelled and the visitor's pause is always lifted. A stop selected while
+   * `held` was true would otherwise arrive silent.
+   */
+  const goToStop = useCallback(
+    (stop: AudioStop | undefined | null) => {
+      if (!stop || !isPlayable(stop)) return;
+      cancelAdvance();
+      setElapsedMs(0);
+      setDurationMs(0);
+      setHeld(false);
+      setSelectedKey(stop.stop_key);
+    },
+    [cancelAdvance],
+  );
+
+  const goPrevious = useCallback(() => {
+    if (position > 0) goToStop(sequence[position - 1]);
+  }, [goToStop, position, sequence]);
+
+  const goNext = useCallback(() => {
+    if (position >= 0 && position < sequence.length - 1) {
+      goToStop(sequence[position + 1]);
+    }
+  }, [goToStop, position, sequence]);
+
+  /**
+   * The clip finished. Offer the next stop rather than taking it: the visitor
+   * may be standing in front of the thing the clip was about, and a guide that
+   * walks off mid-sentence is the failure this gap exists to prevent.
+   */
+  const handleEnd = useCallback(() => {
+    setElapsedMs(durationMs);
+    const next = position >= 0 ? sequence[position + 1] : undefined;
+    if (!autoAdvance || !next) return;
+    setPendingNext(next);
+    advanceTimer.current = setTimeout(() => {
+      advanceTimer.current = null;
+      setPendingNext(null);
+      goToStop(next);
+    }, AUTO_ADVANCE_GAP_MS);
+  }, [autoAdvance, durationMs, goToStop, position, sequence]);
+
+  /**
+   * The file would not play. Offer the next stop on the same terms as a clip
+   * that finished, because the alternative is a visitor standing in front of a
+   * silent phone with no event ever coming — the clip cannot end if it never
+   * started. Still an OFFER: it is refusable, and with auto-advance off nothing
+   * happens at all, which is the same contract as a normal ending.
+   */
+  const handleError = useCallback(() => {
+    handleEnd();
+  }, [handleEnd]);
+
+  /**
+   * The one control that must work without looking. It also cancels a pending
+   * advance, because pressing play at the end of a clip means "not yet" as
+   * clearly as pressing "stay here" does.
+   */
+  const togglePlay = useCallback(() => {
+    cancelAdvance();
+    setHeld(v => !v);
+  }, [cancelAdvance]);
+
+  const sounding = !!selectedUri && !playerPaused && !held;
+  const remainingMs = Math.max(0, durationMs - elapsedMs);
+
+  /**
+   * ONE instance, created here rather than inside the sheet so the big button
+   * on the screen and the transport in the sheet drive the same component. No
+   * `key` prop: changing `uri` swaps the source on the SAME player rather than
+   * remounting it, which is what keeps the chosen speed across stops.
+   */
+  const playerNode =
+    selected?.clip && selectedUri ? (
+      <AudioPlayer
+        uri={selectedUri}
+        sourceKey={selected.stop_key}
+        title={selected.title}
+        autoPlay
+        suspended={held}
+        onPausedChange={setPlayerPaused}
+        onLoad={d => setDurationMs(Math.round((d.duration ?? 0) * 1000))}
+        onProgress={d => setElapsedMs(Math.round((d.currentTime ?? 0) * 1000))}
+        onEnd={handleEnd}
+        onError={handleError}
+      />
+    ) : null;
+
+  // ---- states that are not "a stop is playing" ------------------------------
+
+  const renderFallbackState = () => {
     if (isOffline && !data) {
       return <OfflineInline message={t('offline.inlineMessage')} />;
     }
@@ -153,7 +338,7 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       );
     }
-    if (stops.length === 0) {
+    if (sequence.length === 0) {
       return (
         <View style={styles.centered}>
           <Headphones size={26} color={COLORS.textTertiary} />
@@ -162,99 +347,10 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       );
     }
-
-    return (
-      <>
-        {data?.fallback_lang ? (
-          <View style={styles.notice}>
-            <Info size={14} color={COLORS.textSecondary} />
-            <Text style={styles.noticeText}>
-              {t('audioGuide.fallbackNotice')}
-            </Text>
-          </View>
-        ) : null}
-
-        {groups.map(group => (
-          <View key={group.zone ?? '__ungrouped__'} style={styles.group}>
-            {group.zone ? (
-              <Text style={styles.zoneHeader}>{formatZoneLabel(group.zone)}</Text>
-            ) : null}
-            {group.stops.map(stop => {
-              const playable = isPlayable(stop);
-              const active = stop.stop_key === selectedKey;
-              return (
-                <Pressable
-                  key={stop.stop_key}
-                  onPress={() => handleSelect(stop)}
-                  disabled={!playable}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: !playable, selected: active }}
-                  accessibilityLabel={stop.title}
-                  style={[styles.row, active && styles.rowActive]}>
-                  <Play
-                    size={14}
-                    color={playable ? COLORS.gold : COLORS.textTertiary}
-                    fill={active ? COLORS.gold : 'transparent'}
-                  />
-                  <Text
-                    style={[styles.rowTitle, !playable && styles.rowDisabled]}
-                    numberOfLines={2}>
-                    {stop.title}
-                  </Text>
-                  <Text style={styles.rowMeta}>
-                    {playable
-                      ? formatClipDuration(stop.clip?.duration_ms)
-                      : t('audioGuide.notRecorded')}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        ))}
-
-        {selected?.clip && selectedUri ? (
-          <View style={styles.playerBlock}>
-            {/* One instance, no `key` prop: changing `uri` swaps the source on
-                the SAME player rather than remounting it, which is what keeps
-                the chosen speed and avoids a playback gap between stops. */}
-            <AudioPlayer
-              uri={selectedUri}
-              sourceKey={selected.stop_key}
-              title={selected.title}
-              autoPlay
-            />
-
-            {/* Only for stops that actually have a restored view — the other
-                stops are unchanged. */}
-            {hasRestoration(selected) && restorationUri ? (
-              <Pressable
-                onPress={() =>
-                  navigation.navigate(ROUTES.MAIN.RESTORATION, {
-                    imageUrl: restorationUri,
-                    caption: selected.clip?.restoration_caption,
-                    title: selected.title,
-                    siteName,
-                  })
-                }
-                accessibilityRole="button"
-                accessibilityLabel={t('restoration.cta')}
-                style={styles.restorationBtn}>
-                <Sparkles size={16} color={COLORS.gold} />
-                <Text style={styles.restorationText}>
-                  {t('restoration.cta')}
-                </Text>
-              </Pressable>
-            ) : null}
-
-            <Text style={styles.transcriptTitle}>
-              {t('audioGuide.transcriptTitle')}
-            </Text>
-            <Text style={styles.transcript}>{selected.clip.transcript}</Text>
-          </View>
-        ) : null}
-      </>
-    );
+    return null;
   };
+
+  const fallback = renderFallbackState();
 
   return (
     <View style={styles.root}>
@@ -265,223 +361,319 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel={t('common.back')}
-            style={styles.backBtn}>
-            <ChevronLeft size={20} color={COLORS.textPrimary} />
+            style={styles.headerBtn}>
+            <ChevronLeft size={22} color={COLORS.textPrimary} />
           </Pressable>
-          <View style={styles.headerText}>
-            <Text style={styles.title} numberOfLines={1}>
-              {t('audioGuide.title')}
-            </Text>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {siteName || t('audioGuide.subtitle')}
-            </Text>
-          </View>
-        </View>
-
-        <View
-          style={styles.personaRow}
-          accessibilityRole="radiogroup"
-          accessibilityLabel={t('audioGuide.personaLabel')}>
-          {AUDIO_PERSONAS.map(p => {
-            const active = p === persona;
-            return (
-              <Pressable
-                key={p}
-                onPress={() => setPersona(p)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: active }}
-                style={[styles.personaChip, active && styles.personaChipActive]}>
-                <Text
-                  style={[
-                    styles.personaText,
-                    active && styles.personaTextActive,
-                  ]}
-                  numberOfLines={1}>
-                  {t(PERSONA_LABEL_KEY[p])}
-                </Text>
-              </Pressable>
-            );
-          })}
+          <View style={styles.headerSpacer} />
+          {fallback ? null : (
+            <Pressable
+              onPress={() => setSheetOpen(true)}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t('audioGuide.allStops')}
+              style={styles.headerBtn}>
+              <List size={22} color={COLORS.textPrimary} />
+            </Pressable>
+          )}
         </View>
       </SafeAreaView>
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}>
-        {renderBody()}
-      </ScrollView>
+      {fallback ?? (
+        <SafeAreaView style={styles.stage} edges={['bottom']}>
+          {/* THE STOP. Zone, name, and where to stand — in that order, because
+              that is the order a visitor needs them: which part of the building,
+              what this one is called, how to get to it. */}
+          <View style={styles.stop}>
+            {selected?.zone ? (
+              <Text style={styles.zone}>{formatZoneLabel(selected.zone)}</Text>
+            ) : null}
+            <Text style={styles.title}>{selected?.title ?? ''}</Text>
+            {walkTo ? <Text style={styles.walkTo}>{walkTo}</Text> : null}
+
+            {/* WHAT LANGUAGE THIS ACTUALLY IS. A truth claim about the thing
+                playing right now, so it stays on the screen rather than moving
+                into the sheet with the preferences. */}
+            {data?.fallback_lang ? (
+              <View style={styles.notice}>
+                <Info size={13} color={COLORS.textTertiary} />
+                <Text style={styles.noticeText}>
+                  {t('audioGuide.fallbackNotice')}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* THE TRANSPORT. Three targets, the middle one large enough to hit
+              without looking at the phone. */}
+          <View style={styles.transportBlock}>
+            <Text style={styles.remaining}>
+              {durationMs > 0 ? `−${formatClipDuration(remainingMs)}` : ' '}
+            </Text>
+
+            <View style={styles.transport}>
+              <Pressable
+                onPress={goPrevious}
+                disabled={position <= 0}
+                hitSlop={16}
+                accessibilityRole="button"
+                accessibilityLabel={t('audioGuide.previousStop')}
+                style={[styles.step, position <= 0 && styles.stepOff]}>
+                <SkipBack size={24} color={COLORS.textPrimary} />
+              </Pressable>
+
+              <Pressable
+                onPress={togglePlay}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  sounding ? t('audioGuide.pause') : t('audioGuide.play')
+                }
+                style={styles.playBtn}>
+                {sounding ? (
+                  <Pause size={32} color={COLORS.bg} fill={COLORS.bg} />
+                ) : (
+                  <Play size={32} color={COLORS.bg} fill={COLORS.bg} />
+                )}
+              </Pressable>
+
+              <Pressable
+                onPress={goNext}
+                disabled={position < 0 || position >= sequence.length - 1}
+                hitSlop={16}
+                accessibilityRole="button"
+                accessibilityLabel={t('audioGuide.nextStop')}
+                style={[
+                  styles.step,
+                  (position < 0 || position >= sequence.length - 1) &&
+                    styles.stepOff,
+                ]}>
+                <SkipForward size={24} color={COLORS.textPrimary} />
+              </Pressable>
+            </View>
+
+            {/* THE OFFER, not the act. Visible for the whole gap, and refusable
+                without hunting for a control. */}
+            {pendingNext ? (
+              <View style={styles.movingOn}>
+                <Text style={styles.movingOnText} numberOfLines={1}>
+                  {t('audioGuide.movingOn', { title: pendingNext.title })}
+                </Text>
+                <Pressable
+                  onPress={cancelAdvance}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  style={styles.stayBtn}>
+                  <Text style={styles.stayText}>
+                    {t('audioGuide.stayHere')}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {/* WHERE YOU ARE IN THE GUIDE. One tick per stop, replacing four
+                zone headings and eight rows that were carrying this one fact
+                between them. */}
+            <View
+              style={styles.ticks}
+              accessibilityRole="progressbar"
+              accessibilityValue={{
+                min: 1,
+                max: sequence.length,
+                now: position + 1,
+              }}>
+              {sequence.map((s, i) => (
+                <View
+                  key={s.stop_key}
+                  style={[styles.tick, i === position && styles.tickOn]}
+                />
+              ))}
+            </View>
+          </View>
+        </SafeAreaView>
+      )}
+
+      {/* EVERYTHING ELSE, one tap away. Always mounted: the player lives in
+          here, and unmounting would restart the clip on every close. */}
+      <AudioGuideSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        groups={groups}
+        selectedKey={selectedKey}
+        selected={selected}
+        onSelectStop={stop => {
+          goToStop(stop);
+          setSheetOpen(false);
+        }}
+        restorationUri={restorationUri}
+        onOpenRestoration={() => {
+          if (!selected || !restorationUri) return;
+          navigation.navigate(ROUTES.MAIN.RESTORATION, {
+            imageUrl: restorationUri,
+            caption: selected.clip?.restoration_caption,
+            title: selected.title,
+            siteName,
+          });
+        }}
+        persona={persona}
+        onSelectPersona={setPersona}
+        autoAdvance={autoAdvance}
+        onAutoAdvanceChange={setAutoAdvance}
+        player={playerNode}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.sm,
-    paddingBottom: SPACING.md,
+    paddingBottom: SPACING.sm,
   },
-  backBtn: { padding: 4 },
-  headerText: { flex: 1 },
-  title: {
-    fontFamily: FONTS.display,
-    fontSize: FONT_SIZES.title,
-    color: COLORS.textPrimary,
-  },
-  subtitle: {
-    fontFamily: FONTS.sans,
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.textSecondary,
-    marginTop: 1,
-  },
-  personaRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.md,
-  },
-  personaChip: {
-    flex: 1,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: COLORS.amberSubtle,
-    backgroundColor: COLORS.bgWarm,
-    alignItems: 'center',
-  },
-  personaChipActive: {
-    backgroundColor: COLORS.gold,
-    borderColor: COLORS.gold,
-  },
-  personaText: {
-    fontFamily: FONTS.sansMedium,
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.textSecondary,
-  },
-  personaTextActive: { color: COLORS.bg },
-  scroll: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.section,
-  },
-  centered: {
+  headerBtn: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.section,
-    gap: SPACING.sm,
   },
-  emptyTitle: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: FONT_SIZES.subtitle,
+  headerSpacer: { flex: 1 },
+
+  // ---- the stop ------------------------------------------------------------
+  stage: { flex: 1, justifyContent: 'space-between' },
+  stop: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.xl },
+  zone: {
+    color: COLORS.amberLight,
+    fontFamily: FONTS.uiSemiBold,
+    fontSize: FONT_SIZES.caption,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: SPACING.sm,
+  },
+  title: {
     color: COLORS.textPrimary,
-    marginTop: SPACING.sm,
+    fontFamily: FONTS.display,
+    fontSize: 34,
+    lineHeight: 41,
+    marginBottom: SPACING.lg,
   },
-  emptyBody: {
-    fontFamily: FONTS.sans,
-    fontSize: FONT_SIZES.body,
+  walkTo: {
     color: COLORS.textSecondary,
-    textAlign: 'center',
-  },
-  retryBtn: {
-    marginTop: SPACING.lg,
-    paddingHorizontal: SPACING.xxl,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: COLORS.amberSubtle,
-  },
-  retryText: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: FONT_SIZES.small,
-    color: COLORS.textPrimary,
+    fontFamily: FONTS.ui,
+    fontSize: FONT_SIZES.body,
+    lineHeight: 24,
   },
   notice: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.amberSubtle,
-    backgroundColor: COLORS.bgWarm,
+    gap: SPACING.xs,
+    marginTop: SPACING.lg,
   },
   noticeText: {
     flex: 1,
-    fontFamily: FONTS.sans,
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.textSecondary,
-  },
-  group: { marginBottom: SPACING.lg },
-  zoneHeader: {
-    fontFamily: FONTS.uiSemiBold,
-    fontSize: FONT_SIZES.caption,
-    // 1.6 was tracking for an ALL-CAPS slug. The header is sentence case now,
-    // where that much letter-spacing reads as a label rather than a place.
-    letterSpacing: 0.6,
     color: COLORS.textTertiary,
-    marginBottom: SPACING.sm,
+    fontFamily: FONTS.ui,
+    fontSize: FONT_SIZES.caption,
+    lineHeight: 17,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+
+  // ---- the transport -------------------------------------------------------
+  transportBlock: {
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
     gap: SPACING.md,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: 'transparent',
   },
-  rowActive: {
-    borderColor: COLORS.amberSubtle,
-    backgroundColor: COLORS.bgWarm,
-  },
-  rowTitle: {
-    flex: 1,
-    fontFamily: FONTS.sansMedium,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
-  },
-  rowDisabled: { color: COLORS.textTertiary },
-  rowMeta: {
-    fontFamily: FONTS.sans,
-    fontSize: FONT_SIZES.caption,
+  remaining: {
     color: COLORS.textTertiary,
+    fontFamily: FONTS.ui,
+    fontSize: FONT_SIZES.small,
+    textAlign: 'center',
   },
-  playerBlock: { marginTop: SPACING.md },
-  restorationBtn: {
+  transport: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: SPACING.xxxl,
+  },
+  step: {
+    width: 56,
+    height: 56,
+    borderRadius: RADIUS.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepOff: { opacity: 0.25 },
+  playBtn: {
+    width: 76,
+    height: 76,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.amber,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  movingOn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.md,
+  },
+  movingOnText: {
+    flexShrink: 1,
+    color: COLORS.textTertiary,
+    fontFamily: FONTS.ui,
+    fontSize: FONT_SIZES.small,
+  },
+  stayBtn: { paddingVertical: 4, paddingHorizontal: SPACING.sm },
+  stayText: {
+    color: COLORS.amber,
+    fontFamily: FONTS.uiSemiBold,
+    fontSize: FONT_SIZES.small,
+  },
+  ticks: { flexDirection: 'row', gap: 4 },
+  tick: {
+    flex: 1,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  tickOn: { backgroundColor: COLORS.amber, height: 3 },
+
+
+  // ---- states that are not a stop -----------------------------------------
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.xl,
     gap: SPACING.sm,
-    marginTop: SPACING.lg,
-    paddingVertical: SPACING.md,
+  },
+  emptyTitle: {
+    color: COLORS.textPrimary,
+    fontFamily: FONTS.uiSemiBold,
+    fontSize: FONT_SIZES.subtitle,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    color: COLORS.textTertiary,
+    fontFamily: FONTS.ui,
+    fontSize: FONT_SIZES.small,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: COLORS.amberSubtle,
-    backgroundColor: COLORS.bgWarm,
+    borderColor: COLORS.border,
   },
-  restorationText: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: FONT_SIZES.small,
-    color: COLORS.gold,
-  },
-  transcriptTitle: {
+  retryText: {
+    color: COLORS.textPrimary,
     fontFamily: FONTS.uiSemiBold,
-    fontSize: FONT_SIZES.caption,
-    letterSpacing: 1.6,
-    color: COLORS.textTertiary,
-    marginTop: SPACING.xl,
-    marginBottom: SPACING.sm,
-  },
-  transcript: {
-    fontFamily: FONTS.sans,
-    fontSize: FONT_SIZES.body,
-    lineHeight: FONT_SIZES.body * 1.6,
-    color: COLORS.textSecondary,
+    fontSize: FONT_SIZES.small,
   },
 });
 

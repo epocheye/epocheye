@@ -60,6 +60,19 @@ interface MuseumPrefsState {
   setNarrationLangOverride: (lang: NarrationLang | null) => void;
   narrationPersona: NarrationPersona;
   setNarrationPersona: (persona: NarrationPersona) => void;
+  /**
+   * Play the next audio-guide stop when the current clip ends.
+   *
+   * ON by default, because the guide is meant to be listenable with the phone
+   * in a pocket and the alternative is silence until the visitor looks at the
+   * screen — which is the thing the redesign exists to avoid. It is a stored
+   * preference rather than a constant because the opposite visitor is real:
+   * someone who stops in front of one carving and does not want to be walked
+   * on by a recording. Turning it off is not the same as pausing, and the
+   * choice should outlive the session.
+   */
+  autoAdvance: boolean;
+  setAutoAdvance: (on: boolean) => void;
 }
 
 export const useMuseumPrefsStore = create<MuseumPrefsState>()(
@@ -69,11 +82,13 @@ export const useMuseumPrefsStore = create<MuseumPrefsState>()(
       setNarrationLangOverride: lang => set({ narrationLangOverride: lang }),
       narrationPersona: 'casual',
       setNarrationPersona: persona => set({ narrationPersona: persona }),
+      autoAdvance: true,
+      setAutoAdvance: on => set({ autoAdvance: on }),
     }),
     {
       name: 'epocheye-museum-prefs',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 3,
+      version: 4,
       migrate: (persisted, version) => {
         const state = (persisted ?? {}) as Partial<MuseumPrefsState> & {
           narrationLang?: NarrationLang;
@@ -91,11 +106,18 @@ export const useMuseumPrefsStore = create<MuseumPrefsState>()(
         // deliberate choice ever made. Carrying it forward as an override would
         // instead badge those users as "overridden" when their two values
         // actually agree.
+        // v4 added autoAdvance. Merged the same way and for the same reason as
+        // narrationPersona: a v3 payload arrives without the key, and leaving
+        // it undefined would make the audio guide read `undefined` as "off"
+        // for everyone who already had the app installed.
+        const autoAdvance = state.autoAdvance ?? true;
+
         if (version < 3) {
           return { ...state, narrationLang: undefined, narrationPersona,
+            autoAdvance,
             narrationLangOverride: null } as unknown as MuseumPrefsState;
         }
-        return { ...state, narrationPersona } as MuseumPrefsState;
+        return { ...state, narrationPersona, autoAdvance } as MuseumPrefsState;
       },
     },
   ),
