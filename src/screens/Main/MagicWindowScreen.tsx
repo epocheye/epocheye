@@ -87,6 +87,7 @@ import {
 } from '../../stores/museumPrefsStore';
 import {tourFor, type TourStop} from '../../features/magicwindow/tour';
 import MagicWindowSheet from '../../features/magicwindow/MagicWindowSheet';
+import FigureVoice from '../../features/magicwindow/FigureVoice';
 import {ASSAULT} from '../../features/magicwindow/assault';
 import {FORT_STATES} from '../../features/magicwindow/timeline';
 import {resolveModelGlb} from '../../services/glbSource';
@@ -421,16 +422,35 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
   const [lineIndex, setLineIndex] = useState<number | null>(null);
   const [everSpoke, setEverSpoke] = useState(false);
 
-  // VOICE. Android's own TextToSpeech, prepared once. `canSpeak` false means the
-  // device has no voice data installed, in which case the control is hidden
-  // rather than shown as a button that does nothing.
-  const [canSpeak, setCanSpeak] = useState(false);
+  // VOICE, by one of two paths.
+  //
+  // RECORDED, when the person carries a `voiceKeyPrefix`: Chirp 3 HD clips off
+  // the same CDN and through the same mediaCache as the guide narration. This
+  // is what Purnaiah uses.
+  //
+  // DEVICE TTS otherwise, via Android's TextToSpeech. That is whatever voice the
+  // handset ships — different on every phone, and sharing nothing with the
+  // narrator the visitor has been listening to. It stays only because the fort's
+  // Tipu figure has no recordings yet; deleting it would silence him.
+  //
+  // `speaking` means the figure is talking, whichever path produced the sound,
+  // because its only job is to duck the guide narration underneath.
+  const [ttsReady, setTtsReady] = useState(false);
   const [voiceOn, setVoiceOn] = useState(true);
   const [speaking, setSpeaking] = useState(false);
+  // Set by the prefetch below when every one of a figure's clips fails.
+  // Declared here, not beside that effect, because `recordedVoice` reads
+  // it on the very next line and a `const` is in its temporal dead zone
+  // until then — which crashes the screen rather than falling back.
+  const [voiceUnreachable, setVoiceUnreachable] = useState(false);
+  // Recorded AND reachable. A prefix whose clips all fail is not a voice,
+  // and treating it as one is what silenced Purnaiah with no error anywhere.
+  const recordedVoice = !!person?.voiceKeyPrefix && !voiceUnreachable;
+  const canSpeak = recordedVoice || ttsReady;
   useEffect(() => {
     let cancelled = false;
     void prepareSpeech().then(ok => {
-      if (!cancelled) setCanSpeak(ok);
+      if (!cancelled) setTtsReady(ok);
     });
     const sub = addSpeechListener(e => {
       if (!cancelled) setSpeaking(e.state === 'start');
@@ -441,6 +461,97 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
       stopSpeaking();
     };
   }, []);
+
+  /**
+   * Which utterance is playing. Counted rather than derived from `lineIndex`,
+   * because tapping the SAME line again has to replay it — and a line index
+   * that has not changed is indistinguishable from one that has been retapped.
+   */
+  const [utterance, setUtterance] = useState(0);
+  const figureLineRemote = useMemo(() => {
+    if (!recordedVoice || lineIndex === null || !voiceOn) return null;
+    return buildAudioUrl(`${person!.voiceKeyPrefix}line_${lineIndex + 1}_en.mp3`);
+  }, [person, recordedVoice, lineIndex, voiceOn]);
+
+  // Through the same LRU as the guide clips, and for the same reason: this plays
+  // inside a stone-walled building where the signal is poor, and a line that
+  // buffers after the tap has already lost the moment. Falls back to the remote
+  // URL when the cache cannot produce a file, exactly as the narration does.
+  //
+  // THE FILE AND THE KEY ARE ONE PIECE OF STATE, and that is the whole point.
+  // Held separately, the key advanced on the tap while the file was still being
+  // resolved out of the cache, so <FigureVoice/> saw the NEXT line's key beside
+  // the PREVIOUS line's file and did exactly what it is told to do — replayed
+  // it. Measured on device: `player piid:8815 started 15:53:18.000, stopped
+  // 15:53:18.182` between line 1 and line 2. 182 ms of the wrong man's sentence,
+  // every time the visitor taps. Updating them together makes the mismatched
+  // pair unrepresentable rather than merely unlikely.
+  const [figureLine, setFigureLine] = useState<{uri: string; key: string} | null>(
+    null,
+  );
+  useEffect(() => {
+    const key =
+      person && lineIndex !== null
+        ? `${person.id}-${lineIndex}-${utterance}`
+        : null;
+    if (!figureLineRemote || !key) {
+      setFigureLine(null);
+      return;
+    }
+    let cancelled = false;
+    void getOrFetchMedia(figureLineRemote)
+      .then(u => {
+        if (!cancelled) setFigureLine({uri: u, key});
+      })
+      .catch(() => {
+        if (!cancelled) setFigureLine({uri: figureLineRemote, key});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [figureLineRemote, person, lineIndex, utterance]);
+
+  /**
+   * All of a figure's lines, warmed as soon as he is on screen. Five clips of
+   * roughly 50 KB; the visitor taps through them in sequence anyway.
+   *
+   * AND IT REPORTS WHAT FAILED, which it did not before. `prefetchMedia` returns
+   * {total, cached, failed} and this discarded it, while `getOrFetchMedia`
+   * returns the REMOTE URL on any error rather than rejecting — so five clips
+   * 404ing produced no log, no error state and no rejected promise anywhere. The
+   * figure just waved and said nothing, for ever. `voiceUnreachable` is what
+   * puts the device-TTS fallback back in play; see `advance`.
+   */
+  useEffect(() => {
+    if (!person?.voiceKeyPrefix || !personVisible) return;
+    const urls = person.lines
+      .map((_l, i) =>
+        buildAudioUrl(`${person.voiceKeyPrefix}line_${i + 1}_en.mp3`),
+      )
+      .filter((u): u is string => !!u);
+    if (urls.length === 0) {
+      setVoiceUnreachable(true);
+      return;
+    }
+    let cancelled = false;
+    void prefetchMedia(urls).then(s => {
+      if (cancelled) return;
+      // EVERY line failing is a broken figure; some failing is a bad network on
+      // one file, which the player can still retry from the CDN.
+      const dead = s.failed >= s.total;
+      setVoiceUnreachable(dead);
+      if (s.failed > 0) {
+        console.warn(
+          `[magicwindow] ${person.id}: ${s.failed}/${s.total} voice clips ` +
+            `unreachable${dead ? ' — falling back to device speech' : ''}`,
+        );
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [person, personVisible]);
+
 
   // ---- VIEWPOINT NARRATION -------------------------------------------------
   //
@@ -518,14 +629,19 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
   const advance = useCallback(() => {
     if (!person) return;
     setEverSpoke(true);
+    // Bumped even when the line index does not change, so retapping the last
+    // line replays it rather than sitting silently at the end of the clip.
+    setUtterance(u => u + 1);
     setLineIndex(i => {
       const next = i === null ? 0 : (i + 1) % person.lines.length;
-      if (voiceOn && canSpeak) {
+      // A recorded figure is driven by <FigureVoice/> off the line key. Only
+      // the device-TTS fallback has to be told to start talking.
+      if (voiceOn && !recordedVoice && ttsReady) {
         speak(person.lines[next].text, `${person.id}-${next}`);
       }
       return next;
     });
-  }, [person, voiceOn, canSpeak]);
+  }, [person, voiceOn, recordedVoice, ttsReady]);
 
   // Pointing at him in the world is the real gesture; the card is the fallback
   // for anyone who cannot find him.
@@ -892,6 +1008,15 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
 
       {/* The figure's voice. Every line carries its tier and source in the
           record; what the visitor sees is the sentence, not the apparatus. */}
+      {/* The figure's voice. Audio only, no transport, no notification — one
+          recorded line at a time. `speaking` ducks the guide narration under it,
+          exactly as it did under device TTS. */}
+      <FigureVoice
+        uri={figureLine?.uri ?? null}
+        lineKey={figureLine?.key ?? null}
+        onSpeakingChange={setSpeaking}
+      />
+
       {figure && person && personVisible ? (
         <Pressable style={styles.personTab} onPress={advance}>
           <Text style={styles.personName}>{person.name}</Text>
@@ -912,12 +1037,19 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
                   if (voiceOn) {
                     stopSpeaking();
                     setVoiceOn(false);
+                    // The recorded path stops by unmounting, which fires no
+                    // callback, so the duck has to be lifted here or the guide
+                    // narration stays suspended after a mute.
+                    setSpeaking(false);
                   } else {
                     setVoiceOn(true);
-                    speak(
-                      person.lines[lineIndex].text,
-                      `${person.id}-${lineIndex}`,
-                    );
+                    setUtterance(u => u + 1);
+                    if (!recordedVoice && ttsReady) {
+                      speak(
+                        person.lines[lineIndex].text,
+                        `${person.id}-${lineIndex}`,
+                      );
+                    }
                   }
                 }}
                 hitSlop={10}>

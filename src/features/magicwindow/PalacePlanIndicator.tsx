@@ -216,4 +216,14 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PalacePlanIndicator;
+/**
+ * MEMOISED, because it is redrawn by the compass.
+ *
+ * Every heading event from the native view re-renders MagicWindowScreen, and
+ * this SVG is the most expensive thing hanging off it. Over a 10-minute static
+ * run `dumpsys gfxinfo` counted 6,855 overlay frames at 11.4 a second, 66% of
+ * them janky, on a scene where nothing was moving. The native side now rate-
+ * limits that event to 4 Hz and a degree of movement; this stops the remaining
+ * ones costing a full SVG rebuild when the props are identical.
+ */
+export default React.memo(PalacePlanIndicator);

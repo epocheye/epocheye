@@ -39,6 +39,25 @@ export interface MagicWindowPerson {
    * the "someone is here" prompt points at a man in another storey.
    */
   visibleFrom?: string[];
+  /**
+   * CDN key prefix for this figure's recorded lines, if they have been voiced.
+   * Line n (1-based) is `${voiceKeyPrefix}line_${n}_${lang}.mp3`, resolved
+   * through buildAudioUrl like any other clip.
+   *
+   * WHY RECORDED AND NOT SYNTHESISED ON THE DEVICE. The alternative — and what
+   * this replaces for Purnaiah — is Android's own TextToSpeech (SpeechModule.kt).
+   * That is whatever voice the handset ships, it differs between phones, and it
+   * shares nothing with the guide narration the visitor has had in their ears
+   * for the previous six stops. A figure who sounds like a satnav mid-guide is
+   * worse than a figure who says nothing.
+   *
+   * Recorded in en-IN-Chirp3-HD-Achird, deliberately a different voice from the
+   * guide's Aoede: he is a person being quoted, not the narrator.
+   *
+   * OMITTED means fall back to device TTS, which is what the fort's Tipu figure
+   * still does. Removing that fallback would silence him.
+   */
+  voiceKeyPrefix?: string;
   /** What they say. Every entry carries its tier and source. */
   lines: {
     text: string;
@@ -191,6 +210,7 @@ const PALACE_PEOPLE: MagicWindowPerson[] = [
     // is 55.5 deg off it; P9 faces 223.3 deg and he is 21.9 deg off. Listing
     // them would point the visitor at a man who is not on screen.
     visibleFrom: ['P5'],
+    voiceKeyPrefix: 'audio/tipu-summer-palace-bengaluru/figures/purnaiah_darbar/',
     lines: [
       {
         text:

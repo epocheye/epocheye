@@ -250,4 +250,9 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MagicWindowSheet;
+/**
+ * MEMOISED for the same reason as PalacePlanIndicator: the sheet is always
+ * mounted (the player lives inside it), so it re-rendered on every heading
+ * event even while closed and untouched.
+ */
+export default React.memo(MagicWindowSheet);

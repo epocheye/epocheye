@@ -145,10 +145,26 @@ const PALACE: MagicWindowScene = {
   ctaLabel: 'Step inside, as it was painted',
   loadingLabel: 'Repainting the palace…',
   // Linear RGB, matching the pale daylight the GLB's own dome used to carry.
-  skyColor: [0.678, 0.741, 0.808],
+  //
+  // CORRECTED. This was [0.678, 0.741, 0.808], which is the SRGB value the build
+  // script writes — build_palace_magicwindow.py passes it through srgb(), and
+  // what lands in the GLB's dome material is the linear [0.417, 0.509, 0.617].
+  // Shipping the sRGB numbers straight into Skybox.color() made the app-side sky
+  // about 1.6x brighter than the dome it claimed to match, which is most of why
+  // the device reported "the sky is merely white".
+  //
+  // The vertical gradient is built around this value in gradientSkybox(); the
+  // scene keeps its hue and only gains the fall-off. The fog colour is derived
+  // from it too, so the horizon and the haze cannot drift apart.
+  skyColor: [0.417, 0.509, 0.617],
   lightScale: 0.45,
   // 25 m to 105 m, against a 140 m scene. The lawn's far edge is 72 m from the
   // darbar hall, so it now fades toward the sky instead of ending in a line.
+  //
+  // HAND-AUTHORED, and it does NOT track the lawn. sceneSpanM is emitted from
+  // the build (2 x GROUND_R) but these two are typed here: growing the lawn past
+  // 105 m would leave its new edge fully fogged, and shrinking it below 25 m
+  // would make fog inert again, with nothing to warn you either way.
   fog: [25.0, 105.0],
   viewpoints: PALACE_VIEWPOINTS,
   legend: PALACE_LEGEND,

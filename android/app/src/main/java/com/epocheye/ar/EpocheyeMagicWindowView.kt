@@ -150,6 +150,39 @@ class EpocheyeMagicWindowView(
          * ambient exactly.
          */
         private const val IBL_UP_GRADIENT = 0.45f
+
+        /**
+         * Refresh rate asked of the compositor while the magic window is up.
+         *
+         * 60, because the input is a 50 Hz rotation vector (SENSOR_DELAY_GAME)
+         * and nothing else in the scene moves except one 4-second idle clip.
+         * Every frame above that is the same image computed a second time. See
+         * [capRefreshRate].
+         */
+        private const val TARGET_REFRESH_HZ = 60f
+
+        /** Heading events to JS: at most 4 a second, and only when it moved. */
+        private const val HEADING_MIN_INTERVAL_NS = 250_000_000L
+        private const val HEADING_MIN_DELTA_DEG = 1.0f
+
+        /**
+         * THE SKY RAMP. Multipliers on the scene's authored `skyColor`, so a
+         * scene that changes its sky keeps its own hue and only gains the
+         * vertical fall-off. Horizon lifts and warms; zenith deepens and cools.
+         * Set horizon and zenith equal on all three to get the old flat sky back.
+         *
+         * The exponent shapes where the change happens. Below 1 puts most of it
+         * in the lower half of the dome, which is the part a visitor standing in
+         * a colonnade can actually see.
+         */
+        private const val SKY_FACE_PX = 32
+        private const val SKY_RAMP_POWER = 0.65
+        private const val SKY_HORIZON_R = 1.14f
+        private const val SKY_HORIZON_G = 1.10f
+        private const val SKY_HORIZON_B = 1.04f
+        private const val SKY_ZENITH_R = 0.72f
+        private const val SKY_ZENITH_G = 0.80f
+        private const val SKY_ZENITH_B = 0.95f
     }
 
     // ---- props (set by EpocheyeMagicWindowViewManager) ----------------------
@@ -315,6 +348,7 @@ class EpocheyeMagicWindowView(
     var onHeading: ((Float) -> Unit)? = null
 
     private var lastHeadingNanos = 0L
+    private var lastHeadingSent = -999f
     private var lastDebugNanos = 0L
     private var debugPosX = Float.NaN
     private var debugPosY = Float.NaN
@@ -494,14 +528,10 @@ class EpocheyeMagicWindowView(
                             // A scene that ships WITHOUT a sky dome in its GLB
                             // gets its sky here instead. See [skyColor] for why
                             // the palace does and the fort does not.
-                            val sb = sky?.let {
-                                Skybox.Builder()
-                                    .color(it[0], it[1], it[2], 1.0f)
-                                    .build(eng)
-                            }
+                            val sb = sky?.let { gradientSkybox(eng, it) }
                             if (sb != null) {
-                                Log.i(TAG, "skybox: app-side %.3f %.3f %.3f"
-                                    .format(sky[0], sky[1], sky[2]))
+                                Log.i(TAG, "skybox: vertical gradient about " +
+                                    "%.3f %.3f %.3f".format(sky[0], sky[1], sky[2]))
                             }
                             Environment(indirectLight = ibl, skybox = sb)
                         } catch (t: Throwable) {
@@ -521,6 +551,7 @@ class EpocheyeMagicWindowView(
                         cameraNode = cam
                         applyCamera()
                         applyFog(fView)
+                        applyRenderBudget(fView)
                         try {
                             mainLight?.let {
                                 it.lightManager.setIntensity(
@@ -880,15 +911,190 @@ class EpocheyeMagicWindowView(
                 // Filament's default is INFINITY; the Java object would otherwise
                 // start at 0 and cut the fog off immediately.
                 cutOffDistance = Float.POSITIVE_INFINITY
-                // Linear, not sRGB - the same colour space the GLB's vertex colours
-                // and baseColorFactors are written in.
-                color = floatArrayOf(0.729f, 0.745f, 0.752f)
+                // FOG IS THE HORIZON, so it takes the horizon's colour rather
+                // than a hand-picked grey.
+                //
+                // It was floatArrayOf(0.729, 0.745, 0.752) - neutral grey against
+                // a blue sky. That softened the line where the lawn ends and left
+                // a hue step across it, which is most of the "standing on stairs
+                // in the sky" reading: the ground faded toward a colour the sky
+                // never reaches. Derived from the scene's own skyColor through
+                // the same horizon multipliers gradientSkybox uses, so the two
+                // agree by construction and cannot drift apart when a scene
+                // changes its sky.
+                //
+                // Linear, not sRGB - the same colour space the GLB's vertex
+                // colours and baseColorFactors are written in.
+                color = skyColorState.value?.let {
+                    floatArrayOf(
+                        it[0] * SKY_HORIZON_R,
+                        it[1] * SKY_HORIZON_G,
+                        it[2] * SKY_HORIZON_B,
+                    )
+                } ?: floatArrayOf(0.729f, 0.745f, 0.752f)
                 fogColorFromIbl = false
             }
         } catch (t: Throwable) {
             // Not fatal, and worth saying out loud: without fog the scene still
             // reads, because the GLB carries the ground and sky ramps itself.
             Log.w(TAG, "fog unavailable; the GLB's own ground/sky ramps still apply", t)
+        }
+    }
+
+    /**
+     * Switch off the post-processing this scene never asked for.
+     *
+     * THE PHONE GETS HOT, AND IT IS NOT ARCORE. The palace composes a plain
+     * SceneView - `hasSiteWalk` is false, so `arTracking` can never become true
+     * and no ARCore session, camera stream or plane finder is ever created. What
+     * runs instead is Filament at full display refresh over 97,628 triangles in
+     * 758 renderables, and SceneView applies `RenderQuality.Default` to the View
+     * it hands us, which silently turns on:
+     *
+     *   SSAO      a full-screen depth-sampling + blur pass, EVERY frame, for
+     *             occlusion this GLB already ships baked into COLOR_0 at
+     *             strength 0.75 (see palace_audit.txt). We were paying twice for
+     *             the same effect and the cheap copy was the one being ignored.
+     *   BLOOM     a downsample/upsample mip chain over the HDR buffer, on an
+     *             interior document scene with no emissive material in it.
+     *   SHADOWING at View level, while the only light already has
+     *             setShadowCaster(false) - so the flag buys a per-frame check
+     *             for a pass that can never draw anything.
+     *
+     * FXAA is KEPT. It is one cheap full-screen pass and this scene is all long
+     * straight teak edges, which is exactly what aliases worst.
+     *
+     * DYNAMIC RESOLUTION IS TURNED ON, and it is the only knob here that degrades
+     * gracefully: under thermal load Filament drops the render scale before the
+     * frame rate, which is far less visible on a static reconstruction than a
+     * stutter while the visitor is turning their head.
+     *
+     * Set explicitly rather than via `RenderQuality.Performance` so each change
+     * is named and reversible on its own. The preset would also drop the HDR
+     * colour buffer to LOW, which is a colour decision, not a heat one.
+     */
+    /**
+     * A sky that gets deeper overhead, built at runtime. No asset ships.
+     *
+     * WHY A CUBEMAP AND NOT A COLOUR. Filament's Skybox takes either a single
+     * flat RGBA or an environment texture - there is no gradient parameter. It
+     * was a flat colour, and a flat colour is exactly what the device reported:
+     * "the sky is merely white". A dome mesh is not the answer either; the last
+     * one inflated the bounding box to 400 m and hid the palace (see the build
+     * script's own NO SKY DOME note).
+     *
+     * So: 32x32 per face, filled from the world direction's y. Thirty-two is
+     * plenty because the ramp is smooth and the sampler is bilinear - the whole
+     * texture is 24 KB and is built once per scene, not per frame.
+     *
+     * THE RAMP IS A DOCUMENT, NOT A SUNSET. Horizon is the scene's authored sky
+     * colour lifted and warmed slightly; zenith is the same colour deepened and
+     * pushed toward blue. Everything BELOW the horizon holds the horizon colour
+     * exactly, because that is what the ground fades into - a ramp that kept
+     * darkening downward would put a second visible line under the first.
+     */
+    private fun gradientSkybox(eng: com.google.android.filament.Engine,
+                               base: FloatArray): Skybox? {
+        return try {
+            val n = SKY_FACE_PX
+            // Filament's cubemap face order, and the axis each face looks down.
+            val faces = arrayOf(
+                Float3(1f, 0f, 0f), Float3(-1f, 0f, 0f),   // +X, -X
+                Float3(0f, 1f, 0f), Float3(0f, -1f, 0f),   // +Y, -Y
+                Float3(0f, 0f, 1f), Float3(0f, 0f, -1f),   // +Z, -Z
+            )
+            val floats = 4 * n * n * 6
+            val buf = java.nio.ByteBuffer
+                .allocateDirect(floats * 4)
+                .order(java.nio.ByteOrder.nativeOrder())
+            val offsets = IntArray(6) { it * 4 * n * n * 4 }
+
+            for (f in 0 until 6) {
+                for (py in 0 until n) {
+                    for (px in 0 until n) {
+                        // Texel centre in [-1, 1] on the face, then the world
+                        // direction it corresponds to. Only y is used, so the
+                        // exact face tangent basis does not matter - what
+                        // matters is that y is continuous across the seams,
+                        // and it is, because it comes from the direction.
+                        val u = (px + 0.5f) / n * 2f - 1f
+                        val v = (py + 0.5f) / n * 2f - 1f
+                        val d = faceDirection(faces[f], u, v)
+                        val len = kotlin.math.sqrt(d.x * d.x + d.y * d.y + d.z * d.z)
+                        val y = if (len > 0f) d.y / len else 0f
+                        // Below the horizon the sky holds its horizon colour.
+                        val t = if (y <= 0f) 0f
+                                else Math.pow(y.toDouble(), SKY_RAMP_POWER).toFloat()
+                        buf.putFloat(ramp(base[0], SKY_HORIZON_R, SKY_ZENITH_R, t))
+                        buf.putFloat(ramp(base[1], SKY_HORIZON_G, SKY_ZENITH_G, t))
+                        buf.putFloat(ramp(base[2], SKY_HORIZON_B, SKY_ZENITH_B, t))
+                        buf.putFloat(1f)
+                    }
+                }
+            }
+            buf.rewind()
+
+            val tex = com.google.android.filament.Texture.Builder()
+                .width(n).height(n).levels(1)
+                .sampler(com.google.android.filament.Texture.Sampler.SAMPLER_CUBEMAP)
+                .format(com.google.android.filament.Texture.InternalFormat.RGBA16F)
+                .build(eng)
+            tex.setImage(
+                eng, 0,
+                com.google.android.filament.Texture.PixelBufferDescriptor(
+                    buf,
+                    com.google.android.filament.Texture.Format.RGBA,
+                    com.google.android.filament.Texture.Type.FLOAT,
+                ),
+                offsets,
+            )
+            Skybox.Builder().environment(tex).showSun(false).build(eng)
+        } catch (t: Throwable) {
+            // A flat sky is worse than a graded one and better than none, so
+            // fall back rather than losing the background entirely.
+            Log.w(TAG, "gradient skybox failed; falling back to flat colour", t)
+            try {
+                Skybox.Builder().color(base[0], base[1], base[2], 1f).build(eng)
+            } catch (t2: Throwable) {
+                Log.w(TAG, "flat skybox failed too", t2)
+                null
+            }
+        }
+    }
+
+    /** Channel value at ramp position t, as a multiple of the authored colour. */
+    private fun ramp(base: Float, horizon: Float, zenith: Float, t: Float): Float =
+        base * (horizon + (zenith - horizon) * t)
+
+    /** World direction for a texel at (u, v) on the face looking down [axis]. */
+    private fun faceDirection(axis: Float3, u: Float, v: Float): Float3 = when {
+        axis.x != 0f -> Float3(axis.x, -v, -u * axis.x)
+        axis.y != 0f -> Float3(u, axis.y, v * axis.y)
+        else -> Float3(u * axis.z, -v, axis.z)
+    }
+
+    private fun applyRenderBudget(fView: FilamentView) {
+        try {
+            fView.ambientOcclusionOptions =
+                FilamentView.AmbientOcclusionOptions().apply { enabled = false }
+            fView.bloomOptions =
+                FilamentView.BloomOptions().apply { enabled = false }
+            fView.setShadowingEnabled(false)
+            fView.dynamicResolutionOptions =
+                FilamentView.DynamicResolutionOptions().apply {
+                    enabled = true
+                    homogeneousScaling = true
+                    quality = FilamentView.QualityLevel.MEDIUM
+                    // Never below half-scale: past that the gilding stops
+                    // reading and the visitor is looking at a different model.
+                    minScale = 0.5f
+                    maxScale = 1.0f
+                }
+            Log.i(TAG, "render budget: SSAO off, bloom off, shadowing off, " +
+                "dynamic resolution 0.5-1.0 (FXAA kept)")
+        } catch (t: Throwable) {
+            // A View that refuses these still renders; it just renders hot.
+            Log.w(TAG, "render budget could not be applied", t)
         }
     }
 
@@ -1285,12 +1491,29 @@ class EpocheyeMagicWindowView(
             // The heading the visitor is actually facing, for the plan
             // indicator. Derived from the SAME forward vector the camera uses,
             // so the wedge can never disagree with the view.
+            //
+            // RATE-LIMITED TO 4 Hz, AND ALSO TO A DEGREE OF MOVEMENT. It was
+            // 10 Hz unconditionally, and every one of those crosses the bridge
+            // and re-renders MagicWindowScreen - a 1,800-line component with a
+            // bottom sheet and an SVG plan under it. `dumpsys gfxinfo` over a
+            // 10-minute static run counted 6,855 overlay frames, 11.4 a second,
+            // 66% of them janky: the interface was redrawing at the rate of this
+            // event and nothing else.
+            //
+            // The wedge is a direction indicator a few millimetres across. 4 Hz
+            // is imperceptible on it, and skipping sub-degree deltas means a
+            // phone lying still on a desk stops publishing at all.
             val nowH = event.timestamp
-            if (nowH - lastHeadingNanos > 100_000_000L) {
-                lastHeadingNanos = nowH
+            if (nowH - lastHeadingNanos > HEADING_MIN_INTERVAL_NS) {
                 val hdg = ((Math.toDegrees(atan2(fe.toDouble(), fn.toDouble()))
                     .toFloat()) % 360f + 360f) % 360f
-                post { onHeading?.invoke(hdg) }
+                var d = kotlin.math.abs(hdg - lastHeadingSent)
+                if (d > 180f) d = 360f - d
+                if (d >= HEADING_MIN_DELTA_DEG) {
+                    lastHeadingNanos = nowH
+                    lastHeadingSent = hdg
+                    post { onHeading?.invoke(hdg) }
+                }
             }
 
             if (BuildConfig.DEBUG) {
@@ -1682,6 +1905,10 @@ class EpocheyeMagicWindowView(
         if (same) return
         skyColorState.value = rgb
         skyColor = rgb
+        // The fog colour is derived from this one, so it has to be recomputed
+        // here or the horizon and the haze disagree until something else
+        // happens to re-apply the fog.
+        filamentView?.let { applyFog(it) }
     }
 
     fun setLightScale(v: Float) {
@@ -1766,14 +1993,52 @@ class EpocheyeMagicWindowView(
         // time, which is exactly what the display timeout counts as idle. On a handset
         // with a 30 s timeout the screen would blank mid-viewpoint.
         keepScreenOn = true
+        capRefreshRate(true)
         if (composeView == null) setupScene()
         pendingRecenter = true
         startListening()
     }
 
+    /**
+     * Ask the compositor for 60 Hz while this view is up, and give the panel back
+     * when it goes away.
+     *
+     * SceneView renders from a Compose `withFrameNanos` loop with no dirty check,
+     * so it draws a full frame on EVERY vsync whether or not anything moved. On a
+     * 120 Hz panel that is 120 renders per second of a scene whose only input is
+     * a 50 Hz rotation vector - half of them are, by construction, the same image
+     * computed twice.
+     *
+     * There is no frame limiter anywhere in this file to reach for. The AR screen
+     * did not need one: EpocheyeDetectARView pins updateMode to BLOCKING, which
+     * paces its loop to the ~30 fps camera, and its own comment records that as
+     * "the fix for a thermal shutdown at Bangalore Fort". The magic window has no
+     * ARCore session, so it inherited no governor at all. Capping the surface's
+     * refresh rate is the equivalent lever from the other end.
+     *
+     * A HINT, NOT A GUARANTEE, AND IT DOES NOTHING ON THE TEST PHONE. Measured
+     * on the V2538: the panel advertises 60/90/120 but `SurfaceFlinger`'s
+     * activeMode is already `vsyncRate=60.00 Hz`, and `--latency` reports a
+     * 16,666,666 ns period. So this cap is worth nothing here and the honest
+     * accounting is that the render budget below is what saved the heat, not
+     * this. It stays because a 120 Hz handset would otherwise pay double for a
+     * scene driven by a 50 Hz sensor, and because it costs one line.
+     */
+    private fun capRefreshRate(cap: Boolean) {
+        try {
+            val w = (context as? ThemedReactContext)?.currentActivity?.window ?: return
+            w.attributes = w.attributes.apply {
+                preferredRefreshRate = if (cap) TARGET_REFRESH_HZ else 0f
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "could not set preferred refresh rate", t)
+        }
+    }
+
     override fun onDetachedFromWindow() {
         stopListening()
         keepScreenOn = false
+        capRefreshRate(false)
         // DisposeOnDetachedFromWindow tears the composition down on detach, which
         // destroys the Filament engine and every node with it. Forget what was loaded
         // so re-attaching rebuilds the scene rather than trusting dead handles - and
