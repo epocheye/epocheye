@@ -109,6 +109,17 @@ interface Props {
   onSpeaking: () => void;
   /** Running pre-cache tally, for the quiet "saving" line. */
   prefetch: PrefetchSummary | null;
+  /**
+   * Open the world-locked reconstruction — the "See the reconstruction" button
+   * that used to sit on SiteDetail.
+   *
+   * IT LIVES HERE BECAUSE IT ONLY MAKES SENSE HERE. It places authored viewing
+   * stations against the real building, so the visitor has to be standing
+   * outside looking at it — which is exactly what the arrival step is. Omitted
+   * when the site has no stations, or when the phone cannot run world-locked
+   * AR, so the control never offers something the device will refuse.
+   */
+  onOpenReconstruction?: () => void;
   onContinue: () => void;
 }
 
@@ -119,6 +130,7 @@ const LawnStep: React.FC<Props> = ({
   cameraGranted,
   onRequestCamera,
   onSpeaking,
+  onOpenReconstruction,
   prefetch,
   onContinue,
 }) => {
@@ -646,6 +658,14 @@ const LawnStep: React.FC<Props> = ({
                   label={t('journey.arrival.replay')}
                   icon={<RotateCcw size={16} color={JOURNEY_GOLD} />}
                   onPress={handleReplay}
+                />
+              ) : null}
+              {/* Only where stations are authored AND the phone can hold them
+                  in place. The parent decides both; omitted, nothing renders. */}
+              {onOpenReconstruction ? (
+                <GhostButton
+                  label={t('journey.arrival.seeReconstruction')}
+                  onPress={onOpenReconstruction}
                 />
               ) : null}
             </View>

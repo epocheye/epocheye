@@ -586,7 +586,8 @@
       "stay": "Stay a moment",
       "loadFailed": "Couldn't bring the figure in. Check your connection and try again.",
       "audioOnly": "AR isn't available on this phone, so Tipu Sultan will speak without appearing.",
-      "voiceFailed": "The welcome couldn't play. You can carry on."
+      "voiceFailed": "The welcome couldn't play. You can carry on.",
+      "seeReconstruction": "See it standing here"
     },
     "prepare": {
       "eyebrow": "BEFORE YOU GO IN",
@@ -679,8 +680,10 @@
       "unavailableTitle": "We can't tell where you are",
       "unavailableBody": "The journey only runs at the palace, so it needs your location. Turn location on for Epocheye and try again.",
       "retry": "Try again",
-      "devBanner": "DEV — outside the site (admin bypass)"
-    }
+      "devBanner": "DEV — outside the site (admin bypass)",
+      "unavailableCta": "Location needed"
+    },
+    "askCta": "Ask about this place"
   },
   "arSession": {
     "dark": "It's too dark to make out the room. More light will help — I've turned the phone's lamp on.",
@@ -691,5 +694,14 @@
     "lost": "It's lost its place. Hold still for a moment while it finds the room again.",
     "hot": "The phone is getting warm, so this may stutter for a while. It settles down on its own.",
     "retry": "Try again"
+  },
+  "siteCta": {
+    "audioHint": "Listen to the guide for this place",
+    "magicWindow": "Step inside the reconstruction",
+    "magicWindowHint": "See the interior rebuilt, without the camera",
+    "scanHint": "Point your camera at something to learn about it",
+    "askHint": "Ask anything about this place",
+    "reconstruction": "See it standing here",
+    "reconstructionHint": "Place the reconstruction against the real building"
   }
 }

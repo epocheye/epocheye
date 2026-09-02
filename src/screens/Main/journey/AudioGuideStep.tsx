@@ -561,10 +561,13 @@ const AudioGuideStep: React.FC<Props> = ({
             the visitor lands looking at the right thing instead of at a list of
             eight place names.
 
-            No extra gate: entry to the journey is already admin-only
-            (canBeginJourney -> isAdminUser), the same gate SiteDetail puts on
-            the magic window. viewpointForStop returns undefined for any venue
-            without a magic window, so this simply does not render elsewhere. */}
+            THE GATE IS THE PROP. This used to say "no extra gate: entry to the
+            journey is already admin-only" — true when it was written, and false
+            the moment JOURNEY_OPEN_TO_ALL flipped. The parent now decides, and
+            passes onOpenReconstruction only to a viewer who may open the magic
+            window; omitted, this control does not render. viewpointForStop also
+            returns undefined for any venue without a magic window, so it stays
+            absent elsewhere for a second, independent reason. */}
         {mwViewpointId && onOpenReconstruction ? (
           <GhostButton
             label={t('journey.guide.seeReconstruction')}

@@ -16,11 +16,27 @@ import { buildAudioUrl } from '../../../services/mediaCache';
 import { isAdminUser } from '../../../shared/auth/isAdminUser';
 
 /**
- * The ONE flag that opens the journey to everyone. While false the "Begin the
- * journey" CTA is shown only to the admin allowlist (isAdminUser) so the slice
- * can be walked on site without exposing it to visitors.
+ * The ONE flag that opens the journey to everyone. While false the journey is
+ * shown only to the admin allowlist (isAdminUser) so the slice can be walked on
+ * site without exposing it to visitors.
+ *
+ * NOW TRUE. The journey is the single call to action on SiteDetail
+ * (screens/Main/siteCta.ts), so leaving this false would have meant one button
+ * that three accounts could press and everyone else resolved past.
+ *
+ * IT IS STILL GEOFENCED. useJourneyGate answers 'outside' beyond the venue
+ * radius and the CTA renders dimmed with "Available at the palace"; admins get
+ * 'bypass'. Opening the flag opens WHO may enter, not FROM WHERE.
+ *
+ * WHAT THIS FLIP DELIBERATELY DOES NOT OPEN: the magic window. The journey's
+ * guide step can hand off to it, and that hand-off used to rely on this flag
+ * being false for its access control — a load-bearing assumption written down
+ * in a comment and nowhere else. PalaceJourneyScreen now applies isAdminUser
+ * directly, so both magic-window scenes stay admin-only on their own terms
+ * (the palace pending a tape measurement of its disputed facade), independent
+ * of this flag.
  */
-export const JOURNEY_OPEN_TO_ALL = false;
+export const JOURNEY_OPEN_TO_ALL = true;
 
 /**
  * How long the arrival step waits after ARCore reports TRACKING before placing
@@ -32,6 +48,13 @@ export const JOURNEY_OPEN_TO_ALL = false;
 export const FIGURE_WARM_UP_MS = 2500;
 
 export interface JourneyHost {
+  /**
+   * The venue's display name, for surfaces the journey opens that need one —
+   * the guide chat's header, today. The journey screen is reached by slug and
+   * never fetches the site record, so without this the chat would be titled
+   * with a URL slug.
+   */
+  siteName: string;
   /** GLB model id under GLB_BASE_URL (no extension). */
   figureModelId: string;
   /**
@@ -56,6 +79,7 @@ const JOURNEY_HOSTS: Readonly<Record<string, JourneyHost>> = {
   'tipu-summer-palace-bengaluru': {
     figureModelId: 'tipu_figure_royal9',
     figureScaleM: 1.7,
+    siteName: "Tipu Sultan's Summer Palace",
     talkClip: 'Talk_with_Right_Hand_Open',
     idleClip: 'Idle_02',
     welcomeAudioKey:

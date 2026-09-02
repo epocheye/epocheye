@@ -18,7 +18,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, ChevronLeft, X } from 'lucide-react-native';
+import { Camera, ChevronLeft, Sparkles, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import { COLORS, FONTS } from '../../../core/constants/theme';
@@ -38,6 +38,13 @@ interface TopBarProps {
   onClose: () => void;
   /** Go to the previous step. Omit on the first step. */
   onBack?: () => void;
+  /**
+   * Open the guide chat. Present on EVERY step, because the question a visitor
+   * wants to ask arrives when they are looking at the thing, not when they are
+   * back on a menu — and the chat lost its own button when SiteDetail collapsed
+   * to one call to action. Omit to hide it.
+   */
+  onAsk?: () => void;
 }
 
 /**
@@ -45,7 +52,12 @@ interface TopBarProps {
  * underneath. `pointerEvents="box-none"` so the AR feed behind it still takes
  * taps everywhere the bar has no control.
  */
-export const JourneyTopBar: React.FC<TopBarProps> = ({ stepIndex, onClose, onBack }) => {
+export const JourneyTopBar: React.FC<TopBarProps> = ({
+  stepIndex,
+  onClose,
+  onBack,
+  onAsk,
+}) => {
   const { t } = useTranslation();
   const stepId = JOURNEY_STEPS[stepIndex] ?? JOURNEY_STEPS[0];
   return (
@@ -84,19 +96,31 @@ export const JourneyTopBar: React.FC<TopBarProps> = ({ stepIndex, onClose, onBac
           </View>
         </View>
 
-        {/* When a back control is showing, close still needs a home. */}
-        {onBack ? (
-          <Pressable
-            onPress={onClose}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.close')}
-            style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
-            <X size={18} color={JOURNEY_TEXT} />
-          </Pressable>
-        ) : (
-          <View style={styles.iconButton} />
-        )}
+        {/* Ask, then close. The spacer keeps the step block centred when
+            neither is showing. */}
+        <View style={styles.rightGroup} pointerEvents="box-none">
+          {onAsk ? (
+            <Pressable
+              onPress={onAsk}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t('journey.askCta')}
+              style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+              <Sparkles size={18} color={JOURNEY_TEXT} />
+            </Pressable>
+          ) : null}
+          {onBack ? (
+            <Pressable
+              onPress={onClose}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+              <X size={18} color={JOURNEY_TEXT} />
+            </Pressable>
+          ) : null}
+          {!onAsk && !onBack ? <View style={styles.iconButton} /> : null}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -305,6 +329,7 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     gap: 8,
   },
+  rightGroup: { flexDirection: 'row', alignItems: 'center' },
   iconButton: {
     width: 40,
     height: 40,

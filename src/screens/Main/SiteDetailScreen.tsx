@@ -59,6 +59,12 @@ import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 import { analytics } from '../../services/analytics';
 import { canBeginJourney } from './journey/journeyConfig';
 import { useJourneyGate } from './journey/useJourneyGate';
+import { resolveSiteCta } from './siteCta';
+import type { SiteCtaKey } from './siteCta';
+import {
+  useARCapability,
+  isNonArCapability,
+} from '../../shared/hooks/useARCapability';
 import type {
   MainScreenProps,
   PlaceNavParam,
@@ -69,6 +75,20 @@ const { height: SCREEN_H } = Dimensions.get('window');
 const HERO_HEIGHT = Math.round(SCREEN_H * 0.52);
 
 type Props = MainScreenProps<'SiteDetail'>;
+
+/**
+ * The icon follows whichever rung the ladder settled on, so the button can
+ * never show footprints beside "View in AR". Keyed on SiteCtaKey so adding a
+ * rung without an icon is a type error rather than a blank space.
+ */
+const SITE_CTA_ICON: Record<SiteCtaKey, typeof Camera> = {
+  journey: Footprints,
+  audio: Headphones,
+  magic: Eye,
+  reconstruction: Shield,
+  scan: Camera,
+  ask: Sparkles,
+};
 
 const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const { t } = useTranslation();
@@ -381,17 +401,6 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   }, [navigation, siteDetail, site]);
 
-  // Record a site view once per opened site (the auto screen_view carries no slug).
-  useEffect(() => {
-    analytics.track('site_viewed', {slug: site.id});
-  }, [site.id]);
-
-  const handleGetPassport = useCallback(() => {
-    navigation.navigate(ROUTES.MAIN.PURCHASE, {
-      preSelectedPlaceId: site.id,
-    });
-  }, [navigation, site.id]);
-
   // "Ask about this site" — open the AI Guide chat for this monument.
   const handleAskGuide = useCallback(() => {
     const guideSlug = siteDetail?.slug ?? site.id;
@@ -402,6 +411,106 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       heroImageUrl: siteDetail?.hero_image_url,
     });
   }, [navigation, siteDetail, site.id, site.name]);
+
+  // THE ONE BUTTON. Everything above computes an input to this; the ladder and
+  // its reasoning live in screens/Main/siteCta.ts.
+  //
+  // arCapable passes TRUE while the ArCoreApk check is still 'checking'. The
+  // scan rung is the most common resolution, and demoting it for the few
+  // hundred milliseconds before the check answers would flash a different
+  // button — and a different LABEL — at a visitor who has just opened the
+  // screen. A capability that resolves to unsupported swaps it once, quietly.
+  const { capability: arCapability } = useARCapability();
+  const siteCta = useMemo(
+    () =>
+      resolveSiteCta({
+        journeyAvailable: showJourney,
+        journeyGateState: journeyGate.state,
+        journeyAllowed: journeyGate.allowed,
+        audioAvailable: showAudioCta,
+        // showMagicWindow keeps its own isAdminUser check. It is NOT inherited
+        // from the journey gate, so opening the journey cannot open this.
+        magicWindowAvailable: showMagicWindow,
+        magicWindowLabel: magicWindowScene.ctaLabel,
+        hasReconstruction,
+        arCapable:
+          arCapability === 'checking' || !isNonArCapability(arCapability),
+      }),
+    [
+      showJourney,
+      journeyGate.state,
+      journeyGate.allowed,
+      showAudioCta,
+      showMagicWindow,
+      magicWindowScene.ctaLabel,
+      hasReconstruction,
+      arCapability,
+    ],
+  );
+  // A scene-owned literal wins over the key, except while disabled — the
+  // disabled label has to say why, and "Step inside, as it was painted" does not.
+  const siteCtaLabel =
+    siteCta.disabled && siteCta.disabledLabelKey
+      ? t(siteCta.disabledLabelKey)
+      : (siteCta.label ?? t(siteCta.labelKey));
+  const SiteCtaIcon = SITE_CTA_ICON[siteCta.key];
+
+  // ONE EVENT FOR THE ONE BUTTON, carrying what it resolved to so the four
+  // rungs stay separable in the funnel. Nothing is lost by this: three of the
+  // six buttons it replaces (View in AR, See the reconstruction, Listen) fired
+  // no tap event at all, so there is no prior series to break. The two that
+  // did — journey_cta_tapped, magic_window_opened — still fire from their own
+  // call sites downstream, so those series stay continuous.
+  const handleSiteCta = useCallback(() => {
+    if (siteCta.disabled) return;
+    analytics.track('site_cta_tapped', {
+      slug: siteDetail?.slug ?? site.id,
+      resolved_to: siteCta.key,
+      gate: journeyGate.state,
+    });
+    switch (siteCta.key) {
+      case 'journey':
+        handleBeginJourney();
+        return;
+      case 'audio':
+        handleAudioGuide();
+        return;
+      case 'magic':
+        handleMagicWindow();
+        return;
+      case 'reconstruction':
+        handleReconstruction();
+        return;
+      case 'scan':
+        handleStartARExperience();
+        return;
+      case 'ask':
+      default:
+        handleAskGuide();
+    }
+  }, [
+    siteCta,
+    journeyGate.state,
+    siteDetail,
+    site.id,
+    handleBeginJourney,
+    handleAudioGuide,
+    handleMagicWindow,
+    handleReconstruction,
+    handleStartARExperience,
+    handleAskGuide,
+  ]);
+
+  // Record a site view once per opened site (the auto screen_view carries no slug).
+  useEffect(() => {
+    analytics.track('site_viewed', {slug: site.id});
+  }, [site.id]);
+
+  const handleGetPassport = useCallback(() => {
+    navigation.navigate(ROUTES.MAIN.PURCHASE, {
+      preSelectedPlaceId: site.id,
+    });
+  }, [navigation, site.id]);
 
   const handleElaborateFact = useCallback(
     async (fact: PersonalizedFact) => {
@@ -567,139 +676,51 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           </Text>
         )}
 
-        {/* CTAs (Figma 238:72 / 238:75) */}
+        {/* ONE CALL TO ACTION. See screens/Main/siteCta.ts for the ladder and
+            why disabled is dimmed rather than hidden.
+
+            THIS BLOCK HELD SIX BUTTONS. View in AR, Begin the journey, Step
+            inside, See the reconstruction, Listen, Learn About It — four of
+            them behind an admin allowlist, so a real visitor saw two and an
+            admin saw a wall, and neither screen said where to start. The other
+            five are not deleted: they are reached from inside whatever this
+            one resolves to. The journey's own steps are the audio guide, the
+            reconstruction and the camera; the magic window opens from the
+            stops that have a viewpoint; the guide chat is the header's Ask.
+
+            The TourTarget id moves here from "View in AR" so a SiteDetail tour
+            step could still spotlight the primary action. Nothing points at it
+            today — appTour.ts:9-13 records the deep-flow steps being removed
+            because they pulled first-run users into a permission prompt — so
+            this registration is available, not used. */}
         <View className="px-7 mt-7 gap-3.5">
-          <TourTarget id="siteDetail.viewAr">
+          <TourTarget id="siteDetail.cta">
             <TouchableOpacity
-              onPress={handleStartARExperience}
-              activeOpacity={0.9}
+              onPress={handleSiteCta}
+              activeOpacity={siteCta.disabled ? 1 : 0.9}
+              disabled={siteCta.disabled}
               className="bg-brand-gold flex-row items-center justify-center gap-2"
-              style={{height: moderateScale(53), borderRadius: moderateScale(30)}}
+              style={{
+                height: moderateScale(53),
+                borderRadius: moderateScale(30),
+                opacity: siteCta.disabled ? 0.45 : 1,
+              }}
               accessibilityRole="button"
-              accessibilityLabel={t('siteDetail.viewInAr')}
-            >
-              <Camera color="#0A0A0C" size={18} />
-              <Text className="text-ink font-display" style={{fontSize: moderateScale(22)}}>
-                {t('siteDetail.viewInAr')}
+              accessibilityState={{disabled: siteCta.disabled}}
+              accessibilityLabel={siteCtaLabel}
+              accessibilityHint={
+                siteCta.disabled || !siteCta.hintKey
+                  ? undefined
+                  : t(siteCta.hintKey)
+              }>
+              <SiteCtaIcon color="#0A0A0C" size={18} />
+              <Text
+                className="text-ink font-display"
+                style={{fontSize: moderateScale(22)}}>
+                {siteCtaLabel}
               </Text>
             </TouchableOpacity>
           </TourTarget>
-
-          {showJourney && (
-            <TouchableOpacity
-              onPress={handleBeginJourney}
-              activeOpacity={journeyGate.allowed ? 0.9 : 1}
-              disabled={!journeyGate.allowed}
-              className="flex-row items-center justify-center gap-2"
-              style={{
-                height: moderateScale(53),
-                borderRadius: moderateScale(30),
-                borderWidth: 1,
-                borderColor: '#C9A84C',
-                // Dimmed rather than hidden: a visitor reading about the palace at
-                // home should see that this exists and that it happens on site.
-                opacity: journeyGate.allowed ? 1 : 0.45,
-              }}
-              accessibilityRole="button"
-              accessibilityState={{disabled: !journeyGate.allowed}}
-              accessibilityLabel={
-                journeyGate.allowed
-                  ? t('journey.cta')
-                  : t('journey.gate.outsideCta')
-              }
-              accessibilityHint={
-                journeyGate.allowed ? t('journey.ctaHint') : undefined
-              }>
-              <Footprints color="#CBA862" size={18} />
-              <Text
-                className="text-brand-gold font-display"
-                style={{fontSize: moderateScale(20)}}>
-                {journeyGate.allowed
-                  ? t('journey.cta')
-                  : journeyGate.state === 'checking'
-                    ? t('journey.gate.checking')
-                    : t('journey.gate.outsideCta')}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {showMagicWindow && (
-            <TouchableOpacity
-              onPress={handleMagicWindow}
-              activeOpacity={0.9}
-              className="flex-row items-center justify-center gap-2"
-              style={{
-                height: moderateScale(53),
-                borderRadius: moderateScale(30),
-                borderWidth: 1,
-                borderColor: '#C9A84C',
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={magicWindowScene.ctaLabel}>
-              <Eye color="#CBA862" size={18} />
-              <Text
-                className="text-brand-gold font-display"
-                style={{fontSize: moderateScale(20)}}>
-                {magicWindowScene.ctaLabel}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {hasReconstruction && (
-            <TouchableOpacity
-              onPress={handleReconstruction}
-              activeOpacity={0.9}
-              className="flex-row items-center justify-center gap-2"
-              style={{
-                height: moderateScale(53),
-                borderRadius: moderateScale(30),
-                borderWidth: 1,
-                borderColor: '#C9A84C',
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="See the reconstruction">
-              <Text
-                className="text-brand-gold font-display"
-                style={{fontSize: moderateScale(20)}}>
-                See the reconstruction
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {showAudioCta && (
-            <TouchableOpacity
-              onPress={handleAudioGuide}
-              activeOpacity={0.9}
-              className="flex-row items-center justify-center gap-2"
-              style={{
-                height: moderateScale(53),
-                borderRadius: moderateScale(30),
-                borderWidth: 1,
-                borderColor: '#C9A84C',
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t('audioGuide.listenCta')}>
-              <Headphones color="#C9A84C" size={18} />
-              <Text
-                className="text-brand-gold font-display"
-                style={{fontSize: moderateScale(20)}}>
-                {t('audioGuide.listenCta')}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            onPress={handleAskGuide}
-            activeOpacity={0.85}
-            className="bg-surface-1 border border-white/12 items-center justify-center"
-            style={{height: moderateScale(53), borderRadius: moderateScale(30)}}
-            accessibilityRole="button"
-            accessibilityLabel={t('siteDetail.learnAboutIt')}
-          >
-            <Text className="text-brand-gold font-display" style={{fontSize: moderateScale(22)}}>
-              {t('siteDetail.learnAboutIt')}
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* ---- Kept functional sections (restyled onto warm-dark) ---- */}

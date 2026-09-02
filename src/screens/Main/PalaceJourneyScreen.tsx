@@ -61,6 +61,10 @@ import {
   journeyWelcomeUrl,
 } from './journey/journeyConfig';
 import { useJourneyGate } from './journey/useJourneyGate';
+import { isAdminUser } from '../../shared/auth/isAdminUser';
+import { hasMagicWindow } from '../../features/magicwindow/scenes';
+import { useUserStore } from '../../stores/userStore';
+import { listViewingStations } from '../../utils/api/ar';
 import LawnStep from './journey/LawnStep';
 import PromptStep from './journey/PromptStep';
 import AudioGuideStep, { type StopsStatus } from './journey/AudioGuideStep';
@@ -258,14 +262,73 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
    * since both were written; the visitor heard about the darbar hall and then
    * had to find it again in a list of eight place names.
    *
-   * No extra gate: entry to this screen is already admin-only through
-   * canBeginJourney, the same gate SiteDetail puts on the magic window.
+   * THIS GATE USED TO BE INHERITED, AND THAT WAS THE BUG. The previous comment
+   * here read "no extra gate: entry to this screen is already admin-only
+   * through canBeginJourney, the same gate SiteDetail puts on the magic
+   * window." That was true, load-bearing, and written down nowhere else — so
+   * flipping JOURNEY_OPEN_TO_ALL to open the JOURNEY would silently have opened
+   * the MAGIC WINDOW too, to every visitor, on the first stop that has a
+   * viewpoint. At the palace that is all eight.
+   *
+   * Those are two different decisions. The magic window is admin-only for its
+   * own reason — the palace's facade length is DISPUTED between three
+   * derivations (satellite 33.5 m, OSM 35.1 m, photographs 29-33 m,
+   * deliberately not averaged) and its painted decoration reconstructs an idiom
+   * rather than recording a room — and that decision is not the journey's to
+   * make. So it is applied here, explicitly, against the same isAdminUser the
+   * SiteDetail gate uses.
    */
+  const email = useUserStore(s => s.profile?.email);
+  const magicWindowAllowed = isAdminUser(email) && hasMagicWindow(slug);
+  /**
+   * The guide chat, from anywhere in the journey.
+   *
+   * It lost its own button when SiteDetail collapsed to one call to action, and
+   * a chat about a monument is worth most while the visitor is standing in
+   * front of it — not back on a menu two taps away. `step` rides along on the
+   * existing ai_guide_opened event so it stays one series while gaining the
+   * ability to say where the question was asked from.
+   */
+  /**
+   * Authored viewing stations for this venue, so the arrival step can offer the
+   * world-locked reconstruction. Fetched once; a failure leaves it false and
+   * the control simply does not appear, which is the same outcome as a site
+   * with no stations and needs no separate message.
+   */
+  const [hasStations, setHasStations] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void listViewingStations(slug).then(res => {
+      if (!cancelled && res.success) {
+        setHasStations((res.data.stations ?? []).length > 0);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+  const openReconstructionStations = useCallback(() => {
+    navigation.navigate(ROUTES.MAIN.AR_CAPABILITY, {
+      intent: 'reconstruction',
+      venueSlug: slug,
+      siteName: host?.siteName,
+    });
+  }, [navigation, slug, host]);
+
+  const openAsk = useCallback(() => {
+    analytics.track('ai_guide_opened', { slug, step: JOURNEY_STEPS[stepIndex] });
+    navigation.navigate(ROUTES.MAIN.AI_GUIDE, {
+      slug,
+      siteName: host?.siteName ?? slug,
+    });
+  }, [navigation, slug, stepIndex, host]);
+
   const openReconstruction = useCallback(
     (viewpointId: string) => {
+      if (!magicWindowAllowed) return;
       navigation.navigate(ROUTES.MAIN.MAGIC_WINDOW, { slug, viewpointId });
     },
-    [navigation, slug],
+    [navigation, slug, magicWindowAllowed],
   );
 
   const finishJourney = useCallback(() => {
@@ -475,6 +538,9 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
           cameraGranted={cameraGranted}
           onRequestCamera={requestCamera}
           onSpeaking={wantPrefetch}
+          onOpenReconstruction={
+            hasStations && arCapable ? openReconstructionStations : undefined
+          }
           prefetch={prefetch}
           onContinue={() => advanceFrom('arrival')}
         />
@@ -497,7 +563,9 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
           onRetry={() => void loadStops()}
           initialStopKey={progress.lastStopKey}
           onStopChange={handleStopChange}
-          onOpenReconstruction={openReconstruction}
+          onOpenReconstruction={
+            magicWindowAllowed ? openReconstruction : undefined
+          }
           onContinue={() => advanceFrom('guide')}
         />
       );
@@ -533,6 +601,7 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
         stepIndex={stepIndex}
         onClose={confirmLeave}
         onBack={stepIndex > 0 ? goPrevious : undefined}
+        onAsk={openAsk}
       />
       {video ? (
         <FullscreenVideo uri={video.uri} poster={video.poster} onClose={() => setVideo(null)} />
