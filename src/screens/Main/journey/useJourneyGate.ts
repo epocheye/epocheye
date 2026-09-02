@@ -25,9 +25,12 @@
  * so the screen can show a standing banner. A silent bypass would let an admin test a
  * broken gate for weeks and never know.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getActiveZone } from '../../../services/geofenceService';
+import {
+  ACCURACY_SLACK_CAP_M,
+  getActiveZone,
+} from '../../../services/geofenceService';
 import { fetchZones, getCachedZones } from '../../../services/zoneService';
 import { useCurrentZoneStore } from '../../../stores/currentZoneStore';
 import { usePlacesStore } from '../../../stores/placesStore';
@@ -73,6 +76,87 @@ function haversineMeters(
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+/**
+ * HOW FAR BEYOND THE BOUNDARY COUNTS AS HAVING LEFT.
+ *
+ * 150 m, and it is not a new magic number: it is ACCURACY_SLACK_CAP_M, the most
+ * this app is already willing to widen a zone by when a fix says it might be
+ * wrong by that much. If we will let a 150 m-uncertain fix count as INSIDE on
+ * the way in, we have no business calling the same uncertainty OUTSIDE on the
+ * way out. Making the two the same number keeps the gate symmetric about its
+ * own admitted error.
+ */
+export const EXIT_MARGIN_M = ACCURACY_SLACK_CAP_M;
+
+/**
+ * HOW LONG THAT HAS TO HOLD.
+ *
+ * A single sample is not evidence. Urban GPS wanders tens of metres between
+ * fixes and occasionally throws one much further, and the cost of believing a
+ * bad one here is not a flickering button — PalaceJourneyScreen renders its
+ * refusal card the moment `allowed` goes false, so a visitor mid-stop is thrown
+ * out of a running journey.
+ *
+ * 30 s because it is far longer than any wobble and far shorter than a real
+ * departure: crossing 150 m beyond a 1 km boundary and STAYING there for half a
+ * minute is walking away, not standing still badly.
+ */
+export const EXIT_GRACE_MS = 30_000;
+
+/** What one evaluation of the latch needs to know. Pure, so it is testable. */
+export interface ExitLatchInput {
+  /** getActiveZone said this venue, this tick. */
+  rawInside: boolean;
+  /** Metres to the venue centroid, or null when it cannot be computed. */
+  distanceM: number | null;
+  /** The zone's own radius, before accuracy slack. */
+  radiusM: number | null;
+  /** True once the visitor has been inside and has not sustainedly left. */
+  sticky: boolean;
+  /** When the current run of out-of-margin fixes began; null when there is none. */
+  outsideSinceMs: number | null;
+  nowMs: number;
+}
+
+export interface ExitLatchResult {
+  /** The latch's answer: treat the visitor as inside. */
+  inside: boolean;
+  /** Write back to the ref. */
+  outsideSinceMs: number | null;
+  /** Write back to state. */
+  sticky: boolean;
+}
+
+/**
+ * The hysteresis, as one pure step.
+ *
+ * Entering is immediate — a visitor arriving should not wait 30 s to be let in.
+ * Only LEAVING is damped, because only leaving throws someone out of something
+ * they are in the middle of.
+ */
+export function evaluateExitLatch(input: ExitLatchInput): ExitLatchResult {
+  const {rawInside, distanceM, radiusM, sticky, outsideSinceMs, nowMs} = input;
+
+  if (rawInside) {
+    return {inside: true, outsideSinceMs: null, sticky: true};
+  }
+  if (!sticky) {
+    // Never been inside on this journey: nothing to protect, answer plainly.
+    return {inside: false, outsideSinceMs: null, sticky: false};
+  }
+  // Inside the margin, or the distance is unknowable — hold, and reset the run.
+  // An unknown distance must not start an eviction clock: "we cannot tell" is
+  // not the same as "they left".
+  if (distanceM == null || radiusM == null || distanceM <= radiusM + EXIT_MARGIN_M) {
+    return {inside: true, outsideSinceMs: null, sticky: true};
+  }
+  const since = outsideSinceMs ?? nowMs;
+  if (nowMs - since >= EXIT_GRACE_MS) {
+    return {inside: false, outsideSinceMs: null, sticky: false};
+  }
+  return {inside: true, outsideSinceMs: since, sticky: true};
+}
+
 export function useJourneyGate(slug: string | null | undefined): JourneyGate {
   const email = useUserStore(s => s.profile?.email);
   const currentLocation = usePlacesStore(s => s.currentLocation);
@@ -84,6 +168,20 @@ export function useJourneyGate(slug: string | null | undefined): JourneyGate {
   const refresh = useCallback(() => setNonce(n => n + 1), []);
 
   const bypass = isAdminUser(email);
+
+  // Latch state for the exit hysteresis. Refs rather than state: they must not
+  // themselves trigger a render, and they are read and written in the same pass
+  // that computes the answer.
+  const stickyRef = useRef(false);
+  const outsideSinceRef = useRef<number | null>(null);
+  // A different venue is a different question. Without this, walking from the
+  // fort to the palace would carry the fort's "inside" latch across.
+  const latchSlugRef = useRef<string | null | undefined>(slug);
+  if (latchSlugRef.current !== slug) {
+    latchSlugRef.current = slug;
+    stickyRef.current = false;
+    outsideSinceRef.current = null;
+  }
 
   // Start the app's location tracking if nothing else has. Cheap and idempotent —
   // the store no-ops when already tracking or unauthenticated.
@@ -136,7 +234,7 @@ export function useJourneyGate(slug: string | null | undefined): JourneyGate {
     currentLocation.longitude,
     currentLocation.accuracy,
   );
-  const inside = active?.monument_id === slug;
+  const rawInside = active?.monument_id === slug;
 
   // Distance comes from the cached zone list, not the active zone: the "you are
   // N km away" line is needed exactly when the visitor is NOT inside, and in that
@@ -153,9 +251,34 @@ export function useJourneyGate(slug: string | null | undefined): JourneyGate {
       )
     : null;
 
+  // HYSTERESIS. See evaluateExitLatch: entering is immediate, leaving needs the
+  // fix to be EXIT_MARGIN_M beyond the boundary for EXIT_GRACE_MS.
+  //
+  // Evaluated during render rather than in an effect, deliberately. The gate's
+  // answer has to be correct in the same pass that produces it — an effect
+  // would let one render escape with the un-latched value, and that render is
+  // the one that swaps a running journey for a refusal card. The refs are the
+  // only mutation, they are idempotent for a given (rawInside, distance) pair,
+  // and nothing outside this hook observes them.
+  //
+  // A visitor who leaves and then stops moving produces no further fixes, so
+  // the grace never elapses and they stay 'inside'. That is the safe direction
+  // and it is chosen, not overlooked: the failure we are preventing is ejecting
+  // someone who is present, not detaining someone who has gone.
+  const latch = evaluateExitLatch({
+    rawInside,
+    distanceM,
+    radiusM: target?.radiusMeters ?? null,
+    sticky: stickyRef.current,
+    outsideSinceMs: outsideSinceRef.current,
+    nowMs: Date.now(),
+  });
+  stickyRef.current = latch.sticky;
+  outsideSinceRef.current = latch.outsideSinceMs;
+
   return {
-    state: inside ? 'inside' : 'outside',
-    allowed: inside,
+    state: latch.inside ? 'inside' : 'outside',
+    allowed: latch.inside,
     distanceM,
     refresh,
   };
