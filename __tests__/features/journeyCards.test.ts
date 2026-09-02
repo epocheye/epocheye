@@ -11,7 +11,10 @@ import {
   capCards,
   splitIntoSections,
   titleMentionsPillar,
-  withDevVideoCard,
+  withVideoCards,
+  MAX_VIDEO_CARDS,
+  videoCardId,
+  type ArCard,
 } from '../../src/screens/Main/journey/journeyCards';
 import type { ObjectCard } from '../../src/services/detectorResolver';
 
@@ -118,7 +121,7 @@ describe('capCards', () => {
   });
 });
 
-describe('dev video hook', () => {
+describe('video cards', () => {
   it('matches pillar titles case-insensitively and not others', () => {
     expect(titleMentionsPillar('The Pillars')).toBe(true);
     expect(titleMentionsPillar('a fluted pillar')).toBe(true);
@@ -129,7 +132,11 @@ describe('dev video hook', () => {
 
   it('appends one video card for a pillar and keeps within the cap', () => {
     const base = buildAiCards('The pillars', longBody);
-    const cards = withDevVideoCard(base, 'The pillars', 'https://cdn/test.mp4', 'Watch');
+    const cards = withVideoCards(
+      base,
+      [{ videoUrl: 'https://cdn/test.mp4', title: 'The pillars' }],
+      'Watch',
+    );
     expect(cards.length).toBeLessThanOrEqual(MAX_AR_CARDS);
     const video = cards[cards.length - 1];
     expect(video).toMatchObject({
@@ -138,12 +145,89 @@ describe('dev video hook', () => {
       heading: 'Watch',
       narrative: 'The pillars',
     });
-    expect(cards.filter(c => 'video_url' in c)).toHaveLength(1);
+    expect(cards.filter((c: ArCard) => 'video_url' in c)).toHaveLength(1);
   });
 
   it('attaches nothing without a video URL or for a non-pillar', () => {
     const base = buildAiCards('The pillars', 'Body.');
-    expect(withDevVideoCard(base, 'The pillars', null, 'Watch')).toBe(base);
-    expect(withDevVideoCard(base, 'The balcony', 'https://cdn/test.mp4', 'Watch')).toBe(base);
+    expect(withVideoCards(base, [{ videoUrl: '', title: 'The pillars' }], 'Watch')).toBe(base);
+    expect(
+      withVideoCards(base, [{ videoUrl: 'https://cdn/test.mp4', title: 'The balcony' }], 'Watch'),
+    ).toBe(base);
+    expect(withVideoCards(base, [], 'Watch')).toBe(base);
+  });
+
+  // THE REGRESSION THIS FUNCTION WAS MADE PLURAL FOR. PointLearnStep used
+  // `.find()`, so an object with two seeded videos showed one and the other was
+  // unreachable — which is exactly what migration 093 seeds on the palace's
+  // sword and hilt.
+  it('carries EVERY video an object has, in order, each with its own title', () => {
+    const base = buildAiCards('Sword hilt', 'Body.');
+    const cards = withVideoCards(
+      base,
+      [
+        { videoUrl: 'https://cdn/a.mp4', title: 'A tiger-head hilt on a marked blade', disclosure: 'Visualisation.' },
+        { videoUrl: 'https://cdn/b.mp4', title: 'A bronze tiger-head hilt', disclosure: 'Visualisation.' },
+      ],
+      'Watch',
+    );
+    const videos = cards.filter((c: ArCard) => 'video_url' in c);
+    expect(videos).toHaveLength(2);
+    expect(videos[0]).toMatchObject({
+      id: JOURNEY_VIDEO_CARD_ID,
+      video_url: 'https://cdn/a.mp4',
+      narrative: 'A tiger-head hilt on a marked blade',
+    });
+    expect(videos[1]).toMatchObject({
+      id: videoCardId(1),
+      video_url: 'https://cdn/b.mp4',
+      narrative: 'A bronze tiger-head hilt',
+    });
+    expect(cards.length).toBeLessThanOrEqual(MAX_AR_CARDS);
+  });
+
+  it('drops a generated clip missing its disclosure WITHOUT dropping its siblings', () => {
+    const base = buildAiCards('Sword', 'Body.');
+    const cards = withVideoCards(
+      base,
+      [
+        { videoUrl: 'https://cdn/good.mp4', title: 'A watered-steel blade', disclosure: 'Visualisation.' },
+        { videoUrl: 'https://cdn/bad.mp4', title: 'Unlabelled' },
+      ],
+      'Watch',
+    );
+    const videos = cards.filter((c: ArCard) => 'video_url' in c);
+    expect(videos).toHaveLength(1);
+    expect(videos[0]).toMatchObject({ video_url: 'https://cdn/good.mp4' });
+  });
+
+  it('keeps the words when an object has more videos than can be shown', () => {
+    const base = buildAiCards('Sword', longBody);
+    const many = Array.from({ length: MAX_VIDEO_CARDS + 3 }, (_, i) => ({
+      videoUrl: `https://cdn/${i}.mp4`,
+      title: `Clip ${i}`,
+      disclosure: 'Visualisation.',
+    }));
+    const cards = withVideoCards(base, many, 'Watch');
+    const videos = cards.filter((c: ArCard) => 'video_url' in c);
+    const text = cards.filter((c: ArCard) => !('video_url' in c));
+    expect(videos).toHaveLength(MAX_VIDEO_CARDS);
+    expect(text.length).toBeGreaterThanOrEqual(2);
+    expect(cards.length).toBeLessThanOrEqual(MAX_AR_CARDS);
+  });
+
+  it('passes a poster through when the row has one', () => {
+    const base = buildAiCards('Sword', 'Body.');
+    const [video] = withVideoCards(
+      base,
+      [{
+        videoUrl: 'https://cdn/a.mp4',
+        title: 'A watered-steel blade',
+        posterUrl: 'https://cdn/a.jpg',
+        disclosure: 'Visualisation.',
+      }],
+      'Watch',
+    ).filter((c: ArCard) => 'video_url' in c);
+    expect(video).toMatchObject({ poster_url: 'https://cdn/a.jpg' });
   });
 });

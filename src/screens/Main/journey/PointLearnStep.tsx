@@ -14,7 +14,7 @@
  * A card carrying `video_url` renders as a video playing ON the placard; its tap
  * arrives on onCardTap and opens the full-screen player. Until real card video
  * exists, a dev-only hook attaches the CloudFront test pattern when the
- * recognised title names a pillar (see journeyCards.withDevVideoCard). It is
+ * recognised title names a pillar (see journeyCards.withVideoCards). It is
  * inert in release builds: JOURNEY_TEST_VIDEO_URL is null there.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -50,7 +50,8 @@ import {
   buildAiCards,
   buildGroundedCards,
   titleMentionsPillar,
-  withDevVideoCard,
+  withVideoCards,
+  type VideoCardSpec,
   type ArCard,
 } from './journeyCards';
 import {
@@ -322,38 +323,55 @@ const PointLearnStep: React.FC<Props> = ({
           return;
         }
 
-        // REAL CARD MEDIA. object_media (migration 090) is the row the video
-        // card was always waiting for; until it existed the only thing feeding
-        // the native VideoNode path was a colour-bar test pattern matched on the
-        // word "pillar".
+        // REAL CARD MEDIA — ALL OF IT, not just the first row.
+        //
+        // object_media (migration 090) is the row the video card was always
+        // waiting for; until it existed the only thing feeding the native
+        // VideoNode path was a colour-bar test pattern matched on the word
+        // "pillar".
+        //
+        // THIS USED TO BE `.find()`. One video per object, first in sort_order,
+        // and every later row silently unreachable — migration 093 seeds two
+        // each on the palace's sword and hilt, so half of what was authored
+        // could never be seen. It carries the list now.
         //
         // Keyed on class_id, so it only fires for a result with a catalogued
-        // object behind it — an AI-interpretation card has nothing to attach
-        // media to. Failure is silent: a card with no video is the normal case,
-        // not an error worth interrupting a visitor for.
-        let videoUri: string | null = null;
-        let mediaTitle = '';
-        let disclosure = '';
+        // object behind it. Failure is silent: a card with no video is the
+        // normal case, not an error worth interrupting a visitor for.
+        let videos: VideoCardSpec[] = [];
         if (result.class_id) {
           const res = await listObjectMedia(slug, result.class_id);
           if (controller.signal.aborted) return;
           if (res.success) {
-            const clip = res.data.media.find(m => m.media_type === 'video');
-            const url = buildMediaUrl(clip?.media_url);
-            if (clip && url) {
-              videoUri = await getOrFetchMedia(url);
-              if (controller.signal.aborted) return;
-              mediaTitle = clip.title ?? '';
-              // A GENERATED ASSET NEVER PLAYS WITHOUT ITS DISCLOSURE. The
-              // database refuses to store one without it; this is the other half
-              // of that promise. If the text is somehow absent the video simply
-              // does not play — an unlabelled generated image of a Tipu sword is
-              // the one thing this whole feature must not produce.
-              if (clip.is_generated) {
-                disclosure = clip.disclosure ?? '';
-                if (!disclosure) videoUri = null;
-              }
-            }
+            const clips = res.data.media.filter(m => m.media_type === 'video');
+            // Resolved together rather than in sequence. getOrFetchMedia never
+            // rejects — it falls back to the remote URL — so one slow or absent
+            // clip cannot hold up or fail the others.
+            const resolved = await Promise.all(
+              clips.map(async clip => {
+                const url = buildMediaUrl(clip.media_url);
+                if (!url) return null;
+                // A GENERATED ASSET NEVER PLAYS WITHOUT ITS DISCLOSURE. The
+                // database refuses to store one without it; this is the other
+                // half of that promise. Checked PER CLIP, so a bad row is
+                // dropped on its own instead of taking its siblings with it.
+                const disclosure = clip.is_generated ? (clip.disclosure ?? '') : '';
+                if (clip.is_generated && !disclosure) return null;
+                const posterRemote = buildMediaUrl(clip.poster_url);
+                const [videoUrl, posterUrl] = await Promise.all([
+                  getOrFetchMedia(url),
+                  posterRemote ? getOrFetchMedia(posterRemote) : Promise.resolve(null),
+                ]);
+                return {
+                  videoUrl,
+                  title: clip.title || title,
+                  posterUrl,
+                  disclosure,
+                } as VideoCardSpec;
+              }),
+            );
+            if (controller.signal.aborted) return;
+            videos = resolved.filter((v): v is VideoCardSpec => v !== null);
           }
         }
 
@@ -361,18 +379,12 @@ const PointLearnStep: React.FC<Props> = ({
         // video-card path on anything called a pillar. JOURNEY_TEST_VIDEO_URL is
         // null outside a dev build, so this is dead in release and flipping
         // JOURNEY_OPEN_TO_ALL cannot ship a test pattern onto a heritage pillar.
-        if (!videoUri && JOURNEY_TEST_VIDEO_URL && titleMentionsPillar(title)) {
-          videoUri = await getOrFetchMedia(JOURNEY_TEST_VIDEO_URL);
+        if (videos.length === 0 && JOURNEY_TEST_VIDEO_URL && titleMentionsPillar(title)) {
+          const devUrl = await getOrFetchMedia(JOURNEY_TEST_VIDEO_URL);
           if (controller.signal.aborted) return;
+          videos = [{ videoUrl: devUrl, title }];
         }
-        cards = withDevVideoCard(
-          cards,
-          mediaTitle || title,
-          videoUri,
-          t('journey.explore.watch'),
-          undefined,
-          disclosure,
-        );
+        cards = withVideoCards(cards, videos, t('journey.explore.watch'));
 
         pendingCardsRef.current = { json: JSON.stringify(cards), title };
         setMessage(null);

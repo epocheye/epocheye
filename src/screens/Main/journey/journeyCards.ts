@@ -155,25 +155,60 @@ export function titleMentionsPillar(title: string | null | undefined): boolean {
   return /\bpillars?\b/i.test(title ?? '');
 }
 
+/** One video row, as a card wants it. Built from an object_media row. */
+export interface VideoCardSpec {
+  /** Resolved, playable URL — cache path or remote. */
+  videoUrl: string;
+  /** The row's own title, which is per-video and not the object's name. */
+  title: string;
+  posterUrl?: string | null;
+  disclosure?: string;
+}
+
 /**
- * DEV-ONLY HOOK — attach a video card so the VideoNode path (video playing ON a
- * world-anchored card, tap-to-enlarge) can be exercised before any real card
- * video exists. No backend schema carries a video yet; when it does, the
- * recognise result's own `video_url` replaces this and the pillar test goes.
+ * How many of an object's videos can become cards.
  *
- * The video card is appended as its OWN placard (it renders as a video quad,
- * not a text placard), so the text cards keep their content. It carries a
- * heading + narrative so that, if native cannot build the player, the fallback
- * placard reads "Watch / <title>" rather than "Unknown object". The whole set
- * stays within MAX_AR_CARDS by folding text overflow first.
+ * MAX_AR_CARDS - 2, so at least two text placards always survive. An object
+ * with more videos than this drops the tail rather than the words: the text is
+ * what the card is FOR, and a wall of silent video quads with no explanation is
+ * a worse outcome than a clip the visitor does not get.
  */
-export function withDevVideoCard(
+export const MAX_VIDEO_CARDS = MAX_AR_CARDS - 2;
+
+/**
+ * Stable id for the i-th video card. Index 0 keeps the bare id so existing log
+ * greps and taps still read, later ones are suffixed 1-based-plus-one.
+ */
+export function videoCardId(i: number): string {
+  return i === 0 ? JOURNEY_VIDEO_CARD_ID : `${JOURNEY_VIDEO_CARD_ID}_${i + 1}`;
+}
+
+/**
+ * Attach EVERY video an object has, not just the first.
+ *
+ * WHY PLURAL. This was `withDevVideoCard`, singular, from when the only thing
+ * feeding it was a colour-bar test pattern. object_media (migration 090) holds
+ * a LIST per class_id, and migration 093 seeds two videos each on the palace's
+ * sword and hilt: under the singular version those second rows existed, served
+ * from the CDN, and could never appear. The name also outlived its truth —
+ * nothing about this is dev-only any more.
+ *
+ * Each video is its OWN placard, because it renders as a video quad rather than
+ * a text placard. Each carries a heading + narrative so that, if native cannot
+ * build the player, the fallback reads "Watch / <title>" instead of "Unknown
+ * object" — and the narrative is the ROW's title, not the object's, so two
+ * clips on one object do not both say the same thing.
+ *
+ * The disclosure test is PER VIDEO and deliberately not hoisted: a generated
+ * row without its disclosure must be dropped on its own, without taking a
+ * legitimate sibling with it.
+ *
+ * The whole set stays within MAX_AR_CARDS by folding text overflow first.
+ */
+export function withVideoCards(
   cards: ArCard[],
-  title: string,
-  videoUrl: string | null,
+  videos: ReadonlyArray<VideoCardSpec>,
   watchLabel: string,
-  posterUrl?: string | null,
-  disclosure?: string,
 ): ArCard[] {
   // THE PILLAR TEST NO LONGER GATES REAL MEDIA. It was the dev hook's way of
   // limiting a colour-bar test pattern to one harmless subject. Media that came
@@ -181,20 +216,35 @@ export function withDevVideoCard(
   // the word "pillar" would hide every real clip. The dev pattern still passes
   // through the same check, because JOURNEY_TEST_VIDEO_URL is the only thing
   // that reaches here without a disclosure or a title of its own.
-  if (!videoUrl) return cards;
-  if (!disclosure && !titleMentionsPillar(title)) return cards;
-  const videoCard: ArCard = {
-    id: JOURNEY_VIDEO_CARD_ID,
+  const usable = videos.filter(
+    v => !!v.videoUrl && (!!v.disclosure || titleMentionsPillar(v.title)),
+  );
+  if (usable.length === 0) return cards;
+
+  const shown = usable.slice(0, MAX_VIDEO_CARDS);
+  if (__DEV__ && shown.length < usable.length) {
+    console.warn(
+      `[journeyCards] ${usable.length - shown.length} video(s) dropped: ` +
+        `${usable.length} on this object, ${MAX_VIDEO_CARDS} can be shown`,
+    );
+  }
+
+  const videoCards: ArCard[] = shown.map((v, i) => ({
+    id: videoCardId(i),
     continuation: true,
     heading: watchLabel,
-    narrative: title,
-    video_url: videoUrl,
-    ...(posterUrl ? { poster_url: posterUrl } : {}),
+    narrative: v.title,
+    video_url: v.videoUrl,
+    ...(v.posterUrl ? { poster_url: v.posterUrl } : {}),
     // Carried on the card itself so the renderer cannot draw the video without
     // it. A generated asset that reached here has a non-empty disclosure by
     // construction: the DB refuses to store one without (migration 090) and
     // PointLearnStep drops the video if it is somehow missing.
-    ...(disclosure ? { disclosure } : {}),
-  };
-  return [...capCards(cards, MAX_AR_CARDS - 1), videoCard];
+    ...(v.disclosure ? { disclosure: v.disclosure } : {}),
+  }));
+
+  return [
+    ...capCards(cards, MAX_AR_CARDS - videoCards.length),
+    ...videoCards,
+  ];
 }
