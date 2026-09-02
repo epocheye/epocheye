@@ -48,6 +48,7 @@ import kotlinx.coroutines.launch
 import com.google.android.filament.Skybox
 import com.epocheye.BuildConfig
 import java.io.File
+import kotlin.math.asin
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.atan2
@@ -166,6 +167,23 @@ class EpocheyeMagicWindowView(
         private const val HEADING_MIN_DELTA_DEG = 1.0f
 
         /**
+         * WHERE THE VIEW IS ACTUALLY POINTED, logged once a second.
+         *
+         * Three separate faults on this scene turned out to be the phone's
+         * resting angle rather than the code: "the camera looks down", the
+         * figure cut off at the waist, and a sky measurement that was really
+         * sampling fog-covered lawn. On a gyroscope-driven view a screenshot
+         * carries no record of where the device was aimed, so a pixel sampled
+         * out of it means nothing on its own.
+         *
+         * Unconditional, unlike the heading emit above, which stops publishing
+         * when the phone stops moving. Held still is exactly when a measurement
+         * is being taken, so that is exactly when this has to keep reporting.
+         * It writes a log line, not a bridge event, so it costs no re-render.
+         */
+        private const val AIM_LOG_INTERVAL_NS = 1_000_000_000L
+
+        /**
          * THE SKY RAMP. Multipliers on the scene's authored `skyColor`, so a
          * scene that changes its sky keeps its own hue and only gains the
          * vertical fall-off. Horizon lifts and warms; zenith deepens and cools.
@@ -176,36 +194,55 @@ class EpocheyeMagicWindowView(
          * a colonnade can actually see.
          */
         /**
-         * SKYBOX INTENSITY, and this is the number that was actually wrong.
+         * SKYBOX INTENSITY. MEASURED INERT. Kept only so it cannot silently
+         * disagree with the light the scene is actually rendered at.
          *
-         * The gradient shipped and did nothing visible, because nobody set this
-         * and Filament's default (30,000 lux) is far too bright for a scene the
-         * IBL lights at 60,000 x lightScale. Measured through the colonnade,
-         * the sky came back as sRGB (223, 227, 230) where the cubemap holds
-         * (183, 199, 212): pushed 40 levels toward white and desaturated from a
-         * 29-level R-to-B spread down to 7. That is the Filmic tone curve doing
-         * what it does at the top of its range, not a broken texture.
+         * Three values were sampled on device, at a recorded elevation, on the
+         * same frame composition:
          *
-         * A skybox is EMISSIVE - you see its luminance directly - while a lit
-         * surface returns that same light times its albedo and 1/pi. So a sky
-         * that merely matches the IBL renders several times brighter than
-         * anything it illuminates, which is physically true and useless here:
-         * the authored skyColor is meant to be the colour you SEE.
+         *   30,000 (Filament's default, nothing set)   sRGB (223, 227, 230)
+         *   60,000 (set to match the IBL)              sRGB (224, 227, 230)
+         *    6,000 (a deliberate 10x probe)            sRGB (224, 228, 231)
          *
-         * SET TO MATCH THE SCENE'S LIGHT LEVEL: the same 60,000 base the IBL
-         * uses, scaled by the same lightScale, so a scene that dims its light
-         * dims its sky with it and the two cannot drift apart.
+         * A ten-fold range, and the sky moved by one level. Filament draws a
+         * TEXTURE skybox at the scene's ibl luminance - the number set on
+         * IndirectLight, line 579 - and not at the skybox's own intensity, so
+         * this call was never the lever. The previous version of this comment
+         * asserted it was, and was wrong; it is corrected here rather than
+         * deleted, because the wrong reading is the reason three earlier
+         * attempts to fix the sky changed nothing.
          *
-         * NOT YET CONFIRMED BY MEASUREMENT, and the reason is worth recording.
-         * The pixels sampled through the colonnade at P5 were never the sky:
-         * with the device pitched 15-20 deg DOWN, everything above the
-         * balustrade is still below the horizon, so that pale field is the lawn
-         * at 72 m seen through fog. It moved when skyColor moved only because
-         * the fog colour is derived from skyColor. To measure the sky the camera
-         * has to be ABOVE the horizon - a positive elevation on the orientation
-         * HUD - and only then does sampling mean anything.
+         * It stays at the IBL's 60,000 x lightScale so the two numbers agree,
+         * and so a reader is not invited to try tuning it again.
          */
         private const val SKY_INTENSITY_BASE = 60_000f
+
+        /**
+         * WHAT ACTUALLY CONTROLS HOW BRIGHT THE SKY LOOKS.
+         *
+         * Since the skybox is drawn at the IBL's luminance, the only way to
+         * move the sky WITHOUT moving the light on the building is the texel
+         * values themselves. That is what this scales.
+         *
+         * WHY IT IS NEEDED. At 1.0 the authored horizon colour reached the
+         * tone mapper at roughly 1.5x its own value and came back sRGB
+         * (224, 227, 230) against an authored (183, 199, 212): 41 levels
+         * toward white, with the red-to-blue spread collapsed from 29 down to
+         * 6. That is the Filmic curve's shoulder, where a large change in
+         * radiance produces almost no change on screen and all three channels
+         * converge - which is also why the sky read as flat white rather than
+         * as a bright blue.
+         *
+         * 0.50 puts the horizon texel near 0.36 going in, low on the curve
+         * where it is close to linear, so the authored hue survives instead of
+         * being compressed out of it. Solved per channel against the authored
+         * pair the scale wanted 0.47 / 0.50 / 0.56 - a single scalar cannot
+         * restore saturation exactly, only stop destroying it - and 0.50 is
+         * the middle of that, chosen over a per-channel correction because
+         * per-channel would bake a hue shift in here and make the scene's own
+         * authored skyColor mean something different from what it says.
+         */
+        private const val SKY_TEXEL_SCALE = 0.50f
 
         private const val SKY_FACE_PX = 32
         private const val SKY_RAMP_POWER = 0.65
@@ -231,6 +268,9 @@ class EpocheyeMagicWindowView(
 
     /** Authored base pitch. Negative is down. The gyro deviates from this. */
     private var pitchDeg = 0f
+
+    /** Last time the aim line was written. See [AIM_LOG_INTERVAL_NS]. */
+    private var lastAimLogNanos = 0L
 
     private var fovDeg = 58f
     private var nearM = 2.0f
@@ -959,11 +999,18 @@ class EpocheyeMagicWindowView(
                 //
                 // Linear, not sRGB - the same colour space the GLB's vertex
                 // colours and baseColorFactors are written in.
+                // SKY_TEXEL_SCALE APPLIES HERE TOO, and it has to. Fog and sky
+                // are two different Filament effects that happen to want the
+                // same colour on screen, and both land on the same tone curve.
+                // Scaling only the cubemap would darken the sky and leave the
+                // fog where it was, which would put the hue step back at the
+                // horizon - the exact artefact deriving this colour from
+                // skyColor was meant to remove.
                 color = skyColorState.value?.let {
                     floatArrayOf(
-                        it[0] * SKY_HORIZON_R,
-                        it[1] * SKY_HORIZON_G,
-                        it[2] * SKY_HORIZON_B,
+                        it[0] * SKY_HORIZON_R * SKY_TEXEL_SCALE,
+                        it[1] * SKY_HORIZON_G * SKY_TEXEL_SCALE,
+                        it[2] * SKY_HORIZON_B * SKY_TEXEL_SCALE,
                     )
                 } ?: floatArrayOf(0.729f, 0.745f, 0.752f)
                 fogColorFromIbl = false
@@ -1106,7 +1153,7 @@ class EpocheyeMagicWindowView(
 
     /** Channel value at ramp position t, as a multiple of the authored colour. */
     private fun ramp(base: Float, horizon: Float, zenith: Float, t: Float): Float =
-        base * (horizon + (zenith - horizon) * t)
+        base * (horizon + (zenith - horizon) * t) * SKY_TEXEL_SCALE
 
     /** World direction for a texel at (u, v) on the face looking down [axis]. */
     private fun faceDirection(axis: Float3, u: Float, v: Float): Float3 = when {
@@ -1529,6 +1576,22 @@ class EpocheyeMagicWindowView(
                 Float4(0f, 0f, 0f, 1f),
             )
             cam.worldQuaternion = quaternion(m)
+
+            // WHERE THE VIEW IS AIMED, once a second. `fy` is the up component
+            // of the final unit forward vector — after the authored base pitch
+            // has been folded in — so its arcsine is the true elevation of the
+            // centre of the screen, not the phone's raw tilt and not the
+            // viewpoint's authored pitch. Positive is above the horizon.
+            val nowA = event.timestamp
+            if (nowA - lastAimLogNanos > AIM_LOG_INTERVAL_NS) {
+                lastAimLogNanos = nowA
+                val elevDeg = Math.toDegrees(
+                    asin(fy.coerceIn(-1f, 1f).toDouble())).toFloat()
+                val bearing = ((Math.toDegrees(atan2(fe.toDouble(), fn.toDouble()))
+                    .toFloat()) % 360f + 360f) % 360f
+                Log.i(TAG, "AIM elevation=%+.1f deg  heading=%.1f deg  eye=%.2f m"
+                    .format(elevDeg, bearing, camUp))
+            }
 
             // The heading the visitor is actually facing, for the plan
             // indicator. Derived from the SAME forward vector the camera uses,

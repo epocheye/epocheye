@@ -28,6 +28,23 @@ export interface ObjectMedia {
   is_generated: boolean;
   disclosure?: string;
   sort_order: number;
+  /**
+   * ffprobe reading of the exact file behind `media_url` (migration 092), never
+   * carried from a sibling encode. Absent means unmeasured or not applicable —
+   * a still image has no duration.
+   */
+  duration_ms?: number;
+  /**
+   * Lets a card reserve the right box BEFORE the first frame decodes, so the
+   * layout does not jump. A string ('16:9'), because that is what a layout reads.
+   */
+  aspect_ratio?: string;
+  /**
+   * Provenance, on the audio_clips model. A generated asset needs this more than
+   * a photographed one does, not less: `disclosure` says "this is not a
+   * photograph", `source_ids` says what the depiction was built from.
+   */
+  source_ids?: string[];
 }
 
 export interface ObjectMediaResponse {

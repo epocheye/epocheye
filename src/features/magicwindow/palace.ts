@@ -50,7 +50,7 @@ import type {MagicWindowViewpoint} from './viewpoints';
  * the camera transform read off the device's own telemetry, rendered the
  * interior correctly. The sky now comes from Filament, per scene.
  */
-export const PALACE_MODEL_ID = 'tipu_summer_palace_magicwindow_v9';
+export const PALACE_MODEL_ID = 'tipu_summer_palace_magicwindow_v10';
 
 /** The site this scene belongs to. */
 export const PALACE_SLUG = 'tipu-summer-palace-bengaluru';
@@ -262,7 +262,7 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
   {
     id: 'P0',
     title: 'Front lawn',
-    position: [0.000, -14.000, 1.600],
+    position: [0.000, -14.000, 0.900],
     headingDeg: 0.00,
     pitchDeg: 0.00,
     fovDeg: 62.0,
