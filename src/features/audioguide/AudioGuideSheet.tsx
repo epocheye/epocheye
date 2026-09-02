@@ -103,8 +103,20 @@ const AudioGuideSheet: React.FC<AudioGuideSheetProps> = ({
 
       {/* THE STOPS. The old screen's entire default state, intact, doing the
           one thing it was always good at: jumping out of order. */}
+      {/* GUARDED AT THE LIST, NOT AT THE BUTTON.
+          This block used to render its heading unconditionally and then map
+          over `groups`. With no groups that is a gold "All stops" over nothing
+          — and the only thing preventing it was that AudioGuideScreen hides the
+          control that opens this sheet whenever it is showing a fallback. That
+          is a coincidence of two files agreeing, not a guarantee: the sheet is
+          ALWAYS mounted (the player lives in it), so anything that empties
+          `groups` while it is open puts the blank straight on screen. A list
+          says its own empty state. */}
       <View style={SHEET.block}>
         <Text style={SHEET.heading}>{t('audioGuide.allStops')}</Text>
+        {groups.length === 0 ? (
+          <Text style={SHEET.meta}>{t('audioGuide.noStops')}</Text>
+        ) : null}
         {groups.map(group => (
           <View key={group.zone ?? '__ungrouped__'} style={styles.group}>
             {group.zone ? (

@@ -175,6 +175,38 @@ class EpocheyeMagicWindowView(
          * in the lower half of the dome, which is the part a visitor standing in
          * a colonnade can actually see.
          */
+        /**
+         * SKYBOX INTENSITY, and this is the number that was actually wrong.
+         *
+         * The gradient shipped and did nothing visible, because nobody set this
+         * and Filament's default (30,000 lux) is far too bright for a scene the
+         * IBL lights at 60,000 x lightScale. Measured through the colonnade,
+         * the sky came back as sRGB (223, 227, 230) where the cubemap holds
+         * (183, 199, 212): pushed 40 levels toward white and desaturated from a
+         * 29-level R-to-B spread down to 7. That is the Filmic tone curve doing
+         * what it does at the top of its range, not a broken texture.
+         *
+         * A skybox is EMISSIVE - you see its luminance directly - while a lit
+         * surface returns that same light times its albedo and 1/pi. So a sky
+         * that merely matches the IBL renders several times brighter than
+         * anything it illuminates, which is physically true and useless here:
+         * the authored skyColor is meant to be the colour you SEE.
+         *
+         * SET TO MATCH THE SCENE'S LIGHT LEVEL: the same 60,000 base the IBL
+         * uses, scaled by the same lightScale, so a scene that dims its light
+         * dims its sky with it and the two cannot drift apart.
+         *
+         * NOT YET CONFIRMED BY MEASUREMENT, and the reason is worth recording.
+         * The pixels sampled through the colonnade at P5 were never the sky:
+         * with the device pitched 15-20 deg DOWN, everything above the
+         * balustrade is still below the horizon, so that pale field is the lawn
+         * at 72 m seen through fog. It moved when skyColor moved only because
+         * the fog colour is derived from skyColor. To measure the sky the camera
+         * has to be ABOVE the horizon - a positive elevation on the orientation
+         * HUD - and only then does sampling mean anything.
+         */
+        private const val SKY_INTENSITY_BASE = 60_000f
+
         private const val SKY_FACE_PX = 32
         private const val SKY_RAMP_POWER = 0.65
         private const val SKY_HORIZON_R = 1.14f
@@ -528,10 +560,12 @@ class EpocheyeMagicWindowView(
                             // A scene that ships WITHOUT a sky dome in its GLB
                             // gets its sky here instead. See [skyColor] for why
                             // the palace does and the fort does not.
-                            val sb = sky?.let { gradientSkybox(eng, it) }
+                            val sb = sky?.let { gradientSkybox(eng, it, lscale) }
                             if (sb != null) {
-                                Log.i(TAG, "skybox: vertical gradient about " +
-                                    "%.3f %.3f %.3f".format(sky[0], sky[1], sky[2]))
+                                Log.i(TAG, ("skybox: vertical gradient about " +
+                                    "%.3f %.3f %.3f at intensity %.0f")
+                                    .format(sky[0], sky[1], sky[2],
+                                        SKY_INTENSITY_BASE * lscale))
                             }
                             Environment(indirectLight = ibl, skybox = sb)
                         } catch (t: Throwable) {
@@ -994,7 +1028,8 @@ class EpocheyeMagicWindowView(
      * darkening downward would put a second visible line under the first.
      */
     private fun gradientSkybox(eng: com.google.android.filament.Engine,
-                               base: FloatArray): Skybox? {
+                               base: FloatArray,
+                               lscale: Float): Skybox? {
         return try {
             val n = SKY_FACE_PX
             // Filament's cubemap face order, and the axis each face looks down.
@@ -1048,13 +1083,20 @@ class EpocheyeMagicWindowView(
                 ),
                 offsets,
             )
-            Skybox.Builder().environment(tex).showSun(false).build(eng)
+            Skybox.Builder()
+                .environment(tex)
+                .showSun(false)
+                .intensity(SKY_INTENSITY_BASE * lscale)
+                .build(eng)
         } catch (t: Throwable) {
             // A flat sky is worse than a graded one and better than none, so
             // fall back rather than losing the background entirely.
             Log.w(TAG, "gradient skybox failed; falling back to flat colour", t)
             try {
-                Skybox.Builder().color(base[0], base[1], base[2], 1f).build(eng)
+                Skybox.Builder()
+                    .color(base[0], base[1], base[2], 1f)
+                    .intensity(SKY_INTENSITY_BASE * lscale)
+                    .build(eng)
             } catch (t2: Throwable) {
                 Log.w(TAG, "flat skybox failed too", t2)
                 null
