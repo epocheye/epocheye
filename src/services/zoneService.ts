@@ -27,6 +27,30 @@ let lastFailed = false;
  * Client-side floor for a venue's radius so the app/Lens stays usable within ~1 km
  * of any site (GPS slack in geofenceService is added on top). Curated sites carry
  * no per-venue radius, so every derived zone uses this.
+ *
+ * ── heritage_zones.radius_meters IS AUTHORED AND UNREAD. DECIDED, NOT SHIPPED ──
+ *
+ * Every one of the six curated sites carries a real authored radius in the
+ * database — fort 120, palace 150, Victoria 250, Indian Museum 300, Udayagiri
+ * 400, Konark 500 — and NONE of them reaches this file. /api/v1/sites selects
+ * from `monuments`, which has no radius column; the numbers live in
+ * `heritage_zones`, which the endpoint does not join. So siteToZone hardcodes
+ * the floor below, and since all six authored values are UNDER 1000 m the floor
+ * would still win even if the join existed. The authored extents are currently
+ * decorative.
+ *
+ * THE DECISION, taken and deliberately deferred: expose radius_meters from
+ * /api/v1/sites and use the authored value for the JOURNEY gate specifically,
+ * keeping this 1 km floor for Lens and venue discovery, where a generous
+ * catchment is the point. That is the only option in which the authored number
+ * means anything.
+ *
+ * IT IS NOT SHIPPED YET, ON PURPOSE. Tightening the journey from 1 km to 150 m
+ * before anyone has walked the palace would mean a real visitor is the first
+ * person to find out whether 150 m is enough to stand in the courtyard and be
+ * let in. The walkthrough comes first. useJourneyGate's exit hysteresis
+ * (EXIT_MARGIN_M / EXIT_GRACE_MS) is the prerequisite that makes a radius this
+ * tight survivable at all, and it is already in place.
  */
 const MIN_VENUE_RADIUS_M = 1000;
 
