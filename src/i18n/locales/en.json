@@ -703,6 +703,8 @@
     "scanHint": "Point your camera at something to learn about it",
     "askHint": "Ask anything about this place",
     "reconstruction": "See it standing here",
-    "reconstructionHint": "Place the reconstruction against the real building"
+    "reconstructionHint": "Place the reconstruction against the real building",
+    "secondaryAudio": "Just listen",
+    "secondaryAudioHint": "Play the audio guide on its own, without the walk"
   }
 }

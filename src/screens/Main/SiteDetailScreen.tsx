@@ -345,6 +345,26 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   // photographs 29-33 m, deliberately not averaged) and the painted decoration
   // is a reconstruction of the idiom rather than a record of any room. Open it
   // up when a tape measurement lands.
+  //
+  // AND IT DOES NOT GET THE SECONDARY TREATMENT THE AUDIO GUIDE GOT. The magic
+  // rung is shadowed at the palace for the same mechanical reason (rung 1
+  // returns first — siteCta.ts:21 already says so), but the two cases are not
+  // alike, and the difference is what the shadowing costs:
+  //
+  //   - The audio guide is FINISHED and gated only by a ladder ordering. Eight
+  //     clips, measured, seeded, serving. Nothing about it is provisional, so
+  //     the shadow was pure loss and a second door is pure gain.
+  //   - The magic window is gated on its OWN terms, by the isAdminUser check
+  //     three lines below, for a reason that has not been resolved: the facade
+  //     length is still DISPUTED across three derivations. Opening a second
+  //     door to it would route visitors around that gate, not around the
+  //     ladder.
+  //
+  // So it stays dark, and it loses nothing by staying dark: the journey's guide
+  // step hands off to it for the accounts that may have it, and Bangalore Fort
+  // — which has no journey — still reaches it at rung 3. Revisit when the tape
+  // measurement lands, not before, and revisit it as a GATE question rather
+  // than a ladder one.
   const magicWindowSlug = siteDetail?.slug ?? site.id;
   const magicWindowScene = getMagicWindowScene(magicWindowSlug);
   const showMagicWindow =
@@ -500,6 +520,42 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     handleStartARExperience,
     handleAskGuide,
   ]);
+
+  /**
+   * THE SECONDARY DOOR TO THE NARRATION, and why it is not a rung.
+   *
+   * siteCta.ts resolves ONE button, top-down, and rung 1 returns outright
+   * wherever a journey is authored. At the summer palace JOURNEY_OPEN_TO_ALL is
+   * true and JOURNEY_HOSTS carries the slug, so `journeyAvailable` is true for
+   * every account and `case 'audio'` in handleSiteCta is unreachable there —
+   * for admins and visitors alike. The narration still reaches people through
+   * AudioGuideStep inside the journey, so nothing was broken; what was missing
+   * was a way to hear it WITHOUT the journey.
+   *
+   * That is a real visitor, not an edge case: seated, low on battery, in light
+   * too poor for the camera, or reading about the place from home. A journey
+   * wants a phone held up and a body walking. The guide wants neither.
+   *
+   * SO IT IS AN AFFORDANCE, NOT A LADDER CHANGE. Adding an audio rung above the
+   * journey would take the whole thing away from everyone who CAN walk it, and
+   * the ladder's ordering (most of the site first) is correct as written. This
+   * sits under the primary button instead, quiet, and only where it adds
+   * something the primary does not already give.
+   *
+   * ITS GATE IS DELIBERATELY NOT shouldShowAudioCta. That helper carries the
+   * on-site rule for the PRIMARY rung and is left exactly as it is. Here the
+   * geofence is the thing being worked around, so the only conditions are that
+   * stops exist and that the primary is not already the audio guide —
+   * otherwise this would render the same destination twice.
+   */
+  const showSecondaryAudio = hasAudioGuide && siteCta.key !== 'audio';
+  const handleSecondaryAudio = useCallback(() => {
+    analytics.track('audio_guide_opened', {
+      slug: siteDetail?.slug ?? site.id,
+      from: 'site_detail_secondary',
+    });
+    handleAudioGuide();
+  }, [handleAudioGuide, siteDetail, site.id]);
 
   // Record a site view once per opened site (the auto screen_view carries no slug).
   useEffect(() => {
@@ -721,6 +777,35 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
             </TouchableOpacity>
           </TourTarget>
+
+          {/* SECONDARY — the narration on its own.
+
+              Deliberately NOT a second gold pill. The screen resolves one
+              primary action and that resolution is the point; a matching button
+              underneath would undo it. This is a quiet text row: available to
+              anyone who looks, invisible to anyone who does not.
+
+              It renders BELOW the primary and inside the same gap-3.5 stack, so
+              a disabled journey button (dimmed, "come to the site") sits
+              directly above a live way to hear the guide from where the visitor
+              actually is. That pairing is the whole reason it exists. */}
+          {showSecondaryAudio && (
+            <TouchableOpacity
+              onPress={handleSecondaryAudio}
+              activeOpacity={0.7}
+              className="flex-row items-center justify-center gap-2 self-center"
+              style={{paddingVertical: moderateScale(10)}}
+              accessibilityRole="button"
+              accessibilityLabel={t('siteCta.secondaryAudio')}
+              accessibilityHint={t('siteCta.secondaryAudioHint')}>
+              <Headphones color="#CBA862" size={16} />
+              <Text
+                className="text-brand-gold font-ui-semibold"
+                style={{fontSize: moderateScale(15)}}>
+                {t('siteCta.secondaryAudio')}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ---- Kept functional sections (restyled onto warm-dark) ---- */}

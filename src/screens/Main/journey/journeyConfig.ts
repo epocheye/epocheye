@@ -71,6 +71,21 @@ export interface JourneyHost {
    * Welcome narration, as a CDN key relative to AUDIO_BASE_URL (or an absolute
    * URL). First-person, generated — the script itself says so in its first
    * sentence, and the prepare step's disclaimer says it once on screen.
+   *
+   * IT IS THE FIGURE'S VOICE, NOT THE GUIDE'S, and that distinction is
+   * load-bearing. LawnStep plays this over the lip-synced figure, so the person
+   * speaking is Tipu, not the narrator. record_figure_voice.py states the rule:
+   * en-IN-Chirp3-HD-Achird for figures, "deliberately a DIFFERENT voice from
+   * the guide's Aoede — he is a character being quoted, not the narrator."
+   * Purnaiah's five lines at P5 already follow it.
+   *
+   * WHAT WAS WRONG UNTIL NOW is that this one clip followed neither rule. It
+   * was cut by scripts/tipu_voice.py on en-IN-Neural2-B at speakingRate 0.90
+   * and pitch −2.0 — a different engine generation, a third voice, and the only
+   * clip left in the project carrying a pitch offset. A journey visitor heard
+   * Neural2-B welcome them, Aoede narrate eight stops, and Achird speak as
+   * Purnaiah: three voices for two roles. Re-cut on Achird at rate 1.0 with no
+   * pitch, that collapses to two.
    */
   welcomeAudioKey: string;
 }
@@ -82,8 +97,13 @@ const JOURNEY_HOSTS: Readonly<Record<string, JourneyHost>> = {
     siteName: "Tipu Sultan's Summer Palace",
     talkClip: 'Talk_with_Right_Hand_Open',
     idleClip: 'Idle_02',
+    // _v2: the Achird re-cut. 31.728 s, ffprobed on the object CloudFront
+    // actually serves (126 912 bytes, matched against Content-Length), not on a
+    // sibling render. The _v1 object is NOT deleted — it went up `immutable,
+    // max-age=31536000`, so it cannot be overwritten in place, and it is what a
+    // revert of this line points back at.
     welcomeAudioKey:
-      'audio/tipu-summer-palace-bengaluru/palace_overview_en_tipu.mp3',
+      'audio/tipu-summer-palace-bengaluru/palace_overview_en_tipu_v2.mp3',
   },
 };
 

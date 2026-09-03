@@ -506,7 +506,9 @@
     "scanHint": "জানতে ক্যামেরা তাক করুন",
     "askHint": "এই জায়গা নিয়ে যা খুশি জিজ্ঞাসা করুন",
     "reconstruction": "এটিকে এখানেই দাঁড়িয়ে দেখুন",
-    "reconstructionHint": "আসল ভবনের উপর পুনর্নির্মাণ বসান"
+    "reconstructionHint": "আসল ভবনের উপর পুনর্নির্মাণ বসান",
+    "secondaryAudio": "শুধু শুনুন",
+    "secondaryAudioHint": "না হেঁটেই অডিও গাইড শুনুন"
   },
   "journey": {
     "gate": {
