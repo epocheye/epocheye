@@ -515,6 +515,43 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
    * that has not changed is indistinguishable from one that has been retapped.
    */
   const [utterance, setUtterance] = useState(0);
+  /**
+   * The card that hangs beside him in the world, for the line he is on.
+   *
+   * ROUTED THROUGH renderDiscovery, per the standing rule, and that is the whole
+   * reason this is worth building. The two card renderers draw opposite
+   * promises: a recognition card's confidence is a statement about OUR MODEL and
+   * is never shown to a visitor, while a discovery card's `meta` is the
+   * provenance of the fact itself and is the most important thing on the card.
+   *
+   * A figure's lines already carry exactly that. `tier` and `source` have been
+   * on every line since the type was written, and until now nothing drew them -
+   * the speech bubble shows the sentence and keeps the apparatus out of sight,
+   * which is right for a bubble and wrong for a card whose job is the evidence.
+   *
+   * So: a figure identified from a portrait painted from life says so, and one
+   * whose likeness is conjectural says that instead. Nothing here decides which
+   * - the line's own tier does.
+   *
+   * ACCENT IS TIER, not confidence. Green only for CONFIRMED; INFERRED,
+   * DISPUTED and NOT-A-CLAIM are all muted, because "we reasoned this", "sources
+   * disagree" and "nobody recorded this" are none of them a confirmed fact and
+   * colouring them alike is the honest simplification.
+   */
+  const figureCard = useMemo(() => {
+    if (!person || lineIndex === null || !personVisible) return null;
+    const line = person.lines[lineIndex];
+    if (!line) return null;
+    return JSON.stringify({
+      title: person.name,
+      // The tier leads, then the source, exactly as the renderer's own example
+      // reads: "CONFIRMED · C. Mackenzie 1791, key 4".
+      meta: `${line.tier} \u00b7 ${line.source}`,
+      body: line.text,
+      accent: line.tier === 'CONFIRMED' ? 'green' : 'muted',
+    });
+  }, [person, lineIndex, personVisible]);
+
   const figureLineRemote = useMemo(() => {
     if (!recordedVoice || lineIndex === null || !voiceOn) return null;
     return buildAudioUrl(`${person!.voiceKeyPrefix}line_${lineIndex + 1}_en.mp3`);
@@ -921,6 +958,7 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
         assaultStep={step}
         onDriftSample={onDriftSample}
         figure={figure}
+        figureCard={figureCard}
         fogEnabled
         fog={scene.fog}
         onModelLoaded={onModelLoaded}

@@ -156,6 +156,22 @@ class EpocheyeMagicWindowViewManager(
      * Atomic, like `viewpoint`, and for the same reason - a half-applied figure
      * could momentarily put one person at another's position.
      */
+    /**
+     * The card to hang beside the figure, as the same JSON EpocheyeArCardRenderer
+     * reads elsewhere: { title, meta, body, accent }.
+     *
+     * A PROP RATHER THAN A COMMAND, unlike placeCardsAtScreenPoint on the AR
+     * view. That one has to be a command because it carries a touch point that
+     * only exists at the moment of the tap. This carries no event - it is a
+     * piece of state, "the card that is currently showing" - and a prop
+     * re-applies itself if the view is recreated, where a missed command would
+     * simply be lost.
+     */
+    @ReactProp(name = "figureCard")
+    fun setFigureCard(view: EpocheyeMagicWindowView, json: String?) {
+        view.setFigureCard(json)
+    }
+
     @ReactProp(name = "figure")
     fun setFigure(view: EpocheyeMagicWindowView, fig: ReadableMap?) {
         if (fig == null) {

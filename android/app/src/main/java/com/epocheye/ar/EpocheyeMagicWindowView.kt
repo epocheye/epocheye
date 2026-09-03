@@ -32,6 +32,10 @@ import io.github.sceneview.ar.rememberARCameraNode
 import io.github.sceneview.environment.Environment
 import io.github.sceneview.loaders.ModelLoader
 import io.github.sceneview.node.CameraNode
+import io.github.sceneview.loaders.MaterialLoader
+import io.github.sceneview.math.Position
+import io.github.sceneview.math.Rotation
+import io.github.sceneview.node.ImageNode
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.node.Node as SvNode
 import io.github.sceneview.rememberCameraNode
@@ -436,6 +440,9 @@ class EpocheyeMagicWindowView(
     // ---- engine / scene refs -----------------------------------------------
 
     @Volatile private var modelLoader: ModelLoader? = null
+    @Volatile private var materialLoader: MaterialLoader? = null
+    /** The one card hanging beside the figure, if any. */
+    private var figureCardNode: ImageNode? = null
     @Volatile private var sceneRoot: SvNode? = null
     @Volatile private var cameraNode: CameraNode? = null
     @Volatile private var filamentView: FilamentView? = null
@@ -622,6 +629,7 @@ class EpocheyeMagicWindowView(
 
                     SideEffect {
                         modelLoader = ml
+                        materialLoader = matl
                         cameraNode = cam
                         applyCamera()
                         applyFog(fView)
@@ -1758,6 +1766,87 @@ class EpocheyeMagicWindowView(
         filamentView?.let { applyFog(it) }
     }
 
+    /**
+     * Hang a card beside the figure, or clear it when [cardJson] is null/blank.
+     *
+     * WHY THIS EXISTS AT ALL, given the AR view already places cards. It cannot
+     * be reused: EpocheyeDetectARView anchors through a depth hit-test on an
+     * ARCore Frame, and this view has no ARCore session, no camera and no
+     * anchors - it is a camera-off gyroscope reconstruction. What IS reusable is
+     * everything above the anchoring: EpocheyeArCardRenderer is a pure object
+     * over Canvas/Paint with no SceneView types, and journeyCards.ts builds the
+     * JSON. Only the placement is new, and it is simpler here precisely because
+     * there is nothing to track against - the scene has a fixed frame, so the
+     * card goes at authored scene coordinates and stays there.
+     *
+     * renderDiscovery, NOT render. The two draw different promises: a
+     * recognition card's confidence is a claim about our model and is never
+     * shown, while a discovery card's meta line is the provenance of the fact
+     * and is the most important thing on it. A figure's lines already carry
+     * their tier and source, so the card has its evidence line for free.
+     *
+     * ONE CARD AT A TIME, like the figure itself. Tapping a second line
+     * replaces the first rather than stacking placards in the room.
+     */
+    fun setFigureCard(cardJson: String?) {
+        val root = sceneRoot
+        figureCardNode?.let {
+            try {
+                root?.removeChildNode(it)
+                it.destroy()
+            } catch (_: Throwable) {
+            }
+        }
+        figureCardNode = null
+        if (cardJson.isNullOrBlank() || root == null) return
+        val matl = materialLoader ?: run {
+            Log.w(TAG, "figure card: no material loader yet")
+            return
+        }
+        try {
+            val bitmap = EpocheyeArCardRenderer.renderDiscovery(cardJson)
+                ?: EpocheyeArCardRenderer.render(cardJson)
+                ?: run {
+                    // Both renderers refuse an empty title AND body. Saying so
+                    // beats a silent no-op that looks like a placement failure.
+                    Log.w(TAG, "figure card: renderer returned no bitmap")
+                    return
+                }
+            // ImageNode takes METRES, so the card is built at an authored width
+            // rather than scale-guessed from the pixel count. 0.9 m reads at the
+            // 5 m the figures stand at without covering the person it describes.
+            val widthM = 0.9f
+            val heightM = widthM * bitmap.height.toFloat() / bitmap.width.toFloat()
+            // Beside him, at chest height, offset along the axis he faces so the
+            // card turns with him rather than through him. figHeadingDeg is
+            // clockwise from +Y; its right-hand side is heading + 90.
+            val rad = Math.toRadians((figHeadingDeg + 90.0))
+            val offX = (0.75 * Math.sin(rad)).toFloat()
+            val offN = (0.75 * Math.cos(rad)).toFloat()
+            val node = ImageNode(
+                materialLoader = matl,
+                bitmap = bitmap,
+                size = Position(widthM, heightM, 0f),
+            ).apply {
+                // (east, north, up) -> glTF (x, y, z), the same conversion the
+                // camera and the figure use. See trap 3.
+                position = Position(
+                    figEast + offX,
+                    figUp + 1.15f,
+                    -(figNorth + offN),
+                )
+                // Face the same way he does, so a visitor standing where he
+                // looks reads the card square on.
+                rotation = Rotation(0f, -figHeadingDeg, 0f)
+            }
+            root.addChildNode(node)
+            figureCardNode = node
+            Log.i(TAG, "figure card placed: %.2f x %.2f m".format(widthM, heightM))
+        } catch (t: Throwable) {
+            Log.w(TAG, "figure card failed", t)
+        }
+    }
+
     fun setFigure(
         uri: String?, east: Float, north: Float, up: Float, heading: Float,
     ) {
@@ -1796,6 +1885,9 @@ class EpocheyeMagicWindowView(
             }
             figureNode = null
             loadedFigureUri = null
+            // A card describing someone who is no longer in the room is worse
+            // than no card.
+            setFigureCard(null)
             return
         }
         if (loadingFigure || uri == loadedFigureUri) return

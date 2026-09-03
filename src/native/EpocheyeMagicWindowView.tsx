@@ -165,6 +165,18 @@ interface NativeProps {
   glbUri?: string;
   viewpoint?: NativeMagicWindowViewpoint;
   walk?: MagicWindowWalk;
+  /**
+   * A card to hang beside the figure, as JSON: { title, meta, body, accent }.
+   *
+   * `meta` is the PROVENANCE line and it is drawn - "CONFIRMED · Home 1794" -
+   * which is the opposite of the recognition card's rule. A recognition card's
+   * confidence is a statement about our model and is never shown; this is a
+   * statement about the record, and on an evidence-led reconstruction it is the
+   * most important thing on the card.
+   *
+   * Null or omitted clears it.
+   */
+  figureCard?: string | null;
   figure?: MagicWindowFigure | null;
   arTracking?: boolean;
   arPin?: MagicWindowArPin;
