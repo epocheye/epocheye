@@ -6,6 +6,8 @@
  * becomes a card without a translation layer.
  */
 
+import type { MediaSubjectKind } from './Objects';
+
 export interface ObjectMedia {
   id: string;
   class_id: string;
@@ -45,10 +47,21 @@ export interface ObjectMedia {
    * photograph", `source_ids` says what the depiction was built from.
    */
   source_ids?: string[];
+  /**
+   * What this media hangs off, since migration 094. 'stop' + an
+   * audio_stops.stop_key, 'figure' + a MagicWindowPerson id, or 'class' + a
+   * detector class. The first two are authored; the third is minted at runtime
+   * at an explore-mode venue, which is why it stopped being the only key.
+   */
+  subject_kind: MediaSubjectKind;
+  subject_key: string;
 }
 
 export interface ObjectMediaResponse {
   monument_id: string;
-  class_id: string;
+  subject_kind: MediaSubjectKind;
+  subject_key: string;
+  /** Echoed only when the subject IS a detector class. Kept for older builds. */
+  class_id?: string;
   media: ObjectMedia[];
 }

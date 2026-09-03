@@ -127,10 +127,44 @@ describe('persistence', () => {
       state: { progress: Record<string, { stepIndex: number; lastStopKey: string }> };
       version: number;
     };
-    expect(parsed.version).toBe(1);
+    // 2 since 'explore' left JOURNEY_STEPS. zustand only runs `migrate` when
+    // the stored version differs, so the bump is what re-sanitises a record
+    // saved against the old four-step array.
+    expect(parsed.version).toBe(2);
     expect(parsed.state.progress[SLUG].stepIndex).toBe(1);
     expect(parsed.state.progress[SLUG].lastStopKey).toBe('palace_overview');
     // Actions are never persisted.
     expect(Object.keys(parsed.state)).toEqual(['progress']);
+  });
+
+  // THE REASON THE VERSION WAS BUMPED. A record written while the journey had
+  // four steps can carry stepIndex 3, which is off the end of a three-entry
+  // array: "Step 4 of 3", a top-bar title falling back to the first step, and a
+  // dot row with no current dot. sanitizeProgress fixes it, but it only runs on
+  // migrate, and migrate only runs when the version differs.
+  it('re-clamps a stepIndex saved against the old four-step journey', async () => {
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.JOURNEY.PROGRESS,
+      JSON.stringify({
+        version: 1,
+        state: {
+          progress: {
+            [SLUG]: {
+              stepIndex: 3,
+              completedSteps: ['arrival', 'prepare', 'guide', 'explore'],
+              lastStopKey: 'palace_overview',
+              updatedAt: 1,
+            },
+          },
+        },
+      }),
+    );
+    await useJourneyStore.persist.rehydrate();
+
+    const p = progressFor(useJourneyStore.getState(), SLUG);
+    expect(p.stepIndex).toBe(JOURNEY_STEP_COUNT - 1);
+    // 'explore' is no longer a step id and must not survive the migration.
+    expect(p.completedSteps).not.toContain('explore');
+    expect(p.lastStopKey).toBe('palace_overview');
   });
 });

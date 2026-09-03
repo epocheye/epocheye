@@ -36,6 +36,7 @@ import ARCapabilityScreen from '../screens/Main/ARCapabilityScreen';
 // Prod guided on-site journey (figure welcome → audio guide → point-and-learn).
 // The entry CTA on SiteDetail is gated (journeyConfig.canBeginJourney).
 import PalaceJourneyScreen from '../screens/Main/PalaceJourneyScreen';
+import PointLearnScreen from '../screens/Main/PointLearnScreen';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -226,6 +227,23 @@ const MainNavigation: React.FC<MainNavigationProps> = ({ onLogout }) => {
         {props => (
           <ErrorBoundary onReset={() => props.navigation.goBack()}>
             <PalaceJourneyScreen {...props} />
+          </ErrorBoundary>
+        )}
+      </Stack.Screen>
+      {/* POINT-AND-RECOGNISE, ADMIN ONLY. Removed from the journey's step
+          sequence on 2026-09-03 because Phase 2 measured it grounding wrongly 7
+          times out of 7 where the margin admits. The component is the surface
+          the object-recognition work is built on and PalaceJourneyScreen was its
+          only render site, so it is routed here rather than left unreachable.
+          The screen re-checks isAdminUser itself; nothing in the UI offers this
+          route. */}
+      <Stack.Screen
+        name={ROUTES.MAIN.POINT_LEARN}
+        options={{ animation: 'fade', presentation: 'fullScreenModal' }}
+      >
+        {props => (
+          <ErrorBoundary onReset={() => props.navigation.goBack()}>
+            <PointLearnScreen {...props} />
           </ErrorBoundary>
         )}
       </Stack.Screen>

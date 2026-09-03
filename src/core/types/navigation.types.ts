@@ -151,6 +151,7 @@ export type MainStackParamList = {
    * request are both keyed by it, so there is no sensible default.
    */
   PalaceJourney: {slug: string};
+  PointLearn: {slug: string};
   /**
    * Magic window — camera-off, gyroscope-driven reconstruction.
    *

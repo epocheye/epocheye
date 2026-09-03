@@ -13,7 +13,8 @@
     "account": "खाता",
     "language": "भाषा",
     "somethingWrong": "कुछ गलत हो गया",
-    "tryAgain": "पुनः प्रयास करें"
+    "tryAgain": "पुनः प्रयास करें",
+    "notAvailable": "उपलब्ध नहीं"
   },
   "tabs": {
     "home": "घर",

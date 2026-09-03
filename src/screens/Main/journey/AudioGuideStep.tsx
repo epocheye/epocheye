@@ -291,9 +291,15 @@ const AudioGuideStep: React.FC<Props> = ({
       if (via === 'manual') lastEndingRef.current = null;
       if (isLast) {
         // completeStep is idempotent but the analytics event behind onContinue
-        // is not, so the exit is latched. Safe against stranding anyone:
-        // completing 'guide' moves journeyStore past this step, which unmounts
-        // this screen.
+        // is not, so the exit is latched.
+        //
+        // THE OLD REASON FOR THAT BEING SAFE IS GONE. It read "completing
+        // 'guide' moves journeyStore past this step, which unmounts this
+        // screen" - true only while a fourth step existed to advance into.
+        // 'guide' is terminal now, so clampStep cannot move the index and this
+        // screen is NOT unmounted by completing it. What makes the latch safe
+        // today is that the parent's onContinue is finishJourney, which sets
+        // `done` and swaps the whole step out.
         if (leftStepRef.current) return;
         leftStepRef.current = true;
         onContinue();

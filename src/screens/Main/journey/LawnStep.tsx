@@ -32,9 +32,11 @@
  * The lead is never a shove: while the beat runs, "Stay a moment" and "Hear it
  * again" cancel it, and a cancelled hand-off never re-arms on its own.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+
+import { tourFor } from '../../../features/magicwindow/tour';
 import Video, { type VideoRef } from 'react-native-video';
 import { Footprints, RotateCcw } from 'lucide-react-native';
 
@@ -483,6 +485,24 @@ const LawnStep: React.FC<Props> = ({
     else status = t('journey.arrival.tapToPlace');
   }
 
+  /**
+   * WHERE YOU ARE AND WHAT TO DO, before anything is revealed.
+   *
+   * REUSED, NOT REWRITTEN. The tour's first stop already says it - "Stand out
+   * on the lawn in front of the palace, far enough back to see the whole front
+   * at once. Face the building." - and it was written for exactly this moment,
+   * by someone thinking about a visitor holding a phone in a garden. Writing a
+   * second sentence beside it would give the same instruction two voices.
+   *
+   * `tourFor` returns [] for any venue without a magic window, and the honest
+   * answer there is nothing rather than an invented direction; the panel simply
+   * omits the line. That is the same refusal `walkToForStop` documents.
+   *
+   * Index 0 is the arrival by construction: PALACE_TOUR is ordered as a walk and
+   * opens on P0, the front lawn.
+   */
+  const arrivalLine = useMemo(() => tourFor(slug)[0]?.walkTo, [slug]);
+
   const welcomeShown = showAr ? placed : true;
   const savingLine =
     prefetch && prefetch.total > 0
@@ -673,7 +693,16 @@ const LawnStep: React.FC<Props> = ({
         ) : (
           <>
             <Text style={journeyStyles.title}>{t('journey.arrival.title')}</Text>
-            <Text style={journeyStyles.body}>{t('journey.arrival.findGround')}</Text>
+            {/* The orientation line first, then the tracking status. A visitor
+                who has just opened this is looking at a garden and a camera
+                feed; "hold steady while we find the ground" answers a question
+                they have not asked yet. Where they should stand does. */}
+            {arrivalLine ? (
+              <Text style={journeyStyles.body}>{arrivalLine}</Text>
+            ) : null}
+            <Text style={journeyStyles.caption}>
+              {t('journey.arrival.findGround')}
+            </Text>
             {/* The way out is ALWAYS here, not only after an error was reported.
                 If the figure never places and ARCore never emits a fault — a
                 tracking session that simply never settles — this branch used to

@@ -340,7 +340,7 @@ const PointLearnStep: React.FC<Props> = ({
         // normal case, not an error worth interrupting a visitor for.
         let videos: VideoCardSpec[] = [];
         if (result.class_id) {
-          const res = await listObjectMedia(slug, result.class_id);
+          const res = await listObjectMedia(slug, 'class', result.class_id);
           if (controller.signal.aborted) return;
           if (res.success) {
             const clips = res.data.media.filter(m => m.media_type === 'video');

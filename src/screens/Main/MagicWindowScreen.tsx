@@ -310,37 +310,82 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
     () => (scene.hasFigure ? peopleFor(scene.slug) : []),
     [scene.hasFigure, scene.slug],
   );
+  /**
+   * Who is at THIS viewpoint, or nobody.
+   *
+   * THE `?? people[0]` FALLBACK IS GONE, and it was the whole bug. With one
+   * person in the list it made `person` unconditionally Purnaiah at every
+   * stop, and since the load effect below had no viewpoint gate he was posed
+   * at (0.45, 14.0) floor 2.6 for the entire session - visible from the lawn,
+   * 28 m away, because nothing ever removed him. The fallback was written so a
+   * scene "never silently loses its figure"; what it actually did was put a
+   * figure in seven rooms he is not in.
+   *
+   * `find` returns the FIRST match, so `visibleFrom` sets must be disjoint.
+   * They are, per person, and that is a requirement rather than a tidiness:
+   * two people claiming one viewpoint would make the second unreachable, which
+   * is exactly the state FORT_PEOPLE is in - both omit `visibleFrom`, so the
+   * fort's second figure can never be selected.
+   */
   const person: MagicWindowPerson | undefined = useMemo(
     () =>
       people.find(
         pp => !pp.visibleFrom || pp.visibleFrom.includes(viewpoint.id),
-      ) ?? people[0],
+      ),
     [people, viewpoint.id],
   );
   /**
    * The figure can actually be SEEN from where the visitor is standing.
    *
-   * ONE predicate, two consumers. It used to be written inline in the point
-   * hint and simply omitted from the person tab, so at a viewpoint the figure
-   * is not visible from - every palace stop except P5, since Purnaiah is
-   * `visibleFrom: ['P5']` - the hint correctly stayed away while the tab still
-   * announced him by name. `person` falls back to `people[0]` so that a scene
-   * never silently loses its figure, which is what put a name on screen for
-   * someone standing a storey above the visitor.
+   * ONE predicate, THREE consumers now: the point hint, the person tab, and -
+   * as of this change - the figure itself. It was written inline in the hint
+   * and omitted from the tab; a later fix enrolled the tab and left the figure
+   * out, which is why the durbar hall could show "Someone is here" while the
+   * lawn showed the man. The prompt was never the thing that was wrong.
+   *
+   * Now that `person` is undefined where nobody is placed, this is `!!person`
+   * for every list whose `visibleFrom` sets are complete. The second clause is
+   * kept for a person who declares none at all - the fort's two - where the
+   * honest answer is still "visible everywhere".
    */
   const personVisible =
     !!person &&
     (!person.visibleFrom || person.visibleFrom.includes(viewpoint.id));
 
+  /**
+   * Load and pose the figure for the CURRENT viewpoint, and clear it when
+   * there is nobody here.
+   *
+   * The clear is the fix. Without it the native view keeps the last figure it
+   * was given - `setFigure` only reloads when the uri changes - so walking from
+   * the durbar hall to the lawn left Purnaiah standing in the lawn scene.
+   *
+   * FAILURES ARE LOUD NOW. This was `catch {}` with "Silent: the fort is the
+   * deliverable, the figure is an addition", and that silence is what made a
+   * missing figure indistinguishable from a figure that failed to resolve.
+   * A falsy uri is a real outcome too - resolveModelGlb returns null when no
+   * CDN base is configured - and it deserves a line rather than an early
+   * return that looks like success.
+   */
   useEffect(() => {
-    if (!person) return;
+    if (!person) {
+      setFigure(null);
+      return;
+    }
     let cancelled = false;
     (async () => {
+      const modelId = rigTest ? RIG_TEST_MODEL_ID : person.modelId;
       try {
-        const uri = await resolveModelGlb(
-          rigTest ? RIG_TEST_MODEL_ID : person.modelId,
-        );
-        if (cancelled || !uri) return;
+        const uri = await resolveModelGlb(modelId);
+        if (cancelled) return;
+        if (!uri) {
+          console.warn(
+            `[magicwindow] figure ${person.id}: no URL for ${modelId} - ` +
+              'GLB_BASE_URL unset or the model is not published',
+          );
+          setFigure(null);
+          return;
+        }
         setFigure(
           rigTest
             ? {uri, ...RIG_TEST_PLACEMENT}
@@ -352,8 +397,10 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
                 heading: person.headingDeg,
               },
         );
-      } catch {
-        // Silent: the fort is the deliverable, the figure is an addition.
+      } catch (err) {
+        if (cancelled) return;
+        console.warn(`[magicwindow] figure ${person.id} (${modelId}) failed`, err);
+        setFigure(null);
       }
     })();
     return () => {

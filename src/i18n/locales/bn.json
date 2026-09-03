@@ -13,7 +13,8 @@
     "account": "অ্যাকাউন্ট",
     "language": "ভাষা",
     "somethingWrong": "কিছু একটা ভুল হয়েছে",
-    "tryAgain": "আবার চেষ্টা করুন"
+    "tryAgain": "আবার চেষ্টা করুন",
+    "notAvailable": "উपলব্ধ নয়"
   },
   "tabs": {
     "home": "হোম",

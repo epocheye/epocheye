@@ -52,6 +52,8 @@ export const ROUTES = {
     AR_CAPABILITY: 'ArCapability',
     /** Prod: the guided on-site journey (figure welcome → audio guide → point-and-learn). */
     PALACE_JOURNEY: 'PalaceJourney',
+    /** Admin workbench for point-and-recognise; not a product surface. */
+    POINT_LEARN: 'PointLearn',
     /** Dev-build-only workflow health-check board (not registered in release). */
     DEV_HEALTH: 'DevHealth',
   },

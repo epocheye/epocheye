@@ -11,12 +11,12 @@
  * The screen owns what the steps share: the safety gate, AR capability and the
  * camera permission, the audio-stop list, the pre-cache run, journey progress
  * (journeyStore, persisted per venue so a killed app resumes at the same step),
- * the leave/back handling and the full-screen video overlay. Each step owns its
+ * the leave/back handling. Each step owns its
  * own native AR view so the session is torn down between steps.
  *
  * Back handling: every affordance — the X, the back chevron, the Android
  * hardware button — goes through useSafeBackHandler so exiting can never fall
- * through to closing the app. Hardware back closes the video first, then steps
+ * through to closing the app. Hardware back steps
  * back one step, and on the first step asks before leaving.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -68,8 +68,6 @@ import { listViewingStations } from '../../utils/api/ar';
 import LawnStep from './journey/LawnStep';
 import PromptStep from './journey/PromptStep';
 import AudioGuideStep, { type StopsStatus } from './journey/AudioGuideStep';
-import PointLearnStep from './journey/PointLearnStep';
-import FullscreenVideo from './journey/FullscreenVideo';
 import {
   GhostButton,
   JourneyTopBar,
@@ -134,7 +132,6 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
   const [capabilityNoticeDone, setCapabilityNoticeDone] = useState(false);
   const [camera, setCamera] = useState<CameraState>('unknown');
   const [done, setDone] = useState(false);
-  const [video, setVideo] = useState<{ uri: string; poster?: string } | null>(null);
 
   // GEOFENCE. Entry is refused off-site, which also closes the deep-link route into
   // the journey (a link reaches this screen without ever passing the Site Detail CTA).
@@ -159,10 +156,10 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
     if (stepIndex > 0) goToStep(slug, stepIndex - 1);
   }, [slug, stepIndex, goToStep]);
   const intercept = useCallback((): boolean => {
-    if (video) {
-      setVideo(null);
-      return true;
-    }
+    // The full-screen video branch that used to sit here went with 'explore':
+    // PointLearnStep's card videos were the only thing that ever opened one, so
+    // with that step out of the sequence nothing in the journey can.
+    //
     // Gates and the finish screen exit directly; only a live step is a place
     // worth guarding.
     if (!acknowledged || resumeOffer === 'shown' || done) return false;
@@ -172,7 +169,7 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
     }
     confirmLeave();
     return true;
-  }, [video, acknowledged, resumeOffer, done, stepIndex, goPrevious, confirmLeave]);
+  }, [acknowledged, resumeOffer, done, stepIndex, goPrevious, confirmLeave]);
   useSafeBackHandler(intercept);
 
   // ---- Resume offer, decided once per visit, after hydration ----
@@ -331,17 +328,22 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
     [navigation, slug, magicWindowAllowed],
   );
 
+  /**
+   * The end of the journey.
+   *
+   * Completes 'guide', not 'explore'. With 'explore' gone from JOURNEY_STEPS,
+   * `completeStep('explore')` computes clampStep(indexOf(...) + 1) =
+   * clampStep(0) and would send a visitor who just finished back to the lawn,
+   * while `isStepId` quietly dropped 'explore' from completedSteps so nothing
+   * recorded the finish either.
+   */
   const finishJourney = useCallback(() => {
-    advanceFrom('explore');
+    advanceFrom('guide');
     setDone(true);
   }, [advanceFrom]);
   const handleStopChange = useCallback(
     (key: string) => setLastStopKey(slug, key),
     [slug, setLastStopKey],
-  );
-  const openVideo = useCallback(
-    (uri: string, poster?: string) => setVideo({ uri, poster }),
-    [],
   );
 
   /** ARCore is missing but the phone is capable — one tap from fixed. */
@@ -556,6 +558,11 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
       );
       break;
     case 'guide':
+    default:
+      // THE LAST STEP NOW. `onContinue` is `finishJourney` rather than an
+      // advance into a fourth step that no longer exists — completing 'guide'
+      // can no longer move the index, so without this the visitor is parked on
+      // the final audio stop with the top-bar X as the only way out.
       step = (
         <AudioGuideStep
           status={stopsStatus}
@@ -566,20 +573,7 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
           onOpenReconstruction={
             magicWindowAllowed ? openReconstruction : undefined
           }
-          onContinue={() => advanceFrom('guide')}
-        />
-      );
-      break;
-    case 'explore':
-    default:
-      step = (
-        <PointLearnStep
-          slug={slug}
-          arCapable={arCapable}
-          cameraGranted={cameraGranted}
-          onRequestCamera={requestCamera}
-          onOpenVideo={openVideo}
-          onFinish={finishJourney}
+          onContinue={finishJourney}
         />
       );
       break;
@@ -603,9 +597,6 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
         onBack={stepIndex > 0 ? goPrevious : undefined}
         onAsk={openAsk}
       />
-      {video ? (
-        <FullscreenVideo uri={video.uri} poster={video.poster} onClose={() => setVideo(null)} />
-      ) : null}
     </View>
   );
 };

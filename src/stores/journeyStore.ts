@@ -27,7 +27,29 @@ import {STORAGE_KEYS} from '../core/constants/storage-keys';
  *   guide   — zone-grouped audio stops in sort_order
  *   explore — point-and-learn: capture → recognize → world-anchored card
  */
-export const JOURNEY_STEPS = ['arrival', 'prepare', 'guide', 'explore'] as const;
+/**
+ * The journey, in order.
+ *
+ * 'explore' (point-and-recognise) WAS the fourth step and was removed on
+ * 2026-09-03. Phase 2 measured retrieval grounding wrongly 7 times out of 7
+ * where the margin admits, on a corpus whose objects sit 0.865 apart, and
+ * established the shortfall is representational rather than a matter of data
+ * volume. That is not a thing to put in front of a visitor.
+ *
+ * PointLearnStep IS NOT DELETED. It remains the surface the object-recognition
+ * work is built on and is reachable outside the journey; only its place in this
+ * sequence is gone. Shrinking this array has three consequences that are handled
+ * rather than discovered:
+ *
+ *   - `completeStep('explore')` would compute clampStep(-1 + 1) = 0 and silently
+ *     reset a finishing visitor to 'arrival'. The caller now completes 'guide'.
+ *   - 'guide' becomes TERMINAL, so AudioGuideStep calls onFinish rather than
+ *     onContinue; its old comment assumed completing 'guide' would unmount it,
+ *     which was only true while a fourth step existed to advance into.
+ *   - A persisted stepIndex of 3 rehydrates verbatim, because zustand only runs
+ *     `migrate` when the stored version differs. Hence version 2 below.
+ */
+export const JOURNEY_STEPS = ['arrival', 'prepare', 'guide'] as const;
 export type JourneyStepId = (typeof JOURNEY_STEPS)[number];
 export const JOURNEY_STEP_COUNT = JOURNEY_STEPS.length;
 
@@ -167,7 +189,12 @@ export const useJourneyStore = create<JourneyState & JourneyActions>()(
     {
       name: STORAGE_KEYS.JOURNEY.PROGRESS,
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      // BUMPED 1 -> 2 WHEN 'explore' LEFT THE SEQUENCE. zustand only calls
+      // `migrate` when the stored version differs, so leaving this at 1 would
+      // rehydrate a saved `stepIndex: 3` verbatim against a 3-entry array:
+      // "Step 4 of 3", a title falling back to "On the lawn" over the guide, and
+      // a dot row with no current dot, until the first write repaired it.
+      version: 2,
       // Sanitize every record rather than trusting the persisted shape: a
       // stepIndex past the end would crash the step switch on resume.
       migrate: (persisted: unknown) => {

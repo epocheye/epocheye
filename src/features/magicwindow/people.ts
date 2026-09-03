@@ -262,6 +262,244 @@ const PALACE_PEOPLE: MagicWindowPerson[] = [
       },
     ],
   },
+
+  // ── THE FOUR REMAINING FIGURES ─────────────────────────────────────
+  //
+  // Every placement below is a STAGING DECISION, not an evidence claim, and each
+  // one says so in its own NOT-A-CLAIM line. The ledger is unambiguous
+  // (figure-court/evidence.md:75-78, :121-135): no source places any named
+  // person anywhere inside this palace. What the record attaches to the building
+  // is Hyder Ali commencing it, Tipu completing it, and the artists who drew it.
+  //
+  // Three of these four are TYPE figures and may never carry a personal name on
+  // screen (evidence.md:399-400). Their costume is evidenced; their faces are
+  // not, and their lines say so.
+  //
+  // POSITIONS ARE COMPUTED AGAINST THE DELIVERED FRUSTUM, never the authored
+  // 62 deg. `fovDeg` reaches Filament as a focal length and comes back as a
+  // 10.47 deg horizontal HALF-angle and 21.83 deg vertical. Placing against 62
+  // is exactly how Purnaiah ended up 28 deg off axis and off screen; the first
+  // draft of Hyder Ali below made the same mistake at 13.8 deg and was moved.
+  // Each entry records its off-axis angle, screen height and whether the feet
+  // are in shot.
+  //
+  // `visibleFrom` IS ONE STOP EACH AND DISJOINT. `people.find` returns the first
+  // match, so an overlap would make the later person unreachable — which is the
+  // state FORT_PEOPLE is already in, both omitting `visibleFrom` so the second
+  // can never be selected.
+
+  {
+    id: 'guard_threshold',
+    // `_amp`: the raw idle moves 5 of 24 joints by 2.85 deg at the shoulder,
+    // about three pixels at this distance over a four-second cycle. See
+    // heritage_assets/.../tools/amplify_idle.py.
+    modelId: 'figures/tipu-summer-palace-bengaluru/guard_idle_amp',
+    name: 'A court attendant',
+    role: 'one of the men who kept the doors',
+    // Front colonnade, ground floor, in the centre bay a visitor walks into.
+    // From P1 (0, 1.9, eye 1.6): 4.64 m away, 7.4 deg off axis, feet 19.0 deg
+    // below the eye against a 21.8 deg half-angle so they stay in shot, and he
+    // stands 45% of the screen height. Mid-bay between the x = +-1.875 pillars,
+    // clear of the y = 3.75 and 7.5 rows and of both light wells.
+    position: [0.6, 6.5],
+    floorM: 0,
+    // atan2(0 - 0.6, 1.9 - 6.5) = 187.4 deg, computed from the two positions.
+    headingDeg: 187,
+    visibleFrom: ['P1'],
+    lines: [
+      {
+        text:
+          'The clothes are real. They were painted from sketches made on the ' +
+          'spot at Srirangapatna in February 1792, by an artist who came with ' +
+          'Cornwallis’s army — so this is Mysore court dress of exactly this ' +
+          'decade, observed rather than imagined.',
+        tier: 'CONFIRMED',
+        source:
+          'Robert Home, “The Reception of the Mysorean Hostage Princes”, ' +
+          'c.1793. National Army Museum 1976-11-86. PD-Art',
+      },
+      {
+        text:
+          'The face is not his. No one recorded the face of any doorkeeper ' +
+          'here, so this one was made up. That is why he has no name — he is a ' +
+          'type, not a person, and putting a name on him would be an invention ' +
+          'dressed as a record.',
+        tier: 'NOT-A-CLAIM',
+        source: 'evidence.md §S6 — costume CONFIRMED, no named individual buildable',
+      },
+      {
+        text:
+          'That anyone stood in this doorway is not attested either. He is ' +
+          'here because a threshold is where a guard stands, and because you ' +
+          'need a person beside these pillars to feel how big they are.',
+        tier: 'NOT-A-CLAIM',
+        source: 'No source places any named person inside this palace',
+      },
+    ],
+  },
+
+  {
+    id: 'rocketman_arcade',
+    modelId: 'figures/tipu-summer-palace-bengaluru/rocketman_idle_amp',
+    name: 'A rocket-man of Tipu’s army',
+    role: 'one of the men who fired the iron rockets',
+    // Down the arcade, ground floor. From P2 (7.5, 1.9, eye 1.6) looking -X:
+    // 7.01 m away, 3.3 deg off axis, feet 12.9 deg below the eye, 30% of the
+    // screen height. He stands in the run of the colonnade so the 18.75 m of
+    // receding arches has something human against it, which is what P2 is for.
+    position: [0.5, 2.3],
+    floorM: 0,
+    // atan2(7.5 - 0.5, 1.9 - 2.3) = 93.3 deg.
+    headingDeg: 93,
+    visibleFrom: ['P2'],
+    lines: [
+      {
+        text:
+          'Two men who were here wrote down what this uniform looked like, ' +
+          'separately, and they agree: a purple coat scattered with white ' +
+          'spots, a red sash, a wide flat turban, bare lower legs. One was a ' +
+          'Royal Artillery officer on campaign against Mysore in these exact ' +
+          'years.',
+        tier: 'CONFIRMED',
+        source:
+          'Capt. Charles Gold, “Oriental Drawings” (1806), sketched 1791–1798; ' +
+          'corroborated by Robert Home, Madras 1793–94',
+      },
+      {
+        text:
+          'The spots are spots, not stripes. The tiger-stripe emblem you will ' +
+          'hear about elsewhere in this building is not on this coat, and ' +
+          'painting it on would be inventing an emblem.',
+        tier: 'CONFIRMED',
+        source:
+          'evidence.md §S5 — “spotted, not striped”; forbidden to render as bubri',
+      },
+      {
+        text:
+          'His face is invented, like the guard’s, and for the same reason. ' +
+          'And nothing records a rocket-man standing in this colonnade — he is ' +
+          'here to give you the length of it.',
+        tier: 'NOT-A-CLAIM',
+        source:
+          'evidence.md §S4 — type figure; no named individual, no attested presence',
+      },
+    ],
+  },
+
+  {
+    id: 'cavalryman_stair',
+    modelId: 'figures/tipu-summer-palace-bengaluru/cavalryman_idle_amp',
+    name: 'A Mysore trooper',
+    role: 'one of the cavalry',
+    // Head of the NNE stair, first floor. From P4 (8, 3, eye 4.2) looking -X:
+    // 5.51 m away, 4.2 deg off axis, feet 16.2 deg below the eye, 39% of the
+    // screen height. On the 2.6 m floor, so he stands on it rather than through
+    // it into the colonnade below.
+    //
+    // PLACED AT THE OWNER'S DIRECTION, and the objection is recorded rather than
+    // buried: research/figure-court/build-record.md:284-319 recommended dropping
+    // this figure before it was built, notes the source is an 82 x 90 px crop
+    // upscaled eight times in which "his face is three blobs", and predicts he
+    // "does not match Purnaiah, the guard or the rocketman". He is on the upper
+    // floor and alone in frame, which is the least unkind place for him.
+    position: [2.5, 3.4],
+    floorM: 2.6,
+    // atan2(8 - 2.5, 3 - 3.4) = 94.2 deg.
+    headingDeg: 94,
+    visibleFrom: ['P4'],
+    lines: [
+      {
+        text:
+          'This one is the thinnest evidence of the four. The costume comes ' +
+          'from a battle painting — a copy of the Pollilur mural — where the ' +
+          'whole rider is about eighty pixels tall. It tells you the colours ' +
+          'and roughly the dress. It does not tell you a face.',
+        tier: 'INFERRED',
+        source:
+          '“The Battle of Pollilur”, early 19th c. copy of the Daria Daulat ' +
+          'Bagh mural, private collection. evidence.md §S7 — corroborate only',
+      },
+      {
+        text:
+          'So the face is invented, and so is most of the detail. He is a ' +
+          'type, not a man, and he has no name for that reason.',
+        tier: 'NOT-A-CLAIM',
+        source:
+          'evidence.md:399-400 — type figures are captioned as types, never named',
+      },
+      {
+        text:
+          'Cavalry did not stand at the top of a staircase. He is here so the ' +
+          'upper floor is not empty, and because this is the one spot where he ' +
+          'is not standing next to a better-evidenced figure.',
+        tier: 'NOT-A-CLAIM',
+        source:
+          'Staging decision; no source places any named person inside this palace',
+      },
+    ],
+  },
+
+  {
+    id: 'hyderali_lawn',
+    modelId: 'figures/tipu-summer-palace-bengaluru/hyderali_idle_amp',
+    name: 'Hyder Ali',
+    role: 'who began this building and never saw it finished',
+    // OUTSIDE, on the lawn, at the external ground level of -0.70 m - not on the
+    // plinth. From P0 (0, -14, eye 0.9): 6.59 m away, 9.6 deg off axis inside a
+    // 10.47 deg half-angle, feet 13.7 deg below the eye, 33% of the screen.
+    //
+    // OUTSIDE IS THE POINT, and it is the one placement here the record
+    // positively supports. He commenced the palace inside the fort in 1781 and
+    // died in 1782, so he never entered a finished room of it - which is what
+    // the `palace_overview` narration already tells the visitor. Standing him on
+    // the lawn looking at it is the evidenced position.
+    //
+    // FIRST DRAFT PUT HIM AT x = -1.60, WHICH IS 13.8 DEG OFF AXIS AND THEREFORE
+    // OFF SCREEN - the identical fault that moved Purnaiah. Moved to -1.10.
+    //
+    // NO LIKENESS BADGE ON SCREEN, at the owner's direction. The face is a
+    // documented fabrication (build-record.md:120-122) and build-record.md:140-141
+    // requires that if this figure is labelled it must not be captioned in a way
+    // implying the face is documented. It carries no badge - consistent with
+    // every other figure here, where the tier lives in the record and the visitor
+    // hears the sentence - and the third line below states the fabrication
+    // outright, which is what satisfies that requirement.
+    position: [-1.1, -7.5],
+    floorM: -0.7,
+    // atan2(0 - (-1.1), -14 - (-7.5)) = 170.4 deg.
+    headingDeg: 170,
+    visibleFrom: ['P0'],
+    lines: [
+      {
+        text:
+          'He began this building in 1781, inside the walls of the fort, and ' +
+          'died the year after. He never saw a room of it finished. His son ' +
+          'completed it in 1791 and named it the envy of heaven.',
+        tier: 'CONFIRMED',
+        source:
+          'evidence.md §S3 — commencement 1781, death 1782; ASI and published sources',
+      },
+      {
+        text:
+          'That is why he is out here and not inside. Standing him in a room ' +
+          'he never entered would be the one thing the record actually rules ' +
+          'out about him.',
+        tier: 'NOT-A-CLAIM',
+        source: 'Staging decision, argued from the commencement and death dates',
+      },
+      {
+        text:
+          'The face is the weakest thing in this reconstruction. Every widely ' +
+          'circulated portrait of him descends from an engraving made in 1846 ' +
+          'to illustrate a novel, forty-seven years after he died. Two men who ' +
+          'met him wrote that he wore no beard and no moustache at all.',
+        tier: 'DISPUTED',
+        source:
+          'figure-hyder-ali/evidence.md W1 (Maistre de la Tour) and W2 (Kirmani), ' +
+          'both CONFIRMED; build-record.md:120-122 on the 1846 Keck/Dickes engraving',
+      },
+    ],
+  },
 ];
 
 /**
