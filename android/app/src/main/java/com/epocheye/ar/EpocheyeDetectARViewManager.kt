@@ -332,6 +332,7 @@ class EpocheyeDetectARViewManager(
             .put("walkPath", CMD_WALK_PATH)
             .put("placeFromDetection", CMD_PLACE_FROM_DETECTION)
             .put("placeCardsOnly", CMD_PLACE_CARDS_ONLY)
+            .put("updateAnchoredCards", CMD_UPDATE_ANCHORED_CARDS)
             .put("placeCardsAtScreenPoint", CMD_PLACE_CARDS_AT_SCREEN_POINT)
             .put("placeInFront", CMD_PLACE_IN_FRONT)
             .put("clearAnchor", CMD_CLEAR_ANCHOR)
@@ -382,6 +383,10 @@ class EpocheyeDetectARViewManager(
                 val ny = args?.getDouble(1)?.toFloat() ?: return
                 val cards = args.getString(2) ?: return
                 view.placeCardsOnly(nx, ny, cards)
+            }
+            CMD_UPDATE_ANCHORED_CARDS -> {
+                val cards = args?.getString(0) ?: return
+                view.updateAnchoredCards(cards)
             }
             CMD_PLACE_CARDS_AT_SCREEN_POINT -> {
                 val x = args?.getDouble(0)?.toFloat() ?: return
@@ -483,6 +488,10 @@ class EpocheyeDetectARViewManager(
                 val ny = args?.getDouble(1)?.toFloat() ?: return
                 val cards = args.getString(2) ?: return
                 view.placeCardsOnly(nx, ny, cards)
+            }
+            "updateAnchoredCards" -> {
+                val cards = args?.getString(0) ?: return
+                view.updateAnchoredCards(cards)
             }
             "placeCardsAtScreenPoint" -> {
                 val x = args?.getDouble(0)?.toFloat() ?: return
@@ -614,5 +623,6 @@ class EpocheyeDetectARViewManager(
         private const val CMD_MARK_ALIGNMENT_POINT = 16
         private const val CMD_APPLY_ALIGNMENT = 17
         private const val CMD_PLACE_CARDS_AT_SCREEN_POINT = 18
+        private const val CMD_UPDATE_ANCHORED_CARDS = 19
     }
 }

@@ -68,7 +68,12 @@ import {resolveModelGlb} from '../../services/glbSource';
 // path production uses (via glbSource → getOrFetchGlb). Used ONLY by the
 // __DEV__ direct-GLB render test below.
 import {getOrFetchGlb} from '../../services/glbCache';
-import {recognize} from '../../services/recognizeService';
+import {
+  recognize,
+  pollResearch,
+  type ResearchCard,
+} from '../../services/recognizeService';
+import {getValidAccessToken} from '../../utils/api/auth/Login';
 import {streamMuseumNarration} from '../../services/museumModeService';
 // fetchObjectCard is the grounded data-card lookup (GET /vision/object/{class_id});
 // it is NOT the Roboflow detector. Roboflow (roboflowDetectionService /
@@ -402,12 +407,24 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
   // Aborts an in-flight recognize submit/poll so leaving the screen (or resetting)
   // doesn't leave the up-to-45s poll loop running in the background.
   const recognizeAbortRef = useRef<AbortController | null>(null);
+  // The background research run for the scan just placed, and its stop function.
+  // Research is the SECOND job: the identification is already on screen by the
+  // time it starts, and the card it produces replaces that card's text without
+  // moving it.
+  const pendingResearchRef = useRef<{
+    runId?: string;
+    cards?: ResearchCard[];
+  } | null>(null);
 
   const reset = useCallback(() => {
     abortRef.current?.();
     abortRef.current = null;
     recognizeAbortRef.current?.abort();
     recognizeAbortRef.current = null;
+    // Forget the research handles for the scan being discarded. Without this a
+    // run started by the PREVIOUS scan could land while a different object is
+    // anchored and overwrite that object's card with another one's history.
+    pendingResearchRef.current = null;
     setResolved({kind: 'idle'});
   }, []);
 
@@ -545,6 +562,14 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
         }
       }
 
+      // Carry the research handles out to the placement site. Cards present here
+      // were researched by an EARLIER visitor and came straight from the database
+      // with no model call; a run id means one is happening now.
+      pendingResearchRef.current = {
+        runId: result.research_run_id,
+        cards: result.research_cards,
+      };
+
       // One event covers every recognition outcome (grounded/ai/paywall/
       // out_of_scope/out_of_venue/daily_limit) for the scan funnel + breakdowns.
       analytics.track('scan_result', {
@@ -615,7 +640,7 @@ function useDetectionResolver(venueSlug: string, allowUngrounded = false) {
     [venueSlug, allowUngrounded, runMuseumFallback],
   );
 
-  return {resolved, runResolution, reset, remaining};
+  return {resolved, runResolution, reset, remaining, pendingResearchRef};
 }
 
 const DetectArScreen: React.FC = () => {
@@ -1033,6 +1058,9 @@ const DetectARNative: React.FC<{
   const navigation =
     useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const arRef = useRef<EpocheyeDetectARHandle>(null);
+  const researchStopRef = useRef<(() => void) | null>(null);
+
+
   const [status, setStatus] = useState<ARStatus>('initializing');
   const [activationDone, setActivationDone] = useState(false);
   const [tracking, setTracking] = useState(false);
@@ -1046,11 +1074,59 @@ const DetectARNative: React.FC<{
   // is up — showing both would let the on-screen card block the AR view. Reset on
   // every fresh Detect / manual reset so the next scan re-evaluates.
   const [arCardShown, setArCardShown] = useState(false);
-  const {resolved, runResolution, reset, remaining} = useDetectionResolver(
-    venueSlug,
-    allowUngrounded,
-  );
+  const {resolved, runResolution, reset, remaining, pendingResearchRef} =
+    useDetectionResolver(venueSlug, allowUngrounded);
+
+  /**
+   * Apply an object's sourced history to the cards already standing in the world.
+   *
+   * Two ways this fires, and the difference is the whole economic argument for
+   * the cache:
+   *
+   *   - `cards` present  -> an earlier visitor already paid for this research.
+   *     It arrived on the recognize response itself, read from the database with
+   *     ZERO model calls, and lands the moment the identification does.
+   *   - `runId` present  -> nobody has researched this object before. This
+   *     visitor's scan started a background run; we poll it and update the card
+   *     in place when it finishes, which can be a minute later.
+   *
+   * The anchor is never re-acquired: `updateAnchoredCards` swaps what the cards
+   * say where they already stand. And it is a no-op natively if nothing is
+   * anchored, so a run that lands after the visitor has walked away or started a
+   * new scan cannot resurrect a card.
+   */
+  const applyResearch = useCallback(() => {
+    researchStopRef.current?.();
+    researchStopRef.current = null;
+
+    const pending = pendingResearchRef.current;
+    if (!pending) return;
+
+    if (pending.cards?.length) {
+      arRef.current?.updateAnchoredCards(JSON.stringify(pending.cards));
+      return;
+    }
+    if (!pending.runId) return;
+
+    void (async () => {
+      const token = await getValidAccessToken();
+      researchStopRef.current = pollResearch(pending.runId!, token, cards => {
+        arRef.current?.updateAnchoredCards(JSON.stringify(cards));
+      });
+    })();
+  }, [pendingResearchRef]);
+
   const {scanPhase, cardReady, resolveScan, resetPhase} = useScanPhase(detecting);
+
+  // A research poll outlives the request that started it, so unmount has to stop
+  // it explicitly or it keeps polling for minutes after the screen has closed.
+  useEffect(
+    () => () => {
+      researchStopRef.current?.();
+      researchStopRef.current = null;
+    },
+    [],
+  );
 
   const trackingRef = useRef(false);
   useEffect(() => {
@@ -1160,6 +1236,7 @@ const DetectARNative: React.FC<{
               buildGroundedArCards(resolution.card),
             );
           }
+          applyResearch();
           // Either branch puts a card/model in the air → hide the on-screen card so
           // it can't overlap and block the AR view.
           setArCardShown(true);
@@ -1200,6 +1277,7 @@ const DetectARNative: React.FC<{
               buildArCards(resolution.label ?? null, resolution.body),
             );
             setArCardShown(true); // AR placard is up → hide the on-screen card
+            applyResearch();
           }
           // DEV "scan anything" anchors its AR cards later (after the stream
           // completes) via the effect below, which hides the on-screen card then.
@@ -1213,7 +1291,15 @@ const DetectARNative: React.FC<{
         setDetecting(false);
       }
     },
-    [runResolution, resolveScan, navigation, venueSlug, allowUngrounded, t],
+    [
+      runResolution,
+      resolveScan,
+      navigation,
+      venueSlug,
+      allowUngrounded,
+      t,
+      applyResearch,
+    ],
   );
 
   const handleTrackingState = useCallback((state: string) => {

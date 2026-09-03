@@ -315,6 +315,22 @@ export interface EpocheyeDetectARHandle {
     cardsJson: string,
   ) => void;
   /**
+   * Replace what the already-anchored cards SAY, without moving them.
+   *
+   * The anchor is kept: no new hit-test, no re-detection, no drift. This is how a
+   * researched history fills in behind an identification the visitor was shown
+   * seconds earlier - the cards change their text where they already stand rather
+   * than vanishing and re-appearing somewhere slightly different.
+   *
+   * A card carrying `meta` renders on the discovery surface, which draws the
+   * evidence tier and source above the body ("CONFIRMED - Museums of India").
+   * That is the per-claim citation, rendered.
+   *
+   * No-op when nothing is anchored, so a result that lands after the visitor has
+   * walked away or started a new scan cannot resurrect a card.
+   */
+  updateAnchoredCards: (cardsJson: string) => void;
+  /**
    * Card placement at a TAP: same cards, same world-anchoring (depth hit-test at
    * the point → tracked plane → ahead of the camera → headlocked, never nothing),
    * but the point is the touch in dp exactly as `placeAtScreenPoint` takes it.
@@ -533,6 +549,7 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
         walkPath: commands.walkPath,
         placeFromDetection: commands.placeFromDetection,
         placeCardsOnly: commands.placeCardsOnly,
+        updateAnchoredCards: commands.updateAnchoredCards,
         placeCardsAtScreenPoint: commands.placeCardsAtScreenPoint,
         placeInFront: commands.placeInFront,
         clearAnchor: commands.clearAnchor,
@@ -586,6 +603,8 @@ const EpocheyeDetectARView = forwardRef<EpocheyeDetectARHandle, Props>(
           dispatch(commandIds?.placeFromDetection, [imgNormX, imgNormY]),
         placeCardsOnly: (imgNormX, imgNormY, cardsJson) =>
           dispatch(commandIds?.placeCardsOnly, [imgNormX, imgNormY, cardsJson]),
+        updateAnchoredCards: cardsJson =>
+          dispatch(commandIds?.updateAnchoredCards, [cardsJson]),
         placeCardsAtScreenPoint: (screenX, screenY, cardsJson) =>
           dispatch(commandIds?.placeCardsAtScreenPoint, [
             screenX,

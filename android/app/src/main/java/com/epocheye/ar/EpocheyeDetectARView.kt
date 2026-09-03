@@ -2249,9 +2249,86 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
             val node = ImageNode(matl, bitmap).apply { setScale(scale) }
             return CardRecord(id, node, videoUrl, posterUrl, null, null)
         }
-        val bitmap = EpocheyeArCardRenderer.render(json) ?: return null
+        val bitmap = renderCardBitmap(obj, json) ?: return null
         val node = ImageNode(matl, bitmap).apply { setScale(scale) }
         return CardRecord(id, node, null, null, null, null)
+    }
+
+    /**
+     * Choose the renderer from the card's own shape.
+     *
+     * A card carrying `meta` is a PROVENANCE card: its meta line is the evidence
+     * tier and the source that supports the body ("CONFIRMED · Museums of India").
+     * renderDiscovery draws that line; render() does not, and would silently drop
+     * it — which for a researched claim means dropping the citation and showing the
+     * claim bare. That is the one thing this must never do.
+     *
+     * The no-source rule that governs render() is unaffected: a recognition card's
+     * confidence is a statement about our model and is still never shown. A
+     * provenance line is a statement about the record, which is the opposite case.
+     */
+    private fun renderCardBitmap(obj: JSONObject?, json: String): android.graphics.Bitmap? {
+        val hasMeta = obj?.optString("meta")?.isNotBlank() == true
+        return if (hasMeta) {
+            EpocheyeArCardRenderer.renderDiscovery(json) ?: EpocheyeArCardRenderer.render(json)
+        } else {
+            EpocheyeArCardRenderer.render(json)
+        }
+    }
+
+    /**
+     * Replace the content of the cards already standing at the current anchor.
+     *
+     * This is what lets a researched history fill in behind an identification the
+     * visitor was shown seconds earlier. The ANCHOR IS KEPT: no new hit-test, no
+     * re-detection, no drift — the cards do not jump to a new place in the room,
+     * they change what they say where they already are.
+     *
+     * A per-node texture swap is not possible here and would not be right anyway:
+     * research returns a different NUMBER of cards than the identification placed
+     * (one lead card plus one per sourced claim), so the arc layout has to be
+     * recomputed. Rebuilding the children of the existing AnchorNode is the
+     * smallest operation that preserves what the visitor cares about, which is
+     * where the cards are — not which Kotlin objects back them.
+     *
+     * No-ops when nothing is anchored: research that lands after the visitor has
+     * walked away or started a new scan must not resurrect a card.
+     */
+    fun updateAnchoredCards(cardsJson: String) {
+        val anchorNode = currentAnchorNode
+        if (anchorNode == null) {
+            Log.i(TAG, "updateAnchoredCards: nothing anchored, ignoring")
+            return
+        }
+        val cards = try {
+            JSONArray(cardsJson)
+        } catch (t: Throwable) {
+            Log.w(TAG, "updateAnchoredCards: bad JSON", t)
+            return
+        }
+        val n = minOf(cards.length(), maxCards)
+        if (n == 0) return
+
+        // Tear down the old children only after the new JSON has parsed, so a
+        // malformed payload leaves the visitor with the card they already had
+        // rather than an empty anchor.
+        releaseCardPlayers()
+        for (node in cardNodes) {
+            try {
+                anchorNode.removeChildNode(node)
+            } catch (_: Throwable) {
+            }
+            destroyNodeSafely(node, "updated card")
+        }
+        cardNodes.clear()
+
+        activeCardLayout = cardLayoutFor(n)
+        for (i in 0 until n) {
+            val json = cards.optJSONObject(i)?.toString() ?: continue
+            addCardNode(anchorNode, json, activeCardLayout[i], cardOnlyScale)
+        }
+        Log.i(TAG, "updateAnchoredCards: replaced with $n card(s) on the existing anchor")
+        post { onAnchorPlaced?.invoke("cards_updated") }
     }
 
     /** Whether the renderer would draw anything but a blank "Unknown object" card. */
