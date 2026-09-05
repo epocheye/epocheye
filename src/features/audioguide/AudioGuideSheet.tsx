@@ -21,10 +21,13 @@
 
 import React from 'react';
 import {Pressable, StyleSheet, Switch, Text, View} from 'react-native';
-import {Play, Sparkles} from 'lucide-react-native';
+import {Play} from 'lucide-react-native';
 import {useTranslation} from 'react-i18next';
 
 import DetailSheet, {SHEET} from '../../components/ui/DetailSheet';
+import StopVisual from './StopVisual';
+import EvidenceNote from './EvidenceNote';
+import type {SubjectImage} from '../../shared/hooks/useSubjectMedia';
 import {AUDIO_PERSONAS} from '../../utils/api/audio';
 import type {AudioStop} from '../../utils/api/audio';
 import type {NarrationPersona} from '../../stores/museumPrefsStore';
@@ -56,6 +59,12 @@ export interface AudioGuideSheetProps {
   /** Resolved restoration image URL, when this stop has one. */
   restorationUri: string | null;
   onOpenRestoration: () => void;
+  /**
+   * The stop's stills, resolved. The screen shows ONE of these in its hero
+   * band; this is where the whole set lives, with the titles and captions the
+   * hero has no room for — and, on `what_the_board_says`, the second board.
+   */
+  images: SubjectImage[];
   persona: NarrationPersona;
   onSelectPersona: (persona: NarrationPersona) => void;
   autoAdvance: boolean;
@@ -73,6 +82,7 @@ const AudioGuideSheet: React.FC<AudioGuideSheetProps> = ({
   onSelectStop,
   restorationUri,
   onOpenRestoration,
+  images,
   persona,
   onSelectPersona,
   autoAdvance,
@@ -88,17 +98,23 @@ const AudioGuideSheet: React.FC<AudioGuideSheetProps> = ({
       closeLabel={t('audioGuide.closeStops')}>
       {player ? <View style={SHEET.block}>{player}</View> : null}
 
-      {/* THE RESTORED VIEW. An evidence path, so it moves behind a tap rather
-          than away. */}
-      {selected && hasRestoration(selected) && restorationUri ? (
-        <Pressable
-          onPress={onOpenRestoration}
-          accessibilityRole="button"
-          accessibilityLabel={t('restoration.cta')}
-          style={styles.restorationBtn}>
-          <Sparkles size={16} color={COLORS.gold} />
-          <Text style={styles.restorationText}>{t('restoration.cta')}</Text>
-        </Pressable>
+      {/* THE PICTURES, AND THE RESTORED VIEW.
+          This block used to be a lone button that opened a camera — the only
+          route to the one image this venue had. It is now the full set: every
+          still for the stop with its title, caption, disclosure and credit,
+          and the restored view drawn rather than merely promised, with the
+          camera wipe still offered underneath it. */}
+      {images.length > 0 || (selected && hasRestoration(selected) && restorationUri) ? (
+        <View style={SHEET.block}>
+          <StopVisual
+            images={images}
+            restorationUri={
+              selected && hasRestoration(selected) ? restorationUri : null
+            }
+            restorationCaption={selected?.clip?.restoration_caption}
+            onOpenRestoration={onOpenRestoration}
+          />
+        </View>
       ) : null}
 
       {/* THE STOPS. The old screen's entire default state, intact, doing the
@@ -141,11 +157,19 @@ const AudioGuideSheet: React.FC<AudioGuideSheetProps> = ({
                     color={playable ? COLORS.gold : COLORS.textTertiary}
                     fill={active ? COLORS.gold : 'transparent'}
                   />
-                  <Text
-                    style={[styles.rowTitle, !playable && styles.rowDisabled]}
-                    numberOfLines={2}>
-                    {stop.title}
-                  </Text>
+                  <View style={styles.rowText}>
+                    <Text
+                      style={[styles.rowTitle, !playable && styles.rowDisabled]}
+                      numberOfLines={2}>
+                      {stop.title}
+                    </Text>
+                    {/* BEFORE THE TAP, WHICH IS THE WHOLE POINT. This list is
+                        how a visitor chooses a stop, so it is the one surface
+                        where "which parts of this building are known" can be
+                        answered without listening to anything. Renders nothing
+                        on the five CONFIRMED stops. */}
+                    <EvidenceNote tier={stop.clip?.tier} variant="mark" />
+                  </View>
                   <Text style={styles.rowMeta}>
                     {playable
                       ? formatClipDuration(stop.clip?.duration_ms)
@@ -235,8 +259,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   rowActive: {backgroundColor: COLORS.amberSubtle},
+  rowText: {flex: 1, gap: 2},
   rowTitle: {
-    flex: 1,
     color: COLORS.textPrimary,
     fontFamily: FONTS.ui,
     fontSize: FONT_SIZES.small,
@@ -246,22 +270,6 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
     fontFamily: FONTS.ui,
     fontSize: FONT_SIZES.caption,
-  },
-  restorationBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.borderFocus,
-    marginBottom: SPACING.lg,
-  },
-  restorationText: {
-    color: COLORS.gold,
-    fontFamily: FONTS.uiSemiBold,
-    fontSize: FONT_SIZES.small,
   },
   personaRow: {flexDirection: 'row', gap: SPACING.sm},
   personaChip: {

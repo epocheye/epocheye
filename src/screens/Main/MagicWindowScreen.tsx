@@ -88,6 +88,12 @@ import {
 import {tourFor, type TourStop} from '../../features/magicwindow/tour';
 import MagicWindowSheet from '../../features/magicwindow/MagicWindowSheet';
 import FigureVoice from '../../features/magicwindow/FigureVoice';
+import {
+  useSubjectMedia,
+  type SubjectVideo,
+} from '../../shared/hooks/useSubjectMedia';
+import VideoStrip from './journey/VideoStrip';
+import FullscreenVideo from './journey/FullscreenVideo';
 import {ASSAULT} from '../../features/magicwindow/assault';
 import {FORT_STATES} from '../../features/magicwindow/timeline';
 import {resolveModelGlb} from '../../services/glbSource';
@@ -552,6 +558,38 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
     });
   }, [person, lineIndex, personVisible]);
 
+  /**
+   * THE VIDEO AUTHORED AGAINST THIS FIGURE.
+   *
+   * Keyed on the person's id, which is what migration 095 bound the guard's two
+   * clips to. Gated on `personVisible` for the same reason the card and the tab
+   * are: at a viewpoint where nobody is placed there is nobody to attach a
+   * video to, and asking anyway would fetch media for a man who is not in the
+   * room.
+   *
+   * IT CANNOT GO ON THE CARD. `figureCard` above is JSON handed to native and
+   * rasterised by EpocheyeArCardRenderer.renderDiscovery() into a flat
+   * ImageNode - it draws text, not media. So the posters live here, in the React
+   * Native layer beside the speech panel, compact so they sit over the
+   * reconstruction rather than covering it.
+   */
+  const { videos: figureVideos } = useSubjectMedia(
+    scene.slug,
+    'figure',
+    personVisible ? (person?.id ?? null) : null,
+  );
+  /**
+   * The open clip, and the single source of the audio duck. Non-null suspends
+   * BOTH the guide narration and the figure's own voice - two players, one
+   * flag, so they cannot fall out of step with each other.
+   */
+  const [openVideo, setOpenVideo] = useState<SubjectVideo | null>(null);
+  // Walking to another viewpoint changes who is here; a clip opened on the last
+  // figure must not outlive him.
+  useEffect(() => {
+    setOpenVideo(null);
+  }, [person?.id]);
+
   const figureLineRemote = useMemo(() => {
     if (!recordedVoice || lineIndex === null || !voiceOn) return null;
     return buildAudioUrl(`${person!.voiceKeyPrefix}line_${lineIndex + 1}_en.mp3`);
@@ -884,7 +922,7 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
         sourceKey={stopForView.stop_key}
         title={stopForView.title}
         autoPlay
-        suspended={speaking || audioHeld}
+        suspended={speaking || audioHeld || openVideo !== null}
         // `the_lost_colour` runs 105 s and this is a screen a visitor holds up
         // and then lowers. The lock-screen transport is how they pause it
         // without coming back in. Ducking a figure's speech over it raises
@@ -1100,6 +1138,7 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
         uri={figureLine?.uri ?? null}
         lineKey={figureLine?.key ?? null}
         onSpeakingChange={setSpeaking}
+        suspended={openVideo !== null}
       />
 
       {figure && person && personVisible ? (
@@ -1149,6 +1188,26 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
               </Pressable>
             ) : null}
           </View>
+
+          {/* THE FIGURE'S OWN MEDIA, at the foot of the figure's own panel.
+              It belongs here rather than free-floating over the scene: it is
+              about the man being quoted, it inherits the panel's card so it
+              reads as part of him, and it appears only once the visitor has
+              tapped him - which is the moment a clip of the sword he carries
+              is worth offering.
+
+              'compact', so two 116 px posters sit inside the panel instead of
+              covering the reconstruction. The disclosure travels with them to
+              FullscreenVideo; see VideoStrip's header. */}
+          {figureVideos.length > 0 ? (
+            <View style={styles.speechMedia}>
+              <VideoStrip
+                videos={figureVideos}
+                onOpen={setOpenVideo}
+                variant="compact"
+              />
+            </View>
+          ) : null}
         </Pressable>
       ) : null}
 
@@ -1442,6 +1501,19 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
           </View>
         </Pressable>
       ) : null}
+
+      {/* Last child of the root, so it covers the native surface and every
+          overlay. Both audio players are already held by `openVideo !== null`,
+          so closing this resumes the guide narration and the figure's line
+          exactly where each was cut. */}
+      {openVideo ? (
+        <FullscreenVideo
+          uri={openVideo.videoUrl}
+          poster={openVideo.posterUrl ?? undefined}
+          disclosure={openVideo.disclosure || undefined}
+          onClose={() => setOpenVideo(null)}
+        />
+      ) : null}
     </View>
   );
 };
@@ -1635,6 +1707,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10,10,12,0.88)',
     borderWidth: 1,
     borderColor: COLORS.borderFocus,
+  },
+  speechMedia: {
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(203,168,98,0.28)',
   },
   speechText: {
     color: COLORS.textPrimary,

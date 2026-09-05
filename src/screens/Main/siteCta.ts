@@ -42,7 +42,7 @@
  * Pure and synchronous on purpose: every input is already computed in the
  * screen, and a resolver with no effects can be tested without a renderer.
  */
-import type {JourneyGateState} from './journey/useJourneyGate';
+import type {SiteGateState} from '../../shared/hooks/useSiteGate';
 
 /** Which entry the ladder settled on. Also the analytics `resolved_to` value. */
 export type SiteCtaKey =
@@ -56,9 +56,9 @@ export type SiteCtaKey =
 export interface SiteCtaInput {
   /** canBeginJourney() — a journey is authored here AND this user may have it. */
   journeyAvailable: boolean;
-  /** useJourneyGate().state, for the disabled label. */
-  journeyGateState: JourneyGateState;
-  /** useJourneyGate().allowed — inside the venue, or an admin bypass. */
+  /** useSiteGate().state, for the disabled label. */
+  journeyGateState: SiteGateState;
+  /** useSiteGate().allowed — inside the venue, or an admin bypass. */
   journeyAllowed: boolean;
   /** shouldShowAudioCta() — stops exist AND (at this venue OR admin). */
   audioAvailable: boolean;
@@ -124,7 +124,7 @@ export interface SiteCta {
  * available or not resolved at all — there is no such thing as an audio guide
  * you can see but not press.
  */
-function journeyCta(state: JourneyGateState, allowed: boolean): SiteCta {
+function journeyCta(state: SiteGateState, allowed: boolean): SiteCta {
   if (allowed) {
     return {
       key: 'journey',

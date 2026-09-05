@@ -75,6 +75,9 @@ import AudioGuideSheet from '../../features/audioguide/AudioGuideSheet';
 import AudioPlayer from '../../components/AudioPlayer';
 import { buildAudioUrl } from '../../config/glbDelivery';
 import { walkToForStop } from '../../features/magicwindow/tour';
+import StopVisual from '../../features/audioguide/StopVisual';
+import EvidenceNote from '../../features/audioguide/EvidenceNote';
+import { useSubjectMedia } from '../../shared/hooks/useSubjectMedia';
 import {
   formatClipDuration,
   formatZoneLabel,
@@ -205,6 +208,16 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
         : null,
     [selected],
   );
+
+  /**
+   * THE PICTURES FOR THIS STOP.
+   *
+   * The same call the journey's guide step makes, against the same rows, so the
+   * two doors show the same thing. This screen is the one built for a visitor
+   * who cannot walk the journey, and it had no image of any kind on it — not
+   * even the restored view, which sat behind a button that opened a camera.
+   */
+  const { images } = useSubjectMedia(venueSlug, 'stop', selected?.stop_key);
 
   /** Where to stand. Palace-only, and absent is left absent — see the header. */
   const walkTo = useMemo(
@@ -394,6 +407,9 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={styles.zone}>{formatZoneLabel(selected.zone)}</Text>
             ) : null}
             <Text style={styles.title}>{selected?.title ?? ''}</Text>
+            {/* Same note, same place, same silence on CONFIRMED. This door must
+                not be the poorer one. */}
+            <EvidenceNote tier={selected?.clip?.tier} />
             {walkTo ? <Text style={styles.walkTo}>{walkTo}</Text> : null}
 
             {/* WHAT LANGUAGE THIS ACTUALLY IS. A truth claim about the thing
@@ -408,6 +424,21 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             ) : null}
           </View>
+
+          {/* THE PICTURE, in the empty band this screen has always had between
+              the stop's name and the play button.
+
+              ONE image, `contain`, no title and no caption: the screen does not
+              scroll, and a stack of captioned figures would push the transport
+              off the bottom of it. The disclosure and the credit come with it
+              because those are owed; the rest of the stack, and every other
+              image, is in the sheet behind the list button. */}
+          <StopVisual
+            images={images}
+            restorationUri={restorationUri}
+            restorationCaption={selected?.clip?.restoration_caption}
+            layout="hero"
+          />
 
           {/* THE TRANSPORT. Three targets, the middle one large enough to hit
               without looking at the phone. */}
@@ -510,6 +541,7 @@ const AudioGuideScreen: React.FC<Props> = ({ navigation, route }) => {
           setSheetOpen(false);
         }}
         restorationUri={restorationUri}
+        images={images}
         onOpenRestoration={() => {
           if (!selected || !restorationUri) return;
           navigation.navigate(ROUTES.MAIN.RESTORATION, {

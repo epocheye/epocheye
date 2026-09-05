@@ -58,7 +58,7 @@ import { useVenueGate } from '../../shared/hooks/useVenueGate';
 import { useIsAdmin } from '../../shared/hooks/useIsAdmin';
 import { analytics } from '../../services/analytics';
 import { canBeginJourney } from './journey/journeyConfig';
-import { useJourneyGate } from './journey/useJourneyGate';
+import { useSiteGate } from '../../shared/hooks/useSiteGate';
 import { resolveSiteCta } from './siteCta';
 import type { SiteCtaKey } from './siteCta';
 import {
@@ -314,7 +314,7 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   // off-site — the same rule DetectArScreen states for production scanning. The
   // hook answers 'bypass' (never 'inside') for the admin allowlist so an admin can
   // still reach it, and the journey screen itself shows a standing banner saying so.
-  const journeyGate = useJourneyGate(showJourney ? journeySlug : null);
+  const journeyGate = useSiteGate(showJourney ? journeySlug : null);
   const handleBeginJourney = useCallback(() => {
     if (!journeyGate.allowed) return;
     analytics.track('journey_cta_tapped', {
@@ -339,38 +339,49 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   //
   // TWO SITES NOW. Tipu Sultan's Summer Palace joins Bangalore Fort, and the
   // scene is chosen by slug rather than by having a second screen — see
-  // features/magicwindow/scenes.ts. The palace stays admin-gated for its first
-  // release for its own reason, not the fort's: its facade length is still
-  // DISPUTED between three derivations (satellite 33.5 m, OSM 35.1 m,
-  // photographs 29-33 m, deliberately not averaged) and the painted decoration
-  // is a reconstruction of the idiom rather than a record of any room. Open it
-  // up when a tape measurement lands.
+  // features/magicwindow/scenes.ts.
   //
-  // AND IT DOES NOT GET THE SECONDARY TREATMENT THE AUDIO GUIDE GOT. The magic
-  // rung is shadowed at the palace for the same mechanical reason (rung 1
-  // returns first — siteCta.ts:21 already says so), but the two cases are not
-  // alike, and the difference is what the shadowing costs:
+  // THIS RUNG IS NOW GATED BY PLACE, NOT BY ROLE. It used to end in
+  // `isAdminUser(profile?.email)`, and the comment here argued the palace
+  // should stay admin-gated because its facade length is DISPUTED across three
+  // derivations (satellite 33.5 m, OSM 35.1 m, photographs 29-33 m,
+  // deliberately not averaged). That argument does not survive being written
+  // down plainly: a disputed measurement is a reason to CAPTION the model
+  // honestly — which it does, every material name in the GLB carries its own
+  // tier — and not a reason to show it only to the three people least able to
+  // hold a tape against the wall. The person standing at the fort is the one
+  // who can tell us the model is wrong.
   //
-  //   - The audio guide is FINISHED and gated only by a ladder ordering. Eight
-  //     clips, measured, seeded, serving. Nothing about it is provisional, so
-  //     the shadow was pure loss and a second door is pure gain.
-  //   - The magic window is gated on its OWN terms, by the isAdminUser check
-  //     three lines below, for a reason that has not been resolved: the facade
-  //     length is still DISPUTED across three derivations. Opening a second
-  //     door to it would route visitors around that gate, not around the
-  //     ladder.
+  // So: `venueGate.allowed`, which is 'inside' OR 'bypass', i.e.
+  // `atVenue || isAdminUser`. Admin is the OFF-SITE TEST BYPASS now, not the
+  // audience.
   //
-  // So it stays dark, and it loses nothing by staying dark: the journey's guide
-  // step hands off to it for the accounts that may have it, and Bangalore Fort
-  // — which has no journey — still reaches it at rung 3. Revisit when the tape
-  // measurement lands, not before, and revisit it as a GATE question rather
-  // than a ladder one.
+  // THIS IS BANGALORE FORT'S ONLY DOOR. The fort has no journey, so rung 3 is
+  // where it is reached; at the palace rung 1 (the journey) returns first and
+  // shadows this one, which is fine — the journey's guide step hands off to
+  // the same screen at every stop. The rung is still not given the secondary
+  // treatment the audio guide got, and now for a plain reason rather than a
+  // gate one: it is not shadowed anywhere it is the only way in.
+  //
+  // `hasMagicWindow` and `isMagicWindowAvailable` STAY. They are content and
+  // platform readiness — is anything built for this venue, is the native view
+  // registered — not permission. Standing at a site with nothing built must
+  // still show nothing.
   const magicWindowSlug = siteDetail?.slug ?? site.id;
   const magicWindowScene = getMagicWindowScene(magicWindowSlug);
+  // A SECOND GATE INSTANCE, not a reuse of `journeyGate` above. That one is
+  // passed `showJourney ? journeySlug : null`, so at a venue with no journey —
+  // Bangalore Fort, the only venue where this rung is reachable — it is asked
+  // about `null` and answers 'outside'. Two instances also latch
+  // independently, which is what we want: they are two different questions
+  // about two slugs that only coincide at the palace.
+  const magicWindowGate = useSiteGate(
+    hasMagicWindow(magicWindowSlug) ? magicWindowSlug : null,
+  );
   const showMagicWindow =
     hasMagicWindow(magicWindowSlug) &&
     isMagicWindowAvailable &&
-    isAdminUser(profile?.email);
+    magicWindowGate.allowed;
   const handleMagicWindow = useCallback(() => {
     analytics.track('magic_window_opened', {slug: magicWindowSlug});
     navigation.navigate(ROUTES.MAIN.MAGIC_WINDOW, {slug: magicWindowSlug});
@@ -448,8 +459,10 @@ const SiteDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         journeyGateState: journeyGate.state,
         journeyAllowed: journeyGate.allowed,
         audioAvailable: showAudioCta,
-        // showMagicWindow keeps its own isAdminUser check. It is NOT inherited
-        // from the journey gate, so opening the journey cannot open this.
+        // showMagicWindow keeps its OWN gate instance (magicWindowGate), asked
+        // about the magic-window slug rather than the journey slug. Still not
+        // inherited from the journey gate — the two answer different questions
+        // and only coincide at the palace.
         magicWindowAvailable: showMagicWindow,
         magicWindowLabel: magicWindowScene.ctaLabel,
         hasReconstruction,

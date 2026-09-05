@@ -60,10 +60,8 @@ import {
   journeyHostFor,
   journeyWelcomeUrl,
 } from './journey/journeyConfig';
-import { useJourneyGate } from './journey/useJourneyGate';
-import { isAdminUser } from '../../shared/auth/isAdminUser';
+import { useSiteGate } from '../../shared/hooks/useSiteGate';
 import { hasMagicWindow } from '../../features/magicwindow/scenes';
-import { useUserStore } from '../../stores/userStore';
 import { listViewingStations } from '../../utils/api/ar';
 import LawnStep from './journey/LawnStep';
 import PromptStep from './journey/PromptStep';
@@ -136,7 +134,7 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
   // GEOFENCE. Entry is refused off-site, which also closes the deep-link route into
   // the journey (a link reaches this screen without ever passing the Site Detail CTA).
   // Admins get state 'bypass' and a standing banner rather than a silent pass.
-  const journeyGate = useJourneyGate(slug);
+  const siteGate = useSiteGate(slug);
 
   const arCapable = capability === 'ready';
   const nonAr = isNonArCapability(capability);
@@ -264,19 +262,33 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
    * through canBeginJourney, the same gate SiteDetail puts on the magic
    * window." That was true, load-bearing, and written down nowhere else — so
    * flipping JOURNEY_OPEN_TO_ALL to open the JOURNEY would silently have opened
-   * the MAGIC WINDOW too, to every visitor, on the first stop that has a
-   * viewpoint. At the palace that is all eight.
+   * the MAGIC WINDOW too. Keeping the two decisions separate was right and
+   * stays right; what was wrong was the decision the separate gate then made.
    *
-   * Those are two different decisions. The magic window is admin-only for its
-   * own reason — the palace's facade length is DISPUTED between three
-   * derivations (satellite 33.5 m, OSM 35.1 m, photographs 29-33 m,
-   * deliberately not averaged) and its painted decoration reconstructs an idiom
-   * rather than recording a room — and that decision is not the journey's to
-   * make. So it is applied here, explicitly, against the same isAdminUser the
-   * SiteDetail gate uses.
+   * IT WAS `isAdminUser(email)`, AND THAT WAS BACKWARDS. This single boolean
+   * hid all five palace figures, every figure card, Purnaiah's five recorded
+   * lines and the reconstruction button on all eight stops — from the only
+   * people who could possibly be standing in the building. Three accounts saw
+   * the reconstruction from an office; a visitor in the courtyard saw none of
+   * it. The DISPUTED facade length (satellite 33.5 m, OSM 35.1 m, photographs
+   * 29-33 m, deliberately not averaged) is a reason to caption the model
+   * honestly, which it does — every material name carries its tier — not a
+   * reason to show it only to people who cannot check it against the wall.
+   *
+   * SO IT IS PLACE, NOT ROLE: `siteGate.allowed` is 'inside' OR 'bypass', i.e.
+   * `atVenue || isAdminUser`. Admin remains the OFF-SITE TEST BYPASS.
+   *
+   * `hasMagicWindow(slug)` STAYS, and is a different kind of check. It asks
+   * whether anything has been BUILT for this venue. Standing at a site with no
+   * reconstruction must still show nothing, however present the visitor is.
+   *
+   * In practice the gate term is always true here: the screen already returns
+   * the refusal card at `!siteGate.allowed` below, so by this line the visitor
+   * is inside or bypassing. It is written out anyway rather than dropped,
+   * because the next person to move this line must not have to rediscover that
+   * the guarantee comes from somewhere else.
    */
-  const email = useUserStore(s => s.profile?.email);
-  const magicWindowAllowed = isAdminUser(email) && hasMagicWindow(slug);
+  const magicWindowAllowed = hasMagicWindow(slug) && siteGate.allowed;
   /**
    * The guide chat, from anywhere in the journey.
    *
@@ -326,6 +338,29 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
       navigation.navigate(ROUTES.MAIN.MAGIC_WINDOW, { slug, viewpointId });
     },
     [navigation, slug, magicWindowAllowed],
+  );
+
+  /**
+   * The camera wipe on a stop's restored view.
+   *
+   * `imageUrl` arrives already resolved, exactly as the route type asks
+   * (navigation.types.ts) and exactly as AudioGuideScreen has always passed it —
+   * the step owns the resolution because the step owns the stop.
+   *
+   * NOT gated on magicWindowAllowed. That gate protects the whole reconstructed
+   * building; this is one image with its own authored provenance caption, and it
+   * has been reachable from the standalone audio screen from the day it shipped.
+   */
+  const openRestoration = useCallback(
+    (args: { imageUrl: string; caption?: string; title: string }) => {
+      navigation.navigate(ROUTES.MAIN.RESTORATION, {
+        imageUrl: args.imageUrl,
+        caption: args.caption,
+        title: args.title,
+        siteName: host?.siteName ?? slug,
+      });
+    },
+    [navigation, host, slug],
   );
 
   /**
@@ -403,14 +438,14 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
   // before anything that spends the visitor's time or data: no pre-cache, no audio
   // fetch, no camera. 'checking' renders the same quiet frame as hydration, so the
   // screen never flashes a refusal at someone standing at the gates waiting for a fix.
-  if (journeyGate.state === 'checking') {
+  if (siteGate.state === 'checking') {
     return <View style={journeyStyles.root} />;
   }
-  if (!journeyGate.allowed) {
-    const unavailable = journeyGate.state === 'unavailable';
+  if (!siteGate.allowed) {
+    const unavailable = siteGate.state === 'unavailable';
     const km =
-      journeyGate.distanceM != null
-        ? Math.max(1, Math.round(journeyGate.distanceM / 1000))
+      siteGate.distanceM != null
+        ? Math.max(1, Math.round(siteGate.distanceM / 1000))
         : null;
     return (
       <SafeAreaView style={journeyStyles.root} edges={['top', 'bottom']}>
@@ -437,7 +472,7 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={journeyStyles.buttonRow}>
             <PrimaryButton
               label={t('journey.gate.retry')}
-              onPress={journeyGate.refresh}
+              onPress={siteGate.refresh}
             />
             <GhostButton label={t('common.close')} onPress={leave} />
           </View>
@@ -513,7 +548,12 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
     return (
       <SafeAreaView style={journeyStyles.root} edges={['top', 'bottom']}>
         <View style={styles.centered}>
-          <Text style={journeyStyles.eyebrow}>{t('journey.explore.eyebrow')}</Text>
+          {/* NOT `journey.explore.eyebrow`, which reads "POINT AND LEARN".
+              That named the step this screen used to follow, and point-and-learn
+              left the journey sequence — so the finish screen was announcing a
+              step the visitor had never been shown. The key itself stays:
+              PointLearnStep still uses it, and there it is still true. */}
+          <Text style={journeyStyles.eyebrow}>{t('journey.explore.done.eyebrow')}</Text>
           <Text style={[journeyStyles.title, styles.centerText]}>{t('journey.explore.done.title')}</Text>
           <Text style={[journeyStyles.body, styles.centerText]}>{t('journey.explore.done.body')}</Text>
           <PrimaryButton label={t('journey.explore.done.close')} onPress={leave} />
@@ -573,6 +613,12 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
           onOpenReconstruction={
             magicWindowAllowed ? openReconstruction : undefined
           }
+          // NOT GATED, unlike the reconstruction above. This is one image with
+          // its own provenance caption, and the standalone audio screen has
+          // offered the same wipe to anyone who could open it since it shipped;
+          // gating it only inside the journey would make the guided door the
+          // poorer one.
+          onOpenRestoration={openRestoration}
           onContinue={finishJourney}
         />
       );
@@ -586,7 +632,7 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
           account is on the admin allowlist. Saying so, permanently and on top of
           everything, is the difference between a deliberate off-site test and an
           admin quietly exercising a gate that has been broken for weeks. */}
-      {journeyGate.state === 'bypass' ? (
+      {siteGate.state === 'bypass' ? (
         <View pointerEvents="none" style={styles.devBanner}>
           <Text style={styles.devBannerText}>{t('journey.gate.devBanner')}</Text>
         </View>

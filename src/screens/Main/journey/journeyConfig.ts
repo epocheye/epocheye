@@ -24,17 +24,18 @@ import { isAdminUser } from '../../../shared/auth/isAdminUser';
  * (screens/Main/siteCta.ts), so leaving this false would have meant one button
  * that three accounts could press and everyone else resolved past.
  *
- * IT IS STILL GEOFENCED. useJourneyGate answers 'outside' beyond the venue
+ * IT IS STILL GEOFENCED. useSiteGate answers 'outside' beyond the venue
  * radius and the CTA renders dimmed with "Available at the palace"; admins get
  * 'bypass'. Opening the flag opens WHO may enter, not FROM WHERE.
  *
- * WHAT THIS FLIP DELIBERATELY DOES NOT OPEN: the magic window. The journey's
- * guide step can hand off to it, and that hand-off used to rely on this flag
- * being false for its access control — a load-bearing assumption written down
- * in a comment and nowhere else. PalaceJourneyScreen now applies isAdminUser
- * directly, so both magic-window scenes stay admin-only on their own terms
- * (the palace pending a tape measurement of its disputed facade), independent
- * of this flag.
+ * THE MAGIC WINDOW IS NO LONGER GATED SEPARATELY, and the note that used to
+ * stand here saying it was admin-only "pending a tape measurement of its
+ * disputed facade" is stale. PalaceJourneyScreen now reads
+ * `useSiteGate(slug).allowed` — at the venue, or on the admin allowlist — which
+ * is the same rule as everything else. A DISPUTED facade is a reason to caption
+ * the model honestly, not a reason to show it only to people who cannot check
+ * it against the wall. What this flag still controls is WHO may enter the
+ * journey, not from where.
  */
 export const JOURNEY_OPEN_TO_ALL = true;
 
@@ -58,9 +59,19 @@ export interface JourneyHost {
   /** GLB model id under GLB_BASE_URL (no extension). */
   figureModelId: string;
   /**
-   * scaleToUnits size in metres. The rigged figure carries a 100x unit mismatch
-   * in its skeleton, so it MUST stay normalised (no modelTrueScale) — 1.7 m is a
-   * standing adult.
+   * scaleToUnits size in metres. 1.7 m is a standing adult.
+   *
+   * THE "100x UNIT MISMATCH" WARNING THAT STOOD HERE IS WRONG for
+   * `tipu_figure_royal9`, and it was about to stop him being placed in the
+   * magic window, which has no scale control of any kind. Measured against the
+   * file rather than assumed: jointWorld x inverseBind is the identity to
+   * 0.0117 with a residual scale of exactly 1.0000, and the bind-pose bounding
+   * box is 1.700 m. He renders at 1.70 m unnormalised — the same as Purnaiah
+   * at 1.68 and the guard at 1.66.
+   *
+   * Normalising here is still right, because scaleToUnits is what guarantees a
+   * figure is a person-sized thing whatever a future model does. It is a
+   * belt-and-braces, not a repair.
    */
   figureScaleM: number;
   /** Clip to play while he speaks the welcome. Selected by NAME, never index. */

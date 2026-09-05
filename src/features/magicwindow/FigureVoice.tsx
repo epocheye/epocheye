@@ -34,12 +34,28 @@ export interface FigureVoiceProps {
    */
   lineKey: string | null;
   onSpeakingChange?: (speaking: boolean) => void;
+  /**
+   * Hold the line without ending it — raised while a figure's video is open
+   * over the scene.
+   *
+   * Composed with the internal `paused` rather than replacing it, so lifting it
+   * hands the line back exactly where it was cut. Unmounting or nulling `uri`
+   * would restart the line from the top on close, and a figure repeating his
+   * first four words every time you watch a clip is worse than the silence.
+   *
+   * Deliberately NOT reported through `onSpeakingChange`: that callback ducks
+   * the guide narration under this voice, and while a video is up the caller is
+   * already holding the narration for its own reason. Reporting "not speaking"
+   * here would un-duck the narration straight into the video's audio.
+   */
+  suspended?: boolean;
 }
 
 const FigureVoice: React.FC<FigureVoiceProps> = ({
   uri,
   lineKey,
   onSpeakingChange,
+  suspended = false,
 }) => {
   const videoRef = useRef<VideoRef>(null);
   const [paused, setPaused] = useState(true);
@@ -78,7 +94,7 @@ const FigureVoice: React.FC<FigureVoiceProps> = ({
     <Video
       ref={videoRef}
       source={{uri}}
-      paused={paused}
+      paused={paused || suspended}
       onEnd={finish}
       onError={finish}
       playInBackground={false}

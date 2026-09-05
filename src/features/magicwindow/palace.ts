@@ -49,8 +49,27 @@ import type {MagicWindowViewpoint} from './viewpoints';
  * the building entirely — bisected with three diagnostic GLBs while Blender, at
  * the camera transform read off the device's own telemetry, rendered the
  * interior correctly. The sky now comes from Filament, per scene.
+ *
+ * v11 = THE OUTER COLONNADE IS PAINTED. Three exterior materials —
+ * SHAFT_EXT, BASE_EXT and CAP_EXT — had been declared in the build since the
+ * first pass and applied to nothing; `grep SHAFT_EXT build_palace_magicwindow.py`
+ * found them in the MATERIALS table and nowhere else. So the front of the
+ * building rendered in PILLAR_SHAFT_TIMBER and PILLAR_STONE_CARVED — bare teak
+ * on pale stone, the PRESENT state — standing underneath a diaper wall and
+ * salmon arches painted as at February 1792. The model was half-restored, and
+ * that mixed date is most of why the exterior read as an unpainted model rather
+ * than as a building.
+ *
+ * v11 wires them to the outer ring only (the hall edge is interior and keeps the
+ * present-state timber), adds the gold half of Hunter's "shafts fluted
+ * ALTERNATELY green and gold" as a fourth material, and doubles lime_plaster and
+ * stone_coarse to 1024. Net +4,116 bytes against v10, 13.127 MB of a 15 MB
+ * budget, and the material audit still reports UNTIERED: 0.
+ *
+ * v10 IS STILL ON THE CDN and untouched — it is an unversioned immutable key, so
+ * it can never be overwritten, only superseded. Rolling back is this constant.
  */
-export const PALACE_MODEL_ID = 'tipu_summer_palace_magicwindow_v10';
+export const PALACE_MODEL_ID = 'tipu_summer_palace_magicwindow_v11';
 
 /** The site this scene belongs to. */
 export const PALACE_SLUG = 'tipu-summer-palace-bengaluru';
@@ -274,6 +293,60 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
       'Orientation only. The visitor is already standing here in ' +
       'reality; the reconstruction teaches nothing they cannot see. ' +
       'Low priority, skippable.',
+  },
+  {
+    /**
+     * P0b — THE FAR CORNER OF THE LAWN, and the reason Hyder Ali is back.
+     *
+     * He was stood down (people.ts, `visibleFrom: []`) because two different men
+     * were standing on the same ground in two different surfaces: Tipu on the
+     * lawn in AR through JOURNEY_HOSTS, Hyder Ali on the lawn at P0 here. That
+     * was the real fault, and the fix cost three sourced lines including the
+     * 1846-engraving finding.
+     *
+     * HE COULD NOT GO INSIDE. His own second line says standing him in a room he
+     * never entered "would be the one thing the record actually rules out about
+     * him" — he commenced the palace in 1781 and died in 1782. So the choice was
+     * a second EXTERIOR position or nowhere.
+     *
+     * WHY A SECOND VIEWPOINT AND NOT BOTH MEN AT P0. Geometrically both fit —
+     * from P0 they sit 15.85 deg apart against combined half-widths of 5.27 deg,
+     * so they do not even overlap, and each is one primitive. What blocks it is
+     * the renderer: EpocheyeMagicWindowView holds a single `figureNode` and
+     * `setFigure` REPLACES it, the card, the tap target and figHeadingDeg are all
+     * singular, and on this side `find` returns the first match. Two figures at
+     * one viewpoint is a native feature and a rebuild; one figure per viewpoint
+     * is a data change. This is the data change.
+     *
+     * THE SEPARATION IS CLEAN IN BOTH DIRECTIONS, computed against the DELIVERED
+     * 10.47 deg horizontal half-angle, not the authored 62 deg fov:
+     *
+     *   from P0b, heading 14 : Hyder Ali  +0.04 deg off axis, 6.18 m   IN
+     *                          Tipu      +39.66 deg off axis, 10.80 m  OUT
+     *   from P0,  heading 0  : Hyder Ali -47.29 deg off axis, 8.85 m   OUT
+     *                          Tipu       +6.24 deg off axis, 6.44 m   IN
+     *
+     * NO stopKey, DELIBERATELY. There are eight audio stops and eight viewpoints
+     * that carry them; this is a ninth place to stand, not a ninth thing to hear.
+     * It therefore sits on the viewpoint rail and stays out of the guided tour,
+     * and `roomPhotoFor` has no photograph for it, so the rail gives it a
+     * name-only chip — which roomPhotos.ts already argues is the honest fallback
+     * rather than a picture of some other part of the lawn.
+     */
+    id: 'P0b',
+    title: 'The far corner of the lawn',
+    position: [-8.000, -14.000, 0.900],
+    headingDeg: 14.00,
+    pitchDeg: 0.00,
+    fovDeg: 62.0,
+    nearM: 0.35,
+    farM: 150.0,
+    facing: 'west-north-west',
+    caption:
+      'The other end of the same lawn. Hyder Ali began this building ' +
+      'in 1781 and died the year after, so father and son stand ' +
+      'outside it at opposite ends — neither of them in a room ' +
+      'neither of them saw finished.',
   },
 ];
 

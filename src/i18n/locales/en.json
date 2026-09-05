@@ -498,7 +498,9 @@
     "exposureUp": "Brighter",
     "exposureDown": "Darker",
     "holdStill": "Hold still — a brighter shot takes longer to capture",
-    "torchWarning": "Many protected monuments prohibit torches. Check the site's signage before using this."
+    "torchWarning": "Many protected monuments prohibit torches. Check the site's signage before using this.",
+    "imageTitle": "The room, as it was painted",
+    "wipeCta": "Hold it up in the room"
   },
   "arCapability": {
     "eyebrow": "AR ON THIS DEVICE",
@@ -669,7 +671,8 @@
       "done": {
         "title": "That's the palace",
         "body": "Come back any time — your place is saved.",
-        "close": "Done"
+        "close": "Done",
+        "eyebrow": "JOURNEY COMPLETE"
       }
     },
     "gate": {
@@ -706,5 +709,15 @@
     "reconstructionHint": "Place the reconstruction against the real building",
     "secondaryAudio": "Just listen",
     "secondaryAudioHint": "Play the audio guide on its own, without the walk"
+  },
+  "evidence": {
+    "inferred": {
+      "short": "Worked out",
+      "full": "Worked out from photographs and the pillar spacing, not recorded in any source we could reach."
+    },
+    "disputed": {
+      "short": "Sources differ",
+      "full": "The sources disagree here, and we are not going to pick one for you."
+    }
   }
 }

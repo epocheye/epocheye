@@ -1602,8 +1602,11 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
         // surface rather than on a guess beyond its edge.
         val camPoseForHit = frame.camera.pose
         // Camera forward projected onto the ground plane. The model's forward is its
-        // local -Z, so a yaw of atan2(-fx, -fz) makes it face the same way the viewer
-        // is looking; adding WALK_HEADING_OFFSET_DEG turns it across the view.
+        // local +Z (measured, not assumed - see faceOffsetDeg), so a yaw of
+        // atan2(-fx, -fz) aims it BACK AT THE CAMERA; adding
+        // WALK_HEADING_OFFSET_DEG turns it across the view. The older reading of
+        // this line said -Z and "the same way the viewer is looking", which is
+        // where the compensating 180 in faceOffsetDeg came from.
         run {
             val z = camPoseForHit.zAxis          // camera +Z points BACKWARD
             val fx = -z[0]
@@ -4700,8 +4703,30 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
     private val walkArcSign = 1f
 
     @Volatile private var faceViewer: Boolean = true
+    /**
+     * Yaw added to [placementCamYawDeg] at PLACEMENT only.
+     *
+     * FACE_VIEWER IS 0, NOT 180, AND THE 180 WAS A SIGN ERROR. placementCamYawDeg
+     * is atan2(-fx, -fz) — derived on the belief that the rigs face local -Z, for
+     * which it aims the model the same way the viewer is looking, so a further
+     * 180 was needed to turn it round. The rigs face +Z (measured from
+     * RightFoot -> RightToeBase and RightUpLeg -> LeftUpLeg in all six figure
+     * GLBs), and under +Z that same yaw ALREADY points the model back at the
+     * camera. Adding 180 turned him away again.
+     *
+     * IT WAS NEVER PERMANENTLY VISIBLE, which is why it survived: faceViewerTick
+     * runs every frame and re-aims him with atan2(cam - node), a formula that is
+     * correct for +Z, so he swung round to the visitor at 140 deg/s regardless.
+     * The 180 bought a ~1.3 s spin on arrival, nothing more. The comment two
+     * stops up the history — "the reason he read as facing away or looking to the
+     * side" — records someone chasing exactly this symptom and changing 90 to 180,
+     * which moved it without curing it.
+     *
+     * WALK is unchanged at 90: across the view is across the view either way, and
+     * the sign error only decides which way he crosses.
+     */
     private val faceOffsetDeg: Float
-        get() = if (faceViewer) 180f else WALK_HEADING_OFFSET_DEG
+        get() = if (faceViewer) 0f else WALK_HEADING_OFFSET_DEG
 
     fun setFaceViewer(enabled: Boolean) {
         if (enabled == faceViewer) return
@@ -5718,10 +5743,12 @@ class EpocheyeDetectARView(context: Context) : FrameLayout(context) {
                         // frame, wrong the moment he stands and talks, and the reason he
                         // read as "facing away or looking to the side".
                         //
-                        // 180 is derived, not tuned: the model's forward is local -Z, so
-                        // a yaw of t points it at (-sin t, 0, -cos t). Setting that equal
-                        // to the vector BACK toward the camera gives t = atan2(fx, fz),
-                        // which is exactly placementCamYawDeg + 180 (mod 360).
+                        // THAT 180 WAS DERIVED FROM A WRONG PREMISE AND IS NOW 0. The
+                        // derivation assumed the model's forward is local -Z, giving
+                        // t = atan2(fx, fz) = placementCamYawDeg + 180. The rigs face
+                        // +Z, so the forward at yaw t is (+sin t, 0, +cos t) and facing
+                        // back at the camera is t = atan2(-fx, -fz) = placementCamYawDeg
+                        // itself. See faceOffsetDeg for the measurement.
                         currentYawDeg =
                             (placementCamYawDeg + faceOffsetDeg + 360f) % 360f
                         Log.i(

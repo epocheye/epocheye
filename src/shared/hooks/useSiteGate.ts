@@ -1,12 +1,30 @@
 /**
- * useJourneyGate — the venue geofence for the guided journey.
+ * useSiteGate — "may this account open this venue's on-site content, from here?"
  *
- * A site journey is a thing you do AT the site. Without this the journey was
- * reachable from anywhere, which the rest of the app already refuses: DetectArScreen's
- * header states the rule outright ("production stays geofenced") and its dev
- * "scan anything" path exists precisely because the production path is gated. The
- * journey shipped without that check; this closes the gap using the machinery that
- * already decides the question everywhere else.
+ * ONE PREDICATE, AND IT IS `allowed`. Every place-gated feature reads it and
+ * nothing re-derives it: the journey, the magic window at both venues, and
+ * point-and-learn. `allowed` is true for exactly two states — 'inside' (the
+ * hysteresis latch below says the visitor is at the site) and 'bypass' (the
+ * admin allowlist). That is literally `atVenue || isAdminUser(email)`, which is
+ * the rule this app now runs on:
+ *
+ *   A VISITOR GETS THE FEATURE WHEN THEY ARE AT THE SITE.
+ *   AN ADMIN GETS IT ANYWHERE.
+ *
+ * It used to be the opposite — admin-only regardless of location — and one
+ * boolean (PalaceJourneyScreen's `magicWindowAllowed`) hid all five palace
+ * figures, every figure card, Purnaiah's five recorded lines and the
+ * reconstruction button on all eight stops from the only people standing in the
+ * building. Admin is now the OFF-SITE TEST BYPASS, not the audience.
+ *
+ * WHY THIS IS NOT `useVenueGate`, WHICH ALREADY EXISTS. shared/hooks/useVenueGate
+ * answers a different question: slug-less ("which venue am I in?"), read straight
+ * off currentZoneStore, with no admin bypass and — the part that matters — NO
+ * HYSTERESIS. siteDetectionService clears the zone on the FIRST out-of-range fix,
+ * so one bad GPS sample instantly drops `inVenue` for the Lens, Home and the
+ * audio CTA. That is a real defect and a separate ticket; folding the two hooks
+ * together would hand those three paths a stickiness they have never had, in a
+ * change that is supposed to be about permissions.
  *
  * Reused, not reinvented:
  *   - `getActiveZone(lat, lon, accuracy)` (services/geofenceService) — Haversine against
@@ -15,29 +33,29 @@
  *   - `useCurrentZoneStore.evaluated` — the flag whose whole purpose is that a gate must
  *     not eject someone before their first fix resolves. We stay in 'checking' until it flips.
  *   - `usePlacesStore.currentLocation` + `ensureLocationTracking()` — the app's single
- *     location source; the journey does not start its own watcher.
+ *     location source; this hook does not start its own watcher.
  *   - `fetchZones()` — populates the cached list `getActiveZone` reads. Called here
  *     because a visitor can reach Site Detail by deep link without ever passing a screen
  *     that loads zones, in which case the list is empty and everyone reads as outside.
  *
- * ADMIN BYPASS is deliberate and visible. `isAdminUser()` skips the gate so the journey
- * can be exercised off-site, and the state is reported back as 'bypass' — never 'inside' —
- * so the screen can show a standing banner. A silent bypass would let an admin test a
- * broken gate for weeks and never know.
+ * ADMIN BYPASS is deliberate and visible. `isAdminUser()` skips the gate so the
+ * site can be exercised from a desk, and the state is reported back as 'bypass' —
+ * never 'inside' — so the screen can show a standing banner. A silent bypass
+ * would let an admin test a broken gate for weeks and never know.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   ACCURACY_SLACK_CAP_M,
   getActiveZone,
-} from '../../../services/geofenceService';
-import { fetchZones, getCachedZones } from '../../../services/zoneService';
-import { useCurrentZoneStore } from '../../../stores/currentZoneStore';
-import { usePlacesStore } from '../../../stores/placesStore';
-import { useUserStore } from '../../../stores/userStore';
-import { isAdminUser } from '../../../shared/auth/isAdminUser';
+} from '../../services/geofenceService';
+import { fetchZones, getCachedZones } from '../../services/zoneService';
+import { useCurrentZoneStore } from '../../stores/currentZoneStore';
+import { usePlacesStore } from '../../stores/placesStore';
+import { useUserStore } from '../../stores/userStore';
+import { isAdminUser } from '../auth/isAdminUser';
 
-export type JourneyGateState =
+export type SiteGateState =
   /** No usable fix yet, or the geofence has not run once. Show nothing final. */
   | 'checking'
   /** Inside the venue's zone. */
@@ -49,8 +67,8 @@ export type JourneyGateState =
   /** Location permission refused or unavailable, so the question cannot be answered. */
   | 'unavailable';
 
-export interface JourneyGate {
-  state: JourneyGateState;
+export interface SiteGate {
+  state: SiteGateState;
   /** True when the journey may be entered (inside or admin bypass). */
   allowed: boolean;
   /** Metres to the venue when both a fix and the zone are known; null otherwise. */
@@ -157,7 +175,7 @@ export function evaluateExitLatch(input: ExitLatchInput): ExitLatchResult {
   return {inside: true, outsideSinceMs: since, sticky: true};
 }
 
-export function useJourneyGate(slug: string | null | undefined): JourneyGate {
+export function useSiteGate(slug: string | null | undefined): SiteGate {
   const email = useUserStore(s => s.profile?.email);
   const currentLocation = usePlacesStore(s => s.currentLocation);
   const ensureLocationTracking = usePlacesStore(s => s.ensureLocationTracking);

@@ -20,10 +20,28 @@ import { JOURNEY_TEXT, journeyStyles } from './JourneyUi';
 interface Props {
   uri: string;
   poster?: string;
+  /**
+   * The row's `object_media.disclosure`, drawn over the foot of the player.
+   *
+   * A GENERATED ASSET NEVER PLAYS WITHOUT ITS DISCLOSURE, and this is the place
+   * that promise is hardest to slip: the strip that offered the poster can be
+   * scrolled past, laid out compactly, or reused by a caller with less room,
+   * but nothing plays without passing through here. `useSubjectMedia` already
+   * refuses to return a generated row with an empty disclosure, so a caller
+   * that forwards this field cannot draw a generated clip bare.
+   *
+   * Optional only because a non-generated clip legitimately has none.
+   */
+  disclosure?: string;
   onClose: () => void;
 }
 
-const FullscreenVideo: React.FC<Props> = ({ uri, poster, onClose }) => {
+const FullscreenVideo: React.FC<Props> = ({
+  uri,
+  poster,
+  disclosure,
+  onClose,
+}) => {
   const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
 
@@ -57,6 +75,17 @@ const FullscreenVideo: React.FC<Props> = ({ uri, poster, onClose }) => {
           <X size={20} color={JOURNEY_TEXT} />
         </Pressable>
       </SafeAreaView>
+
+      {/* pointerEvents none so it never eats a tap meant for the transport
+          controls sitting behind it. */}
+      {disclosure ? (
+        <SafeAreaView
+          edges={['bottom']}
+          style={styles.foot}
+          pointerEvents="none">
+          <Text style={styles.disclosure}>{disclosure}</Text>
+        </SafeAreaView>
+      ) : null}
     </View>
   );
 };
@@ -78,6 +107,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10,10,12,0.6)',
   },
   pressed: { opacity: 0.85 },
+  foot: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  disclosure: {
+    color: 'rgba(245,240,232,0.82)',
+    fontSize: 12,
+    fontStyle: 'italic',
+    lineHeight: 17,
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowRadius: 6,
+  },
   failed: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
 });
 

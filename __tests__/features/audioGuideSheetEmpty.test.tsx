@@ -61,6 +61,7 @@ const render = (groups: any[]) => {
         selected={null}
         onSelectStop={() => {}}
         restorationUri={null}
+        images={[]}
         onOpenRestoration={() => {}}
         persona="casual"
         onSelectPersona={() => {}}

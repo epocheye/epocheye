@@ -48,12 +48,20 @@ import { Skeleton } from '../../../components/ui';
 import { COLORS } from '../../../core/constants/theme';
 import { analytics } from '../../../services/analytics';
 import { buildAudioUrl, getCachedMediaUri } from '../../../services/mediaCache';
+import StopVisual from '../../../features/audioguide/StopVisual';
+import EvidenceNote from '../../../features/audioguide/EvidenceNote';
 import { groupStopsByZone } from '../../../utils/api/audio';
 import type { AudioStop, AudioStopsResponse } from '../../../utils/api/audio';
 import useAudioCompletion, {
   type AudioCompletionReason,
 } from './useAudioCompletion';
 import { viewpointForStop } from '../../../features/magicwindow/tour';
+import {
+  useSubjectMedia,
+  type SubjectVideo,
+} from '../../../shared/hooks/useSubjectMedia';
+import VideoStrip from './VideoStrip';
+import FullscreenVideo from './FullscreenVideo';
 import {
   GhostButton,
   JOURNEY_GOLD,
@@ -92,6 +100,19 @@ interface Props {
    * parent owns the machine and owns the navigator. Omitted = no link shown.
    */
   onOpenReconstruction?: (viewpointId: string) => void;
+  /**
+   * Open the camera wipe on this stop's restored view. A CALLBACK for the same
+   * reason as onOpenReconstruction: the parent owns the navigator.
+   *
+   * Omitting it does NOT hide the restoration — StopVisual renders the picture
+   * either way and only drops the button. That is the whole change here: the
+   * image existed and was reachable solely by holding a phone up in the room.
+   */
+  onOpenRestoration?: (args: {
+    imageUrl: string;
+    caption?: string;
+    title: string;
+  }) => void;
   onContinue: () => void;
 }
 
@@ -127,6 +148,22 @@ interface StopPlayerProps {
   title: string;
   /** Fired once, however this stop's audio ended — including badly. */
   onFinished: (reason: AudioCompletionReason) => void;
+  /**
+   * Hold the narration without touching the visitor's own play/pause choice —
+   * raised while a stop's video is open over the step.
+   *
+   * Straight through to AudioPlayer's existing `suspended`, which was built for
+   * exactly this and is already what AudioGuideScreen and the magic window ride.
+   * It leaves `paused` alone, so closing the video resumes the clip at the same
+   * position with the button still showing what the visitor chose —
+   * `the_lost_colour` runs 88 s and losing that position would be the whole cost
+   * of watching a 12-second clip.
+   *
+   * AudioPlayer reports it through onPausedChange too, so the completion
+   * watchdog below cannot read a deliberate duck as a stalled player and march
+   * the guide on without the visitor.
+   */
+  suspended?: boolean;
 }
 
 /**
@@ -141,7 +178,12 @@ interface StopPlayerProps {
  * alongside the player it belongs to, which is exactly what the key on
  * AudioPlayer already did for the scrub bar.
  */
-const StopPlayer: React.FC<StopPlayerProps> = ({ uri, title, onFinished }) => {
+const StopPlayer: React.FC<StopPlayerProps> = ({
+  uri,
+  title,
+  onFinished,
+  suspended,
+}) => {
   // Mirrors AudioPlayer's own play/pause state, reported by onPausedChange. The
   // watchdog must see it: a visitor who pauses to look at a carving is not a
   // stalled player, and treating one as the other would march the guide onward
@@ -154,6 +196,7 @@ const StopPlayer: React.FC<StopPlayerProps> = ({ uri, title, onFinished }) => {
       uri={uri}
       title={title}
       autoPlay
+      suspended={suspended}
       onPausedChange={setPaused}
       // onLoad / onProgress / onEnd / onError, as one memoised object.
       {...audio.handlers}
@@ -168,6 +211,7 @@ const AudioGuideStep: React.FC<Props> = ({
   initialStopKey,
   onStopChange,
   onOpenReconstruction,
+  onOpenRestoration,
   onContinue,
 }) => {
   const { t } = useTranslation();
@@ -202,6 +246,44 @@ const AudioGuideStep: React.FC<Props> = ({
     stops?.monument_id,
     current?.stop.stop_key,
   );
+
+  /**
+   * THE VIDEO AUTHORED AGAINST THIS STOP, if any.
+   *
+   * Keyed on `stop_key`, which is what migration 095 bound these rows to. The
+   * previous binding was a detector `class_id` minted at runtime by the
+   * recogniser, which meant authored media could only ever be attached to a
+   * string a language model might later produce; a stop key is written by a
+   * person and is stable, so a curator can attach a clip to "the museum room"
+   * and have it stay there.
+   *
+   * `stops.monument_id` rather than a new `slug` prop: it is the venue the API
+   * actually answered about, so the media request cannot drift from the audio.
+   *
+   * SEVEN OF EIGHT STOPS RETURN NOTHING, and that is the designed case, not a
+   * degraded one — VideoStrip renders null and the stop looks exactly as it did
+   * before this existed.
+   */
+  const { videos, images } = useSubjectMedia(
+    stops?.monument_id,
+    'stop',
+    current?.stop.stop_key,
+  );
+  /**
+   * The open video, and the reason the narration goes quiet.
+   *
+   * Held here rather than inside VideoStrip for two reasons: FullscreenVideo is
+   * an absolute-fill overlay and would be clipped inside the ScrollView below,
+   * and the strip has no business reaching the audio player. Non-null is also
+   * exactly the `suspended` signal — one piece of state, no second flag to keep
+   * in step with it.
+   */
+  const [openVideo, setOpenVideo] = useState<SubjectVideo | null>(null);
+  // A stop change must close a video opened on the previous one: the clip that
+  // is playing would no longer be the clip the screen is about.
+  useEffect(() => {
+    setOpenVideo(null);
+  }, [current?.stop.stop_key]);
   const next = ordered[index + 1];
   const isLast = ordered.length > 0 && index >= ordered.length - 1;
 
@@ -244,6 +326,14 @@ const AudioGuideStep: React.FC<Props> = ({
    * the clip they have just finished before it was torn down again.
    */
   const audioUri = resolved && resolved.url === audioUrl ? resolved.uri : null;
+
+  // THE RESTORED VIEW. Same key-or-absolute-URL convention as the audio, so the
+  // same helper resolves it. Only `the_lost_colour` has one; every other stop
+  // gets null here and StopVisual simply does not draw that block.
+  const restorationUri = useMemo(
+    () => buildAudioUrl(current?.stop.restoration_image_url),
+    [current],
+  );
 
   // ---- The hand-over. One pending advance at a time, always cancellable. ----
   const [pending, setPending] = useState<PendingReason | null>(null);
@@ -524,6 +614,11 @@ const AudioGuideStep: React.FC<Props> = ({
             {t('journey.guide.nowIn', { zone: zoneLabel(current.zone) })}
           </Text>
           <Text style={styles.stopTitle}>{current.stop.title}</Text>
+          {/* HOW WELL THIS ONE IS KNOWN, under its own name and above
+              everything else, so it frames the stop rather than footnoting it.
+              Silent on the five CONFIRMED stops — see EvidenceNote for why a
+              badge on all eight would carry no information at all. */}
+          <EvidenceNote tier={current.stop.clip?.tier} />
         </View>
 
         {/* Said once, at the top: the visitor should know the guide walks itself
@@ -540,6 +635,7 @@ const AudioGuideStep: React.FC<Props> = ({
               uri={audioUri}
               title={current.stop.title}
               onFinished={handleFinished}
+              suspended={openVideo !== null}
             />
           ) : (
             <Skeleton height={150} radius={16} />
@@ -554,12 +650,40 @@ const AudioGuideStep: React.FC<Props> = ({
           <Text style={journeyStyles.caption}>{t('journey.guide.fallbackNotice')}</Text>
         ) : null}
 
+        {/* ABOVE THE TRANSCRIPT, and the opposite of where the video goes.
+            A visitor with the audio running should be looking at the thing the
+            voice is describing, not reading along with it — the transcript is
+            the path for someone who cannot hear the clip, and it belongs after
+            the picture rather than in front of it. The video stays below for
+            the same reason in reverse: it is a thing to watch afterwards, and
+            it cannot play while the narration does. */}
+        <StopVisual
+          images={images}
+          restorationUri={restorationUri}
+          restorationCaption={clip?.restoration_caption}
+          onOpenRestoration={
+            restorationUri && onOpenRestoration
+              ? () =>
+                  onOpenRestoration({
+                    imageUrl: restorationUri,
+                    caption: clip?.restoration_caption,
+                    title: current.stop.title,
+                  })
+              : undefined
+          }
+        />
+
         {clip?.transcript ? (
           <View style={styles.transcript}>
             <Text style={journeyStyles.eyebrow}>{t('journey.guide.transcript')}</Text>
             <Text style={journeyStyles.body}>{clip.transcript}</Text>
           </View>
         ) : null}
+
+        {/* UNDER THE TRANSCRIPT, deliberately. The words are what the stop IS;
+            the video is a thing to look at afterwards, and putting it above
+            would pull the eye off the sentence the narration is speaking. */}
+        <VideoStrip videos={videos} onOpen={setOpenVideo} />
 
         {/* THE ROOM THIS STOP IS ABOUT, RECONSTRUCTED. The magic window has a
             viewpoint standing exactly where each stop is heard, and until now
@@ -635,6 +759,18 @@ const AudioGuideStep: React.FC<Props> = ({
           />
         </View>
       </ScrollView>
+
+      {/* Above the ScrollView, not inside it. The narration is already held by
+          `suspended` on StopPlayer, so closing this resumes the stop where the
+          visitor left it rather than restarting an 88-second clip. */}
+      {openVideo ? (
+        <FullscreenVideo
+          uri={openVideo.videoUrl}
+          poster={openVideo.posterUrl ?? undefined}
+          disclosure={openVideo.disclosure || undefined}
+          onClose={() => setOpenVideo(null)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 };

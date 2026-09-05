@@ -1837,7 +1837,17 @@ class EpocheyeMagicWindowView(
                 )
                 // Face the same way he does, so a visitor standing where he
                 // looks reads the card square on.
-                rotation = Rotation(0f, -figHeadingDeg, 0f)
+                //
+                // 180 - heading, for the SAME reason as poseFigure above: an
+                // ImageNode's readable face is +Z, not -Z. Two shipped, working
+                // call sites prove it rather than assert it — the AR view
+                // billboards its cards with yaw = atan2(cam.x - card.x,
+                // cam.z - card.z) (EpocheyeDetectARView.kt:1126-1132 and
+                // :1137-1143), which aims a +Z face at the camera and is the
+                // formula behind every card a visitor has actually read. A -Z
+                // face under that formula would have shown them the back of
+                // every card since the AR cards shipped.
+                rotation = Rotation(0f, 180f - figHeadingDeg, 0f)
             }
             root.addChildNode(node)
             figureCardNode = node
@@ -1867,9 +1877,37 @@ class EpocheyeMagicWindowView(
         try {
             // (east, north, up) -> glTF, same conversion as the camera. Trap 3.
             n.worldPosition = Float3(figEast, figUp, -figNorth)
-            // A heading is clockwise from north; a rotation about glTF +Y is
-            // counter-clockwise, so it negates - same relation the camera uses.
-            n.worldRotation = Float3(0f, -figHeadingDeg, 0f)
+            // TRAP 6: THE RIGS FACE +Z, AND THIS USED TO ASSUME -Z.
+            //
+            // It read `Float3(0f, -figHeadingDeg, 0f)`, whose reasoning was
+            // sound as far as it went - a heading is clockwise from north, a
+            // rotation about glTF +Y is counter-clockwise, so it negates - but
+            // it silently assumed the model's own forward was glTF -Z. Every
+            // figure in this project faces +Z, so every one of them stood with
+            // its back to the visitor, at every viewpoint, since figures
+            // shipped. Nobody caught it because nobody had looked at one.
+            //
+            // MEASURED, NOT GUESSED, from two independent skeletal features in
+            // all six figure GLBs (tipu royal9, hyderali, purnaiah v2, guard,
+            // rocketman, cavalryman):
+            //
+            //   RightFoot -> RightToeBase, horizontal component:  +Z  (0.93-0.99)
+            //   RightUpLeg -> LeftUpLeg  (the character's LEFT):  +X  (1.000)
+            //
+            // Those corroborate: for a character facing F with up +Y, left is
+            // up x F, and (0,1,0) x (0,0,1) = (+1,0,0). A -Z forward would have
+            // put left at -X. It does not.
+            //
+            // So the correction is 180 - heading, not -heading. Check it:
+            // Ry(180-h) applied to +Z gives (sin h, 0, cos(180-h)) =
+            // (sin h, 0, -cos h), and un-mapping glTF back to the plan frame
+            // (east = x, north = -z) gives (sin h, cos h) - bearing h exactly.
+            //
+            // The fix is HERE and not in people.ts. The authored headings are
+            // correct in their own stated terms ("the bearing they FACE"); it
+            // was the renderer that mis-read them, and moving the 180 into the
+            // data would leave six correct bearings looking like typos.
+            n.worldRotation = Float3(0f, 180f - figHeadingDeg, 0f)
         } catch (t: Throwable) {
             Log.w(TAG, "figure pose failed", t)
         }

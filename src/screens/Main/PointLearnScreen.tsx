@@ -13,10 +13,19 @@
  * against a moving codebase. This is the smallest thing that keeps it alive and
  * exercisable.
  *
- * ADMIN-GATED, deliberately. It is a workbench, not a product surface, and it is
- * gated on the same `isAdminUser` allowlist the magic window uses rather than on
- * the journey's flag — so opening the journey to visitors, which has happened,
- * can never open this by side effect.
+ * GATED BY PLACE, NOT BY ROLE, at the owner's direction. It was
+ * `isAdminUser(email)`; it is now `useSiteGate(slug).allowed` — 'inside' or
+ * 'bypass', i.e. `atVenue || isAdminUser`, the same predicate the journey and
+ * both magic windows now use. A visitor standing at the site can point at a
+ * pillar; an admin can do it from a desk.
+ *
+ * THE MEASUREMENT ABOVE HAS NOT CHANGED AND PRESENCE DOES NOT FIX IT. 7/7 wrong
+ * where the margin admits is a property of the retrieval representation, not of
+ * where the phone is standing. This is opened as a deliberate decision with that
+ * known, exactly as the cavalryman was placed with build-record.md's objection
+ * on the record. It is NOT re-added to `JOURNEY_STEPS` — the journey is three
+ * steps and stays three steps. Reaching this needs a deliberate navigation to
+ * the PointLearn route; nothing walks a visitor into it.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
@@ -31,8 +40,7 @@ import {
 } from '../../shared/hooks/useARCapability';
 import { PermissionService } from '../../shared/services/permission.service';
 import { useSafeGoBack } from '../../shared/hooks/useSafeGoBack';
-import { useUserStore } from '../../stores/userStore';
-import { isAdminUser } from '../../shared/auth/isAdminUser';
+import { useSiteGate } from '../../shared/hooks/useSiteGate';
 import PointLearnStep from './journey/PointLearnStep';
 import FullscreenVideo from './journey/FullscreenVideo';
 import { GhostButton, journeyStyles } from './journey/JourneyUi';
@@ -44,8 +52,12 @@ const PointLearnScreen: React.FC<Props> = ({ route }) => {
   const slug = route.params?.slug ?? '';
   const leave = useSafeGoBack();
 
-  const email = useUserStore(s => s.profile?.email);
-  const allowed = isAdminUser(email);
+  // ONE PREDICATE. `allowed` is 'inside' OR 'bypass' — see useSiteGate. The
+  // exit hysteresis lives in there too, so a visitor who loses their fix
+  // mid-scan is not thrown out: release needs the fix to be 150 m beyond the
+  // boundary AND stay there 30 s, and a fix that stops arriving never starts
+  // that clock.
+  const allowed = useSiteGate(slug).allowed;
 
   const { capability } = useARCapability();
   const arCapable = capability === 'ready';
@@ -71,8 +83,11 @@ const PointLearnScreen: React.FC<Props> = ({ route }) => {
     [],
   );
 
-  // Not an error state worth designing: a non-admin cannot navigate here
-  // because nothing offers the route, and this is the belt to that braces.
+  // NOW A STATE A REAL VISITOR CAN REACH, which it was not while this was
+  // admin-only: an off-site account that follows the route lands here rather
+  // than on a blank screen. Kept deliberately plain — "not available" is the
+  // honest sentence, and dressing it up as "come to the palace" would promise
+  // a walk this workbench does not lead.
   if (!allowed || !slug) {
     return (
       <SafeAreaView style={journeyStyles.root} edges={['top', 'bottom']}>

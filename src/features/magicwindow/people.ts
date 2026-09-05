@@ -76,6 +76,32 @@ const FORT_PEOPLE: MagicWindowPerson[] = [
     // where somebody inspecting the defences would stand and look back out.
     position: [0, -14],
     headingDeg: 0,
+    /**
+     * VP2 ONLY, AND IT IS THE LEAST BAD CHOICE RATHER THAN A GOOD ONE.
+     *
+     * This list exists to fix a real defect: both fort figures omitted
+     * `visibleFrom`, and `personVisible` treats an omitted list as "visible
+     * everywhere", so `people.find` returned THIS man at every viewpoint and the
+     * garrison soldier below could never be selected at all. The palace carries
+     * a test against exactly that (magicWindowPeople.test.ts); the fort did not.
+     *
+     * MEASURED AGAINST EVERY SHIPPED FORT VIEWPOINT, he is only ever distant:
+     *
+     *   VP2_over_the_barbican         40.2 m   -4.75 deg off axis   2.42 deg tall
+     *   VP1_DelhiGate_from_the_north  84.8 m   +5.84                1.15 deg
+     *   VP4_along_the_circuit        226.7 m   -5.34                0.43 deg
+     *   VP6_above_the_fort           299.2 m   +0.00                0.33 deg
+     *   every other viewpoint: outside the 10.47 deg horizontal half-angle
+     *
+     * 2.42 degrees is about a twentieth of the frame — a speck, not a person.
+     * VP2 is named because it is the only viewpoint that frames him at all, not
+     * because it works. THE PLACEMENT IS THE REAL PROBLEM: he stands 40 m from
+     * the nearest camera that can see him, which is the same class of fault as
+     * the palace's P4. Fixing that means re-placing him against fort evidence,
+     * which is a separate piece of work at a different venue and is NOT done
+     * here. His four CONFIRMED lines are untouched either way.
+     */
+    visibleFrom: ['VP2_over_the_barbican'],
     lines: [
       {
         text:
@@ -120,6 +146,16 @@ const FORT_PEOPLE: MagicWindowPerson[] = [
     // Just inside the breach, in view of VP5, turned back toward the visitor.
     position: [3.4, 37.7],
     headingDeg: 326,
+    /**
+     * VP5, which this figure's own comment already named and the geometry
+     * confirms: 6.0 m away, 0.35 deg off axis, 15.9 deg tall. He is properly
+     * framed — the only figure at this venue that is.
+     *
+     * He was UNREACHABLE until now. Both fort people omitted `visibleFrom`, and
+     * `find` returns the first match, so Tipu above answered for every viewpoint
+     * including this one and this man was never selected anywhere.
+     */
+    visibleFrom: ['VP5_the_breach'],
     lines: [
       {
         text:
@@ -440,6 +476,96 @@ const PALACE_PEOPLE: MagicWindowPerson[] = [
   },
 
   {
+    id: 'tipu_lawn',
+    // THE SAME GLB THE ARRIVAL STEP ALREADY PLACES, deliberately, and it costs
+    // nothing extra: LawnStep downloads `tipu_figure_royal9` at step 1, so by
+    // the time a visitor reaches the magic window it is a cache hit. It is the
+    // one palace figure with a talking clip (Idle_02,
+    // Talk_with_Right_Hand_Open, Thoughtful_Walk); the other five are idle-only.
+    //
+    // ITS SCALE WAS MEASURED, NOT ASSUMED. journeyConfig.ts warns of a 100x unit
+    // mismatch in this skeleton and normalises him with scaleToUnits; the magic
+    // window has no scale control at all (MagicWindowFigure carries east, north,
+    // up and heading and nothing else), so an unnormalised rig with a live
+    // armature scale would arrive 100x wrong. Checked directly against the file:
+    // jointWorld x inverseBind is the identity to 0.0117 with a residual scale
+    // of exactly 1.0000, and the bind-pose bbox is 1.700 m. He renders at 1.70 m
+    // here, alongside Purnaiah at 1.68 and the guard at 1.66. The warning is
+    // stale for royal9.
+    modelId: 'tipu_figure_royal9',
+    name: 'Tipu Sultan',
+    role: 'who finished this house and named it',
+    // OUTSIDE, at external ground level -0.70 m, on the lawn where the arrival
+    // step already stands him. From P0 (0, -14, eye 0.90): 6.44 m away, 6.2 deg
+    // off axis inside the 10.47 deg delivered half-angle, feet 14.0 deg below
+    // the eye and head 0.9 deg above it — comfortably inside the 21.8 deg
+    // vertical half-angle, so he is whole in frame rather than cropped.
+    //
+    // WHY HE IS HERE AND NOT INSIDE. Not because the record forbids it — he
+    // lived in this house — but because P0 is the one viewpoint whose stop is
+    // the script he is already recorded speaking. His two other written scripts
+    // (`the_pillars`, `the_lost_colour` in tipu_voice.py) land on P2 and P5,
+    // both occupied, and exist on the CDN only in the retired Neural2-B voice.
+    position: [0.7, -7.6],
+    floorM: -0.7,
+    // atan2(0 - 0.7, -14 - (-7.6)) = 186.2 deg — facing the visitor at P0.
+    headingDeg: 186,
+    visibleFrom: ['P0'],
+    voiceKeyPrefix: 'audio/tipu-summer-palace-bengaluru/figures/tipu_lawn/',
+    lines: [
+      {
+        text:
+          'I am not a recording. No likeness of me was ever taken from life, ' +
+          'and no words of mine about this house survive. What you hear was ' +
+          'written for me.',
+        tier: 'NOT-A-CLAIM',
+        // The same sentence opens the arrival welcome, on purpose: a visitor
+        // who meets him twice should be told twice, in his own voice, before
+        // he says anything that sounds like testimony.
+        source:
+          'figure-tipu/evidence.md, "The governing problem"; journey welcome, first sentence',
+      },
+      {
+        text:
+          'My father began it in 1781 and died the year after, without seeing ' +
+          'a room of it finished. It was completed in my reign, in the year ' +
+          'you would count as seventeen ninety-one.',
+        tier: 'CONFIRMED',
+        source:
+          'figure-tipu/script-fact-trace.md §A; migration 079 timeline and founder',
+      },
+      {
+        text:
+          'It is built of teak, not of stone, as a fort is. That was the ' +
+          'point. A fort is for holding. This was for living in, in the hot ' +
+          'months, with the air moving through it.',
+        tier: 'CONFIRMED',
+        source:
+          'figure-tipu/script-fact-trace.md §A; migration 079 architecture.typology',
+      },
+      {
+        text:
+          'They called it Rashk-e-Jannat. The Envy of Heaven. You may judge ' +
+          'for yourself whether that was ever fair.',
+        tier: 'CONFIRMED',
+        // The name is sourced; the closing sentence is manner, not matter, and
+        // makes no claim — the rule script-fact-trace.md works to.
+        source: 'figure-tipu/script-fact-trace.md §A; migration 079 one_line',
+      },
+      {
+        text:
+          'The face is inferred, not recorded. It is worked from a portrait ' +
+          'painted in my lifetime and kept in my own family — but even that ' +
+          'identification is contested, and no photograph of me exists or ' +
+          'ever could.',
+        tier: 'DISPUTED',
+        source:
+          'figure-tipu/evidence.md S1 (BL, attributed G. F. Cherry c. 1792, ' +
+          'descent through Prince Ghulam Muhammad) and its DISPUTED section',
+      },
+    ],
+  },
+  {
     id: 'hyderali_lawn',
     modelId: 'figures/tipu-summer-palace-bengaluru/hyderali_idle_amp',
     name: 'Hyder Ali',
@@ -454,8 +580,26 @@ const PALACE_PEOPLE: MagicWindowPerson[] = [
     // the `palace_overview` narration already tells the visitor. Standing him on
     // the lawn looking at it is the evidenced position.
     //
-    // FIRST DRAFT PUT HIM AT x = -1.60, WHICH IS 13.8 DEG OFF AXIS AND THEREFORE
-    // OFF SCREEN - the identical fault that moved Purnaiah. Moved to -1.10.
+    // MOVED TO THE FAR CORNER, AND WHY THE OLD NUMBERS ARE GONE. The comment
+    // above is kept because the reasoning still holds; only the viewpoint it was
+    // framed against has changed. He was at (-1.1, -7.5) heading 170, framed from
+    // P0 — a first draft at x = -1.60 was 13.8 deg off axis and off screen, the
+    // identical fault that moved Purnaiah, so it went to -1.10.
+    //
+    // P0 now belongs to Tipu, so that framing constraint is void and replaced by
+    // framing from P0b (-8.0, -14.0), the far corner of the same lawn. Against
+    // the DELIVERED 10.47 deg horizontal half-angle:
+    //
+    //   from P0b heading 14 : +0.04 deg off axis, 6.18 m, feet 14.5 deg below
+    //                         the eye, head 0.9 deg above    IN, dead centre
+    //   from P0  heading 0  : -47.29 deg off axis            OUT, as intended
+    //   Tipu from P0b       : +39.66 deg off axis            OUT, as intended
+    //
+    // The two men are 1.8 m apart at their old positions, which is why no single
+    // distant view can hold one without the other; separating them meant moving
+    // him, and nothing in the record ties him to a spot on the lawn — only to
+    // being on it. See palace.ts P0b for why a second viewpoint rather than two
+    // figures at P0.
     //
     // NO LIKENESS BADGE ON SCREEN, at the owner's direction. The face is a
     // documented fabrication (build-record.md:120-122) and build-record.md:140-141
@@ -464,11 +608,44 @@ const PALACE_PEOPLE: MagicWindowPerson[] = [
     // every other figure here, where the tier lives in the record and the visitor
     // hears the sentence - and the third line below states the fabrication
     // outright, which is what satisfies that requirement.
-    position: [-1.1, -7.5],
+    position: [-6.5, -8.0],
     floorM: -0.7,
-    // atan2(0 - (-1.1), -14 - (-7.5)) = 170.4 deg.
-    headingDeg: 170,
-    visibleFrom: ['P0'],
+    // Facing P0b: atan2(-8.0 - (-6.5), -14.0 - (-8.0)) = atan2(-1.5, -6.0)
+    // = 194.0 deg. He looks back down the lawn at the viewpoint, which is also
+    // the direction the building's front runs away from him.
+    headingDeg: 194,
+    /**
+     * BACK ON THE LAWN, AT HIS OWN VIEWPOINT.
+     *
+     * He was stood down here with an EMPTY array — and `[]` is not the same as
+     * omitting the field: `personVisible` reads
+     * `!person.visibleFrom || person.visibleFrom.includes(id)`, so an omitted
+     * list means "visible everywhere" and an empty one means the `find` in
+     * MagicWindowScreen never matches him anywhere. That distinction is a trap
+     * worth keeping named here rather than rediscovering.
+     *
+     * WHY HE WENT AWAY. The palace had two different men standing on the same
+     * ground in two different surfaces — Tipu on the lawn in AR through
+     * JOURNEY_HOSTS, Hyder Ali on the lawn at P0 in the magic window — and a
+     * visitor who walked the journey met both with no way to know it was the same
+     * place. That was the real fault. Removing him fixed it and cost three
+     * sourced lines, including the 1846-engraving finding, which is the strongest
+     * piece of scepticism anywhere in this file.
+     *
+     * WHY HE COULD NOT JUST MOVE INSIDE. Every free viewpoint (P3, P6, P9) is an
+     * interior, and his own second line below says standing him in a room he
+     * never entered "would be the one thing the record actually rules out about
+     * him". Relocating him indoors would have made the figure contradict itself.
+     *
+     * WHAT CHANGED. P0b — the far corner of the same lawn — separates the two men
+     * without putting either of them anywhere the record refuses. P0 is Tipu's
+     * and stays Tipu's; this list names P0b and nothing else, so the two sets are
+     * disjoint and no viewpoint can resolve to both.
+     *
+     * EVERYTHING BELOW IS UNCHANGED — three lines, their tiers and their sources.
+     * Only the position, the heading and this one field moved.
+     */
+    visibleFrom: ['P0b'],
     lines: [
       {
         text:

@@ -338,6 +338,22 @@ const PointLearnStep: React.FC<Props> = ({
         // Keyed on class_id, so it only fires for a result with a catalogued
         // object behind it. Failure is silent: a card with no video is the
         // normal case, not an error worth interrupting a visitor for.
+        //
+        // 'class' IS STILL THE RIGHT KIND HERE, AND IT RETURNS NOTHING TODAY.
+        // Migration 094 replaced the single class_id binding with a
+        // (subject_kind, subject_key) pair, and 095 moved the palace's five
+        // clips onto 'stop' and 'figure' - so this query is empty at the
+        // palace by construction, and prod currently holds FIVE object_media
+        // rows in total, all of them the palace's, none of them 'class'.
+        // Measured on 2026-09-04 so the next reader does not re-investigate it.
+        //
+        // It stays anyway. 'class' is the only binding that can work at an
+        // explore-mode venue, where the key is minted at runtime from whatever
+        // the recogniser called the object and therefore cannot be authored
+        // ahead of time. The two authored kinds are read where they belong -
+        // AudioGuideStep for 'stop', MagicWindowScreen for 'figure', both
+        // through shared/hooks/useSubjectMedia. Cost of keeping this: one
+        // request per successful recognition that returns {media: []}.
         let videos: VideoCardSpec[] = [];
         if (result.class_id) {
           const res = await listObjectMedia(slug, 'class', result.class_id);

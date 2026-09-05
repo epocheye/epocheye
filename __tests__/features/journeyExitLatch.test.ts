@@ -11,7 +11,7 @@ import {
   evaluateExitLatch,
   EXIT_GRACE_MS,
   EXIT_MARGIN_M,
-} from '../../src/screens/Main/journey/useJourneyGate';
+} from '../../src/shared/hooks/useSiteGate';
 
 const T0 = 1_000_000;
 const RADIUS = 1000;
