@@ -36,6 +36,7 @@ import {
   trackingHintKey,
   type TrackingFailureReason,
 } from '../../features/ar/trackingHint';
+import { siteTelemetry } from '../../services/siteTelemetry';
 
 /**
  * How long a tracking fault must persist before the visitor is told.
@@ -95,6 +96,11 @@ export function useArSessionHealth(): UseArSessionHealthResult {
 
   const onTrackingFailure = useCallback(
     (raw: string) => {
+      // TELEMETRY BEFORE DEBOUNCE, deliberately. The banner is slow to alarm so a
+      // visitor is not nagged by a blip; the RECORD wants every blip, because a
+      // building that produces ten suppressed faults is telling us something the
+      // banner is designed to hide.
+      siteTelemetry.sampleTrackingFailure(raw);
       const next = parseTrackingFailure(raw);
       clearTimer();
       if (next === 'NONE') {
@@ -124,6 +130,7 @@ export function useArSessionHealth(): UseArSessionHealthResult {
 
   const onThermalStatus = useCallback(
     (e: ThermalStatusEvent) => {
+      siteTelemetry.sampleThermal(e?.status ?? 0);
       // Kept in its OWN state slot. SiteReconstructionScreen writes thermal and AR
       // faults into one variable, so a thermal-clear silently wipes a live AR fault
       // and vice versa. Two independent facts need two slots.

@@ -64,6 +64,7 @@ import {useARCore} from '../../shared/hooks/useARCore';
 import {prepareImageForGemini} from '../../services/geminiVisionService';
 import {PermissionService} from '../../shared/services/permission.service';
 import {resolveModelGlb} from '../../services/glbSource';
+import {siteTelemetry} from '../../services/siteTelemetry';
 // getOrFetchGlb runs a full GLB URL through the SAME on-device download+cache
 // path production uses (via glbSource → getOrFetchGlb). Used ONLY by the
 // __DEV__ direct-GLB render test below.
@@ -1077,6 +1078,14 @@ const DetectARNative: React.FC<{
   const {resolved, runResolution, reset, remaining, pendingResearchRef} =
     useDetectionResolver(venueSlug, allowUngrounded);
 
+  // A scan session is its own visit to the building: someone opened the camera
+  // here, and how the room behaved for it is the measurement. Ends on unmount,
+  // which is also how a summary survives a visitor who backs straight out.
+  useEffect(() => {
+    siteTelemetry.beginSession(venueSlug, 'scan');
+    return () => siteTelemetry.endSession();
+  }, [venueSlug]);
+
   /**
    * Apply an object's sourced history to the cards already standing in the world.
    *
@@ -1513,7 +1522,14 @@ const DetectARNative: React.FC<{
         walkDistanceM={devWalkDistance || undefined}
         animationClip={devAnimationClip ?? undefined}
         onModelAnimations={devDirectGlb ? handleModelAnimations : undefined}
-        onFrameStats={devDirectGlb ? setFrameStats : undefined}
+        // UNGATED. The dev HUD still only reads this behind devDirectGlb, but the
+        // burst also carries luma, plane count and fps — the lighting and
+        // trackability of the actual room — and gating the SUBSCRIPTION on a
+        // developer flag meant no visit ever recorded any of it.
+        onFrameStats={e => {
+          siteTelemetry.sampleFrameStats(e);
+          if (devDirectGlb) setFrameStats(e);
+        }}
         onFigureGeometry={devDirectGlb ? setFigure : undefined}
         cardData={
           resolved.kind === 'grounded' ? JSON.stringify(resolved.card) : undefined
@@ -1535,7 +1551,12 @@ const DetectARNative: React.FC<{
         onFrameCaptured={handleFrameCaptured}
         onCloudAnchorEvent={devCloudAnchor ? handleCloudAnchorEvent : undefined}
         onVpsResult={showAdminHarness ? setVpsResult : undefined} // ADMIN-HARNESS (REMOVE AFTER KONARK)
-        onGeospatialState={showAdminHarness ? setGeoState : undefined} // ADMIN-HARNESS (REMOVE AFTER KONARK)
+        onGeospatialState={e => {
+          // Accuracies only, never the coordinates. This is the direct evidence
+          // for whether a world-locked anchor could ever resolve at this site.
+          siteTelemetry.sampleGeoAccuracy(e);
+          if (showAdminHarness) setGeoState(e);
+        }}
       />
 
       {/* TAP THE FLOOR TO PLACE HIM.

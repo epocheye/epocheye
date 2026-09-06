@@ -146,6 +146,8 @@
     "grantPermission": "Grant {{name}} permission",
     "grant": "Grant",
     "openDeviceSettingsA11y": "Open device settings",
+    "dataSharingTitle": "Help improve this site",
+    "dataSharingBody": "Share anonymous measurements from your visit — how bright the room was, how well tracking held, how your phone performed — so the reconstructions get more accurate. No photos, no location, nothing that identifies you.",
     "openDeviceSettings": "Open Device Settings",
     "getSupport": "Get Support",
     "supportEmailFallback": "Email us at support@epocheye.app",

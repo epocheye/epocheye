@@ -69,6 +69,7 @@ import {
   type AudioCompletionReason,
 } from './useAudioCompletion';
 import { useVisemeTrack } from './useVisemeTrack';
+import { siteTelemetry } from '../../../services/siteTelemetry';
 
 type VoiceState = 'idle' | 'speaking' | 'done' | 'failed';
 
@@ -571,6 +572,9 @@ const LawnStep: React.FC<Props> = ({
             handleTrackingState(state);
             arHealth.onTrackingState(state);
           }}
+          // The room's own lighting and trackability, recorded while the visitor
+          // is standing in it. Nothing here identifies them.
+          onFrameStats={siteTelemetry.sampleFrameStats}
           onTrackingFailure={arHealth.onTrackingFailure}
           onThermalStatus={arHealth.onThermalStatus}
           onAnchorPlaced={handleAnchorPlaced}

@@ -255,10 +255,13 @@ describe('AudioGuideStep — the hand-over', () => {
     await runTimers(PAST_THE_BEAT_MS);
 
     expect(onStopChange).toHaveBeenLastCalledWith('stop-two');
-    expect(mockTrack).toHaveBeenCalledWith('journey_stop_finished', {
-      stop: 'stop-one',
-      reason: 'stalled',
-    });
+    // objectContaining, not a whole-object match: this test is about the
+    // WATCHDOG reporting 'stalled', and it should not fail the day telemetry
+    // gains a field. The two keys it names are the two it is actually asserting.
+    expect(mockTrack).toHaveBeenCalledWith(
+      'journey_stop_finished',
+      expect.objectContaining({stop: 'stop-one', reason: 'stalled'}),
+    );
     unmount(tree);
   });
 

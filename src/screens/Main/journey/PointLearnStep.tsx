@@ -46,6 +46,7 @@ import { listObjectMedia } from '../../../utils/api/objects';
 import { analytics } from '../../../services/analytics';
 import { ROUTES } from '../../../core/constants';
 import type { MainStackParamList } from '../../../core/types/navigation.types';
+import { siteTelemetry } from '../../../services/siteTelemetry';
 import {
   buildAiCards,
   buildGroundedCards,
@@ -566,6 +567,9 @@ const PointLearnStep: React.FC<Props> = ({
           handleTrackingState(state);
           arHealth.onTrackingState(state);
         }}
+        // The room's own lighting and trackability, recorded while the visitor
+        // is standing in it. Nothing here identifies them.
+        onFrameStats={siteTelemetry.sampleFrameStats}
         onTrackingFailure={arHealth.onTrackingFailure}
         onThermalStatus={arHealth.onThermalStatus}
         onAnchorPlaced={handleAnchorPlaced}

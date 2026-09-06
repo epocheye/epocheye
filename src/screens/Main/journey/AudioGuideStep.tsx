@@ -472,6 +472,40 @@ const AudioGuideStep: React.FC<Props> = ({
     [isLast],
   );
 
+  /**
+   * When the visitor arrived at the CURRENT stop.
+   *
+   * A ref, not state: it is read when a stop ends and must not re-render
+   * anything while it ticks. Dwell is the measurement the office cannot make —
+   * a clip is 88 s long, but whether a visitor stands there for 88 s or walks
+   * off at 20 is a fact about the room, not about the file.
+   */
+  const stopEnteredAtRef = useRef<number>(Date.now());
+  useEffect(() => {
+    stopEnteredAtRef.current = Date.now();
+  }, [current?.stop.stop_key]);
+
+  /**
+   * Reaching a locked stop, recorded once per stop.
+   *
+   * This is the conversion denominator. Without it we would know how many people
+   * bought and nothing about how many were asked, which makes the price
+   * unreadable — and it is the first thing anyone will want to know a week after
+   * the paywall ships.
+   */
+  const lockedSeenRef = useRef<string | null>(null);
+  useEffect(() => {
+    const st = current?.stop;
+    if (!st?.locked || lockedSeenRef.current === st.stop_key) return;
+    lockedSeenRef.current = st.stop_key;
+    analytics.track('journey_stop_locked', {
+      stop: st.stop_key,
+      index: index + 1,
+      free_stops: stops?.free_preview_stops,
+      total: ordered.length,
+    });
+  }, [current, index, ordered.length, stops?.free_preview_stops]);
+
   const handleFinished = useCallback(
     (reason: AudioCompletionReason) => {
       // `reason` is the whole point of carrying the watchdog: it is the only way
@@ -481,10 +515,15 @@ const AudioGuideStep: React.FC<Props> = ({
       analytics.track('journey_stop_finished', {
         stop: current?.stop.stop_key,
         reason,
+        // Where in the walk, and how long they actually stood there. Both are
+        // properties of the building rather than of the recording, which is
+        // exactly the kind that cannot be derived from the office.
+        index: index + 1,
+        dwell_s: Math.round((Date.now() - stopEnteredAtRef.current) / 1000),
       });
       scheduleAdvance(reason);
     },
-    [current, scheduleAdvance],
+    [current, index, scheduleAdvance],
   );
 
   // A new stop starts clean: no hand-over in flight, and the visitor's "stay
@@ -671,7 +710,14 @@ const AudioGuideStep: React.FC<Props> = ({
             {onUnlock ? (
               <TouchableOpacity
                 style={styles.lockButton}
-                onPress={onUnlock}
+                onPress={() => {
+                  // The numerator to journey_stop_locked's denominator.
+                  analytics.track('journey_unlock_tapped', {
+                    stop: current.stop.stop_key,
+                    index: index + 1,
+                  });
+                  onUnlock();
+                }}
                 accessibilityRole="button">
                 <Text style={styles.lockButtonLabel}>
                   {t('journey.guide.lockedCta')}

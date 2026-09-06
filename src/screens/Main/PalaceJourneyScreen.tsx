@@ -68,6 +68,7 @@ import PromptStep from './journey/PromptStep';
 import AudioGuideStep, { type StopsStatus } from './journey/AudioGuideStep';
 import SitePaywallSheet from '../Lens/components/SitePaywallSheet';
 import { getExplorerPassQuote } from '../../utils/api/explorer-pass';
+import { siteTelemetry } from '../../services/siteTelemetry';
 import {
   GhostButton,
   JourneyTopBar,
@@ -203,6 +204,20 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
    * thing that knows the clips, because it stripped them, so re-asking is the
    * only way to get them and the only way that cannot disagree with entitlement.
    */
+  /**
+   * ONE SESSION FOR THE WHOLE JOURNEY, not one per AR step.
+   *
+   * The lawn, the scan and the guide are three surfaces of one visit to one
+   * building, and the numbers we want out of them — how dark it was, how often
+   * tracking gave up, how hot the phone got — are properties of that visit. Three
+   * summaries would have to be stitched back together by whoever reads them, and
+   * a visitor who backs out of one step would look like a separate visit.
+   */
+  useEffect(() => {
+    siteTelemetry.beginSession(slug, 'journey');
+    return () => siteTelemetry.endSession();
+  }, [slug]);
+
   const [paywallOpen, setPaywallOpen] = useState(false);
 
   /**

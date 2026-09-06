@@ -97,6 +97,7 @@ import FullscreenVideo from './journey/FullscreenVideo';
 import {ASSAULT} from '../../features/magicwindow/assault';
 import {FORT_STATES} from '../../features/magicwindow/timeline';
 import {resolveModelGlb} from '../../services/glbSource';
+import {siteTelemetry} from '../../services/siteTelemetry';
 import {isAdminUser} from '../../shared/auth/isAdminUser';
 import {useSafeBackHandler} from '../../shared/hooks/useSafeGoBack';
 import {COLORS, FONTS, RADIUS, SPACING} from '../../core/constants/theme';
@@ -441,7 +442,14 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
     [viewpoint],
   );
   const onDriftSample = useCallback(
-    ({nativeEvent}: {nativeEvent: MagicWindowDriftEvent}) => setDrift(nativeEvent),
+    ({nativeEvent}: {nativeEvent: MagicWindowDriftEvent}) => {
+      setDrift(nativeEvent);
+      // The HUD is for whoever is holding the phone; this is for us. Until now
+      // the only record of how far ARCore drifts INSIDE THIS BUILDING was a
+      // string on a debug overlay, discarded on unmount — which is why the
+      // palace's real-walking decision rests on a budget nobody measured here.
+      siteTelemetry.sampleDrift(nativeEvent);
+    },
     [],
   );
 
@@ -486,6 +494,7 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
   const onFigureVisibility = useCallback(
     (e: {nativeEvent: {onScreen: boolean}}) => {
       setFigureOnScreen(e.nativeEvent.onScreen);
+      siteTelemetry.figureVisibility(e.nativeEvent.onScreen);
     },
     [],
   );
@@ -598,6 +607,31 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
    * BOTH the guide narration and the figure's own voice - two players, one
    * flag, so they cannot fall out of step with each other.
    */
+  /**
+   * TELEMETRY LIFECYCLE — the two sessions this screen is the only place to open.
+   *
+   * Drift runs for as long as the window is up, because the question ("how far
+   * does this building push ARCore off") is about the visit, not about a
+   * viewpoint. The figure session restarts per figure, because "did they find
+   * him" is a question about one man in one doorway and averaging two of them
+   * together would answer neither.
+   *
+   * Both END on teardown rather than on success, which is the whole point: a
+   * visitor who never found the figure emits nothing under a fire-on-acquire
+   * design, so the failure we most need to see would be the one case that
+   * reports nothing at all.
+   */
+  useEffect(() => {
+    siteTelemetry.beginDrift(scene.slug);
+    return () => siteTelemetry.endDrift();
+  }, [scene.slug]);
+
+  useEffect(() => {
+    if (!personVisible || !person) return undefined;
+    siteTelemetry.figurePlaced(scene.slug, viewpoint.id, person.id);
+    return () => siteTelemetry.figureGone();
+  }, [scene.slug, viewpoint.id, person, personVisible]);
+
   const [openVideo, setOpenVideo] = useState<SubjectVideo | null>(null);
   // Walking to another viewpoint changes who is here; a clip opened on the last
   // figure must not outlive him.
@@ -783,7 +817,10 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
   // Pointing at him in the world is the real gesture; the card is the fallback
   // for anyone who cannot find him.
   const onFigureTapped = useCallback(
-    (_e: {nativeEvent: MagicWindowFigureTappedEvent}) => advance(),
+    (_e: {nativeEvent: MagicWindowFigureTappedEvent}) => {
+      siteTelemetry.figureTapped();
+      advance();
+    },
     [advance],
   );
 

@@ -7,6 +7,7 @@ import {
   Pressable,
   RefreshControl,
   StatusBar,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -31,6 +32,7 @@ import {
   Save,
   Shield,
   Sparkles,
+  Activity,
   Trash2,
   Volume2,
 } from 'lucide-react-native';
@@ -52,6 +54,7 @@ import {
   useProfileDigest,
 } from '../../shared/hooks';
 import { useDevSettingsStore } from '../../stores/devSettingsStore';
+import { useDataSharingStore } from '../../stores/dataSharingStore';
 import {
   useMuseumPrefsStore,
   useNarrationLangResolution,
@@ -302,6 +305,10 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
       },
     ]);
   }, [clearUserData, onLogout, t]);
+
+  // Selected individually so a change to one does not re-render on the other.
+  const shareSiteData = useDataSharingStore(st => st.shareSiteData);
+  const setShareSiteData = useDataSharingStore(st => st.setShareSiteData);
 
   const permissionRows = [
     {
@@ -1053,6 +1060,38 @@ const SettingsScreen: React.FC<Props> = ({ navigation, onLogout }) => {
                 {t('settings.replayTour')}
               </Text>
             </TouchableOpacity>
+          </Animated.View>
+
+          {/* ── Improving the reconstructions ──
+              A card of its own rather than a line inside Permissions: this is a
+              choice about what the visitor contributes, not a capability the OS
+              grants, and burying it under "Permissions" would make it read as
+              something the phone already decided. */}
+          <Animated.View
+            entering={FadeInDown.delay(340).duration(350)}
+            className="mx-5 mb-5 rounded-2xl border border-white/[0.08] bg-surface-1 p-4"
+          >
+            <View className="flex-row items-center gap-2.5 mb-3">
+              <View className="w-9 h-9 rounded-full bg-surface-2 items-center justify-center">
+                <Activity size={16} color="#CBA862" />
+              </View>
+              <Text className="text-parchment text-base font-ui-semibold">
+                {t('settings.dataSharingTitle')}
+              </Text>
+            </View>
+
+            <View className="flex-row items-center justify-between">
+              <Text className="text-parchment-muted text-xs font-ui-regular flex-1 pr-3 leading-5">
+                {t('settings.dataSharingBody')}
+              </Text>
+              <Switch
+                value={shareSiteData}
+                onValueChange={setShareSiteData}
+                trackColor={{ false: '#3A3630', true: 'rgba(203,168,98,0.5)' }}
+                thumbColor={shareSiteData ? '#CBA862' : '#6B6357'}
+                accessibilityLabel={t('settings.dataSharingTitle')}
+              />
+            </View>
           </Animated.View>
 
           <DevLoadTestArModelButton />
