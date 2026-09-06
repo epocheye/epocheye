@@ -38,10 +38,16 @@
  * when it was not — nothing here downloads on the visitor's time.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { ChevronRight, Pause, SkipBack } from 'lucide-react-native';
+import { ChevronRight, Lock, Pause, SkipBack } from 'lucide-react-native';
 
 import AudioPlayer from '../../../components/AudioPlayer';
 import { Skeleton } from '../../../components/ui';
@@ -114,6 +120,16 @@ interface Props {
     title: string;
   }) => void;
   onContinue: () => void;
+  /**
+   * Open the purchase sheet for this venue. Called from a LOCKED stop — one
+   * beyond the free preview, which the server returned stripped of its clip.
+   *
+   * A callback, like onOpenReconstruction and onOpenRestoration above, for the
+   * same reason: the parent owns the navigator and the sheet. Omitted and the
+   * lock card still explains itself; it just loses its button, which is the
+   * right degradation for a build where purchasing is not wired.
+   */
+  onUnlock?: () => void;
 }
 
 interface Entry {
@@ -213,6 +229,7 @@ const AudioGuideStep: React.FC<Props> = ({
   onOpenReconstruction,
   onOpenRestoration,
   onContinue,
+  onUnlock,
 }) => {
   const { t } = useTranslation();
 
@@ -594,6 +611,13 @@ const AudioGuideStep: React.FC<Props> = ({
   }
 
   const clip = current.stop.clip;
+  /**
+   * Beyond the free preview and unpaid. The server has ALREADY removed the audio
+   * URL, the transcript and the restored image (apis/audio/handler.go), so this
+   * flag decides what the visitor is told, never what they can reach.
+   */
+  const locked = current.stop.locked === true;
+  const freeStops = stops?.free_preview_stops ?? 0;
   const fellBack = !!stops?.fallback_lang && !!clip && clip.lang !== stops.lang;
   const handingOver = pending !== null;
   /** Ended badly and we are NOT moving: the visitor needs a reason and a way out. */
@@ -628,7 +652,34 @@ const AudioGuideStep: React.FC<Props> = ({
         {/* Gated on the URL, not on the clip record: a clip row with no audio
             file is "not recorded" as far as the visitor is concerned, and
             showing a skeleton that never resolves would be a lie. */}
-        {audioUrl ? (
+        {locked ? (
+          /* LOCKED, and said plainly. Not "unavailable" and not an error — the
+             visitor has reached the end of what the venue gives away, and the
+             difference matters: one reads as something broken, the other as a
+             choice they can make. */
+          <View style={styles.lockCard}>
+            <Lock size={22} color="#CBA862" />
+            <Text style={styles.lockTitle}>
+              {t('journey.guide.lockedTitle')}
+            </Text>
+            <Text style={journeyStyles.body}>
+              {t('journey.guide.lockedBody', {
+                free: freeStops,
+                total: ordered.length,
+              })}
+            </Text>
+            {onUnlock ? (
+              <TouchableOpacity
+                style={styles.lockButton}
+                onPress={onUnlock}
+                accessibilityRole="button">
+                <Text style={styles.lockButtonLabel}>
+                  {t('journey.guide.lockedCta')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : audioUrl ? (
           audioUri ? (
             <StopPlayer
               key={`${current.stop.stop_key}#${attempt}`}
@@ -789,6 +840,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     padding: 18,
+  },
+  // Warmer border than notRecorded, on purpose: a locked stop is an offer, and
+  // it should not share the visual language of a stop that is simply broken.
+  lockCard: {
+    backgroundColor: COLORS.bgWarm,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(203, 168, 98, 0.4)',
+    padding: 18,
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  lockTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  lockButton: {
+    marginTop: 4,
+    backgroundColor: 'rgba(203, 168, 98, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(203, 168, 98, 0.5)',
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  lockButtonLabel: {
+    color: '#CBA862',
+    fontSize: 14,
+    fontWeight: '600',
   },
   transcript: {
     backgroundColor: COLORS.bgWarm,

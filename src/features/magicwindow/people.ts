@@ -427,10 +427,39 @@ const PALACE_PEOPLE: MagicWindowPerson[] = [
     modelId: 'figures/tipu-summer-palace-bengaluru/cavalryman_idle_amp',
     name: 'A Mysore trooper',
     role: 'one of the cavalry',
-    // Head of the NNE stair, first floor. From P4 (8, 3, eye 4.2) looking -X:
-    // 5.51 m away, 4.2 deg off axis, feet 16.2 deg below the eye, 39% of the
-    // screen height. On the 2.6 m floor, so he stands on it rather than through
-    // it into the colonnade below.
+    // ACROSS THE GALLERY on the first floor, which is what P4 is captioned to
+    // show: "Arrival on the upper floor; the gallery opens out."
+    //
+    // HE USED TO STAND IN MID-AIR, and the comment here asserted the opposite.
+    // It read "On the 2.6 m floor, so he stands on it rather than through it
+    // into the colonnade below" — which is the exact failure that had happened.
+    // Measured against the shipped GLB rather than against the intent:
+    //
+    //   FirstFloor_centre (node 226) spans z[-18.750, -3.750]. He was at
+    //   [2.5, 3.4], i.e. glTF z = -3.400 — 0.350 m OUT PAST the slab edge, on
+    //   the open side of the balustrade, over the double-height well. The
+    //   nearest surface under his feet was Platform_stone at y = 0.000, a drop
+    //   of 2.600 m. Balustrade_rail (node 300, y 3.350-3.450) therefore crossed
+    //   his waist and Arch_well_long (node 137) his head, by 0.120 m and
+    //   0.260 m of depth respectively.
+    //
+    // The slab ends at north 3.750 in v10 as well, so this was wrong from the
+    // day he was placed; it is not a v11 regression. It is the size_m: null /
+    // UNRECORDED hazard biting: the position was authored against the room's
+    // intent and never against the slab's extent.
+    //
+    // NOW, from P4 (8, 3, eye 4.2) looking -X: 10.75 m away, 9.64 deg off axis
+    // inside the 10.47 deg delivered horizontal half-angle, feet 8.58 deg below
+    // the eye and head 0.31 deg above it, so he is whole in frame. Zero
+    // penetrating parts against all 802 nodes, feet on FirstFloor_centre with a
+    // 0.000 m gap. He reads at 20% of screen height rather than the 39% claimed
+    // for the position he could not legally occupy — P4's axis crosses a void
+    // for its first 2.4 m, so every clip-free placement in that view is 10.75 m
+    // or further. Kept at P4's expense rather than P4 moved: the viewpoint is
+    // bound to stop `the_stair` and shows what it says it shows.
+    //
+    // The id stays `cavalryman_stair`. It is a stable key, and his third line
+    // already says cavalry did not stand at the top of a staircase.
     //
     // PLACED AT THE OWNER'S DIRECTION, and the objection is recorded rather than
     // buried: research/figure-court/build-record.md:284-319 recommended dropping
@@ -438,11 +467,41 @@ const PALACE_PEOPLE: MagicWindowPerson[] = [
     // upscaled eight times in which "his face is three blobs", and predicts he
     // "does not match Purnaiah, the guard or the rocketman". He is on the upper
     // floor and alone in frame, which is the least unkind place for him.
-    position: [2.5, 3.4],
+    position: [-2.6, 4.8],
     floorM: 2.6,
-    // atan2(8 - 2.5, 3 - 3.4) = 94.2 deg.
-    headingDeg: 94,
-    visibleFrom: ['P4'],
+    // atan2(8 - (-2.6), 3 - 4.8) = 99.64 deg — facing the visitor at P4.
+    headingDeg: 100,
+    /**
+     * STOOD DOWN, because P4 CANNOT SEE ANYWHERE HE COULD LEGALLY STAND.
+     *
+     * Not a preference. Solved: for every one of the nine viewpoints, every
+     * position on both floors on a 0.3 m grid was tested against all four
+     * constraints at once — a surface under his feet, no penetration, inside
+     * the delivered field of view, and an unobstructed line of sight sampled at
+     * shin, waist, chest and head. P4 returns ZERO. So do P9 and P3.
+     *
+     * WHY. P4 is glTF (8.0, 4.2, -3.0), which is INSIDE
+     * Zenana_corner_2_wall__INT (x 5.625-9.375, y 2.6-5.6, z -7.5-0). Looking
+     * west along its authored heading of 270 it meets that room's own inner
+     * wall 2.375 m away — confirmed by Möller-Trumbore against the real
+     * triangles, blocking at 2.21-2.23 m at all four heights, so it is a solid
+     * wall and not an AABB artefact. The delivered 36.4 deg vertical half-angle
+     * needs him at least 2.166 m out for his feet to stay in frame, which
+     * leaves a 21 cm band against a wall his 0.37-0.84 m half-extent cannot fit
+     * into.
+     *
+     * The other five figures all pass. The viewpoints that CAN hold one — P0,
+     * P0b, P1, P2, P5 — are each already occupied, and `visibleFrom` sets must
+     * stay disjoint because `people.find` returns the first match.
+     *
+     * HIS LINES AND SOURCES ARE UNTOUCHED, exactly as Hyder Ali's were when he
+     * was stood down, and this is reversible in one line the moment a viewpoint
+     * exists that can see him. Three ways to bring him back, none of which I
+     * took unasked: move P4 out of the zenana corner; give him a new viewpoint
+     * the way P0b was created for Hyder Ali; or accept that the zenana
+     * partitions — both SIZE-UNRECORDED — are what box in the stair head.
+     */
+    visibleFrom: [],
     lines: [
       {
         text:

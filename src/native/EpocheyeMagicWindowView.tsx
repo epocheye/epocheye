@@ -40,6 +40,15 @@ export interface MagicWindowFigureTappedEvent {
   distancePx: number;
 }
 
+/**
+ * Whether the figure is on screen enough to point at. Fired only when the
+ * answer changes, and unlike the camera-debug stream it is wired in every
+ * build: it gates a line of copy the visitor reads.
+ */
+export interface MagicWindowFigureVisibilityEvent {
+  onScreen: boolean;
+}
+
 export interface MagicWindowLoadErrorEvent {
   message: string;
 }
@@ -158,6 +167,49 @@ export interface MagicWindowCameraDebugEvent {
   /** World-space vertical span of the loaded model. */
   modelMinY: number;
   modelMaxY: number;
+  /**
+   * The placed figure as the RENDERER has him, not as the data asks for him.
+   *
+   * `figSkeletonM` is the world-space span of his joints — deliberately not
+   * ModelNode.size, which is the unskinned bind box and reads 0.017 m for five
+   * of these six rigs (their armature is scaled 0.01 with a matching 100 in the
+   * inverse bind matrices). `figScale` catches a stray node scale, which is the
+   * one way the renderer alone can resize a figure.
+   *
+   * NaN when no figure is placed at the current viewpoint.
+   */
+  figSkeletonM: number;
+  figPosX: number;
+  figPosY: number;
+  figPosZ: number;
+  figScale: number;
+  /**
+   * The DEVICE camera's own field of view in portrait, degrees, measured from
+   * Camera2 characteristics rather than taken from a spec sheet.
+   *
+   * The comparison it exists for: the magic window delivers 20.94 h x 43.66 v,
+   * because SceneView hands `fovDeg` to Filament as a focal length. If the phone
+   * sees far wider than that, every figure crops for the same reason.
+   */
+  devFovHDeg: number;
+  devFovVDeg: number;
+  /**
+   * True when enough of the figure's projected bounding rect survives the
+   * viewport to point at - half of it in each axis, not one stray pixel.
+   *
+   * The prompt is gated on this because `personVisible` is a pure data check
+   * and cannot tell where the phone is pointing. The native hit test uses the
+   * same rect, so what the visitor is told to tap and what accepts the tap
+   * cannot disagree.
+   */
+  figOnScreen: boolean;
+  /**
+   * What the magic window actually delivers, degrees, derived from the live
+   * `fovDeg` rather than written down — so this line cannot go stale when the
+   * authored value changes.
+   */
+  winFovHDeg: number;
+  winFovVDeg: number;
 }
 
 interface NativeProps {
@@ -201,6 +253,9 @@ interface NativeProps {
   /** Per-scene exposure multiplier. Omit (or 1) to leave lighting alone. */
   lightScale?: number;
   onHeading?: (event: {nativeEvent: MagicWindowHeadingEvent}) => void;
+  onFigureVisibility?: (event: {
+    nativeEvent: MagicWindowFigureVisibilityEvent;
+  }) => void;
   onCameraDebug?: (event: {
     nativeEvent: MagicWindowCameraDebugEvent;
   }) => void;
@@ -255,6 +310,7 @@ const EpocheyeMagicWindowView = forwardRef<
     skyColor,
     lightScale,
     onHeading,
+    onFigureVisibility,
   },
   ref,
 ) => {
@@ -308,6 +364,7 @@ const EpocheyeMagicWindowView = forwardRef<
       skyColor={skyColor}
       lightScale={lightScale}
       onHeading={onHeading}
+      onFigureVisibility={onFigureVisibility}
     />
   );
 });

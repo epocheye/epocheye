@@ -63,7 +63,8 @@ class EpocheyeMagicWindowViewManager(
                 .receiveEvent(view.id, "onModelLoaded", event)
         }
         view.onCameraDebug = {
-            fx, fy, fz, px, py, pz, rot, branch, moved, minY, maxY ->
+            fx, fy, fz, px, py, pz, rot, branch, moved, minY, maxY,
+            figH, figX, figY, figZ, figS, devH, devV, onScreen, winH, winV ->
             val event = Arguments.createMap().apply {
                 putDouble("fwdX", fx.toDouble())
                 putDouble("fwdY", fy.toDouble())
@@ -76,9 +77,41 @@ class EpocheyeMagicWindowViewManager(
                 putBoolean("movedOnRotate", moved)
                 putDouble("modelMinY", minY.toDouble())
                 putDouble("modelMaxY", maxY.toDouble())
+                // The figure as the renderer has him: skeleton span, world
+                // position, node scale. NaN when no figure is placed at this
+                // viewpoint, which JS renders as no line rather than as zeros.
+                putDouble("figSkeletonM", figH.toDouble())
+                putDouble("figPosX", figX.toDouble())
+                putDouble("figPosY", figY.toDouble())
+                putDouble("figPosZ", figZ.toDouble())
+                putDouble("figScale", figS.toDouble())
+                // The DEVICE camera's own FOV in portrait, from Camera2
+                // characteristics. Here to answer whether the reconstruction is
+                // narrower than the camera it is held up against.
+                putDouble("devFovHDeg", devH.toDouble())
+                putDouble("devFovVDeg", devV.toDouble())
+                // Whether enough of the figure's projected rect survives the
+                // viewport to be pointed at. The prompt is gated on this so it
+                // cannot ask for something the visitor cannot do.
+                putBoolean("figOnScreen", onScreen)
+                // What the window DELIVERS, computed from the live fovDeg —
+                // never a written-down constant, which is what the first
+                // version of this line was and why it could not detect its own
+                // staleness.
+                putDouble("winFovHDeg", winH.toDouble())
+                putDouble("winFovVDeg", winV.toDouble())
             }
             reactContext.getJSModule(RCTEventEmitter::class.java)
                 .receiveEvent(view.id, "onCameraDebug", event)
+        }
+        // PRODUCTION, unlike onCameraDebug: this gates the "point at him" copy,
+        // so it is wired unconditionally and fires only on change.
+        view.onFigureVisibility = { onScreen ->
+            val event = Arguments.createMap().apply {
+                putBoolean("onScreen", onScreen)
+            }
+            reactContext.getJSModule(RCTEventEmitter::class.java)
+                .receiveEvent(view.id, "onFigureVisibility", event)
         }
         view.onHeading = { deg ->
             val event = Arguments.createMap().apply {
@@ -299,6 +332,10 @@ class EpocheyeMagicWindowViewManager(
             .put("onRigProbe", MapBuilder.of("registrationName", "onRigProbe"))
             .put("onCameraDebug", MapBuilder.of("registrationName", "onCameraDebug"))
             .put("onHeading", MapBuilder.of("registrationName", "onHeading"))
+            .put(
+                "onFigureVisibility",
+                MapBuilder.of("registrationName", "onFigureVisibility"),
+            )
             .build()
     }
 }

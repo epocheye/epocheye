@@ -19,6 +19,14 @@ interface SitePaywallSheetProps {
   siteName?: string;
   /** The free allowance (drives the "you've used N free scans" line). */
   limit?: number;
+  /**
+   * Overrides the "you've used N free scans" sentence.
+   *
+   * The sheet sells ONE pass but is reached from more than one wall: scans run
+   * out at the lens, and the audio guide locks after its free preview. Naming
+   * scans to someone who was listening would describe a limit they never hit.
+   */
+  reasonLine?: string;
   /** Region-appropriate display price, e.g. "₹149". Server still decides the charge. */
   priceLabel?: string;
   onClose: () => void;
@@ -46,6 +54,7 @@ export const SitePaywallSheet: React.FC<SitePaywallSheetProps> = ({
   siteId,
   siteName,
   limit,
+  reasonLine,
   priceLabel,
   onClose,
   onUnlocked,
@@ -56,7 +65,9 @@ export const SitePaywallSheet: React.FC<SitePaywallSheetProps> = ({
   const place =
     siteName && siteName.trim().length > 0 ? siteName.trim() : 'this site';
   const usedLine =
-    typeof limit === 'number' && limit > 0
+    reasonLine && reasonLine.trim().length > 0
+      ? reasonLine.trim()
+      : typeof limit === 'number' && limit > 0
       ? `You've used your ${limit} free ${
           limit === 1 ? 'scan' : 'scans'
         } at ${place}.`

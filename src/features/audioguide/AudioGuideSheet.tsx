@@ -171,7 +171,13 @@ const AudioGuideSheet: React.FC<AudioGuideSheetProps> = ({
                     <EvidenceNote tier={stop.clip?.tier} variant="mark" />
                   </View>
                   <Text style={styles.rowMeta}>
-                    {playable
+                    {/* THREE STATES, NOT TWO. A locked stop has no clip either,
+                        so without this it would read "not recorded" — telling a
+                        visitor the palace never recorded a stop we are in fact
+                        selling them. */}
+                    {stop.locked
+                      ? t('audioGuide.locked')
+                      : playable
                       ? formatClipDuration(stop.clip?.duration_ms)
                       : t('audioGuide.notRecorded')}
                   </Text>

@@ -474,6 +474,21 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
 
   const [lineIndex, setLineIndex] = useState<number | null>(null);
   const [everSpoke, setEverSpoke] = useState(false);
+  /**
+   * Whether the figure is currently on screen enough to point at.
+   *
+   * From the native projected-rect test, which is the same rect the tap uses.
+   * Starts false so the prompt cannot claim he is pointable before the renderer
+   * has said anything; the native side is edge-triggered and emits as soon as
+   * a figure is posed.
+   */
+  const [figureOnScreen, setFigureOnScreen] = useState(false);
+  const onFigureVisibility = useCallback(
+    (e: {nativeEvent: {onScreen: boolean}}) => {
+      setFigureOnScreen(e.nativeEvent.onScreen);
+    },
+    [],
+  );
 
   // VOICE, by one of two paths.
   //
@@ -1006,6 +1021,7 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
         onCameraDebug={__DEV__ ? onCameraDebug : undefined}
         skyColor={scene.skyColor}
         onHeading={onHeading}
+        onFigureVisibility={onFigureVisibility}
         lightScale={scene.lightScale}
       />
 
@@ -1048,12 +1064,25 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
           at any stop the person authored themselves out of — for the palace,
           every stop on the ground floor, because Purnaiah is a storey up. And
           the palace cannot be walked, so it does not ask you to. */}
+      {/* GATED ON WHERE THE PHONE IS POINTING, not only on the data.
+          `personVisible` answers "is anyone assigned to this viewpoint"; it
+          cannot answer "can the visitor see him", and it was firing "Point at
+          him and tap" while he sat below the bottom of the frame. `figOnScreen`
+          is the native side's projected-rect test — the SAME rect the tap uses,
+          so the instruction and the hit target cannot disagree.
+
+          Off screen the prompt becomes a direction instead of an impossible
+          instruction. It says lower the phone because that is the way he always
+          is: eye height is floor + 1.6 m and these people are 1.61-1.70 m, so
+          their feet sit 8-19 deg below the horizon and never above it. */}
       {figure && person && personVisible && !everSpoke && ready ? (
         <View style={styles.pointHint} pointerEvents="none">
           <Text style={styles.pointHintText}>
-            {scene.hasSiteWalk
-              ? 'Someone is here. Walk up and tap him.'
-              : 'Someone is here. Point at him and tap.'}
+            {!figureOnScreen
+              ? 'Someone is here. Lower the phone.'
+              : scene.hasSiteWalk
+                ? 'Someone is here. Walk up and tap him.'
+                : 'Someone is here. Point at him and tap.'}
           </Text>
         </View>
       ) : null}
@@ -1098,6 +1127,47 @@ const MagicWindowScreen: React.FC<MagicWindowScreenProps> = ({route}) => {
               1,
             )})`}
           </Text>
+          {/* THE FIGURE, AS THE RENDERER HAS HIM. Temporary, and admin+__DEV__
+              only like everything else in this card.
+
+              Three numbers because "the figure looks wrong" is three faults:
+              wrong size, wrong place, or a stray scale on the node. Offline,
+              tools/verify_figure.py skins every one of these six meshes through
+              its whole clip and they all hold 1.61-1.70 m with their feet within
+              0.7 mm of the floor — so if this line disagrees with that, the
+              renderer is the one that is wrong, and it says which way.
+
+              Absent, not zeroed, at a viewpoint with no figure: NaN renders as
+              no line, because a stale 1.68 would read as proof. */}
+          {Number.isFinite(camDebug.figSkeletonM) ? (
+            <Text
+              style={[
+                styles.camHudLine,
+                (camDebug.figSkeletonM < 1.5 ||
+                  camDebug.figSkeletonM > 1.9 ||
+                  Math.abs(camDebug.figScale - 1) > 0.01) &&
+                  styles.camHudBad,
+              ]}>
+              {`figure ${camDebug.figSkeletonM.toFixed(2)} m @ (${camDebug.figPosX.toFixed(
+                2,
+              )}, ${camDebug.figPosY.toFixed(2)}, ${camDebug.figPosZ.toFixed(
+                2,
+              )}) x${camDebug.figScale.toFixed(3)}`}
+            </Text>
+          ) : null}
+          {/* THE COMPARISON, not just the number. The magic window delivers
+              20.94 h x 43.66 v because SceneView hands fovDeg to Filament as a
+              focal length; the phone's own camera is measured from Camera2
+              characteristics. Printing both side by side is the whole point. */}
+          {Number.isFinite(camDebug.devFovHDeg) ? (
+            <Text style={styles.camHudLine}>
+              {`fov  win ${camDebug.winFovHDeg.toFixed(
+                1,
+              )}h/${camDebug.winFovVDeg.toFixed(1)}v   cam ${camDebug.devFovHDeg.toFixed(
+                1,
+              )}h/${camDebug.devFovVDeg.toFixed(1)}v`}
+            </Text>
+          ) : null}
           <Text style={styles.camHudBig}>
             {`${(
               (Math.asin(Math.max(-1, Math.min(1, camDebug.fwdY))) * 180) /
@@ -1611,9 +1681,17 @@ const styles = StyleSheet.create({
 
 
   camHud: {
+    // BOTTOM-LEFT, NOT TOP-LEFT, and the move is not cosmetic. Widening the
+    // window to 72.8 deg vertical puts every figure between roughly 12% and
+    // 76% of screen height depending on how far the phone is tilted, and this
+    // card at top: 150 sat squarely across the upper half — it was covering
+    // Purnaiah in the very capture taken to check whether he was visible. An
+    // instrument that hides its subject measures nothing.
+    //
+    // Bottom-left clears the figure band and the two controls on the right.
     position: 'absolute',
     left: SPACING.lg,
-    top: 150,
+    bottom: 260,
     paddingHorizontal: SPACING.md,
     paddingVertical: 8,
     borderRadius: RADIUS.sm,

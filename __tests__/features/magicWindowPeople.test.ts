@@ -41,14 +41,21 @@ const viewpointIds = PALACE_VIEWPOINTS.map(v => v.id);
 
 describe('PALACE_PEOPLE — one person per viewpoint, and no collisions', () => {
   it('holds six figures and places all six of them', () => {
-    // Hyder Ali was the sixth and was stood down with an EMPTY visibleFrom
-    // while Tipu and he were both on the lawn. P0b — the far corner of the same
-    // lawn — separates them, so nobody is stood down any more. If a figure ever
-    // is again, `stoodDown` is how it shows up here rather than silently
-    // vanishing from the venue.
+    // Hyder Ali was stood down once, while he and Tipu were both on the lawn;
+    // P0b — the far corner of the same lawn — separated them and brought him
+    // back. The trooper is stood down now, and for a harder reason: P4 is
+    // inside Zenana_corner_2 looking at that room's own wall 2.375 m away, and
+    // a solve over every viewpoint and both floors returns no position that is
+    // supported, clip-free, in frame AND unoccluded. P9 and P3 are enclosed the
+    // same way.
+    //
+    // This assertion names him rather than counting six placed figures,
+    // because "stood down" must stay visible in the test rather than being
+    // absorbed by a smaller number. His lines and sources are untouched, and
+    // restoring him is one line once a viewpoint can see him.
     expect(palace).toHaveLength(6);
-    expect(placed).toHaveLength(6);
-    expect(stoodDown.map(p => p.id)).toEqual([]);
+    expect(placed).toHaveLength(5);
+    expect(stoodDown.map(p => p.id)).toEqual(['cavalryman_stair']);
   });
 
   it('every PLACED person declares a viewpoint', () => {

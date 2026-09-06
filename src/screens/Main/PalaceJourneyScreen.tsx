@@ -66,6 +66,8 @@ import { listViewingStations } from '../../utils/api/ar';
 import LawnStep from './journey/LawnStep';
 import PromptStep from './journey/PromptStep';
 import AudioGuideStep, { type StopsStatus } from './journey/AudioGuideStep';
+import SitePaywallSheet from '../Lens/components/SitePaywallSheet';
+import { getExplorerPassQuote } from '../../utils/api/explorer-pass';
 import {
   GhostButton,
   JourneyTopBar,
@@ -192,6 +194,47 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [acknowledged, arCapable, camera, requestCamera]);
 
   // ---- Audio stops (shared by the pre-cache and the guide step) ----
+  /**
+   * The purchase sheet for a locked stop.
+   *
+   * Opened from AudioGuideStep, never by it: the sheet is a modal over the whole
+   * screen and the step does not own the screen. On a verified purchase the
+   * stops are RE-FETCHED rather than patched locally — the server is the only
+   * thing that knows the clips, because it stripped them, so re-asking is the
+   * only way to get them and the only way that cannot disagree with entitlement.
+   */
+  const [paywallOpen, setPaywallOpen] = useState(false);
+
+  /**
+   * The price to SHOW, fetched rather than written down.
+   *
+   * /quote is region-aware and resolves the per-place override server-side, so
+   * hardcoding "₹200" here would be wrong for a foreign visitor and would go
+   * stale the day an admin retunes the price. Display only either way — the
+   * charge is locked at /initiate and re-verified at /confirm, so a wrong label
+   * here cannot become a wrong charge.
+   *
+   * Fetched lazily, when the sheet is first opened: nobody who never hits a
+   * locked stop should cost a round trip. Null simply omits the price block.
+   */
+  const [priceLabel, setPriceLabel] = useState<string | null>(null);
+  useEffect(() => {
+    if (!paywallOpen || priceLabel !== null) return;
+    let alive = true;
+    void getExplorerPassQuote([slug]).then(res => {
+      if (!alive || !res.success) return;
+      const paise = res.data.total_paise;
+      if (typeof paise !== 'number') return;
+      // Always rupees: the quote carries no currency because Razorpay charges in
+      // INR for both regions — "foreign" selects a different rupee price
+      // (explorer_pass_config.default_price_paise_foreign), not a different unit.
+      setPriceLabel(`₹${Math.round(paise / 100)}`);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [paywallOpen, priceLabel, slug]);
+
   const [stopsStatus, setStopsStatus] = useState<StopsStatus>('loading');
   const [stops, setStops] = useState<AudioStopsResponse | null>(null);
   const loadStops = useCallback(async () => {
@@ -620,6 +663,7 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
           // poorer one.
           onOpenRestoration={openRestoration}
           onContinue={finishJourney}
+          onUnlock={() => setPaywallOpen(true)}
         />
       );
       break;
@@ -642,6 +686,22 @@ const PalaceJourneyScreen: React.FC<Props> = ({ route, navigation }) => {
         onClose={confirmLeave}
         onBack={stepIndex > 0 ? goPrevious : undefined}
         onAsk={openAsk}
+      />
+      {/* One sheet for the whole journey, mounted here rather than inside the
+          guide step so it survives a step change mid-purchase. `reasonLine`
+          overrides its default copy: the visitor hit the guide's preview limit,
+          not a scan limit, and telling them they used up scans would name a
+          wall they never touched. */}
+      <SitePaywallSheet
+        visible={paywallOpen}
+        siteId={slug}
+        siteName={host?.siteName}
+        priceLabel={priceLabel ?? undefined}
+        reasonLine={t('journey.guide.lockedReason', {
+          free: stops?.free_preview_stops ?? 0,
+        })}
+        onClose={() => setPaywallOpen(false)}
+        onUnlocked={() => void loadStops()}
       />
     </View>
   );

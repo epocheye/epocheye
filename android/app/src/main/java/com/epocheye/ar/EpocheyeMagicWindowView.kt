@@ -2,6 +2,8 @@ package com.epocheye.ar
 
 import android.content.Context
 import android.hardware.Sensor
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
@@ -35,6 +37,7 @@ import io.github.sceneview.node.CameraNode
 import io.github.sceneview.loaders.MaterialLoader
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Rotation
+import com.google.android.filament.gltfio.FilamentInstance as ModelInstance
 import io.github.sceneview.node.ImageNode
 import io.github.sceneview.node.ModelNode
 import io.github.sceneview.node.Node as SvNode
@@ -60,6 +63,7 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.math.atan
 import kotlin.math.tan
 
 /**
@@ -129,6 +133,41 @@ class EpocheyeMagicWindowView(
 
         /** Beyond this the touch was a drag, not a tap. */
         private const val TAP_SLOP_PX = 24.0
+
+        /**
+         * Contact shadow geometry. See [figureShadowNode].
+         *
+         * MIN_RADIUS is a floor on the SKELETON's half-width, not a guess at a
+         * body: the joints sit inside the mesh, and 0.28 m is roughly where a
+         * standing adult's feet and hem actually meet the floor.
+         *
+         * SPREAD widens the patch past the footprint because a shadow that
+         * stops at the silhouette reads as a cut-out; the soft rim needs
+         * somewhere to fall off.
+         *
+         * LIFT keeps it off the surface it sits on. Coplanar would z-fight, and
+         * the lawn is already drawn 20 mm low for that same reason.
+         */
+        private const val SHADOW_MIN_RADIUS_M = 0.28f
+        private const val SHADOW_SPREAD = 1.45f
+        private const val SHADOW_LIFT_M = 0.012f
+
+        /**
+         * How much of the figure's projected rect must survive the viewport in
+         * each axis before he counts as on screen. Half of him, each way -
+         * enough that "point at him and tap" is an instruction that can be
+         * followed, rather than one pixel of elbow at the edge.
+         */
+        private const val ON_SCREEN_MIN_FRACTION = 0.5f
+
+        /**
+         * Slop around the projected rect for the tap test, view pixels.
+         *
+         * Replaces TAP_RADIUS_PX as the thing a tap is measured against. That
+         * was a 150 px disc on the chest of a figure ~1240 px tall; this is the
+         * whole body plus a fingertip's forgiveness on each side.
+         */
+        private const val TAP_RECT_SLOP_PX = 40f
 
         /** Walking pace, m/s. A relaxed amble - the circuit is 1.7 km round. */
         private const val WALK_SPEED_MPS = 3.2f
@@ -386,6 +425,21 @@ class EpocheyeMagicWindowView(
     /** The visitor tapped the figure. Carries how far off they were, in px. */
     var onFigureTapped: ((Float) -> Unit)? = null
 
+    /**
+     * Whether the figure is on screen enough to point at, PRODUCTION, and fired
+     * only when the answer changes.
+     *
+     * Deliberately not carried on [onCameraDebug]: that one is wired only under
+     * __DEV__ and is telemetry, while this gates a line of copy every visitor
+     * reads. Edge-triggered because the predicate is sampled at sensor rate and
+     * a visitor holding still would otherwise push an identical boolean across
+     * the bridge four times a second forever.
+     */
+    var onFigureVisibility: ((Boolean) -> Unit)? = null
+
+    /** Last value pushed through [onFigureVisibility]. */
+    private var lastReportedOnScreen: Boolean? = null
+
     /** (metres walked, anchor drift in metres, tracking state). */
     var onDriftSample: ((Float, Float, String) -> Unit)? = null
 
@@ -407,11 +461,16 @@ class EpocheyeMagicWindowView(
      * sensor's ENU frame and the camera's glTF frame, and the camera position -
      * which must not move when the device only rotates.
      *
-     * (fwdX, fwdY, fwdZ, posX, posY, posZ, displayRotation, remapBranch, movedOnRotate)
+     * (fwdX, fwdY, fwdZ, posX, posY, posZ, displayRotation, remapBranch,
+     *  movedOnRotate, modelMinY, modelMaxY,
+     *  figSkeletonM, figPosX, figPosY, figPosZ, figScale,
+     *  devFovHDeg, devFovVDeg, figOnScreen, winFovHDeg, winFovVDeg)
      */
     var onCameraDebug: (
         (Float, Float, Float, Float, Float, Float, Int, String, Boolean,
-         Float, Float) -> Unit
+         Float, Float,
+         Float, Float, Float, Float, Float,
+         Float, Float, Boolean, Float, Float) -> Unit
     )? = null
 
     /**
@@ -436,6 +495,96 @@ class EpocheyeMagicWindowView(
     // device suppresses this app's logcat, so it travels in the HUD event.
     private var modelMinY = Float.NaN
     private var modelMaxY = Float.NaN
+
+    // THE FIGURE, AS THE RENDERER ACTUALLY HAS HIM. Three numbers, because
+    // "the figure looks wrong" is three different faults and no two share a fix:
+    //
+    //   figSkeletonM  - how tall he is, measured as the world-space span of his
+    //                   joints. NOT ModelNode.size, which is the UNSKINNED bind
+    //                   box and reads 1.7 cm for these rigs; see maybeLoadFigure.
+    //   figPos*       - where he is, so "he is the right size but in the wrong
+    //                   place" cannot be mistaken for "he is the wrong size".
+    //   figScale      - whether anything has scaled the node. scaleToUnits
+    //                   sneaking back in would show up here and nowhere else.
+    //
+    // These travel in the HUD event for the same reason modelMinY does: this
+    // device suppresses the app's logcat - 13 lines for the whole pid - so a
+    // Log.i that nobody can read is not an instrument.
+    //
+    // What they CANNOT catch is a broken inverse-bind premultiplication, which
+    // explodes the skin while leaving the skeleton perfect. That check is
+    // offline in tools/verify_figure.py, which skins the mesh itself. It has
+    // been run on all six figures: every one holds 1.61-1.70 m across its whole
+    // clip with its feet within 0.7 mm of the floor. Do not re-derive it here.
+    private var figSkeletonM = Float.NaN
+    private var figPosX = Float.NaN
+    private var figPosY = Float.NaN
+    private var figPosZ = Float.NaN
+    private var figScale = Float.NaN
+
+    /**
+     * The loaded figure's instance, kept so the skeleton span can be re-measured
+     * LIVE rather than once at load.
+     *
+     * Measuring it once was not good enough, and the first run said so: with
+     * every node scale reading a clean 1.000 and every position exact, four
+     * viewpoints reported 1.62 m, 1.63 m, 1.09 m and 78.48 m for rigs that are
+     * byte-for-byte the same shape and that skin to 1.61-1.70 m offline. A
+     * single sample taken in the frame the node is added cannot tell a figure
+     * that IS 78 m from a transform hierarchy Filament had not finished
+     * updating when we looked. Sampling every burst can: a wrong number that
+     * settles was a race, and a wrong number that persists is the render.
+     */
+    @Volatile private var figureInstance: ModelInstance? = null
+    private var figureSkinCount = 0
+
+    /**
+     * The DEVICE camera's own field of view, in this phone's portrait terms.
+     *
+     * Measured from Camera2 characteristics - physical sensor size and focal
+     * length - not from a spec sheet, and not from what the magic window asks
+     * Filament for. It exists to answer one question: is the reconstruction
+     * materially narrower than the camera the visitor is holding it up against?
+     *
+     * `getCameraCharacteristics` needs no camera permission; only opening one
+     * does. So this costs nothing and cannot prompt.
+     *
+     * SENSOR_INFO_PHYSICAL_SIZE is given in the sensor's own landscape frame.
+     * SENSOR_ORIENTATION says how that frame is rotated relative to the device's
+     * natural portrait, and on essentially every phone it is 90, which swaps the
+     * two - the sensor's WIDTH becomes the portrait screen's VERTICAL. Reading
+     * the orientation rather than assuming it costs one line and stops this
+     * reporting the numbers transposed on a device that differs.
+     */
+    private var devFovHDeg = Float.NaN
+    private var devFovVDeg = Float.NaN
+    private var devFovMeasured = false
+
+    /**
+     * The figure's projected rectangle in view pixels, and whether enough of it
+     * is on screen to point at.
+     *
+     * WHY A RECT AND NOT A POINT. The tap test used to project one point - the
+     * chest - and accept anything within 150 px of it. The guard subtends about
+     * 1240 px of a 2750 px screen, so his head is four tap-radii from his chest
+     * and tapping it did nothing. And the only rejection was `z < 0`, so when
+     * the chest projected just past the bottom edge, taps in the bottom strip
+     * registered as hits on a figure nobody could see.
+     *
+     * WHY IT GATES THE PROMPT. `personVisible` is a pure data check -
+     * `visibleFrom.includes(viewpoint.id)` (MagicWindowScreen.tsx) - and has no
+     * idea where the phone is pointing. "Someone is here. Point at him and tap."
+     * fired while he was off the bottom of the frame, which is an instruction
+     * that cannot be followed.
+     *
+     * Both now read the same rect, so the thing the visitor is told to tap and
+     * the thing that accepts the tap cannot disagree.
+     */
+    private var figRectL = Float.NaN
+    private var figRectT = Float.NaN
+    private var figRectR = Float.NaN
+    private var figRectB = Float.NaN
+    private var figOnScreen = false
 
     // ---- engine / scene refs -----------------------------------------------
 
@@ -466,6 +615,33 @@ class EpocheyeMagicWindowView(
     private var figUp = 0f
     private var figHeadingDeg = 0f
     private var figureNode: ModelNode? = null
+
+    /**
+     * `Figure_contact_shadow__SCENE-SHELL` - the soft patch under a figure's
+     * feet.
+     *
+     * WHAT IT IS FOR. Tipu stands at y -0.70 with the grass at -0.72. He is on
+     * it, exactly, and still read as pasted in, because nothing under him
+     * touched the ground. Eye height is floor + 1.600 and these people are
+     * 1.61-1.70 m tall, so their feet land 8-19 deg below the horizon: the
+     * contact point is the last few percent of screen height before the edge,
+     * and there is nothing there to read them as standing ON anything.
+     *
+     * WHY IT CARRIES NO TIER, and where it sits in the naming scheme. It is a
+     * grounding cue, not a statement about the building, so it takes the
+     * `__SCENE-SHELL` suffix the lawn and the sky already use
+     * (build_palace_magicwindow.py:269-270, 1257) - the established slot for
+     * scene furniture that asserts nothing. It also cannot reach the build
+     * audit at all: `audit_table()` enumerates the `G.Dim` objects the BUILD
+     * touched, and this is made at runtime and never enters the GLB. Both
+     * reasons are written down because only the first is a judgement.
+     *
+     * NOT A SHADOW MAP. A real shadow would need a light, a caster and a
+     * receiver, and would fall differently at every viewpoint for no gain: this
+     * scene is unlit by design (KHR_materials_unlit) and has no sun to be
+     * consistent with. A radial alpha patch is honest about being a cue.
+     */
+    private var figureShadowNode: ImageNode? = null
     private var loadedFigureUri: String? = null
     private var loadingFigure = false
     private var rigProbeReported = false
@@ -1217,24 +1393,33 @@ class EpocheyeMagicWindowView(
                     (e.x - downX).toDouble(), (e.y - downY).toDouble())
                 val heldMs = (System.nanoTime() - downNanos) / 1_000_000
                 if (moved > TAP_SLOP_PX || heldMs > 600) return false
-                val cam = cameraNode ?: return false
                 figureNode ?: return false
                 return try {
-                    // Aim at the chest, not the feet - that is what a person
-                    // points at, and the feet are often below the frame anyway.
-                    val p = cam.worldToScreenPoint(
-                        io.github.sceneview.collision.Vector3(
-                            figEast, figUp + 1.4f, -figNorth))
-                    // worldToScreenPoint returns z < 0 for points behind the
-                    // camera, which would otherwise project to a phantom hit.
-                    if (p.z < 0f) return false
-                    val d = Math.hypot((e.x - p.x).toDouble(), (e.y - p.y).toDouble())
-                    if (d <= TAP_RADIUS_PX) {
-                        post { onFigureTapped?.invoke(d.toFloat()) }
-                        true
-                    } else {
-                        false
-                    }
+                    // THE WHOLE BODY, NOT A DISC ON THE CHEST. The old test
+                    // projected one point at figUp + 1.4 and accepted anything
+                    // within 150 px of it; the guard is ~1240 px tall, so his
+                    // head sat four tap-radii away and tapping it did nothing.
+                    updateFigureRect()
+                    // AND NOTHING WHEN HE IS NOT THERE TO TAP. The old test
+                    // rejected only points behind the camera, so a chest that
+                    // projected just past the bottom edge turned the bottom
+                    // strip of the screen into a hit target for an invisible
+                    // man. Same predicate as the prompt, so the two agree.
+                    if (!figOnScreen) return false
+                    val l = figRectL - TAP_RECT_SLOP_PX
+                    val t = figRectT - TAP_RECT_SLOP_PX
+                    val r = figRectR + TAP_RECT_SLOP_PX
+                    val b = figRectB + TAP_RECT_SLOP_PX
+                    if (e.x < l || e.x > r || e.y < t || e.y > b) return false
+                    // Distance to the rect's centre is kept as the payload
+                    // because onFigureTapped already carries it and the JS side
+                    // reads it; inside the rect it is now a "how central", not
+                    // a pass/fail.
+                    val cx = (figRectL + figRectR) / 2f
+                    val cy = (figRectT + figRectB) / 2f
+                    val d = Math.hypot((e.x - cx).toDouble(), (e.y - cy).toDouble())
+                    post { onFigureTapped?.invoke(d.toFloat()) }
+                    true
                 } catch (t: Throwable) {
                     Log.w(TAG, "figure tap test failed", t)
                     false
@@ -1668,11 +1853,26 @@ class EpocheyeMagicWindowView(
                                 debugMovedOnRotate, yawOffsetDeg, pitchDeg,
                             ),
                     )
+                    // Re-measure, don't replay. A load-time sample cannot tell a
+                    // figure that is genuinely 78 m from a hierarchy Filament
+                    // had not finished updating when it was taken.
+                    val liveSpan = measureSkeletonSpan()
+                    if (!liveSpan.isNaN()) figSkeletonM = liveSpan
+                    measureDeviceFov()
+                    updateFigureRect()
+                    if (lastReportedOnScreen != figOnScreen) {
+                        lastReportedOnScreen = figOnScreen
+                        val v = figOnScreen
+                        post { onFigureVisibility?.invoke(v) }
+                    }
                     post {
                         onCameraDebug?.invoke(
                             fx, fy, fz, p.x, p.y, p.z,
                             displayRotation(), remapBranch, debugMovedOnRotate,
                             modelMinY, modelMaxY,
+                            figSkeletonM, figPosX, figPosY, figPosZ, figScale,
+                            devFovHDeg, devFovVDeg, figOnScreen,
+                            winFovHDeg(), winFovVDeg(),
                         )
                     }
                 }
@@ -1908,9 +2108,299 @@ class EpocheyeMagicWindowView(
             // was the renderer that mis-read them, and moving the 180 into the
             // data would leave six correct bearings looking like typos.
             n.worldRotation = Float3(0f, 180f - figHeadingDeg, 0f)
+            // READ IT BACK rather than echoing what we just asked for. The
+            // point of the HUD is to report what the renderer HAS, not what
+            // this method intended - a node whose parent carries a transform,
+            // or which something else has scaled, differs here and nowhere
+            // else in the app.
+            try {
+                val wp = n.worldPosition
+                val ws = n.worldScale
+                figPosX = wp.x
+                figPosY = wp.y
+                figPosZ = wp.z
+                figScale = ws.x
+            } catch (_: Throwable) {
+                figPosX = Float.NaN
+                figPosY = Float.NaN
+                figPosZ = Float.NaN
+                figScale = Float.NaN
+            }
+            // The shadow follows him. Posed here rather than at load so a
+            // viewpoint change that only moves him cannot leave it behind.
+            poseFigureShadow()
         } catch (t: Throwable) {
             Log.w(TAG, "figure pose failed", t)
         }
+    }
+
+    /**
+     * World-space vertical span of the figure's joints, sampled NOW.
+     *
+     * The same measurement `maybeLoadFigure` takes once at load, lifted out so
+     * the HUD can repeat it every debug burst. See [figureInstance] for why once
+     * was not enough.
+     *
+     * This is the skeleton, so it reads a little under the skinned mesh - the
+     * top joint is inside the skull and the lowest is inside the foot, not at
+     * the crown and the sole. For these rigs 1.60-1.65 is the healthy band
+     * against a 1.61-1.70 m mesh. It still cannot see a broken inverse-bind
+     * premultiplication; that check is offline in tools/verify_figure.py.
+     */
+    /**
+     * What the WINDOW actually delivers, derived from the live `fovDeg` prop.
+     *
+     * Computed rather than written down. The first version of this HUD line
+     * printed "win 20.9h/43.7v" as a string literal, which is an instrument
+     * that reports a constant: it went on saying 20.9 after the authored fov
+     * changed, and could not have told anyone whether the change had landed.
+     *
+     * The chain it reproduces is the one in applyCamera: fovDeg becomes a focal
+     * length against a 36 mm sensor WIDTH, and Filament reads that back as a
+     * vertical angle against a 24 mm sensor HEIGHT. Horizontal then follows
+     * from the viewport's aspect.
+     */
+    private fun winFovVDeg(): Float {
+        val f = (SENSOR_WIDTH_MM / 2.0) / tan(Math.toRadians(fovDeg / 2.0))
+        if (f <= 0.0) return Float.NaN
+        return Math.toDegrees(2.0 * atan(12.0 / f)).toFloat()
+    }
+
+    private fun winFovHDeg(): Float {
+        val v = winFovVDeg()
+        if (v.isNaN() || width <= 0 || height <= 0) return Float.NaN
+        val aspect = width.toDouble() / height.toDouble()
+        return Math.toDegrees(
+            2.0 * atan(tan(Math.toRadians(v / 2.0)) * aspect),
+        ).toFloat()
+    }
+
+    /** Read the back camera's real FOV once. See [devFovHDeg]. */
+    private fun measureDeviceFov() {
+        if (devFovMeasured) return
+        devFovMeasured = true
+        try {
+            val mgr = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val id = mgr.cameraIdList.firstOrNull { cid ->
+                mgr.getCameraCharacteristics(cid)
+                    .get(CameraCharacteristics.LENS_FACING) ==
+                    CameraCharacteristics.LENS_FACING_BACK
+            } ?: return
+            val ch = mgr.getCameraCharacteristics(id)
+            val size = ch.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE) ?: return
+            val focals = ch.get(
+                CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS
+            ) ?: return
+            val f = focals.firstOrNull() ?: return
+            if (f <= 0f) return
+            val orientation = ch.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
+            fun fov(extentMm: Float) =
+                Math.toDegrees(2.0 * atan((extentMm / (2.0 * f)))).toFloat()
+            val alongSensorW = fov(size.width)
+            val alongSensorH = fov(size.height)
+            // 90 or 270: the sensor's landscape is rotated a quarter turn out of
+            // the device's portrait, so its width reads as the screen's height.
+            val swapped = orientation == 90 || orientation == 270
+            devFovHDeg = if (swapped) alongSensorH else alongSensorW
+            devFovVDeg = if (swapped) alongSensorW else alongSensorH
+            Log.i(
+                TAG,
+                ("device camera %s: sensor %.2f x %.2f mm, focal %.2f mm, " +
+                    "orientation %d -> portrait FOV %.1f h x %.1f v deg")
+                    .format(id, size.width, size.height, f, orientation,
+                            devFovHDeg, devFovVDeg),
+            )
+        } catch (t: Throwable) {
+            Log.w(TAG, "device FOV probe failed", t)
+        }
+    }
+
+    /**
+     * Horizontal radius of the figure's skeleton, sampled NOW, metres.
+     *
+     * The footprint half of [measureSkeletonSpan], from the same joint world
+     * transforms - so the shadow is sized to the person actually standing there
+     * rather than to a constant that would be wrong for five of six.
+     *
+     * Clamped at the bottom because the skeleton is narrower than the body it
+     * carries: joints sit inside the mesh, and a shadow the width of a pelvis
+     * under a robed figure reads as a smudge rather than as contact.
+     */
+    private fun measureFootprintRadius(): Float {
+        val inst = figureInstance ?: return Float.NaN
+        val tm = modelLoader?.engine?.transformManager ?: return Float.NaN
+        var xlo = Float.MAX_VALUE; var xhi = -Float.MAX_VALUE
+        var zlo = Float.MAX_VALUE; var zhi = -Float.MAX_VALUE
+        try {
+            val m = FloatArray(16)
+            for (s in 0 until figureSkinCount) {
+                for (e in inst.getJointsAt(s)) {
+                    val ti = tm.getInstance(e)
+                    if (ti != 0) {
+                        tm.getWorldTransform(ti, m)
+                        if (m[12] < xlo) xlo = m[12]
+                        if (m[12] > xhi) xhi = m[12]
+                        if (m[14] < zlo) zlo = m[14]
+                        if (m[14] > zhi) zhi = m[14]
+                    }
+                }
+            }
+        } catch (_: Throwable) {
+            return Float.NaN
+        }
+        if (xhi <= xlo || zhi <= zlo) return Float.NaN
+        val r = max((xhi - xlo), (zhi - zlo)) / 2f
+        return max(r, SHADOW_MIN_RADIUS_M)
+    }
+
+    /**
+     * A soft round patch, opaque at the centre and clear at the rim.
+     *
+     * Drawn rather than shipped as an asset: it is 128 px of radial gradient,
+     * the same every time, and an asset would be one more file to keep in step
+     * with nothing.
+     */
+    private fun shadowBitmap(): android.graphics.Bitmap {
+        val n = 128
+        val bmp = android.graphics.Bitmap.createBitmap(
+            n, n, android.graphics.Bitmap.Config.ARGB_8888,
+        )
+        val c = android.graphics.Canvas(bmp)
+        val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        // Never fully black. A hard core reads as a hole cut in the floor; this
+        // is a contact cue, and the darkest it gets is a deep grey at 62%.
+        p.shader = android.graphics.RadialGradient(
+            n / 2f, n / 2f, n / 2f,
+            intArrayOf(
+                android.graphics.Color.argb(158, 0, 0, 0),
+                android.graphics.Color.argb(92, 0, 0, 0),
+                android.graphics.Color.argb(0, 0, 0, 0),
+            ),
+            floatArrayOf(0f, 0.55f, 1f),
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+        c.drawCircle(n / 2f, n / 2f, n / 2f, p)
+        return bmp
+    }
+
+    /**
+     * Project the figure's world AABB to screen pixels and decide whether
+     * enough of him is visible to be pointed at. See [figRectL].
+     *
+     * The box is built from what is measured live rather than from the file:
+     * feet at the posed world position, height from the joint span, half-width
+     * from the joint footprint. All eight corners are projected because a box
+     * seen from an angle does not project to the projection of two corners.
+     *
+     * ON SCREEN means at least [ON_SCREEN_MIN_FRACTION] of the rect survives
+     * intersection with the viewport in BOTH axes - "half of him, each way" -
+     * not one stray pixel touching the edge.
+     */
+    private fun updateFigureRect() {
+        figOnScreen = false
+        figRectL = Float.NaN; figRectT = Float.NaN
+        figRectR = Float.NaN; figRectB = Float.NaN
+        val cam = cameraNode ?: return
+        figureNode ?: return
+        val h = figSkeletonM
+        val r = measureFootprintRadius()
+        if (h.isNaN() || r.isNaN() || h <= 0f) return
+        try {
+            var l = Float.MAX_VALUE; var t = Float.MAX_VALUE
+            var rr = -Float.MAX_VALUE; var b = -Float.MAX_VALUE
+            var anyInFront = false
+            for (dx in floatArrayOf(-r, r)) {
+                for (dy in floatArrayOf(0f, h)) {
+                    for (dz in floatArrayOf(-r, r)) {
+                        val p = cam.worldToScreenPoint(
+                            io.github.sceneview.collision.Vector3(
+                                figEast + dx, figUp + dy, -figNorth + dz,
+                            ),
+                        )
+                        // A corner behind the camera projects to a mirrored
+                        // phantom; including it would inflate the rect across
+                        // the whole screen.
+                        if (p.z < 0f) continue
+                        anyInFront = true
+                        if (p.x < l) l = p.x
+                        if (p.x > rr) rr = p.x
+                        if (p.y < t) t = p.y
+                        if (p.y > b) b = p.y
+                    }
+                }
+            }
+            if (!anyInFront || rr <= l || b <= t) return
+            figRectL = l; figRectT = t; figRectR = rr; figRectB = b
+            val vw = width.toFloat()
+            val vh = height.toFloat()
+            if (vw <= 0f || vh <= 0f) return
+            val ix = max(0f, minOf(rr, vw) - max(l, 0f))
+            val iy = max(0f, minOf(b, vh) - max(t, 0f))
+            figOnScreen =
+                ix >= (rr - l) * ON_SCREEN_MIN_FRACTION &&
+                iy >= (b - t) * ON_SCREEN_MIN_FRACTION
+        } catch (t: Throwable) {
+            Log.w(TAG, "figure rect failed", t)
+        }
+    }
+
+    /** Place or re-place `Figure_contact_shadow__SCENE-SHELL`. */
+    private fun poseFigureShadow() {
+        val root = sceneRoot ?: return
+        val matl = materialLoader ?: return
+        figureShadowNode?.let {
+            try { root.removeChildNode(it); it.destroy() } catch (_: Throwable) {}
+        }
+        figureShadowNode = null
+        if (figureNode == null) return
+        val r = measureFootprintRadius()
+        if (r.isNaN()) return
+        try {
+            val d = r * 2f * SHADOW_SPREAD
+            val node = ImageNode(
+                materialLoader = matl,
+                bitmap = shadowBitmap(),
+                size = Position(d, d, 0f),
+            ).apply {
+                // An ImageNode is a quad in its own XY plane facing +Z. Lay it
+                // down: -90 about X puts its face up at the sky.
+                worldRotation = Float3(-90f, 0f, 0f)
+                // A hair above the floor it sits on. Coplanar with the ground
+                // would z-fight with the lawn, which is itself already drawn
+                // 20 mm low for exactly that reason.
+                worldPosition = Float3(figEast, figUp + SHADOW_LIFT_M, -figNorth)
+            }
+            root.addChildNode(node)
+            figureShadowNode = node
+            Log.i(TAG, "contact shadow: r=%.2f m at (%.2f, %.3f, %.2f)"
+                .format(r, figEast, figUp + SHADOW_LIFT_M, -figNorth))
+        } catch (t: Throwable) {
+            Log.w(TAG, "contact shadow failed", t)
+        }
+    }
+
+    private fun measureSkeletonSpan(): Float {
+        val inst = figureInstance ?: return Float.NaN
+        val tm = modelLoader?.engine?.transformManager ?: return Float.NaN
+        var lo = Float.MAX_VALUE
+        var hi = -Float.MAX_VALUE
+        try {
+            val m = FloatArray(16)
+            for (s in 0 until figureSkinCount) {
+                for (e in inst.getJointsAt(s)) {
+                    val ti = tm.getInstance(e)
+                    if (ti != 0) {
+                        tm.getWorldTransform(ti, m)
+                        // Column-major: translation is elements 12..14.
+                        if (m[13] < lo) lo = m[13]
+                        if (m[13] > hi) hi = m[13]
+                    }
+                }
+            }
+        } catch (_: Throwable) {
+            return Float.NaN
+        }
+        return if (hi > lo) hi - lo else Float.NaN
     }
 
     private fun maybeLoadFigure() {
@@ -1923,6 +2413,25 @@ class EpocheyeMagicWindowView(
             }
             figureNode = null
             loadedFigureUri = null
+            // A HUD line describing someone who is no longer in the room is the
+            // same fault as a card describing him, and harder to spot: a stale
+            // 1.68 m would read as proof the figure is fine at a viewpoint that
+            // has none.
+            figSkeletonM = Float.NaN
+            figPosX = Float.NaN
+            figPosY = Float.NaN
+            figPosZ = Float.NaN
+            figScale = Float.NaN
+            figureInstance = null
+            figureSkinCount = 0
+            figureShadowNode?.let {
+                try { root.removeChildNode(it); it.destroy() } catch (_: Throwable) {}
+            }
+            figureShadowNode = null
+            // Force the next real answer to be emitted rather than suppressed
+            // as "unchanged" against a figure who has left.
+            figOnScreen = false
+            lastReportedOnScreen = null
             // A card describing someone who is no longer in the room is worse
             // than no card.
             setFigureCard(null)
@@ -1975,6 +2484,10 @@ class EpocheyeMagicWindowView(
                 // library's own bookkeeping.
                 val nAnim = try { n.animationCount } catch (_: Throwable) { 0 }
                 val nSkin = try { n.skinCount } catch (_: Throwable) { 0 }
+                // Kept so the HUD can re-measure the skeleton every burst
+                // rather than trusting this one sample.
+                figureInstance = inst
+                figureSkinCount = nSkin
                 rigProbeReported = false
                 Log.i(TAG, "RIG PROBE: animations=%d skins=%d (advance TBC)"
                     .format(nAnim, nSkin))
@@ -2028,6 +2541,7 @@ class EpocheyeMagicWindowView(
                     Log.w(TAG, "joint span probe failed", t)
                 }
                 val skeletonM = if (jh > jl) jh - jl else Float.NaN
+                figSkeletonM = skeletonM
                 Log.i(
                     TAG,
                     ("figure loaded: skeleton spans %.3f m of world height " +

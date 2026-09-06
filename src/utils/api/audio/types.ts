@@ -102,6 +102,20 @@ export interface AudioStop {
    * hiding it.
    */
   clip?: AudioClip;
+  /**
+   * True when this stop sits beyond the venue's free preview and the visitor
+   * holds no pass for the site.
+   *
+   * A LOCKED STOP ARRIVES WITHOUT ITS PAYLOAD. The server strips `clip` and
+   * `restoration_image_url` before responding (apis/audio/handler.go), so there
+   * is no audio URL or transcript to leak — the lock is enforced on the wire,
+   * not by this flag. Treat `locked` as "why is the clip missing", never as the
+   * thing that keeps the audio shut.
+   *
+   * `title`, `zone` and `sort_order` still arrive, so the visitor can see what
+   * the rest of the guide covers.
+   */
+  locked?: boolean;
 }
 
 export interface AudioStopsResponse {
@@ -115,6 +129,21 @@ export interface AudioStopsResponse {
    * truth is on Clip.lang.
    */
   fallback_lang?: string;
+  /**
+   * How many stops this venue serves free, by sort_order. Absent means the whole
+   * guide is free (monuments.free_preview_stops IS NULL — every venue that has
+   * not been explicitly gated). Echoed so a "3 of 8 free" line never hardcodes
+   * the number.
+   */
+  free_preview_stops?: number;
+  /** How many stops came back stripped. Absent/0 when the visitor is entitled. */
+  locked_count?: number;
+  /**
+   * What would unlock them — 'explorer_pass', the same vocabulary the scan
+   * paywall uses, so both route through one purchase sheet. Set only when
+   * `locked_count` > 0.
+   */
+  unlock?: string;
   stops: AudioStop[];
 }
 

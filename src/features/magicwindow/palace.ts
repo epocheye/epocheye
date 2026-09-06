@@ -172,6 +172,41 @@ export const TEXTURE_CREDITS = [
   }
 ] as const;
 
+/**
+ * WHY EVERY VIEWPOINT NOW READS `fovDeg: 95.8`, AND WHY THAT IS NOT A WIDE LENS.
+ *
+ * `fovDeg` does not reach Filament as an angle. EpocheyeMagicWindowView turns it
+ * into a focal length - `(36 / 2) / tan(fovDeg / 2)` - and Filament reads that
+ * back as a VERTICAL angle against a 24 mm sensor height. So the authored number
+ * and the delivered number are two different things, and only the second is on
+ * screen:
+ *
+ *     authored 62.0  ->  focal 29.96 mm  ->  delivered 20.8 h / 43.7 v
+ *     authored 95.8  ->  focal 16.28 mm  ->  delivered 37.3 h / 72.8 v
+ *
+ * MEASURED AGAINST THE PHONE, not chosen for taste. This device's back camera
+ * reports 57.8 h x 72.8 v in portrait, computed from Camera2's
+ * SENSOR_INFO_PHYSICAL_SIZE and LENS_INFO_AVAILABLE_FOCAL_LENGTHS. At the old
+ * 62 the reconstruction was 2.77x narrower than the camera horizontally and
+ * 1.67x narrower vertically, and every figure cropped: the guard's feet sat at
+ * 94% of screen height with 2.8 deg of clearance, which is a pair of shins
+ * against the bezel. At 95.8 he is whole with 17.4 deg to spare.
+ *
+ * VERTICAL PARITY ONLY. The horizontal lands at 37.3, not 57.8, and cannot
+ * reach it: this screen is 1260 x 2750, aspect 0.458, against a camera image of
+ * 0.749. A full-height preview is cropped left and right by the screen too.
+ * Vertical is the axis the figures were cropping on, so vertical is the one
+ * matched.
+ *
+ * WHAT THIS DOES NOT FIX, deliberately. Every figure's head still sits at ~49%
+ * of screen height, because eye height is floor + 1.600 and these people are
+ * 1.61-1.70 m: their heads are at the horizon by construction and their bodies
+ * hang below it. Widening turns "clipped at the edge" into "whole, in the lower
+ * half". A pitch offset would centre them and is deliberately NOT applied -
+ * pitch is gravity-driven, and that correspondence with the real world is the
+ * whole premise of the look-around. The grounding is carried by the contact
+ * shadow instead.
+ */
 export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
   {
     id: 'P2',
@@ -179,7 +214,7 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
     position: [7.500, 1.900, 1.600],
     headingDeg: 270.00,
     pitchDeg: 0.00,
-    fovDeg: 62.0,
+    fovDeg: 95.8,
     nearM: 0.35,
     farM: 150.0,
     facing: 'south-south-west',
@@ -194,7 +229,7 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
     position: [0.000, 9.000, 4.200],
     headingDeg: 0.00,
     pitchDeg: 0.00,
-    fovDeg: 62.0,
+    fovDeg: 95.8,
     nearM: 0.35,
     farM: 150.0,
     facing: 'west-north-west',
@@ -209,7 +244,7 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
     position: [0.000, 1.900, 1.600],
     headingDeg: 0.00,
     pitchDeg: 0.00,
-    fovDeg: 62.0,
+    fovDeg: 95.8,
     nearM: 0.35,
     farM: 150.0,
     facing: 'west-north-west',
@@ -224,7 +259,7 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
     position: [0.000, 9.000, 4.200],
     headingDeg: 0.00,
     pitchDeg: 18.00,
-    fovDeg: 62.0,
+    fovDeg: 95.8,
     nearM: 0.35,
     farM: 150.0,
     facing: 'west-north-west',
@@ -240,7 +275,7 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
     position: [8.000, 3.000, 4.200],
     headingDeg: 270.00,
     pitchDeg: 0.00,
-    fovDeg: 62.0,
+    fovDeg: 95.8,
     nearM: 0.35,
     farM: 150.0,
     facing: 'south-south-west',
@@ -254,7 +289,7 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
     position: [8.000, 17.500, 4.200],
     headingDeg: 223.30,
     pitchDeg: 0.00,
-    fovDeg: 62.0,
+    fovDeg: 95.8,
     nearM: 0.35,
     farM: 150.0,
     facing: 'south-south-east',
@@ -269,7 +304,7 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
     position: [-15.000, 8.000, 1.600],
     headingDeg: 90.00,
     pitchDeg: 0.00,
-    fovDeg: 62.0,
+    fovDeg: 95.8,
     nearM: 0.35,
     farM: 150.0,
     facing: 'north-north-east',
@@ -284,7 +319,7 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
     position: [0.000, -14.000, 0.900],
     headingDeg: 0.00,
     pitchDeg: 0.00,
-    fovDeg: 62.0,
+    fovDeg: 95.8,
     nearM: 0.35,
     farM: 150.0,
     facing: 'west-north-west',
@@ -338,7 +373,7 @@ export const PALACE_VIEWPOINTS: MagicWindowViewpoint[] = [
     position: [-8.000, -14.000, 0.900],
     headingDeg: 14.00,
     pitchDeg: 0.00,
-    fovDeg: 62.0,
+    fovDeg: 95.8,
     nearM: 0.35,
     farM: 150.0,
     facing: 'west-north-west',
